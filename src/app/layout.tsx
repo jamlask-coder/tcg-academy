@@ -19,8 +19,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.className}>
         <Providers>
           <div className="flex flex-col min-h-screen">
-            <Header />
-            <Navbar />
+            <div className="sticky top-0 z-50">
+              <Header />
+              <Navbar />
+            </div>
             <main className="flex-1 bg-gray-50">{children}</main>
             <Footer />
           </div>

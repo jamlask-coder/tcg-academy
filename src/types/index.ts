@@ -18,6 +18,8 @@ export interface Product {
   on_sale: boolean
   featured: boolean
   meta_data: { key: string; value: string }[]
+  // language?: string  — reserved for future multi-language support (EN/ES/JP/FR/DE/IT/KO/PT per game)
+  //                       until promoted: read via meta_data.find(m => m.key === 'language')?.value
 }
 
 export interface Category {

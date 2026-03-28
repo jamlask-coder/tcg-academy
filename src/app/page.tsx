@@ -1,23 +1,8 @@
+"use client"
 import Link from "next/link"
-import { ArrowRight, Star, Truck, Shield, Users } from "lucide-react"
-import { wc } from "@/lib/woocommerce/client"
-import { ProductCard } from "@/components/product/ProductCard"
-import { ProductGridSkeleton } from "@/components/product/ProductSkeleton"
-import { Suspense } from "react"
-import type { Metadata } from "next"
-
-export const metadata: Metadata = {
-  title: "TCG Academy — La mejor tienda TCG de Espana",
-}
-
-const GAMES = [
-  { name: "Pokemon", slug: "pokemon", color: "#f59e0b", bg: "#fef3c7", emoji: "P", desc: "Cartas, sobres y colecciones" },
-  { name: "Magic: The Gathering", slug: "magic", color: "#7c3aed", bg: "#ede9fe", emoji: "M", desc: "Singles, mazos y sets" },
-  { name: "Yu-Gi-Oh!", slug: "yugioh", color: "#dc2626", bg: "#fee2e2", emoji: "Y", desc: "Cartas y estructuras" },
-  { name: "Naruto", slug: "naruto", color: "#ea580c", bg: "#ffedd5", emoji: "N", desc: "Cartas y colecciones" },
-  { name: "Lorcana", slug: "lorcana", color: "#0891b2", bg: "#cffafe", emoji: "L", desc: "Sobres y sets Disney" },
-  { name: "Dragon Ball", slug: "dragon-ball", color: "#d97706", bg: "#fef3c7", emoji: "D", desc: "Sets y colecciones DBS" },
-]
+import { ArrowRight, Star, Truck, Shield, Users, ShoppingBag, Store, Zap, Package } from "lucide-react"
+import { LocalProductCard } from "@/components/product/LocalProductCard"
+import { getFeaturedProducts, getNewProducts, GAME_CONFIG } from "@/data/products"
 
 const STORES = [
   { name: "Calpe", city: "Alicante", href: "/tiendas/calpe", color: "#1a3a5c" },
@@ -26,77 +11,108 @@ const STORES = [
   { name: "Barcelona", city: "Barcelona", href: "/tiendas/barcelona", color: "#7c3aed" },
 ]
 
-async function FeaturedProducts() {
-  let products: Awaited<ReturnType<typeof wc.getProducts>> = []
-  try { products = await wc.getProducts({ per_page: 10, featured: 1, status: "publish" }) } catch { products = [] }
-  if (!products.length) return (
-    <div className="text-center py-12 text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
-      <p className="font-medium">Productos se cargaran cuando WooCommerce este configurado</p>
-      <p className="text-sm mt-1">Configura WC_CONSUMER_KEY en .env.local</p>
-    </div>
-  )
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-      {products.map(p => <ProductCard key={p.id} product={p} />)}
-    </div>
-  )
-}
-
 export default function HomePage() {
+  const newProducts = getNewProducts(8)
+  const featuredProducts = getFeaturedProducts(10)
+  const games = Object.entries(GAME_CONFIG)
+
   return (
     <div>
       {/* HERO */}
-      <section className="relative bg-gradient-to-br from-[#1a3a5c] via-[#1e4a73] to-[#2d6a9f] text-white overflow-hidden">
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="absolute top-10 left-10 w-64 h-64 rounded-full bg-yellow-400 blur-3xl" />
-          <div className="absolute bottom-10 right-10 w-96 h-96 rounded-full bg-purple-500 blur-3xl" />
+      <section className="relative min-h-[500px] md:min-h-[580px] bg-[#0f172a] text-white overflow-hidden flex items-center">
+        {/* Multi-layer gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#1a3a5c] via-[#0f172a] to-[#1e1b4b]" />
+        {/* Ambient glows */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-0 w-[600px] h-[600px] rounded-full blur-[100px] opacity-30" style={{ background: "radial-gradient(circle, #3b82f6 0%, transparent 70%)" }} />
+          <div className="absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full blur-[80px] opacity-20" style={{ background: "radial-gradient(circle, #a855f7 0%, transparent 70%)" }} />
+          <div className="absolute top-1/2 left-1/3 w-[300px] h-[300px] rounded-full blur-[60px] opacity-15" style={{ background: "radial-gradient(circle, #f59e0b 0%, transparent 70%)" }} />
         </div>
-        <div className="relative max-w-[1180px] mx-auto px-6 py-24 md:py-32">
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-sm mb-6">
-              <Star size={14} className="text-yellow-400 fill-yellow-400" />
-              <span>La tienda TCG mejor valorada de Espana</span>
+        {/* Subtle grid pattern */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage: "linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+
+        <div className="relative w-full max-w-[1180px] mx-auto px-6 py-16 md:py-24">
+          <div className="max-w-3xl">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 bg-yellow-400/10 border border-yellow-400/30 text-yellow-300 rounded-full px-4 py-1.5 text-sm font-medium mb-8">
+              <Star size={13} className="fill-yellow-400 text-yellow-400" />
+              La tienda TCG líder en España — +10.000 referencias
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6">
-              Tu tienda TCG<br /><span className="text-yellow-400">de confianza</span>
+
+            {/* Headline */}
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-black leading-[1.08] tracking-tight mb-6">
+              El mayor catálogo TCG<br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-400 to-amber-300">
+                de España
+              </span>
             </h1>
-            <p className="text-lg text-blue-100 mb-8 leading-relaxed">
-              Pokemon, Magic, Yu-Gi-Oh!, Naruto, Lorcana y Dragon Ball. Miles de referencias, 4 tiendas fisicas y envio en 24h.
+
+            <p className="text-lg md:text-xl text-blue-200/80 mb-10 leading-relaxed max-w-xl">
+              Pokémon, Magic, One Piece, Riftbound y más.<br className="hidden md:block" />
+              Envío en menos de 24 horas. 4 tiendas físicas.
             </p>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/catalogo" className="inline-flex items-center gap-2 bg-yellow-400 text-[#1a3a5c] font-bold px-6 py-3.5 rounded-xl hover:bg-yellow-300 transition shadow-lg">
-                Ver catalogo completo <ArrowRight size={18} />
+
+            {/* CTAs */}
+            <div className="flex flex-wrap gap-3 mb-14">
+              <Link
+                href="/catalogo"
+                className="inline-flex items-center gap-2 bg-yellow-400 text-[#0f172a] font-black px-7 py-4 rounded-2xl hover:bg-yellow-300 active:scale-[0.98] transition-all shadow-[0_0_40px_rgba(251,191,36,0.25)]"
+              >
+                Explorar catálogo <ArrowRight size={18} />
               </Link>
-              <Link href="/mayoristas" className="inline-flex items-center gap-2 bg-white/10 border border-white/30 text-white font-semibold px-6 py-3.5 rounded-xl hover:bg-white/20 transition">
-                Zona Mayoristas B2B
+              <Link
+                href="/catalogo?filter=nuevo"
+                className="inline-flex items-center gap-2 bg-white/8 border border-white/15 text-white font-semibold px-7 py-4 rounded-2xl hover:bg-white/14 active:scale-[0.98] transition-all"
+              >
+                <Zap size={16} className="text-yellow-400" /> Novedades de la semana
               </Link>
             </div>
-            <div className="flex flex-wrap gap-8 mt-12 pt-8 border-t border-white/20">
-              {[["10.000+","Productos"],["4","Tiendas fisicas"],["500+","Mayoristas"],["24h","Envio"]].map(([n,l]) => (
-                <div key={l}><div className="text-2xl font-bold text-yellow-400">{n}</div><div className="text-sm text-blue-200">{l}</div></div>
+
+            {/* Stats row */}
+            <div className="flex flex-wrap gap-6 md:gap-10 pt-8 border-t border-white/10">
+              {[
+                ["10.000+", "Productos"],
+                ["4", "Tiendas físicas"],
+                ["500+", "Mayoristas"],
+                ["24h", "Envío express"],
+              ].map(([n, l]) => (
+                <div key={l} className="flex flex-col gap-0.5">
+                  <span className="text-2xl font-black text-yellow-400 leading-none">{n}</span>
+                  <span className="text-xs text-blue-300/70 font-medium uppercase tracking-wide">{l}</span>
+                </div>
               ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* VALUE PROPS */}
+      {/* TRUST BAR — staggered fade-in on scroll */}
       <section className="bg-white border-b border-gray-100">
-        <div className="max-w-[1180px] mx-auto px-6 py-5">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="max-w-[1180px] mx-auto px-6 py-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              [Truck,"Envio gratis +49EUR","Entrega en 24-48h"],
-              [Shield,"Compra segura","Pago 100% protegido"],
-              [Star,"Productos oficiales","Solo distribuidores oficiales"],
-              [Users,"Atencion personalizada","Chat, telefono y tienda"],
-            ].map(([Icon,title,sub],i) => (
-              <div key={i} className="flex items-center gap-3 p-3">
-                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Icon size={20} className="text-[#1a3a5c]" />
+              [Truck,    "Envío gratis",      "En pedidos desde 149€",     "#3b82f6"],
+              [Shield,   "Compra segura",     "Pago 100% protegido",       "#16a34a"],
+              [Package,  "+10.000 productos", "Solo distribuidores ofic.", "#7c3aed"],
+              [Users,    "Atención 24h",      "Chat, teléfono y tienda",   "#ea580c"],
+            ].map(([Icon, title, sub, color], i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                style={{ animationDelay: `${i * 80}ms` }}
+              >
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}14` }}>
+                  <Icon size={18} style={{ color: color as string }} />
                 </div>
-                <div>
-                  <div className="text-sm font-semibold text-gray-800">{title as string}</div>
-                  <div className="text-xs text-gray-500">{sub as string}</div>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-gray-800 leading-tight">{title as string}</div>
+                  <div className="text-xs text-gray-500 mt-0.5 leading-tight">{sub as string}</div>
                 </div>
               </div>
             ))}
@@ -111,38 +127,63 @@ export default function HomePage() {
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Juegos TCG</h2>
             <p className="text-gray-500 mt-1">Explora cada universo</p>
           </div>
-          <Link href="/catalogo" className="text-sm font-semibold text-[#1a3a5c] hover:underline flex items-center gap-1">
-            Ver todo <ArrowRight size={14} />
-          </Link>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {GAMES.map(({ name, slug, color, bg, emoji, desc }) => (
-            <Link key={slug} href={`/${slug}`}
-              className="group flex flex-col items-center text-center p-5 rounded-2xl border-2 border-transparent hover:shadow-lg transition-all"
-              style={{ backgroundColor: bg }}>
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white mb-3 shadow-md group-hover:scale-110 transition-transform"
-                style={{ backgroundColor: color }}>{emoji}</div>
-              <span className="font-bold text-sm leading-tight" style={{ color }}>{name}</span>
-              <span className="text-xs mt-1 text-gray-500">{desc}</span>
+        <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-3">
+          {games.map(([slug, { name, color, bgColor, emoji }]) => (
+            <Link
+              key={slug}
+              href={`/${slug}`}
+              className="group flex flex-col items-center text-center p-3 rounded-2xl border-2 border-transparent hover:shadow-lg transition-all"
+              style={{ backgroundColor: bgColor }}
+            >
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-xl mb-2 shadow-md group-hover:scale-110 transition-transform"
+                style={{ backgroundColor: color }}
+              >
+                {emoji}
+              </div>
+              <span className="font-bold text-[10px] leading-tight text-center" style={{ color }}>{name}</span>
             </Link>
           ))}
         </div>
       </section>
+
+      {/* NOVEDADES */}
+      {newProducts.length > 0 && (
+        <section className="max-w-[1180px] mx-auto px-6 pb-16">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Novedades</h2>
+              <p className="text-gray-500 mt-1">Los ultimos lanzamientos</p>
+            </div>
+            <Link href="/catalogo" className="text-sm font-semibold text-[#1a3a5c] hover:underline flex items-center gap-1">
+              Ver todo <ArrowRight size={14} />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {newProducts.map((p) => (
+              <LocalProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* FEATURED PRODUCTS */}
       <section className="max-w-[1180px] mx-auto px-6 pb-16">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Productos Destacados</h2>
-            <p className="text-gray-500 mt-1">Las novedades mas populares</p>
+            <p className="text-gray-500 mt-1">Los mas populares de cada juego</p>
           </div>
           <Link href="/catalogo" className="text-sm font-semibold text-[#1a3a5c] hover:underline flex items-center gap-1">
             Ver catalogo <ArrowRight size={14} />
           </Link>
         </div>
-        <Suspense fallback={<ProductGridSkeleton count={10} />}>
-          <FeaturedProducts />
-        </Suspense>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {featuredProducts.map((p) => (
+            <LocalProductCard key={p.id} product={p} />
+          ))}
+        </div>
       </section>
 
       {/* STORES */}
@@ -164,6 +205,53 @@ export default function HomePage() {
               </Link>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* BUSINESS OPPORTUNITIES */}
+      <section className="max-w-[1180px] mx-auto px-6 py-16">
+        <div className="text-center mb-10">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">¿Quieres emprender en el mundo TCG?</h2>
+          <p className="text-gray-500">Dos formas de crecer con nosotros, sin experiencia previa necesaria</p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-6">
+          <Link href="/vending" className="group relative bg-gradient-to-br from-[#1a3a5c] to-[#2d6a9f] rounded-2xl p-8 text-white overflow-hidden hover:shadow-2xl transition-all hover:-translate-y-1">
+            <div className="absolute inset-0 opacity-10 pointer-events-none">
+              <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-yellow-400 blur-2xl" />
+            </div>
+            <div className="relative">
+              <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center mb-4">
+                <ShoppingBag size={24} className="text-yellow-400" />
+              </div>
+              <span className="text-xs font-bold bg-yellow-400 text-[#1a3a5c] px-2.5 py-0.5 rounded-full uppercase tracking-wider mb-3 inline-block">Próximamente</span>
+              <h3 className="text-xl font-bold mb-2">Máquinas Vending TCG</h3>
+              <p className="text-blue-200 text-sm leading-relaxed mb-4">
+                Ingresos pasivos 24/7 con nuestras máquinas de cartas coleccionables. Sin personal ni horarios.
+              </p>
+              <span className="inline-flex items-center gap-1 text-sm font-bold text-yellow-400 group-hover:gap-2 transition-all">
+                Saber más <ArrowRight size={14} />
+              </span>
+            </div>
+          </Link>
+
+          <Link href="/franquicias" className="group relative bg-gradient-to-br from-[#0f766e] to-[#0d9488] rounded-2xl p-8 text-white overflow-hidden hover:shadow-2xl transition-all hover:-translate-y-1">
+            <div className="absolute inset-0 opacity-10 pointer-events-none">
+              <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white blur-2xl" />
+            </div>
+            <div className="relative">
+              <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center mb-4">
+                <Store size={24} className="text-white" />
+              </div>
+              <span className="text-xs font-bold bg-white text-[#0f766e] px-2.5 py-0.5 rounded-full uppercase tracking-wider mb-3 inline-block">Oportunidad de negocio</span>
+              <h3 className="text-xl font-bold mb-2">Monta tu tienda TCG</h3>
+              <p className="text-teal-100 text-sm leading-relaxed mb-4">
+                Abre tu propia tienda TCG con todo el respaldo de TCG Academy: stock, formación, marketing y soporte.
+              </p>
+              <span className="inline-flex items-center gap-1 text-sm font-bold text-white group-hover:gap-2 transition-all">
+                Ver el modelo <ArrowRight size={14} />
+              </span>
+            </div>
+          </Link>
         </div>
       </section>
 

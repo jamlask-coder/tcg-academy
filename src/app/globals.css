@@ -128,3 +128,112 @@
     @apply font-sans;
   }
 }
+
+/* ── Sticky header offsets ──────────────────────────────────────────────────
+   Mobile:  topbar (28px) + main bar (64px)            = 92px
+   Desktop: topbar (28px) + main bar (64px) + nav (56px) = 148px
+   Used by category filter bars, account nav, etc. to sit right below the header.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  --header-h: 92px;
+}
+@media (min-width: 1024px) {
+  :root {
+    --header-h: 148px;
+  }
+}
+
+/* Utility: position an element sticky directly under the combined header+navbar */
+.sticky-under-nav {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 30;
+}
+
+/* Smooth scrolling with header offset so anchor links land correctly */
+html {
+  scroll-padding-top: var(--header-h);
+}
+
+/* ── Microanimations ────────────────────────────────────────────────────────
+   All durations ≤ 300ms. Reduced-motion: no animation at all.
+   ────────────────────────────────────────────────────────────────────────── */
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.12); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes bounceIn {
+  0%   { transform: scale(0.85); opacity: 0; }
+  60%  { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.28s ease-out both;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.22s ease-out both;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.28s ease-out both;
+}
+
+.animate-badge-pulse {
+  animation: badgePulse 2.4s ease-in-out infinite;
+}
+
+.animate-bounce-in {
+  animation: bounceIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Skeleton shimmer */
+.animate-shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+/* Staggered children — parent sets animation, children get delay via nth-child */
+.stagger-children > * { animation-fill-mode: both; }
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 240ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 360ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 420ms; }
+.stagger-children > *:nth-child(n+9) { animation-delay: 480ms; }
+
+/* Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

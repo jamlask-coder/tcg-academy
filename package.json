@@ -6,7 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "backup": "node scripts/backup.js",
+    "backup:auto": "node scripts/backup.js --auto",
+    "restore": "node scripts/restore.js",
+    "test:visual": "playwright test",
+    "test:layout": "playwright test tests/visual/",
+    "test:overlap": "playwright test tests/visual/overlap-detection.spec.ts",
+    "test:overflow": "npx ts-node --project tsconfig.json tests/visual/check-overflow.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
@@ -29,6 +36,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.72.0",
+    "recharts": "^3.8.1",
     "shadcn": "^4.1.1",
     "sharp": "^0.34.5",
     "tailwind-merge": "^3.5.0",
@@ -37,6 +45,7 @@
   },
   "devDependencies": {
     "@next/bundle-analyzer": "^16.2.1",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -47,6 +56,7 @@
     "eslint-config-next": "16.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
+    "serve": "^14.2.6",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.2"
