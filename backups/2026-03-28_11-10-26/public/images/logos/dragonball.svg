@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 26">
+  <!-- Dragon Ball sphere -->
+  <circle cx="13" cy="13" r="10" fill="#f59e0b" stroke="#d97706" stroke-width="1"/>
+  <!-- Star dots (4-star ball) -->
+  <path d="M13,6 L14.5,10.5 L19,10.5 L15.5,13.5 L17,18 L13,15 L9,18 L10.5,13.5 L7,10.5 L11.5,10.5 Z" fill="#dc2626"/>
+  <!-- Shine highlight -->
+  <ellipse cx="9" cy="9" rx="3" ry="2" fill="white" opacity="0.25" transform="rotate(-30 9 9)"/>
+  <!-- Text -->
+  <text x="28" y="12" font-family="'Arial Black', Arial, sans-serif" font-weight="900" font-size="9" fill="#d97706" letter-spacing="0.3">DRAGON BALL</text>
+  <text x="28" y="23" font-family="'Arial Black', Arial, sans-serif" font-weight="900" font-size="9" fill="#92400e" letter-spacing="0.3">SUPER CARD</text>
+</svg>

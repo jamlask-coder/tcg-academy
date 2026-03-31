@@ -1,273 +1,372 @@
-"use client"
-import { useState, useMemo, useEffect } from "react"
-import { Download, FileText, Euro, TrendingUp, Calendar } from "lucide-react"
-import { MOCK_ORDERS } from "@/data/mockData"
-import { IVA_GENERAL, calcVAT } from "@/hooks/usePrice"
-import { printInvoice, buildInvoiceFromOrder, generateInvoiceNumber } from "@/utils/invoiceGenerator"
+"use client";
+import { useState, useMemo } from "react";
+import Link from "next/link";
+import {
+  FileText,
+  Euro,
+  TrendingUp,
+  Calendar,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  ChevronRight,
+  ShieldCheck,
+  BarChart2,
+  Globe,
+  BookOpen,
+  Download,
+} from "lucide-react";
+import { loadInvoices } from "@/services/invoiceService";
+import {
+  generateQuarterlyReport,
+  getTaxPeriod,
+  getQuarter,
+} from "@/services/taxService";
+import { VerifactuStatus, InvoiceStatus } from "@/types/fiscal";
+import { VERIFACTU_CONFIG } from "@/config/verifactuConfig";
+import type { Quarter } from "@/types/tax";
 
-interface AnyOrder {
-  id: string
-  date: string
-  total: number
-  items: { name: string; quantity?: number; qty?: number; price: number }[]
-  shipping?: number
-  couponDiscount?: number
-  pointsDiscount?: number
-  coupon?: { code: string } | null
-  shippingAddress?: Record<string, string>
-  pago?: string
-}
+// ─── Nav cards ────────────────────────────────────────────────────────────────
 
-function getQuarter(date: Date): number {
-  return Math.floor(date.getMonth() / 3) + 1
-}
+const FISCAL_SECTIONS = [
+  {
+    href: "/admin/fiscal/facturas",
+    icon: FileText,
+    title: "Libro de Facturas",
+    desc: "Todas las facturas emitidas con filtros y exportación",
+    color: "#2563eb",
+  },
+  {
+    href: "/admin/fiscal/trimestral",
+    icon: BarChart2,
+    title: "Informe Trimestral",
+    desc: "Modelo 303 — IVA repercutido por trimestre",
+    color: "#16a34a",
+  },
+  {
+    href: "/admin/fiscal/anual",
+    icon: TrendingUp,
+    title: "Informe Anual",
+    desc: "Modelo 390 — Resumen anual del IVA",
+    color: "#9333ea",
+  },
+  {
+    href: "/admin/fiscal/intracomunitario",
+    icon: Globe,
+    title: "Intracomunitario",
+    desc: "Operaciones UE — Modelo 349",
+    color: "#0284c7",
+  },
+  {
+    href: "/admin/fiscal/verifactu",
+    icon: ShieldCheck,
+    title: "Estado VeriFactu",
+    desc: "Conexión AEAT, hashes e integridad de la cadena",
+    color: "#d97706",
+  },
+  {
+    href: "/admin/fiscal/documentacion",
+    icon: BookOpen,
+    title: "Documentación",
+    desc: "Guía fiscal: VeriFactu, gestoría, rectificativas",
+    color: "#6b7280",
+  },
+];
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminFiscalPage() {
-  const [localOrders, setLocalOrders] = useState<AnyOrder[]>([])
-  const [yearFilter, setYearFilter] = useState(new Date().getFullYear())
-  const [quarterFilter, setQuarterFilter] = useState<number | "all">("all")
+  const [yearFilter] = useState(new Date().getFullYear());
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("tcgacademy_orders")
-      if (raw) setLocalOrders(JSON.parse(raw))
-    } catch {}
-  }, [])
+  const invoices = useMemo(() => loadInvoices(), []);
 
-  const allOrders: AnyOrder[] = useMemo(() => {
-    const mock = MOCK_ORDERS.map(o => ({
-      ...o,
-      date: o.date,
-      items: o.items.map(i => ({ name: i.name, quantity: i.qty ?? 1, price: i.price })),
-    }))
-    return [...localOrders, ...mock]
-  }, [localOrders])
+  const currentQuarter = getQuarter(new Date().getMonth() + 1) as Quarter;
+  const currentPeriod = getTaxPeriod(yearFilter, currentQuarter);
+  const quarterSummary = useMemo(
+    () => generateQuarterlyReport(invoices, yearFilter, currentQuarter),
+    [invoices, yearFilter, currentQuarter],
+  );
 
-  const filtered = useMemo(() => {
-    return allOrders.filter(o => {
-      const d = new Date(o.date)
-      if (isNaN(d.getTime())) return true // mock orders with non-ISO dates
-      const y = d.getFullYear()
-      const q = getQuarter(d)
-      if (y !== yearFilter) return false
-      if (quarterFilter !== "all" && q !== quarterFilter) return false
-      return true
-    })
-  }, [allOrders, yearFilter, quarterFilter])
+  // Alertas VeriFactu
+  const pendingVerifactu = invoices.filter(
+    (inv) => inv.verifactuStatus === VerifactuStatus.PENDIENTE,
+  ).length;
+  const rejectedVerifactu = invoices.filter(
+    (inv) => inv.verifactuStatus === VerifactuStatus.RECHAZADA,
+  ).length;
+  const activeInvoices = invoices.filter(
+    (inv) => inv.status !== InvoiceStatus.ANULADA,
+  ).length;
 
-  // Fiscal calculations
-  const fiscalData = useMemo(() => {
-    let baseImponible = 0
-    let ivaRepercutido = 0
-    let totalFacturado = 0
+  // Días hasta vencimiento del trimestre
+  const daysUntilDue = Math.ceil(
+    (currentPeriod.dueDate.getTime() - Date.now()) / 86400000,
+  );
 
-    for (const o of filtered) {
-      const total = o.total
-      const { priceWithoutVAT, vatAmount } = calcVAT(total, IVA_GENERAL)
-      baseImponible += priceWithoutVAT
-      ivaRepercutido += vatAmount
-      totalFacturado += total
-    }
+  const quarterLabel = `T${currentQuarter} ${yearFilter}`;
 
-    return { baseImponible, ivaRepercutido, totalFacturado, count: filtered.length }
-  }, [filtered])
-
-  // By quarter breakdown
-  const byQuarter = useMemo(() => {
-    const q: Record<number, { base: number; iva: number; total: number; count: number }> = {
-      1: { base: 0, iva: 0, total: 0, count: 0 },
-      2: { base: 0, iva: 0, total: 0, count: 0 },
-      3: { base: 0, iva: 0, total: 0, count: 0 },
-      4: { base: 0, iva: 0, total: 0, count: 0 },
-    }
-    for (const o of allOrders.filter(o => {
-      const d = new Date(o.date)
-      return !isNaN(d.getTime()) && d.getFullYear() === yearFilter
-    })) {
-      const quarter = getQuarter(new Date(o.date))
-      const { priceWithoutVAT, vatAmount } = calcVAT(o.total, IVA_GENERAL)
-      q[quarter].base += priceWithoutVAT
-      q[quarter].iva += vatAmount
-      q[quarter].total += o.total
-      q[quarter].count++
-    }
-    return q
-  }, [allOrders, yearFilter])
-
-  const exportCSV = () => {
-    const rows = [
-      ["Nº Factura", "Fecha", "Cliente", "Base Imponible", "IVA (21%)", "Total", "Forma Pago"],
-      ...filtered.map(o => {
-        const { priceWithoutVAT, vatAmount } = calcVAT(o.total, IVA_GENERAL)
-        const inv = generateInvoiceNumber(o.id)
-        const addr = o.shippingAddress ?? {}
-        return [
-          inv,
-          new Date(o.date).toLocaleDateString("es-ES"),
-          `${addr.nombre ?? ""} ${addr.apellidos ?? ""}`.trim() || "Cliente",
-          priceWithoutVAT.toFixed(2),
-          vatAmount.toFixed(2),
-          o.total.toFixed(2),
-          o.pago ?? "-",
-        ]
-      }),
-    ]
-    const csv = rows.map(r => r.join(";")).join("\n")
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `facturas_${yearFilter}${quarterFilter !== "all" ? `_T${quarterFilter}` : ""}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const handlePrintInvoice = (order: AnyOrder) => {
-    const invNum = generateInvoiceNumber(order.id)
-    const data = buildInvoiceFromOrder(order, invNum)
-    printInvoice(data)
-  }
-
-  const QUARTER_LABELS = ["T1 (Ene-Mar)", "T2 (Abr-Jun)", "T3 (Jul-Sep)", "T4 (Oct-Dic)"]
+  // Exportar CSV rápido del trimestre actual
+  const handleQuickExport = () => {
+    import("@/services/taxService").then(({ generateCSVForAdvisor }) => {
+      const csv = generateCSVForAdvisor(invoices, {
+        period: currentPeriod,
+        format: "CSV",
+        includeLineItems: false,
+        includeRecipientData: true,
+        filterByVatRate: null,
+      });
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `facturas_T${currentQuarter}_${yearFilter}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  };
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Gestión Fiscal</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Informes de IVA repercutido — Modelo 303 — Real Decreto 1619/2012
-        </p>
-      </div>
-
-      {/* Filters */}
-      <div className="flex items-center gap-3 mb-6 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Calendar size={16} className="text-gray-400" />
-          <select
-            value={yearFilter}
-            onChange={e => setYearFilter(Number(e.target.value))}
-            className="h-9 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:border-[#1a3a5c]"
-          >
-            {[2024, 2025, 2026, 2027].map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+      {/* Header */}
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Gestión Fiscal</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Sistema VeriFactu preparado — RD 1619/2012 · Ley 11/2021 · RD
+            1007/2023
+          </p>
         </div>
-        <select
-          value={quarterFilter}
-          onChange={e => setQuarterFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
-          className="h-9 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:border-[#1a3a5c]"
-        >
-          <option value="all">Todos los trimestres</option>
-          <option value={1}>T1 (Ene-Mar)</option>
-          <option value={2}>T2 (Abr-Jun)</option>
-          <option value={3}>T3 (Jul-Sep)</option>
-          <option value={4}>T4 (Oct-Dic)</option>
-        </select>
         <button
-          onClick={exportCSV}
-          className="h-9 px-4 bg-[#1a3a5c] text-white text-sm font-semibold rounded-lg hover:bg-[#15304d] transition flex items-center gap-2 ml-auto"
+          onClick={handleQuickExport}
+          className="flex items-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1d4ed8]"
         >
-          <Download size={15} /> Exportar CSV (Modelo 303)
+          <Download size={15} /> Exportar {quarterLabel}
         </button>
       </div>
 
-      {/* Summary KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* VeriFactu mode banner */}
+      <div
+        className={`mb-6 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium ${
+          VERIFACTU_CONFIG.mode === "mock"
+            ? "border-amber-200 bg-amber-50 text-amber-800"
+            : VERIFACTU_CONFIG.mode === "sandbox"
+              ? "border-blue-200 bg-blue-50 text-blue-800"
+              : "border-green-200 bg-green-50 text-green-800"
+        }`}
+      >
+        <ShieldCheck size={16} />
+        {VERIFACTU_CONFIG.mode === "mock" ? (
+          <>
+            <span>
+              Modo Demo — Sin conexión real con AEAT. Las facturas se almacenan
+              localmente y los hashes se calculan correctamente.
+            </span>
+            <Link
+              href="/admin/fiscal/verifactu"
+              className="ml-auto text-xs whitespace-nowrap underline"
+            >
+              Configurar proveedor →
+            </Link>
+          </>
+        ) : VERIFACTU_CONFIG.mode === "sandbox" ? (
+          <span>
+            Modo Sandbox — Conectado al entorno de pruebas del proveedor
+          </span>
+        ) : (
+          <span className="flex items-center gap-2">
+            <CheckCircle2 size={14} />
+            Producción — Conectado a AEAT mediante proveedor certificado
+          </span>
+        )}
+      </div>
+
+      {/* KPI Cards — trimestre actual */}
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
-          { label: "Base imponible", value: `${fiscalData.baseImponible.toFixed(2)} €`, icon: Euro, color: "#1a3a5c" },
-          { label: "IVA repercutido (21%)", value: `${fiscalData.ivaRepercutido.toFixed(2)} €`, icon: TrendingUp, color: "#dc2626" },
-          { label: "Total facturado", value: `${fiscalData.totalFacturado.toFixed(2)} €`, icon: FileText, color: "#16a34a" },
-          { label: "Nº de facturas", value: String(fiscalData.count), icon: FileText, color: "#d97706" },
+          {
+            label: `Base imp. ${quarterLabel}`,
+            value: `${quarterSummary.totalTaxableBase.toFixed(2)} €`,
+            icon: Euro,
+            color: "#2563eb",
+          },
+          {
+            label: `IVA repercutido ${quarterLabel}`,
+            value: `${quarterSummary.totalOutputVAT.toFixed(2)} €`,
+            icon: TrendingUp,
+            color: "#dc2626",
+          },
+          {
+            label: `Facturas emitidas`,
+            value: String(activeInvoices),
+            icon: FileText,
+            color: "#16a34a",
+          },
+          {
+            label: `Pendientes VeriFactu`,
+            value: String(pendingVerifactu),
+            icon: Clock,
+            color: pendingVerifactu > 0 ? "#d97706" : "#16a34a",
+          },
         ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="bg-white border border-gray-200 rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-2">
+          <div
+            key={label}
+            className="rounded-2xl border border-gray-200 bg-white p-5"
+          >
+            <div className="mb-2 flex items-center gap-2">
               <Icon size={16} style={{ color }} />
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</span>
+              <span className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                {label}
+              </span>
             </div>
             <p className="text-2xl font-bold text-gray-900">{value}</p>
           </div>
         ))}
       </div>
 
-      {/* Quarterly breakdown */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 mb-6">
-        <h2 className="font-bold text-gray-900 mb-4">Resumen por trimestres — {yearFilter}</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-500 uppercase tracking-wide border-b border-gray-100">
-                <th className="text-left pb-3 font-semibold">Trimestre</th>
-                <th className="text-right pb-3 font-semibold">Nº Facturas</th>
-                <th className="text-right pb-3 font-semibold">Base Imponible</th>
-                <th className="text-right pb-3 font-semibold">IVA (21%)</th>
-                <th className="text-right pb-3 font-semibold">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[1, 2, 3, 4].map(q => (
-                <tr key={q} className="border-b border-gray-50">
-                  <td className="py-3 font-semibold text-gray-700">{QUARTER_LABELS[q - 1]}</td>
-                  <td className="py-3 text-right text-gray-600">{byQuarter[q].count}</td>
-                  <td className="py-3 text-right text-gray-800">{byQuarter[q].base.toFixed(2)} €</td>
-                  <td className="py-3 text-right text-red-600 font-medium">{byQuarter[q].iva.toFixed(2)} €</td>
-                  <td className="py-3 text-right font-bold text-gray-900">{byQuarter[q].total.toFixed(2)} €</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Alerts */}
+      {(pendingVerifactu > 0 ||
+        rejectedVerifactu > 0 ||
+        daysUntilDue <= 14) && (
+        <div className="mb-6 space-y-2">
+          {daysUntilDue <= 14 && daysUntilDue > 0 && (
+            <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <Calendar size={15} />
+              <span>
+                Vencimiento modelo 303 {quarterLabel}: queda
+                {daysUntilDue === 1 ? " 1 día" : ` ${daysUntilDue} días`} (
+                {currentPeriod.dueDate.toLocaleDateString("es-ES")})
+              </span>
+            </div>
+          )}
+          {pendingVerifactu > 0 && (
+            <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <AlertCircle size={15} />
+              <span>
+                {pendingVerifactu} factura
+                {pendingVerifactu !== 1 ? "s" : ""} pendiente
+                {pendingVerifactu !== 1 ? "s" : ""} de envío a VeriFactu
+              </span>
+              <Link
+                href="/admin/fiscal/verifactu"
+                className="ml-auto text-xs font-semibold underline"
+              >
+                Ver →
+              </Link>
+            </div>
+          )}
+          {rejectedVerifactu > 0 && (
+            <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              <AlertCircle size={15} />
+              <span>
+                {rejectedVerifactu} factura
+                {rejectedVerifactu !== 1 ? "s" : ""} rechazada
+                {rejectedVerifactu !== 1 ? "s" : ""} por VeriFactu — requieren
+                atención
+              </span>
+              <Link
+                href="/admin/fiscal/verifactu"
+                className="ml-auto text-xs font-semibold underline"
+              >
+                Ver →
+              </Link>
+            </div>
+          )}
         </div>
+      )}
+
+      {/* Section navigation grid */}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {FISCAL_SECTIONS.map(({ href, icon: Icon, title, desc, color }) => (
+          <Link
+            key={href}
+            href={href}
+            className="group flex items-start gap-4 rounded-2xl border border-gray-200 bg-white p-5 transition hover:border-gray-300 hover:shadow-sm"
+          >
+            <div
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl"
+              style={{ backgroundColor: `${color}15` }}
+            >
+              <Icon size={20} style={{ color }} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-gray-900">{title}</p>
+              <p className="mt-0.5 text-xs text-gray-500">{desc}</p>
+            </div>
+            <ChevronRight
+              size={16}
+              className="mt-0.5 flex-shrink-0 text-gray-300 transition group-hover:text-gray-500"
+            />
+          </Link>
+        ))}
       </div>
 
-      {/* Invoice list */}
-      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h2 className="font-bold text-gray-900">Listado de facturas ({filtered.length})</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                <th className="text-left px-6 py-3 font-semibold">Nº Factura</th>
-                <th className="text-left px-4 py-3 font-semibold">Pedido</th>
-                <th className="text-left px-4 py-3 font-semibold">Fecha</th>
-                <th className="text-right px-4 py-3 font-semibold">Base Imp.</th>
-                <th className="text-right px-4 py-3 font-semibold">IVA 21%</th>
-                <th className="text-right px-4 py-3 font-semibold">Total</th>
-                <th className="text-center px-4 py-3 font-semibold">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filtered.map(o => {
-                const { priceWithoutVAT, vatAmount } = calcVAT(o.total, IVA_GENERAL)
-                const invNum = generateInvoiceNumber(o.id)
-                const dateStr = (() => {
-                  const d = new Date(o.date)
-                  return isNaN(d.getTime()) ? o.date : d.toLocaleDateString("es-ES")
-                })()
-                return (
-                  <tr key={o.id} className="hover:bg-gray-50 transition">
-                    <td className="px-6 py-3 font-mono text-xs font-bold text-[#1a3a5c]">{invNum}</td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{o.id}</td>
-                    <td className="px-4 py-3 text-gray-600">{dateStr}</td>
-                    <td className="px-4 py-3 text-right text-gray-800">{priceWithoutVAT.toFixed(2)} €</td>
-                    <td className="px-4 py-3 text-right text-red-600 font-medium">{vatAmount.toFixed(2)} €</td>
-                    <td className="px-4 py-3 text-right font-bold text-gray-900">{o.total.toFixed(2)} €</td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => handlePrintInvoice(o)}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-[#1a3a5c] hover:bg-blue-50 px-2.5 py-1.5 rounded-lg transition border border-[#1a3a5c]/20"
-                      >
-                        <FileText size={12} /> PDF
-                      </button>
+      {/* VAT breakdown for current quarter */}
+      {quarterSummary.outputVAT.length > 0 && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <h2 className="mb-4 font-bold text-gray-900">
+            Desglose IVA — {quarterLabel}
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs tracking-wide text-gray-500 uppercase">
+                  <th className="pb-3 text-left font-semibold">Tipo IVA</th>
+                  <th className="pb-3 text-right font-semibold">
+                    Base Imponible
+                  </th>
+                  <th className="pb-3 text-right font-semibold">Cuota IVA</th>
+                  <th className="pb-3 text-right font-semibold">Facturas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quarterSummary.outputVAT.map((row) => (
+                  <tr
+                    key={row.vatRate}
+                    className="border-b border-gray-50 last:border-0"
+                  >
+                    <td className="py-3 font-semibold text-gray-700">
+                      {row.vatRate}%
+                    </td>
+                    <td className="py-3 text-right text-gray-800">
+                      {row.taxableBase.toFixed(2)} €
+                    </td>
+                    <td className="py-3 text-right font-medium text-red-600">
+                      {row.vatAmount.toFixed(2)} €
+                    </td>
+                    <td className="py-3 text-right text-gray-500">
+                      {row.invoiceCount}
                     </td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                ))}
+                <tr className="font-bold text-gray-900">
+                  <td className="pt-3">Total</td>
+                  <td className="pt-3 text-right">
+                    {quarterSummary.totalTaxableBase.toFixed(2)} €
+                  </td>
+                  <td className="pt-3 text-right text-red-700">
+                    {quarterSummary.totalOutputVAT.toFixed(2)} €
+                  </td>
+                  <td className="pt-3 text-right text-gray-500">
+                    {quarterSummary.invoiceCount}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
+
+      {invoices.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 py-12 text-center">
+          <FileText size={40} className="mx-auto mb-3 text-gray-300" />
+          <p className="font-semibold text-gray-600">
+            No hay facturas registradas
+          </p>
+          <p className="mt-1 text-sm text-gray-400">
+            Las facturas se generan automáticamente al confirmar pedidos.
+          </p>
+        </div>
+      )}
     </div>
-  )
+  );
 }

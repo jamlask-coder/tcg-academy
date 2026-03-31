@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 26">
+  <!-- Rift / portal shape -->
+  <ellipse cx="12" cy="13" rx="8" ry="11" fill="none" stroke="#0f766e" stroke-width="2"/>
+  <ellipse cx="12" cy="13" rx="4" ry="8" fill="#0f766e" opacity="0.3"/>
+  <!-- Lightning bolt / rift crack -->
+  <polyline points="10,4 13,11 10,11 13,22" stroke="#14b8a6" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+  <!-- Text -->
+  <text x="26" y="18" font-family="'Arial Black', Arial, sans-serif" font-weight="900" font-size="11" fill="#0f766e" letter-spacing="0.5">RIFTBOUND</text>
+</svg>

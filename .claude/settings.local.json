@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:commons.wikimedia.org)",
+      "WebFetch(domain:upload.wikimedia.org)",
+      "WebFetch(domain:www.disneylorcana.com)",
+      "WebFetch(domain:www.dbs-cardgame.com)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "WebFetch(domain:api.scryfall.com)",
+      "WebFetch(domain:db.ygoprodeck.com)",
+      "WebFetch(domain:api.pokemontcg.io)"
+    ]
+  }
+}

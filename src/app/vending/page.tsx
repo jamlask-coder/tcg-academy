@@ -1,10 +1,19 @@
-"use client"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { useState } from "react"
-import { ShoppingBag, Clock, MapPin, Send, CheckCircle, Zap, TrendingUp, Shield } from "lucide-react"
-import { checkRateLimit } from "@/utils/sanitize"
+"use client";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useState } from "react";
+import {
+  ShoppingBag,
+  Clock,
+  MapPin,
+  Send,
+  CheckCircle,
+  Zap,
+  TrendingUp,
+  Shield,
+} from "lucide-react";
+import { checkRateLimit } from "@/utils/sanitize";
 
 const schema = z.object({
   nombre: z.string().min(2, "Mínimo 2 caracteres").max(100),
@@ -13,75 +22,114 @@ const schema = z.object({
   telefono: z.string().min(9, "Teléfono requerido").max(20),
   ubicacion: z.string().min(5, "Indica la ubicación deseada").max(300),
   mensaje: z.string().max(2000).optional(),
-})
+});
 
-type FormData = z.infer<typeof schema>
+type FormData = z.infer<typeof schema>;
 
 const VENTAJAS = [
-  { icon: Clock, title: "Disponible 24/7", desc: "Sin horarios ni personal necesario. La máquina vende por ti." },
-  { icon: Zap, title: "Alta rotación", desc: "Sobres y accesorios TCG con alta demanda garantizada." },
-  { icon: TrendingUp, title: "Rentabilidad probada", desc: "Márgenes superiores al vending tradicional." },
-  { icon: Shield, title: "Soporte completo", desc: "Gestión de stock, mantenimiento y reposición incluidos." },
-  { icon: MapPin, title: "Ubicación estratégica", desc: "Centros comerciales, tiendas de juegos, colegios, ocio." },
-  { icon: ShoppingBag, title: "Catálogo TCG Academy", desc: "+10.000 referencias con reposición automática." },
-]
+  {
+    icon: Clock,
+    title: "Disponible 24/7",
+    desc: "Sin horarios ni personal necesario. La máquina vende por ti.",
+  },
+  {
+    icon: Zap,
+    title: "Alta rotación",
+    desc: "Sobres y accesorios TCG con alta demanda garantizada.",
+  },
+  {
+    icon: TrendingUp,
+    title: "Rentabilidad probada",
+    desc: "Márgenes superiores al vending tradicional.",
+  },
+  {
+    icon: Shield,
+    title: "Soporte completo",
+    desc: "Gestión de stock, mantenimiento y reposición incluidos.",
+  },
+  {
+    icon: MapPin,
+    title: "Ubicación estratégica",
+    desc: "Centros comerciales, tiendas de juegos, colegios, ocio.",
+  },
+  {
+    icon: ShoppingBag,
+    title: "Catálogo TCG Academy",
+    desc: "+10.000 referencias con reposición automática.",
+  },
+];
 
 export default function VendingPage() {
-  const [submitted, setSubmitted] = useState(false)
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const [submitted, setSubmitted] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({
     resolver: zodResolver(schema),
-  })
+  });
 
   const onSubmit = async (_data: FormData) => {
     if (!checkRateLimit("vending-form", 3, 60_000)) {
-      alert("Demasiados intentos. Espera un momento.")
-      return
+      alert("Demasiados intentos. Espera un momento.");
+      return;
     }
-    await new Promise((r) => setTimeout(r, 600))
-    setSubmitted(true)
-  }
+    await new Promise((r) => setTimeout(r, 600));
+    setSubmitted(true);
+  };
 
   return (
     <div>
       {/* Hero */}
-      <div className="relative bg-gradient-to-br from-[#1a3a5c] via-[#1e4a73] to-[#2d6a9f] text-white overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-10 right-10 w-80 h-80 rounded-full bg-yellow-400 blur-3xl opacity-10" />
-          <div className="absolute bottom-0 left-10 w-64 h-64 rounded-full bg-purple-500 blur-3xl opacity-10" />
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#2563eb] via-[#1e4a73] to-[#3b82f6] text-white">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute top-10 right-10 h-80 w-80 rounded-full bg-yellow-400 opacity-10 blur-3xl" />
+          <div className="absolute bottom-0 left-10 h-64 w-64 rounded-full bg-purple-500 opacity-10 blur-3xl" />
         </div>
-        <div className="relative max-w-[1180px] mx-auto px-6 py-20">
-          <div className="inline-flex items-center gap-2 bg-yellow-400 text-[#1a3a5c] font-black px-4 py-1.5 rounded-full text-sm uppercase tracking-wider mb-6">
+        <div className="relative mx-auto max-w-[1400px] px-6 py-20">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-yellow-400 px-4 py-1.5 text-sm font-black tracking-wider text-[#2563eb] uppercase">
             <Zap size={14} /> Próximamente
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold leading-tight mb-6">
-            Máquinas Vending <br /><span className="text-yellow-400">TCG Academy</span>
+          <h1 className="mb-6 text-4xl leading-tight font-bold md:text-6xl">
+            Máquinas Vending <br />
+            <span className="text-yellow-400">TCG Academy</span>
           </h1>
-          <p className="text-xl text-blue-100 max-w-2xl leading-relaxed mb-8">
-            Lleva la experiencia TCG a cualquier lugar con nuestras máquinas vending de cartas coleccionables.
-            Sobres, packs y accesorios disponibles 24/7 sin personal ni infraestructura.
+          <p className="mb-8 max-w-2xl text-xl leading-relaxed text-blue-100">
+            Lleva la experiencia TCG a cualquier lugar con nuestras máquinas
+            vending de cartas coleccionables. Sobres, packs y accesorios
+            disponibles 24/7 sin personal ni infraestructura.
           </p>
-          <a href="#interes" className="inline-flex items-center gap-2 bg-yellow-400 text-[#1a3a5c] font-bold px-8 py-4 rounded-xl hover:bg-yellow-300 transition shadow-xl text-lg">
+          <a
+            href="#interes"
+            className="inline-flex items-center gap-2 rounded-xl bg-yellow-400 px-8 py-4 text-lg font-bold text-[#2563eb] shadow-xl transition hover:bg-yellow-300"
+          >
             Quiero una máquina en mi local <Send size={18} />
           </a>
         </div>
       </div>
 
       {/* Ventajas */}
-      <section className="max-w-[1180px] mx-auto px-6 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-3">¿Por qué apostar por el vending TCG?</h2>
-          <p className="text-gray-500 max-w-xl mx-auto">
-            El coleccionismo de cartas es uno de los sectores con mayor crecimiento en España.
-            Una máquina en el lugar correcto genera ingresos pasivos constantes.
+      <section className="mx-auto max-w-[1400px] px-6 py-16">
+        <div className="mb-12 text-center">
+          <h2 className="mb-3 text-3xl font-bold text-gray-900">
+            ¿Por qué apostar por el vending TCG?
+          </h2>
+          <p className="mx-auto max-w-xl text-gray-500">
+            El coleccionismo de cartas es uno de los sectores con mayor
+            crecimiento en España. Una máquina en el lugar correcto genera
+            ingresos pasivos constantes.
           </p>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {VENTAJAS.map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="bg-white border border-gray-200 rounded-2xl p-6 hover:shadow-md transition">
-              <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
-                <Icon size={22} className="text-[#1a3a5c]" />
+            <div
+              key={title}
+              className="rounded-2xl border border-gray-200 bg-white p-6 transition hover:shadow-md"
+            >
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50">
+                <Icon size={22} className="text-[#2563eb]" />
               </div>
-              <h3 className="font-bold text-gray-900 mb-2">{title}</h3>
+              <h3 className="mb-2 font-bold text-gray-900">{title}</h3>
               <p className="text-sm text-gray-600">{desc}</p>
             </div>
           ))}
@@ -90,82 +138,165 @@ export default function VendingPage() {
 
       {/* About */}
       <section className="bg-gray-50 py-16">
-        <div className="max-w-[1180px] mx-auto px-6">
+        <div className="mx-auto max-w-[1400px] px-6">
           <div className="max-w-2xl">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">TCG Academy, empresa líder en el sector</h2>
-            <p className="text-gray-600 leading-relaxed mb-4">
-              TCG Academy es una empresa española en pleno crecimiento, referente en el sector TCG con más de 10.000 referencias
-              y 4 tiendas físicas distribuidas por la geografía española. Con más de 500 mayoristas activos y años de experiencia
-              en distribución de cartas coleccionables, somos el socio ideal para un proyecto de vending TCG.
+            <h2 className="mb-4 text-2xl font-bold text-gray-900">
+              TCG Academy, empresa líder en el sector
+            </h2>
+            <p className="mb-4 leading-relaxed text-gray-600">
+              TCG Academy es una empresa española en pleno crecimiento,
+              referente en el sector TCG con más de 10.000 referencias y 4
+              tiendas físicas distribuidas por la geografía española. Con años
+              de experiencia en distribución de cartas coleccionables, somos
+              el socio ideal para un proyecto de vending TCG.
             </p>
-            <p className="text-gray-600 leading-relaxed">
-              Únete a la revolución del coleccionismo accesible. Nuestras máquinas dispensarán los últimos lanzamientos de
-              Pokémon, Magic, One Piece y más, con reposición y mantenimiento totalmente cubiertos por nuestro equipo.
+            <p className="leading-relaxed text-gray-600">
+              Únete a la revolución del coleccionismo accesible. Nuestras
+              máquinas dispensarán los últimos lanzamientos de Pokémon, Magic,
+              One Piece y más, con reposición y mantenimiento totalmente
+              cubiertos por nuestro equipo.
             </p>
           </div>
         </div>
       </section>
 
       {/* Form */}
-      <section id="interes" className="max-w-[1180px] mx-auto px-6 py-16">
-        <div className="max-w-2xl mx-auto">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Solicitar información</h2>
-          <p className="text-gray-500 mb-8">Rellena el formulario y te contactaremos en menos de 24 horas.</p>
+      <section id="interes" className="mx-auto max-w-[1400px] px-6 py-16">
+        <div className="mx-auto max-w-2xl">
+          <h2 className="mb-2 text-2xl font-bold text-gray-900">
+            Solicitar información
+          </h2>
+          <p className="mb-8 text-gray-500">
+            Rellena el formulario y te contactaremos en menos de 24 horas.
+          </p>
 
           {submitted ? (
-            <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-12 text-center">
-              <CheckCircle size={48} className="text-green-500 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-gray-900 mb-2">¡Solicitud recibida!</h3>
-              <p className="text-gray-600">Te contactaremos en menos de 24 horas para darte toda la información.</p>
+            <div className="rounded-2xl border-2 border-green-200 bg-green-50 p-12 text-center">
+              <CheckCircle size={48} className="mx-auto mb-4 text-green-500" />
+              <h3 className="mb-2 text-xl font-bold text-gray-900">
+                ¡Solicitud recibida!
+              </h3>
+              <p className="text-gray-600">
+                Te contactaremos en menos de 24 horas para darte toda la
+                información.
+              </p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit(onSubmit)} className="bg-white border border-gray-200 rounded-2xl p-8 space-y-5">
-              <div className="grid sm:grid-cols-2 gap-4">
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              className="space-y-5 rounded-2xl border border-gray-200 bg-white p-8"
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nombre *</label>
-                  <input {...register("nombre")} type="text" placeholder="Tu nombre"
-                    className={`w-full h-11 px-4 border-2 rounded-xl text-sm focus:outline-none transition ${errors.nombre ? "border-red-400" : "border-gray-200 focus:border-[#1a3a5c]"}`} />
-                  {errors.nombre && <p className="text-red-500 text-xs mt-1">{errors.nombre.message}</p>}
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    Nombre *
+                  </label>
+                  <input
+                    {...register("nombre")}
+                    type="text"
+                    placeholder="Tu nombre"
+                    className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:outline-none ${errors.nombre ? "border-red-400" : "border-gray-200 focus:border-[#2563eb]"}`}
+                  />
+                  {errors.nombre && (
+                    <p className="mt-1 text-xs text-red-500">
+                      {errors.nombre.message}
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Empresa <span className="font-normal text-gray-400">(opcional)</span></label>
-                  <input {...register("empresa")} type="text" placeholder="Tu empresa"
-                    className="w-full h-11 px-4 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#1a3a5c] transition" />
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    Empresa{" "}
+                    <span className="font-normal text-gray-400">
+                      (opcional)
+                    </span>
+                  </label>
+                  <input
+                    {...register("empresa")}
+                    type="text"
+                    placeholder="Tu empresa"
+                    className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
+                  />
                 </div>
               </div>
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email *</label>
-                  <input {...register("email")} type="email" placeholder="tu@email.com"
-                    className={`w-full h-11 px-4 border-2 rounded-xl text-sm focus:outline-none transition ${errors.email ? "border-red-400" : "border-gray-200 focus:border-[#1a3a5c]"}`} />
-                  {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    Email *
+                  </label>
+                  <input
+                    {...register("email")}
+                    type="email"
+                    placeholder="tu@email.com"
+                    className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:outline-none ${errors.email ? "border-red-400" : "border-gray-200 focus:border-[#2563eb]"}`}
+                  />
+                  {errors.email && (
+                    <p className="mt-1 text-xs text-red-500">
+                      {errors.email.message}
+                    </p>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Teléfono *</label>
-                  <input {...register("telefono")} type="tel" placeholder="+34 600 000 000"
-                    className={`w-full h-11 px-4 border-2 rounded-xl text-sm focus:outline-none transition ${errors.telefono ? "border-red-400" : "border-gray-200 focus:border-[#1a3a5c]"}`} />
-                  {errors.telefono && <p className="text-red-500 text-xs mt-1">{errors.telefono.message}</p>}
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    Teléfono *
+                  </label>
+                  <input
+                    {...register("telefono")}
+                    type="tel"
+                    placeholder="+34 600 000 000"
+                    className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:outline-none ${errors.telefono ? "border-red-400" : "border-gray-200 focus:border-[#2563eb]"}`}
+                  />
+                  {errors.telefono && (
+                    <p className="mt-1 text-xs text-red-500">
+                      {errors.telefono.message}
+                    </p>
+                  )}
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Ubicación deseada *</label>
-                <input {...register("ubicacion")} type="text" placeholder="Ej: Centro comercial en Valencia, tienda de juegos en Madrid..."
-                  className={`w-full h-11 px-4 border-2 rounded-xl text-sm focus:outline-none transition ${errors.ubicacion ? "border-red-400" : "border-gray-200 focus:border-[#1a3a5c]"}`} />
-                {errors.ubicacion && <p className="text-red-500 text-xs mt-1">{errors.ubicacion.message}</p>}
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                  Ubicación deseada *
+                </label>
+                <input
+                  {...register("ubicacion")}
+                  type="text"
+                  placeholder="Ej: Centro comercial en Valencia, tienda de juegos en Madrid..."
+                  className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:outline-none ${errors.ubicacion ? "border-red-400" : "border-gray-200 focus:border-[#2563eb]"}`}
+                />
+                {errors.ubicacion && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {errors.ubicacion.message}
+                  </p>
+                )}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Comentarios <span className="font-normal text-gray-400">(opcional)</span></label>
-                <textarea {...register("mensaje")} rows={3} placeholder="Cuéntanos más sobre tu proyecto..."
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#1a3a5c] transition resize-none" />
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                  Comentarios{" "}
+                  <span className="font-normal text-gray-400">(opcional)</span>
+                </label>
+                <textarea
+                  {...register("mensaje")}
+                  rows={3}
+                  placeholder="Cuéntanos más sobre tu proyecto..."
+                  className="w-full resize-none rounded-xl border-2 border-gray-200 px-4 py-3 text-sm transition focus:border-[#2563eb] focus:outline-none"
+                />
               </div>
-              <button type="submit" disabled={isSubmitting}
-                className="w-full bg-[#1a3a5c] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-[#15304d] transition disabled:opacity-60">
-                {isSubmitting ? "Enviando..." : <><Send size={18} /> Solicitar información</>}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] py-4 font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
+              >
+                {isSubmitting ? (
+                  "Enviando..."
+                ) : (
+                  <>
+                    <Send size={18} /> Solicitar información
+                  </>
+                )}
               </button>
             </form>
           )}
         </div>
       </section>
     </div>
-  )
+  );
 }

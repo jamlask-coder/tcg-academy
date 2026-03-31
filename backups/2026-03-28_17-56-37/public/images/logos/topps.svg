@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 36">
+  <!-- Topps: clean bold logo with red rounded rectangle brand mark -->
+  <rect x="2" y="5" width="26" height="26" rx="5" fill="#E31837"/>
+  <!-- Stars on background -->
+  <text x="5" y="23"
+    font-family="'Arial Black', 'Impact', Arial, sans-serif"
+    font-weight="900"
+    font-size="16"
+    fill="white"
+    letter-spacing="-0.5">TOP</text>
+  <text x="7" y="28"
+    font-family="'Arial Black', Arial, sans-serif"
+    font-weight="900"
+    font-size="7"
+    fill="white"
+    letter-spacing="0.5">PS</text>
+  <!-- TOPPS main wordmark -->
+  <text x="33" y="27"
+    font-family="'Arial Black', 'Franklin Gothic Heavy', Arial, sans-serif"
+    font-weight="900"
+    font-size="22"
+    fill="#E31837"
+    letter-spacing="1">TOPPS</text>
+</svg>

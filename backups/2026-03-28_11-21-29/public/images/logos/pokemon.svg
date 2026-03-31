@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 26">
+  <!-- Pokeball circle -->
+  <circle cx="13" cy="13" r="11" fill="#f59e0b" stroke="#e6850a" stroke-width="1.5"/>
+  <rect x="2" y="11.5" width="22" height="3" fill="#333" rx="0.5"/>
+  <circle cx="13" cy="13" r="4.5" fill="white" stroke="#333" stroke-width="1.5"/>
+  <circle cx="13" cy="13" r="2" fill="white"/>
+  <!-- Top half darker -->
+  <path d="M4,11.5 A11,11 0 0,1 22,11.5 Z" fill="#dc8900" opacity="0.3"/>
+  <!-- Text -->
+  <text x="30" y="18" font-family="'Arial Black', Arial, sans-serif" font-weight="900" font-size="11.5" fill="#d97706" letter-spacing="0.5">POKÉMON</text>
+</svg>

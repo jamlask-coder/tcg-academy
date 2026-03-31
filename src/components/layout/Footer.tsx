@@ -1,205 +1,167 @@
-import Link from "next/link"
+import Link from "next/link";
+import { Container } from "@/components/ui/Container";
 
 const SOCIAL_LINKS = [
   { label: "Instagram", href: "#", icon: "IG" },
-  { label: "YouTube",   href: "#", icon: "YT" },
-  { label: "TikTok",    href: "#", icon: "TK" },
-  { label: "Discord",   href: "#", icon: "DC" },
-  { label: "X",         href: "#", icon: "X"  },
-]
+  { label: "YouTube", href: "#", icon: "YT" },
+  { label: "TikTok", href: "#", icon: "TK" },
+  { label: "Discord", href: "#", icon: "DC" },
+  { label: "X", href: "#", icon: "X" },
+];
 
-const PAYMENT_METHODS = ["Visa", "Mastercard", "PayPal", "Bizum", "Transferencia"]
+const PAYMENT_METHODS = [
+  "Visa",
+  "Mastercard",
+  "PayPal",
+  "Bizum",
+  "Transferencia",
+];
 
-const GAMES = [
-  ["Magic: The Gathering", "/magic"],
-  ["Pokémon TCG",          "/pokemon"],
-  ["One Piece Card Game",  "/one-piece"],
-  ["Riftbound",            "/riftbound"],
-  ["Topps",                "/topps"],
-  ["Disney Lorcana",       "/lorcana"],
-  ["Dragon Ball Super CG", "/dragon-ball"],
-  ["Yu-Gi-Oh!",            "/yugioh"],
-  ["Naruto Mythos",        "/naruto"],
-]
+const GAMES: [string, string][] = [
+  ["Magic", "/magic"],
+  ["Pokémon", "/pokemon"],
+  ["One Piece", "/one-piece"],
+  ["Riftbound", "/riftbound"],
+  ["Topps", "/topps"],
+  ["Lorcana", "/lorcana"],
+  ["Dragon Ball", "/dragon-ball"],
+  ["Yu-Gi-Oh!", "/yugioh"],
+  ["Naruto", "/naruto"],
+];
 
-const INFORMACION = [
-  ["Sobre nosotros",   "/"],
+const LINKS: [string, string][] = [
   ["Nuestras tiendas", "/tiendas"],
-  ["Eventos",          "/eventos"],
-  ["Blog",             "/"],
-  ["Contacto",         "/contacto"],
-]
+  ["Eventos", "/eventos"],
+  ["Contacto", "/contacto"],
+  ["Profesionales B2B", "/mayoristas"],
+  ["Abre tu tienda TCG", "/mayoristas/franquicias"],
+  ["Vending TCG", "/mayoristas/vending"],
+];
 
-const AYUDA = [
-  ["Envíos y plazos",          "/contacto"],
-  ["Métodos de pago",          "/contacto"],
-  ["Política de privacidad",   "/cuenta/datos"],
-  ["Términos y condiciones",   "/contacto"],
-  ["Cookies",                  "/contacto"],
-]
+const LEGAL: [string, string][] = [
+  ["Envíos y plazos", "/contacto"],
+  ["Política de privacidad", "/cuenta/datos"],
+  ["Términos y condiciones", "/contacto"],
+  ["Cookies", "/contacto"],
+];
 
-const NEGOCIO = [
-  ["Mayoristas B2B",      "/mayoristas"],
-  ["Monta tu tienda",     "/franquicias"],
-  ["Máquinas Vending",    "/vending"],
-  ["Contacto empresas",   "/contacto"],
-]
-
-function FooterHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="font-bold text-[11px] uppercase tracking-[0.12em] mb-5 text-white/40">
-      {children}
-    </h3>
-  )
-}
-
-function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
+function FooterLink({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
   return (
     <li>
       <Link
         href={href}
-        className="text-sm text-slate-300 hover:text-white transition-colors duration-150 leading-relaxed"
+        className="text-sm text-slate-300 transition-colors duration-150 hover:text-white"
       >
         {children}
       </Link>
     </li>
-  )
+  );
 }
 
 export function Footer() {
   return (
     <footer className="bg-gradient-to-b from-[#0f172a] to-[#1e293b] text-white">
-      <div className="max-w-[1180px] mx-auto px-6 pt-16 pb-10">
+      <Container className="py-8">
+        {/* Games row */}
+        <div className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-white/8 pb-6">
+          {GAMES.map(([label, href], i) => (
+            <span key={href} className="flex items-center gap-2">
+              {i > 0 && <span className="text-xs text-white/20">·</span>}
+              <Link
+                href={href}
+                className="text-xs text-slate-400 transition-colors hover:text-white"
+              >
+                {label}
+              </Link>
+            </span>
+          ))}
+        </div>
 
-        {/* Main grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 mb-14">
-
-          {/* ── Col 1: Brand ── */}
-          <div className="col-span-2 md:col-span-1">
-            {/* Logo */}
-            <Link href="/" className="inline-flex items-center gap-2.5 mb-4">
-              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-[#1a3a5c] font-black text-base">T</span>
+        {/* 3-column grid */}
+        <div className="mb-6 grid grid-cols-1 gap-8 sm:grid-cols-3">
+          {/* Col 1: Brand + social + payment */}
+          <div>
+            <Link href="/" className="mb-4 inline-flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-md">
+                <span className="text-sm font-black text-[#2563eb]">T</span>
               </div>
-              <span className="text-xl font-bold text-white">TCG Academy</span>
+              <span className="text-lg font-bold text-white">TCG Academy</span>
             </Link>
-
-            <p className="text-slate-400 text-sm leading-relaxed mb-1">
-              La tienda TCG líder en España
+            <p className="mb-4 text-xs text-slate-500">
+              4 tiendas físicas · Envío en 24h con GLS
             </p>
-            <p className="text-slate-500 text-xs leading-relaxed mb-6">
-              Pokémon, Magic, One Piece, Riftbound y más.<br />
-              4 tiendas físicas · Envío en 24h
-            </p>
-
-            {/* Social icons */}
-            <div className="flex gap-2 mb-6">
+            <div className="mb-4 flex gap-1.5">
               {SOCIAL_LINKS.map(({ label, href, icon }) => (
                 <Link
                   key={label}
                   href={href}
                   aria-label={label}
-                  className="w-9 h-9 rounded-xl bg-white/8 hover:bg-white/16 transition-colors duration-150 flex items-center justify-center text-[10px] font-bold text-slate-400 hover:text-white"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/8 text-[10px] font-bold text-slate-400 transition-colors hover:bg-white/16 hover:text-white"
                 >
                   {icon}
                 </Link>
               ))}
             </div>
-
-            {/* Payment methods */}
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-2">Formas de pago</p>
-              <div className="flex flex-wrap gap-1.5">
-                {PAYMENT_METHODS.map((method) => (
-                  <span
-                    key={method}
-                    className="text-[10px] font-semibold text-slate-400 bg-white/6 border border-white/8 px-2 py-0.5 rounded-md"
-                  >
-                    {method}
-                  </span>
-                ))}
-              </div>
+            <div className="flex flex-wrap gap-1">
+              {PAYMENT_METHODS.map((m) => (
+                <span
+                  key={m}
+                  className="rounded-md border border-white/8 bg-white/6 px-2 py-0.5 text-[10px] font-semibold text-slate-400"
+                >
+                  {m}
+                </span>
+              ))}
             </div>
           </div>
 
-          {/* ── Col 2: Juegos ── */}
+          {/* Col 2: Links */}
           <div>
-            <FooterHeading>Juegos</FooterHeading>
-            <ul className="space-y-2.5">
-              {GAMES.map(([label, href]) => (
-                <FooterLink key={href} href={href}>{label}</FooterLink>
+            <h3 className="mb-3 text-[10px] font-bold tracking-widest text-white/40 uppercase">
+              Tienda
+            </h3>
+            <ul className="space-y-2">
+              {LINKS.map(([label, href]) => (
+                <FooterLink key={href} href={href}>
+                  {label}
+                </FooterLink>
               ))}
             </ul>
           </div>
 
-          {/* ── Col 3: Información ── */}
+          {/* Col 3: Legal */}
           <div>
-            <FooterHeading>Información</FooterHeading>
-            <ul className="space-y-2.5">
-              {INFORMACION.map(([label, href]) => (
-                <FooterLink key={label} href={href}>{label}</FooterLink>
+            <h3 className="mb-3 text-[10px] font-bold tracking-widest text-white/40 uppercase">
+              Legal
+            </h3>
+            <ul className="space-y-2">
+              {LEGAL.map(([label, href]) => (
+                <FooterLink key={label} href={href}>
+                  {label}
+                </FooterLink>
               ))}
             </ul>
-          </div>
-
-          {/* ── Col 4: Ayuda ── */}
-          <div>
-            <FooterHeading>Ayuda</FooterHeading>
-            <ul className="space-y-2.5">
-              {AYUDA.map(([label, href]) => (
-                <FooterLink key={label} href={href}>{label}</FooterLink>
-              ))}
-            </ul>
-          </div>
-
-          {/* ── Col 5: Negocio + Newsletter ── */}
-          <div>
-            <FooterHeading>Negocio</FooterHeading>
-            <ul className="space-y-2.5 mb-8">
-              {NEGOCIO.map(([label, href]) => (
-                <FooterLink key={label} href={href}>{label}</FooterLink>
-              ))}
-            </ul>
-
-            <FooterHeading>Newsletter</FooterHeading>
-            <form className="flex flex-col gap-2">
-              <input
-                type="email"
-                placeholder="tu@email.com"
-                className="h-10 px-3 bg-white/8 border border-white/10 rounded-xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-white/25 transition"
-              />
-              <button
-                type="submit"
-                className="h-10 bg-[#1a3a5c] hover:bg-[#234d7a] text-white font-semibold text-sm rounded-xl transition-colors duration-150"
-              >
-                Suscribirme
-              </button>
-            </form>
           </div>
         </div>
 
-        {/* Divider */}
-        <div className="border-t border-white/8 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-slate-500 text-xs order-2 sm:order-1">
+        {/* Bottom bar */}
+        <div className="flex flex-col items-center justify-between gap-2 border-t border-white/8 pt-4 sm:flex-row">
+          <p className="text-xs text-slate-500">
             © 2026 TCG Academy. Todos los derechos reservados.
           </p>
-
-          {/* GLS badge */}
-          <div className="flex items-center gap-2 order-1 sm:order-2">
-            <div className="bg-[#f7a800] text-black text-[10px] font-black px-2 py-0.5 rounded-md tracking-wide">
+          <div className="flex items-center gap-2">
+            <div className="rounded-md bg-[#f7a800] px-2 py-0.5 text-[10px] font-black text-black">
               GLS
             </div>
-            <span className="text-slate-500 text-xs">Envío con GLS a toda España</span>
-          </div>
-
-          {/* Legal links */}
-          <div className="flex items-center gap-4 order-3 text-xs text-slate-600">
-            <Link href="/contacto" className="hover:text-slate-400 transition-colors">Privacidad</Link>
-            <Link href="/contacto" className="hover:text-slate-400 transition-colors">Términos</Link>
-            <Link href="/contacto" className="hover:text-slate-400 transition-colors">Cookies</Link>
+            <span className="text-xs text-slate-500">Envío con GLS</span>
           </div>
         </div>
-      </div>
+      </Container>
     </footer>
-  )
+  );
 }

@@ -1,11 +1,19 @@
-"use client"
-import { useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { Mail, Phone, MapPin, Clock, Send, CheckCircle, MessageSquare } from "lucide-react"
-import Link from "next/link"
-import { checkRateLimit } from "@/utils/sanitize"
+"use client";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import {
+  Mail,
+  Phone,
+  MapPin,
+  Clock,
+  Send,
+  CheckCircle,
+  MessageSquare,
+} from "lucide-react";
+import Link from "next/link";
+import { checkRateLimit } from "@/utils/sanitize";
 
 const schema = z.object({
   nombre: z.string().min(2, "Mínimo 2 caracteres").max(100),
@@ -13,55 +21,60 @@ const schema = z.object({
   telefono: z.string().max(20).optional(),
   asunto: z.string().min(1, "Selecciona un asunto").max(50),
   mensaje: z.string().min(10, "Mínimo 10 caracteres").max(2000),
-})
+});
 
-type FormData = z.infer<typeof schema>
+type FormData = z.infer<typeof schema>;
 
 const STORES_CONTACT = [
   { name: "Calpe", phone: "+34 965 000 001", id: "calpe" },
   { name: "Béjar", phone: "+34 923 000 002", id: "bejar" },
   { name: "Madrid", phone: "+34 910 000 003", id: "madrid" },
   { name: "Barcelona", phone: "+34 930 000 004", id: "barcelona" },
-]
+];
 
 export default function ContactoPage() {
-  const [submitted, setSubmitted] = useState(false)
+  const [submitted, setSubmitted] = useState(false);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({
     resolver: zodResolver(schema),
-  })
+  });
 
   const onSubmit = async (_data: FormData) => {
     if (!checkRateLimit("contact-form", 3, 60_000)) {
-      alert("Demasiados intentos. Espera un momento antes de enviar de nuevo.")
-      return
+      alert("Demasiados intentos. Espera un momento antes de enviar de nuevo.");
+      return;
     }
-    await new Promise((r) => setTimeout(r, 600))
-    setSubmitted(true)
-  }
+    await new Promise((r) => setTimeout(r, 600));
+    setSubmitted(true);
+  };
 
   return (
     <div>
       {/* Hero */}
-      <div className="bg-gradient-to-br from-[#1a3a5c] to-[#2d6a9f] text-white py-16">
-        <div className="max-w-[1180px] mx-auto px-6 text-center">
-          <h1 className="text-3xl md:text-5xl font-bold mb-4">Contacto</h1>
-          <p className="text-blue-200 text-lg max-w-lg mx-auto">
-            Estamos aquí para ayudarte. Escríbenos y te respondemos en menos de 24 horas.
+      <div className="bg-gradient-to-br from-[#2563eb] to-[#3b82f6] py-16 text-white">
+        <div className="mx-auto max-w-[1400px] px-6 text-center">
+          <h1 className="mb-4 text-3xl font-bold md:text-5xl">Contacto</h1>
+          <p className="mx-auto max-w-lg text-lg text-blue-200">
+            Estamos aquí para ayudarte. Escríbenos y te respondemos en menos de
+            24 horas.
           </p>
         </div>
       </div>
 
       {/* Contact cards */}
-      <div className="max-w-[1180px] mx-auto px-6 py-10">
-        <div className="grid sm:grid-cols-3 gap-4 mb-12">
+      <div className="mx-auto max-w-[1400px] px-6 py-10">
+        <div className="mb-12 grid gap-4 sm:grid-cols-3">
           {[
             {
               icon: Mail,
               title: "Email",
               value: "info@tcgacademy.es",
               href: "mailto:info@tcgacademy.es",
-              color: "#1a3a5c",
+              color: "#2563eb",
             },
             {
               icon: Phone,
@@ -78,13 +91,25 @@ export default function ContactoPage() {
               color: "#d97706",
             },
           ].map(({ icon: Icon, title, value, href, color }) => (
-            <div key={title} className="bg-white border border-gray-200 rounded-2xl p-6 text-center hover:shadow-md transition">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: `${color}15` }}>
+            <div
+              key={title}
+              className="rounded-2xl border border-gray-200 bg-white p-6 text-center transition hover:shadow-md"
+            >
+              <div
+                className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl"
+                style={{ backgroundColor: `${color}15` }}
+              >
                 <Icon size={22} style={{ color }} />
               </div>
-              <p className="font-bold text-gray-900 mb-1">{title}</p>
+              <p className="mb-1 font-bold text-gray-900">{title}</p>
               {href ? (
-                <a href={href} className="text-sm font-medium hover:underline" style={{ color }}>{value}</a>
+                <a
+                  href={href}
+                  className="text-sm font-medium hover:underline"
+                  style={{ color }}
+                >
+                  {value}
+                </a>
               ) : (
                 <p className="text-sm text-gray-600">{value}</p>
               )}
@@ -92,59 +117,89 @@ export default function ContactoPage() {
           ))}
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-10">
+        <div className="grid gap-10 lg:grid-cols-3">
           {/* Form */}
           <div className="lg:col-span-2">
             {submitted ? (
-              <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-12 text-center">
-                <CheckCircle size={48} className="text-green-500 mx-auto mb-4" />
-                <h2 className="text-xl font-bold text-gray-900 mb-2">¡Mensaje enviado!</h2>
-                <p className="text-gray-600">Te responderemos en menos de 24 horas en el email indicado.</p>
+              <div className="rounded-2xl border-2 border-green-200 bg-green-50 p-12 text-center">
+                <CheckCircle
+                  size={48}
+                  className="mx-auto mb-4 text-green-500"
+                />
+                <h2 className="mb-2 text-xl font-bold text-gray-900">
+                  ¡Mensaje enviado!
+                </h2>
+                <p className="text-gray-600">
+                  Te responderemos en menos de 24 horas en el email indicado.
+                </p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit(onSubmit)} className="bg-white border border-gray-200 rounded-2xl p-8 space-y-5">
-                <h2 className="font-bold text-gray-900 text-xl flex items-center gap-2">
-                  <MessageSquare size={20} className="text-[#1a3a5c]" /> Enviar mensaje
+              <form
+                onSubmit={handleSubmit(onSubmit)}
+                className="space-y-5 rounded-2xl border border-gray-200 bg-white p-8"
+              >
+                <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900">
+                  <MessageSquare size={20} className="text-[#2563eb]" /> Enviar
+                  mensaje
                 </h2>
 
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nombre *</label>
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                      Nombre *
+                    </label>
                     <input
                       {...register("nombre")}
                       type="text"
                       placeholder="Tu nombre"
-                      className={`w-full h-11 px-4 border-2 rounded-xl text-sm focus:outline-none transition ${errors.nombre ? "border-red-400 focus:border-red-500" : "border-gray-200 focus:border-[#1a3a5c]"}`}
+                      className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:outline-none ${errors.nombre ? "border-red-400 focus:border-red-500" : "border-gray-200 focus:border-[#2563eb]"}`}
                     />
-                    {errors.nombre && <p className="text-red-500 text-xs mt-1">{errors.nombre.message}</p>}
+                    {errors.nombre && (
+                      <p className="mt-1 text-xs text-red-500">
+                        {errors.nombre.message}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email *</label>
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                      Email *
+                    </label>
                     <input
                       {...register("email")}
                       type="email"
                       placeholder="tu@email.com"
-                      className={`w-full h-11 px-4 border-2 rounded-xl text-sm focus:outline-none transition ${errors.email ? "border-red-400 focus:border-red-500" : "border-gray-200 focus:border-[#1a3a5c]"}`}
+                      className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:outline-none ${errors.email ? "border-red-400 focus:border-red-500" : "border-gray-200 focus:border-[#2563eb]"}`}
                     />
-                    {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+                    {errors.email && (
+                      <p className="mt-1 text-xs text-red-500">
+                        {errors.email.message}
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Teléfono <span className="font-normal text-gray-400">(opcional)</span></label>
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                      Teléfono{" "}
+                      <span className="font-normal text-gray-400">
+                        (opcional)
+                      </span>
+                    </label>
                     <input
                       {...register("telefono")}
                       type="tel"
                       placeholder="+34 600 000 000"
-                      className="w-full h-11 px-4 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#1a3a5c] transition"
+                      className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Asunto *</label>
+                    <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                      Asunto *
+                    </label>
                     <select
                       {...register("asunto")}
-                      className={`w-full h-11 px-4 border-2 rounded-xl text-sm focus:outline-none transition bg-white ${errors.asunto ? "border-red-400" : "border-gray-200 focus:border-[#1a3a5c]"}`}
+                      className={`h-11 w-full rounded-xl border-2 bg-white px-4 text-sm transition focus:outline-none ${errors.asunto ? "border-red-400" : "border-gray-200 focus:border-[#2563eb]"}`}
                     >
                       <option value="">Selecciona un asunto</option>
                       <option value="consulta">Consulta general</option>
@@ -153,27 +208,43 @@ export default function ContactoPage() {
                       <option value="tiendas">Sobre nuestras tiendas</option>
                       <option value="otro">Otro</option>
                     </select>
-                    {errors.asunto && <p className="text-red-500 text-xs mt-1">{errors.asunto.message}</p>}
+                    {errors.asunto && (
+                      <p className="mt-1 text-xs text-red-500">
+                        {errors.asunto.message}
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mensaje *</label>
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    Mensaje *
+                  </label>
                   <textarea
                     {...register("mensaje")}
                     rows={5}
                     placeholder="Cuéntanos en qué podemos ayudarte..."
-                    className={`w-full px-4 py-3 border-2 rounded-xl text-sm focus:outline-none transition resize-none ${errors.mensaje ? "border-red-400 focus:border-red-500" : "border-gray-200 focus:border-[#1a3a5c]"}`}
+                    className={`w-full resize-none rounded-xl border-2 px-4 py-3 text-sm transition focus:outline-none ${errors.mensaje ? "border-red-400 focus:border-red-500" : "border-gray-200 focus:border-[#2563eb]"}`}
                   />
-                  {errors.mensaje && <p className="text-red-500 text-xs mt-1">{errors.mensaje.message}</p>}
+                  {errors.mensaje && (
+                    <p className="mt-1 text-xs text-red-500">
+                      {errors.mensaje.message}
+                    </p>
+                  )}
                 </div>
 
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full bg-[#1a3a5c] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-[#15304d] transition disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] py-4 font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
                 >
-                  {isSubmitting ? "Enviando..." : <><Send size={18} /> Enviar mensaje</>}
+                  {isSubmitting ? (
+                    "Enviando..."
+                  ) : (
+                    <>
+                      <Send size={18} /> Enviar mensaje
+                    </>
+                  )}
                 </button>
               </form>
             )}
@@ -181,14 +252,20 @@ export default function ContactoPage() {
 
           {/* Sidebar */}
           <div className="space-y-4">
-            <div className="bg-white border border-gray-200 rounded-2xl p-6">
-              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <MapPin size={16} className="text-[#1a3a5c]" /> Tiendas físicas
+            <div className="rounded-2xl border border-gray-200 bg-white p-6">
+              <h3 className="mb-4 flex items-center gap-2 font-bold text-gray-900">
+                <MapPin size={16} className="text-[#2563eb]" /> Tiendas físicas
               </h3>
               <div className="space-y-3">
                 {STORES_CONTACT.map((s) => (
-                  <Link key={s.id} href={`/tiendas/${s.id}`} className="block group">
-                    <div className="font-semibold text-sm text-gray-800 group-hover:text-[#1a3a5c] transition">{s.name}</div>
+                  <Link
+                    key={s.id}
+                    href={`/tiendas/${s.id}`}
+                    className="group block"
+                  >
+                    <div className="text-sm font-semibold text-gray-800 transition group-hover:text-[#2563eb]">
+                      {s.name}
+                    </div>
                     <div className="text-xs text-gray-500">{s.phone}</div>
                   </Link>
                 ))}
@@ -196,26 +273,39 @@ export default function ContactoPage() {
             </div>
 
             {/* Store map placeholder */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-6">
-              <h3 className="font-bold text-gray-900 mb-3">Dónde estamos</h3>
-              <div className="bg-gray-100 rounded-xl h-48 flex items-center justify-center">
+            <div className="rounded-2xl border border-gray-200 bg-white p-6">
+              <h3 className="mb-3 font-bold text-gray-900">Dónde estamos</h3>
+              <div className="flex h-48 items-center justify-center rounded-xl bg-gray-100">
                 <div className="text-center">
-                  <MapPin size={28} className="mx-auto text-gray-300 mb-2" />
-                  <p className="text-xs text-gray-400 font-medium">Calpe · Béjar · Madrid · Barcelona</p>
-                  <p className="text-xs text-gray-300 mt-1">Mapa interactivo próximamente</p>
+                  <MapPin size={28} className="mx-auto mb-2 text-gray-300" />
+                  <p className="text-xs font-medium text-gray-400">
+                    Calpe · Béjar · Madrid · Barcelona
+                  </p>
+                  <p className="mt-1 text-xs text-gray-300">
+                    Mapa interactivo próximamente
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-2xl p-6">
-              <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                <Clock size={16} className="text-gray-400" /> Horario de atención
+            <div className="rounded-2xl border border-gray-200 bg-white p-6">
+              <h3 className="mb-3 flex items-center gap-2 font-bold text-gray-900">
+                <Clock size={16} className="text-gray-400" /> Horario de
+                atención
               </h3>
               <div className="space-y-2 text-sm">
-                {[["Lunes – Viernes", "10:00 – 19:00"], ["Sábado", "10:00 – 14:00"], ["Domingo", "Cerrado"]].map(([day, hours]) => (
+                {[
+                  ["Lunes – Viernes", "10:00 – 19:00"],
+                  ["Sábado", "10:00 – 14:00"],
+                  ["Domingo", "Cerrado"],
+                ].map(([day, hours]) => (
                   <div key={day} className="flex justify-between">
                     <span className="text-gray-600">{day}</span>
-                    <span className={`font-semibold ${hours === "Cerrado" ? "text-red-400" : ""}`}>{hours}</span>
+                    <span
+                      className={`font-semibold ${hours === "Cerrado" ? "text-red-400" : ""}`}
+                    >
+                      {hours}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -224,5 +314,5 @@ export default function ContactoPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

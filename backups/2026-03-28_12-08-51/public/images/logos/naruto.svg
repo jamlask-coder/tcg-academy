@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 26">
+  <!-- Leaf/Konoha symbol (simplified) -->
+  <circle cx="12" cy="13" r="9" fill="none" stroke="#ea580c" stroke-width="1.5"/>
+  <!-- Leaf vein lines -->
+  <line x1="12" y1="4" x2="12" y2="22" stroke="#ea580c" stroke-width="1.2"/>
+  <path d="M5,10 Q12,13 19,10" stroke="#ea580c" stroke-width="1" fill="none"/>
+  <path d="M5,16 Q12,13 19,16" stroke="#ea580c" stroke-width="1" fill="none"/>
+  <!-- Swirl/spiral center -->
+  <path d="M12,11 Q14,12 13,14 Q11,15 10,13 Q10,11 12,11" stroke="#ea580c" stroke-width="1" fill="#ea580c" opacity="0.4"/>
+  <!-- Text -->
+  <text x="27" y="18" font-family="'Arial Black', Arial, sans-serif" font-weight="900" font-size="12" fill="#ea580c" letter-spacing="0.5">NARUTO</text>
+</svg>
