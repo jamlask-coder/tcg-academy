@@ -1,11 +1,12 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   PRODUCTS,
   GAME_CONFIG,
   CATEGORY_LABELS,
   type LocalProduct,
 } from "@/data/products";
+import { getMergedProducts } from "@/lib/productStore";
 import { useDiscounts } from "@/context/DiscountContext";
 import {
   Search,
@@ -51,6 +52,19 @@ const PAGE_SIZE = 20;
 export default function AdminProductosPage() {
   const { priceOverrides, setPriceOverride, saveToStorage } = useDiscounts();
 
+  // All products: static + admin-created from localStorage
+  const [allProducts, setAllProducts] = useState<LocalProduct[]>(PRODUCTS);
+  useEffect(() => {
+    const load = () => setAllProducts(getMergedProducts());
+    load();
+    window.addEventListener("tcga:products:updated", load);
+    window.addEventListener("storage", load);
+    return () => {
+      window.removeEventListener("tcga:products:updated", load);
+      window.removeEventListener("storage", load);
+    };
+  }, []);
+
   // Local edits (not yet saved)
   const [edits, setEdits] = useState<Record<number, Partial<PriceRow>>>({});
   const [search, setSearch] = useState("");
@@ -89,7 +103,7 @@ export default function AdminProductosPage() {
         ? filtered
         : bulkScope === "category" && catFilter
           ? filtered
-          : PRODUCTS.filter((p) => !deletedIds.has(p.id));
+          : allProducts.filter((p) => !deletedIds.has(p.id));
     const previews = scope.slice(0, 20).map((p) => {
       const before = getPrice(p, bulkField);
       const after = Math.round(before * multiplier * 100) / 100;
@@ -107,7 +121,7 @@ export default function AdminProductosPage() {
         ? filtered
         : bulkScope === "category" && catFilter
           ? filtered
-          : PRODUCTS.filter((p) => !deletedIds.has(p.id));
+          : allProducts.filter((p) => !deletedIds.has(p.id));
     const newEdits: Record<number, Partial<PriceRow>> = { ...edits };
     for (const p of scope) {
       const before = getPrice(p, bulkField);
@@ -157,6 +171,7 @@ export default function AdminProductosPage() {
       );
       existing.unshift(newProduct);
       localStorage.setItem("tcgacademy_new_products", JSON.stringify(existing));
+      window.dispatchEvent(new Event("tcga:products:updated"));
     } catch {}
     setQuickSaved(true);
     setTimeout(() => setQuickSaved(false), 2000);
@@ -185,6 +200,7 @@ export default function AdminProductosPage() {
         slug: `${p.slug}-copia-${newId}`,
       });
       localStorage.setItem("tcgacademy_new_products", JSON.stringify(existing));
+      window.dispatchEvent(new Event("tcga:products:updated"));
       alert(`Duplicado: "${p.name} (copia)" — visible en localStorage`);
     } catch {}
   };
@@ -209,8 +225,8 @@ export default function AdminProductosPage() {
         "Categoria",
         "PVP c/IVA",
         "PVP s/IVA",
-        "PVP Mayoristas",
-        "PVP Tiendas TCG",
+        "PV Mayoristas",
+        "PV Tiendas TCG Academy",
         "IVA%",
         "Stock",
         "Idioma",
@@ -251,14 +267,14 @@ export default function AdminProductosPage() {
 
   const allCats = useMemo(() => {
     const src = gameFilter
-      ? PRODUCTS.filter((p) => p.game === gameFilter)
-      : PRODUCTS;
+      ? allProducts.filter((p) => p.game === gameFilter)
+      : allProducts;
     return [...new Set(src.map((p) => p.category))].sort();
-  }, [gameFilter]);
+  }, [gameFilter, allProducts]);
 
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const filtered = useMemo(() => {
-    let list = PRODUCTS.filter((p) => !deletedIds.has(p.id));
+    let list = allProducts.filter((p) => !deletedIds.has(p.id));
     if (gameFilter) list = list.filter((p) => p.game === gameFilter);
     if (catFilter) list = list.filter((p) => p.category === catFilter);
     if (search.trim()) {
@@ -266,7 +282,7 @@ export default function AdminProductosPage() {
       list = list.filter((p) => p.name.toLowerCase().includes(q));
     }
     return list;
-  }, [gameFilter, catFilter, search, deletedIds]);
+  }, [gameFilter, catFilter, search, deletedIds, allProducts]);
 
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
@@ -322,7 +338,7 @@ export default function AdminProductosPage() {
               Aplicar <strong>{bulkPct}%</strong> a{" "}
               <strong>
                 {bulkField === "price"
-                  ? "PVP público"
+                  ? "PV Público"
                   : bulkField === "wholesalePrice"
                     ? "mayorista"
                     : "tienda"}
@@ -480,7 +496,7 @@ export default function AdminProductosPage() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-gray-600">
-                PVP público (€) *
+                PV Público (€) *
               </label>
               <input
                 type="number"
@@ -494,7 +510,7 @@ export default function AdminProductosPage() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-gray-600">
-                PVP mayorista (€)
+                PV Mayoristas (€)
               </label>
               <input
                 type="number"
@@ -508,7 +524,7 @@ export default function AdminProductosPage() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-gray-600">
-                PVP tienda (€)
+                PV Tiendas TCG Academy (€)
               </label>
               <input
                 type="number"
@@ -703,7 +719,7 @@ export default function AdminProductosPage() {
               onChange={(e) => setBulkField(e.target.value as typeof bulkField)}
               className="h-9 appearance-none rounded-lg border border-amber-300 bg-white pr-8 pl-3 text-xs text-gray-700 focus:border-amber-500 focus:outline-none"
             >
-              <option value="price">PVP Público</option>
+              <option value="price">PV Público</option>
               <option value="wholesalePrice">Mayorista</option>
               <option value="storePrice">Tienda</option>
             </select>
@@ -771,16 +787,16 @@ export default function AdminProductosPage() {
                   Categoria
                 </th>
                 <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-[#2563eb]">
-                  PVP Público
+                  PV Público
                 </th>
                 <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-blue-600">
-                  PVP Mayoristas
+                  PV Mayoristas
                 </th>
                 <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-purple-600">
-                  PVP Tiendas TCG
+                  PV Tiendas TCG Academy
                 </th>
                 <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-violet-600">
-                  Coste
+                  Precio Adquisición
                 </th>
                 <th className="hidden px-4 py-3 text-center font-semibold text-gray-500 sm:table-cell">
                   Acciones
@@ -890,9 +906,11 @@ export default function AdminProductosPage() {
                       <span className="ml-0.5 text-xs text-gray-400">€</span>
                     </td>
                     <td className="px-3 py-3 text-right text-xs text-violet-600">
-                      {p.costPrice !== undefined
-                        ? p.costPrice.toFixed(2) + " €"
-                        : <span className="text-gray-300">—</span>}
+                      {p.costPrice !== undefined ? (
+                        p.costPrice.toFixed(2) + " €"
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="hidden px-4 py-3 sm:table-cell">
                       <div className="flex items-center justify-center gap-1">
@@ -903,13 +921,6 @@ export default function AdminProductosPage() {
                         >
                           <Pencil size={11} />
                         </Link>
-                        <button
-                          onClick={() => handleDuplicate(p)}
-                          className="inline-flex items-center rounded-lg border border-gray-200 px-2 py-1.5 text-xs font-semibold text-gray-400 transition hover:border-blue-300 hover:text-blue-600"
-                          title="Duplicar"
-                        >
-                          <Copy size={11} />
-                        </button>
                         {confirmDelete === p.id ? (
                           <div className="flex items-center gap-1">
                             <button
@@ -934,6 +945,13 @@ export default function AdminProductosPage() {
                             <Trash2 size={11} />
                           </button>
                         )}
+                        <button
+                          onClick={() => handleDuplicate(p)}
+                          className="inline-flex items-center rounded-lg border border-gray-200 px-2 py-1.5 text-xs font-semibold text-gray-400 transition hover:border-blue-300 hover:text-blue-600"
+                          title="Duplicar"
+                        >
+                          <Copy size={11} />
+                        </button>
                       </div>
                     </td>
                   </tr>

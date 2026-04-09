@@ -17,7 +17,6 @@ import {
   CheckCircle,
   Truck,
   AlertTriangle,
-  Clock,
   Ban,
   RotateCcw,
 } from "lucide-react";
@@ -102,9 +101,27 @@ function buildGameData(
 
 // ─── Admin role config ─────────────────────────────────────────────────────────
 const ROLE_CFG = {
-  cliente: { label: "Cliente", color: "#6b7280", bg: "#f3f4f6", rowBg: "bg-white", borderClass: "" },
-  mayorista: { label: "Mayoristas", color: "#1d4ed8", bg: "#dbeafe", rowBg: "bg-blue-100", borderClass: "border-l-4 border-l-blue-400" },
-  tienda: { label: "Tiendas TCG", color: "#15803d", bg: "#dcfce7", rowBg: "bg-green-100", borderClass: "border-l-4 border-l-green-400" },
+  cliente: {
+    label: "Cliente",
+    color: "#6b7280",
+    bg: "#f3f4f6",
+    rowBg: "bg-white",
+    borderClass: "",
+  },
+  mayorista: {
+    label: "Mayoristas",
+    color: "#1d4ed8",
+    bg: "#dbeafe",
+    rowBg: "bg-blue-100",
+    borderClass: "border-l-4 border-l-blue-400",
+  },
+  tienda: {
+    label: "Tiendas TCG",
+    color: "#15803d",
+    bg: "#dcfce7",
+    rowBg: "bg-green-100",
+    borderClass: "border-l-4 border-l-green-400",
+  },
 } as const;
 
 // ─── Admin status config ───────────────────────────────────────────────────────
@@ -112,16 +129,35 @@ const STATUS_CFG: Record<
   AdminOrderStatus,
   { label: string; color: string; bg: string; icon: React.ElementType }
 > = {
-  pendiente_envio: { label: "Pendiente de envío", color: "#c2410c", bg: "#fff7ed", icon: Package },
+  pendiente_envio: {
+    label: "Pendiente de envío",
+    color: "#c2410c",
+    bg: "#fff7ed",
+    icon: Package,
+  },
   enviado: { label: "Enviado", color: "#7c3aed", bg: "#f5f3ff", icon: Truck },
-  finalizado: { label: "Entregado", color: "#15803d", bg: "#dcfce7", icon: CheckCircle },
-  incidencia: { label: "Incidencia", color: "#dc2626", bg: "#fee2e2", icon: AlertTriangle },
+  finalizado: {
+    label: "Entregado",
+    color: "#15803d",
+    bg: "#dcfce7",
+    icon: CheckCircle,
+  },
+  incidencia: {
+    label: "Incidencia",
+    color: "#dc2626",
+    bg: "#fee2e2",
+    icon: AlertTriangle,
+  },
   cancelado: { label: "Cancelado", color: "#374151", bg: "#f3f4f6", icon: Ban },
-  devolucion: { label: "Devolución", color: "#6d28d9", bg: "#ede9fe", icon: RotateCcw },
+  devolucion: {
+    label: "Devolución",
+    color: "#6d28d9",
+    bg: "#ede9fe",
+    icon: RotateCcw,
+  },
 };
 
 type AdminFilterTab = "todos" | AdminOrderStatus;
-
 
 function AdminStatusBadge({ status }: { status: AdminOrderStatus }) {
   const cfg = STATUS_CFG[status];
@@ -148,7 +184,9 @@ function AdminDashboard() {
   const [filter, setFilter] = useState<AdminFilterTab>("todos");
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [trackingInputs, setTrackingInputs] = useState<Record<string, string>>({});
+  const [trackingInputs, setTrackingInputs] = useState<Record<string, string>>(
+    {},
+  );
 
   const filtered = orders
     .slice()
@@ -182,7 +220,11 @@ function AdminDashboard() {
     if (!tracking) return;
     const updated = orders.map((o) =>
       o.id === id
-        ? { ...o, trackingNumber: tracking, adminStatus: "enviado" as AdminOrderStatus }
+        ? {
+            ...o,
+            trackingNumber: tracking,
+            adminStatus: "enviado" as AdminOrderStatus,
+          }
         : o,
     );
     setOrders(updated);
@@ -206,43 +248,54 @@ function AdminDashboard() {
     <div>
       {/* KPI strip */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
-        {(["todos", "pendiente_envio", "enviado", "finalizado", "incidencia", "cancelado", "devolucion"] as const).map(
-          (key) => {
-            const count =
-              key === "todos"
-                ? orders.length
-                : orders.filter((o) => o.adminStatus === key).length;
-            const cfg = key === "todos" ? null : STATUS_CFG[key];
-            return (
-              <button
-                key={key}
-                onClick={() => setFilter(key)}
-                className={`rounded-2xl border p-4 text-left transition ${
-                  filter === key
-                    ? "border-[#2563eb] bg-[#2563eb] text-white"
-                    : "border-gray-200 bg-white hover:border-gray-300"
-                }`}
+        {(
+          [
+            "todos",
+            "pendiente_envio",
+            "enviado",
+            "finalizado",
+            "incidencia",
+            "cancelado",
+            "devolucion",
+          ] as const
+        ).map((key) => {
+          const count =
+            key === "todos"
+              ? orders.length
+              : orders.filter((o) => o.adminStatus === key).length;
+          const cfg = key === "todos" ? null : STATUS_CFG[key];
+          return (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className={`rounded-2xl border p-4 text-left transition ${
+                filter === key
+                  ? "border-[#2563eb] bg-[#2563eb] text-white"
+                  : "border-gray-200 bg-white hover:border-gray-300"
+              }`}
+            >
+              <p
+                className={`text-2xl font-bold ${filter === key ? "text-white" : "text-gray-900"}`}
               >
-                <p
-                  className={`text-2xl font-bold ${filter === key ? "text-white" : "text-gray-900"}`}
-                >
-                  {count}
-                </p>
-                <p
-                  className={`mt-0.5 text-xs ${filter === key ? "text-blue-200" : "text-gray-500"}`}
-                >
-                  {cfg ? cfg.label : "Total pedidos"}
-                </p>
-              </button>
-            );
-          },
-        )}
+                {count}
+              </p>
+              <p
+                className={`mt-0.5 text-xs ${filter === key ? "text-blue-200" : "text-gray-500"}`}
+              >
+                {cfg ? cfg.label : "Total pedidos"}
+              </p>
+            </button>
+          );
+        })}
       </div>
 
       {/* Search + filters */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="relative flex-1">
-          <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400" />
+          <Search
+            size={14}
+            className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400"
+          />
           <input
             type="text"
             placeholder="Buscar por ID, nombre o email…"
@@ -279,12 +332,17 @@ function AdminDashboard() {
             const isExpanded = expanded === order.id;
             const roleCfg = ROLE_CFG[order.userRole];
             return (
-              <div key={order.id} className={`border-b border-gray-100 last:border-0 ${roleCfg.rowBg} ${roleCfg.borderClass}`}>
+              <div
+                key={order.id}
+                className={`border-b border-gray-100 last:border-0 ${roleCfg.rowBg} ${roleCfg.borderClass}`}
+              >
                 {/* Row — columns: expand | nº pedido + nombre | total | estado | acciones */}
                 <div className="flex flex-wrap items-center gap-2 px-4 py-3">
                   <button
                     onClick={() => setExpanded(isExpanded ? null : order.id)}
-                    aria-label={isExpanded ? "Contraer pedido" : "Expandir pedido"}
+                    aria-label={
+                      isExpanded ? "Contraer pedido" : "Expandir pedido"
+                    }
                     className="flex-shrink-0"
                   >
                     <ChevronDown
@@ -295,7 +353,9 @@ function AdminDashboard() {
 
                   {/* Nº pedido + nombre */}
                   <div className="min-w-[130px] flex-1">
-                    <p className="text-xs font-bold text-gray-900">{order.id}</p>
+                    <p className="text-xs font-bold text-gray-900">
+                      {order.id}
+                    </p>
                     <p className="text-xs text-gray-600">{order.userName}</p>
                   </div>
 
@@ -310,15 +370,19 @@ function AdminDashboard() {
                   {/* Status changer */}
                   <select
                     value={order.adminStatus}
-                    onChange={(e) => updateStatus(order.id, e.target.value as AdminOrderStatus)}
+                    onChange={(e) =>
+                      updateStatus(order.id, e.target.value as AdminOrderStatus)
+                    }
                     aria-label={`Cambiar estado del pedido ${order.id}`}
                     className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs outline-none focus:border-[#2563eb]"
                   >
-                    {(Object.keys(STATUS_CFG) as AdminOrderStatus[]).map((s) => (
-                      <option key={s} value={s}>
-                        {STATUS_CFG[s].label}
-                      </option>
-                    ))}
+                    {(Object.keys(STATUS_CFG) as AdminOrderStatus[]).map(
+                      (s) => (
+                        <option key={s} value={s}>
+                          {STATUS_CFG[s].label}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </div>
 
@@ -328,40 +392,70 @@ function AdminDashboard() {
                     {/* Meta grid */}
                     <div className="mb-3 grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-gray-600 sm:grid-cols-3">
                       <div>
-                        <span className="font-semibold">Dirección completa:</span>
-                        <br />{order.address}
+                        <span className="font-semibold">
+                          Dirección completa:
+                        </span>
+                        <br />
+                        {order.address}
                       </div>
-                      <div><span className="font-semibold">Forma de pago:</span> {order.paymentMethod}</div>
+                      <div>
+                        <span className="font-semibold">Forma de pago:</span>{" "}
+                        {order.paymentMethod}
+                      </div>
                       <div>
                         <span className="font-semibold">Tipo de cliente:</span>{" "}
                         <span
                           className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold"
-                          style={{ color: roleCfg.color, backgroundColor: roleCfg.bg }}
+                          style={{
+                            color: roleCfg.color,
+                            backgroundColor: roleCfg.bg,
+                          }}
                         >
                           {roleCfg.label}
                         </span>
                       </div>
                       {order.trackingNumber && (
-                        <div><span className="font-semibold">Nº seguimiento:</span> <span className="font-mono">{order.trackingNumber}</span></div>
+                        <div>
+                          <span className="font-semibold">Nº seguimiento:</span>{" "}
+                          <span className="font-mono">
+                            {order.trackingNumber}
+                          </span>
+                        </div>
                       )}
                       {order.couponCode && (
-                        <div><span className="font-semibold">Cupón:</span> {order.couponCode} (-{order.couponDiscount?.toFixed(2)}€)</div>
+                        <div>
+                          <span className="font-semibold">Cupón:</span>{" "}
+                          {order.couponCode} (-
+                          {order.couponDiscount?.toFixed(2)}€)
+                        </div>
                       )}
                       {order.adminNotes && (
-                        <div className="col-span-2 sm:col-span-3"><span className="font-semibold">Notas internas:</span> {order.adminNotes}</div>
+                        <div className="col-span-2 sm:col-span-3">
+                          <span className="font-semibold">Notas internas:</span>{" "}
+                          {order.adminNotes}
+                        </div>
                       )}
                     </div>
 
                     {/* Items list */}
                     <div className="mb-3 overflow-hidden rounded-lg border border-gray-100">
                       {order.items.map((item, i) => (
-                        <div key={i} className="flex items-center gap-3 border-b border-gray-100 px-3 py-2 last:border-0">
+                        <div
+                          key={i}
+                          className="flex items-center gap-3 border-b border-gray-100 px-3 py-2 last:border-0"
+                        >
                           <div className="flex-1 text-xs">
                             <span className="font-semibold">{item.name}</span>
-                            <span className="ml-2 text-gray-400">×{item.qty}</span>
+                            <span className="ml-2 text-gray-400">
+                              ×{item.qty}
+                            </span>
                           </div>
-                          <span className="text-xs text-gray-500">{item.price.toFixed(2)} € / u</span>
-                          <span className="min-w-[50px] text-right text-xs font-bold text-gray-900">{(item.price * item.qty).toFixed(2)} €</span>
+                          <span className="text-xs text-gray-500">
+                            {item.price.toFixed(2)} € / u
+                          </span>
+                          <span className="min-w-[50px] text-right text-xs font-bold text-gray-900">
+                            {(item.price * item.qty).toFixed(2)} €
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -369,8 +463,12 @@ function AdminDashboard() {
                     {/* Incident */}
                     {order.incident && (
                       <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                        <p className="font-bold">Incidencia: {order.incident.type}</p>
-                        <p className="mt-0.5 text-red-600">{order.incident.description}</p>
+                        <p className="font-bold">
+                          Incidencia: {order.incident.type}
+                        </p>
+                        <p className="mt-0.5 text-red-600">
+                          {order.incident.description}
+                        </p>
                       </div>
                     )}
 
@@ -449,7 +547,9 @@ export default function CuentaPage() {
         <div className="mb-6 rounded-2xl bg-gradient-to-br from-[#2563eb] to-[#3b82f6] p-6 text-white">
           <p className="mb-1 text-sm text-blue-200">Panel de administración</p>
           <h1 className="text-xl font-bold">Hola, {user.name} 👋</h1>
-          <p className="text-sm text-blue-200">Últimos 20 pedidos — gestión rápida de estado y envíos.</p>
+          <p className="text-sm text-blue-200">
+            Últimos 20 pedidos — gestión rápida de estado y envíos.
+          </p>
         </div>
         <AdminDashboard />
       </div>
@@ -524,9 +624,9 @@ export default function CuentaPage() {
         <h1 className="mb-1 text-2xl font-bold">Hola, {user.name} 👋</h1>
         <p className="text-sm text-blue-200">
           {user.role === "mayorista" &&
-            "Estás viendo precios PVP Mayoristas en todo el catálogo."}
+            "Estás viendo precios PV Mayoristas en todo el catálogo."}
           {user.role === "tienda" &&
-            "Estás viendo precios PVP Tiendas TCG en todo el catálogo."}
+            "Estás viendo precios PV Tiendas TCG Academy en todo el catálogo."}
           {user.role === "cliente" &&
             "Explora el catálogo y gestiona tus pedidos desde aquí."}
         </p>

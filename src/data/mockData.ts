@@ -1023,7 +1023,11 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     adminNotes:
       "Cliente habitual — siempre recoge en tienda o prefiere envío express.",
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-01", "10:15"), by: "sistema" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-01", "10:15"),
+        by: "sistema",
+      },
       {
         status: "pendiente_envio",
         date: _DT("2026-03-01", "11:30"),
@@ -1075,7 +1079,11 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     address: "Calle Industria 30, Nave 3, 46017 Valencia",
     paymentMethod: "Transferencia bancaria",
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-05", "09:00"), by: "sistema" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-05", "09:00"),
+        by: "sistema",
+      },
       {
         status: "pendiente_envio",
         date: _DT("2026-03-05", "12:00"),
@@ -1129,7 +1137,11 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     address: "Gran Vía 45, 5ºC, 48001 Bilbao",
     paymentMethod: "PayPal",
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-08", "15:40"), by: "sistema" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-08", "15:40"),
+        by: "sistema",
+      },
       {
         status: "pendiente_envio",
         date: _DT("2026-03-08", "17:00"),
@@ -1199,7 +1211,11 @@ export const ADMIN_ORDERS: AdminOrder[] = [
       ],
     },
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-10", "10:00"), by: "sistema" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-10", "10:00"),
+        by: "sistema",
+      },
       {
         status: "pendiente_envio",
         date: _DT("2026-03-10", "12:00"),
@@ -1263,7 +1279,11 @@ export const ADMIN_ORDERS: AdminOrder[] = [
       ],
     },
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-12", "08:00"), by: "sistema" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-12", "08:00"),
+        by: "sistema",
+      },
       {
         status: "pendiente_envio",
         date: _DT("2026-03-12", "11:00"),
@@ -1305,7 +1325,11 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     adminNotes:
       "Suministro parcial: solo 6 unidades en stock. Faltan 4 ETB — pendiente de reposición. Notificar cuando lleguen.",
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-18", "09:30"), by: "sistema" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-18", "09:30"),
+        by: "sistema",
+      },
       {
         status: "pendiente_envio",
         date: _DT("2026-03-18", "11:00"),
@@ -1351,7 +1375,11 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     address: "Calle Ancha 22, 1ºD, 08001 Barcelona",
     paymentMethod: "Bizum",
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-20", "16:20"), by: "sistema" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-20", "16:20"),
+        by: "sistema",
+      },
       {
         status: "pendiente_envio",
         date: _DT("2026-03-21", "09:00"),
@@ -1398,7 +1426,11 @@ export const ADMIN_ORDERS: AdminOrder[] = [
       "Polígono Industrial Can Parellada, Nave 15, 08228 Terrassa, Barcelona",
     paymentMethod: "Transferencia bancaria",
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-22", "08:00"), by: "sistema" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-22", "08:00"),
+        by: "sistema",
+      },
       {
         status: "pendiente_envio",
         date: _DT("2026-03-22", "11:30"),
@@ -1436,7 +1468,11 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     address: "Calle Fuencarral 78, 28004 Madrid",
     paymentMethod: "Tarjeta Visa ****1122",
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-25", "10:00"), by: "sistema" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-25", "10:00"),
+        by: "sistema",
+      },
       {
         status: "pendiente_envio",
         date: _DT("2026-03-25", "15:30"),
@@ -1477,7 +1513,11 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     adminNotes:
       "Cliente VIP — envío siempre GLS Express. Confirmar disponibilidad Stellar Crown antes de preparar.",
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-26", "09:15"), by: "sistema" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-26", "09:15"),
+        by: "sistema",
+      },
       {
         status: "pendiente_envio",
         date: _DT("2026-03-26", "14:00"),
@@ -1516,7 +1556,11 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     address: "Calle Comercio 45, 08003 Barcelona",
     paymentMethod: "Tarjeta Mastercard ****9876",
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-27", "11:00"), by: "sistema" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-27", "11:00"),
+        by: "sistema",
+      },
       {
         status: "pendiente_envio",
         date: _DT("2026-03-27", "16:45"),
@@ -1555,7 +1599,11 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     address: "Avda. de la Constitución 8, 3ºA, 41001 Sevilla",
     paymentMethod: "Tarjeta Visa ****8899",
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-25", "08:30"), by: "sistema" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-25", "08:30"),
+        by: "sistema",
+      },
     ],
   },
   // ── FAC-2026-00013 · cliente · pagado ────────────────────────────────────
@@ -1589,7 +1637,11 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     address: "Calle Mayor 15, 2ºB, 28001 Madrid",
     paymentMethod: "PayPal",
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-27", "19:12"), by: "sistema" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-27", "19:12"),
+        by: "sistema",
+      },
     ],
   },
   // ── FAC-2026-00014 · cliente · pendiente (hoy, 2º pedido de Laura) ─────────
@@ -1616,7 +1668,11 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     address: "Calle Mayor 15, 2ºB, 28001 Madrid",
     paymentMethod: "Bizum",
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-28", "10:05"), by: "sistema" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-28", "10:05"),
+        by: "sistema",
+      },
     ],
   },
   // ── FAC-2026-00015 · cliente · cancelado ─────────────────────────────────
@@ -1644,8 +1700,17 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     paymentMethod: "Tarjeta Visa ****1234",
     adminNotes: "Cliente solicitó cancelación por duplicado accidental.",
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-20", "09:00"), by: "sistema" },
-      { status: "cancelado", date: _DT("2026-03-20", "14:30"), by: "admin", note: "Cancelado a petición del cliente" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-20", "09:00"),
+        by: "sistema",
+      },
+      {
+        status: "cancelado",
+        date: _DT("2026-03-20", "14:30"),
+        by: "admin",
+        note: "Cancelado a petición del cliente",
+      },
     ],
   },
   // ── FAC-2026-00016 · tienda · devolución ─────────────────────────────────
@@ -1673,10 +1738,24 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     paymentMethod: "Transferencia bancaria",
     adminNotes: "Producto llegó con desperfectos en el embalaje exterior.",
     statusHistory: [
-      { status: "pendiente_envio", date: _DT("2026-03-10", "10:00"), by: "sistema" },
-      { status: "enviado", date: _DT("2026-03-12", "15:00"), by: "admin", note: "GLS ES2026031200099" },
+      {
+        status: "pendiente_envio",
+        date: _DT("2026-03-10", "10:00"),
+        by: "sistema",
+      },
+      {
+        status: "enviado",
+        date: _DT("2026-03-12", "15:00"),
+        by: "admin",
+        note: "GLS ES2026031200099",
+      },
       { status: "finalizado", date: _DT("2026-03-15", "11:00"), by: "sistema" },
-      { status: "devolucion", date: _DT("2026-03-22", "09:30"), by: "admin", note: "Devolución aceptada por desperfectos" },
+      {
+        status: "devolucion",
+        date: _DT("2026-03-22", "09:30"),
+        by: "admin",
+        note: "Devolución aceptada por desperfectos",
+      },
     ],
     trackingNumber: "ES2026031200099",
   },
@@ -1843,3 +1922,699 @@ export const MOCK_BROADCASTS: Broadcast[] = [
 ];
 
 export const BROADCAST_STORAGE_KEY = "tcgacademy_broadcasts";
+
+// ─── Extended sales data ───────────────────────────────────────────────────────
+
+// ─── User growth ──────────────────────────────────────────────────────────────
+export const MOCK_USERS_7D = [
+  { day: "Lun", newUsers: 3, totalUsers: 91 },
+  { day: "Mar", newUsers: 6, totalUsers: 97 },
+  { day: "Mié", newUsers: 2, totalUsers: 99 },
+  { day: "Jue", newUsers: 8, totalUsers: 107 },
+  { day: "Vie", newUsers: 5, totalUsers: 112 },
+  { day: "Sáb", newUsers: 9, totalUsers: 121 },
+  { day: "Dom", newUsers: 4, totalUsers: 125 },
+];
+export const MOCK_USERS_30D = [
+  { day: "06/03", newUsers: 4, totalUsers: 72 },
+  { day: "08/03", newUsers: 7, totalUsers: 79 },
+  { day: "10/03", newUsers: 3, totalUsers: 82 },
+  { day: "12/03", newUsers: 9, totalUsers: 91 },
+  { day: "14/03", newUsers: 5, totalUsers: 96 },
+  { day: "16/03", newUsers: 6, totalUsers: 102 },
+  { day: "18/03", newUsers: 2, totalUsers: 104 },
+  { day: "20/03", newUsers: 8, totalUsers: 112 },
+  { day: "22/03", newUsers: 4, totalUsers: 116 },
+  { day: "24/03", newUsers: 11, totalUsers: 127 },
+  { day: "26/03", newUsers: 3, totalUsers: 130 },
+  { day: "28/03", newUsers: 7, totalUsers: 137 },
+  { day: "30/03", newUsers: 5, totalUsers: 142 },
+  { day: "01/04", newUsers: 10, totalUsers: 152 },
+  { day: "04/04", newUsers: 6, totalUsers: 158 },
+];
+export const MOCK_USERS_3M = [
+  { day: "Sem 1 Feb", newUsers: 18, totalUsers: 52 },
+  { day: "Sem 2 Feb", newUsers: 24, totalUsers: 76 },
+  { day: "Sem 3 Feb", newUsers: 15, totalUsers: 91 },
+  { day: "Sem 4 Feb", newUsers: 31, totalUsers: 122 },
+  { day: "Sem 1 Mar", newUsers: 19, totalUsers: 141 },
+  { day: "Sem 2 Mar", newUsers: 28, totalUsers: 169 },
+  { day: "Sem 3 Mar", newUsers: 22, totalUsers: 191 },
+  { day: "Sem 4 Mar", newUsers: 35, totalUsers: 226 },
+  { day: "Sem 1 Abr", newUsers: 17, totalUsers: 243 },
+  { day: "Sem 2 Abr", newUsers: 41, totalUsers: 284 },
+  { day: "Sem 3 Abr", newUsers: 26, totalUsers: 310 },
+  { day: "Sem 4 Abr", newUsers: 38, totalUsers: 348 },
+];
+
+// ─── Product growth ───────────────────────────────────────────────────────────
+export const MOCK_PRODUCTS_7D = [
+  { day: "Lun", newProducts: 1, totalProducts: 118 },
+  { day: "Mar", newProducts: 3, totalProducts: 121 },
+  { day: "Mié", newProducts: 0, totalProducts: 121 },
+  { day: "Jue", newProducts: 2, totalProducts: 123 },
+  { day: "Vie", newProducts: 4, totalProducts: 127 },
+  { day: "Sáb", newProducts: 1, totalProducts: 128 },
+  { day: "Dom", newProducts: 0, totalProducts: 128 },
+];
+export const MOCK_PRODUCTS_30D = [
+  { day: "06/03", newProducts: 2, totalProducts: 98 },
+  { day: "08/03", newProducts: 4, totalProducts: 102 },
+  { day: "10/03", newProducts: 1, totalProducts: 103 },
+  { day: "12/03", newProducts: 5, totalProducts: 108 },
+  { day: "14/03", newProducts: 0, totalProducts: 108 },
+  { day: "16/03", newProducts: 3, totalProducts: 111 },
+  { day: "18/03", newProducts: 6, totalProducts: 117 },
+  { day: "20/03", newProducts: 1, totalProducts: 118 },
+  { day: "22/03", newProducts: 2, totalProducts: 120 },
+  { day: "24/03", newProducts: 4, totalProducts: 124 },
+  { day: "26/03", newProducts: 0, totalProducts: 124 },
+  { day: "28/03", newProducts: 3, totalProducts: 127 },
+  { day: "30/03", newProducts: 1, totalProducts: 128 },
+  { day: "01/04", newProducts: 2, totalProducts: 130 },
+  { day: "04/04", newProducts: 1, totalProducts: 131 },
+];
+export const MOCK_PRODUCTS_3M = [
+  { day: "Sem 1 Feb", newProducts: 8, totalProducts: 72 },
+  { day: "Sem 2 Feb", newProducts: 12, totalProducts: 84 },
+  { day: "Sem 3 Feb", newProducts: 6, totalProducts: 90 },
+  { day: "Sem 4 Feb", newProducts: 14, totalProducts: 104 },
+  { day: "Sem 1 Mar", newProducts: 7, totalProducts: 111 },
+  { day: "Sem 2 Mar", newProducts: 9, totalProducts: 120 },
+  { day: "Sem 3 Mar", newProducts: 5, totalProducts: 125 },
+  { day: "Sem 4 Mar", newProducts: 11, totalProducts: 136 },
+  { day: "Sem 1 Abr", newProducts: 4, totalProducts: 140 },
+  { day: "Sem 2 Abr", newProducts: 13, totalProducts: 153 },
+  { day: "Sem 3 Abr", newProducts: 8, totalProducts: 161 },
+  { day: "Sem 4 Abr", newProducts: 15, totalProducts: 176 },
+];
+
+// ─── Discount usage ───────────────────────────────────────────────────────────
+export const MOCK_DISCOUNTS_7D = [
+  { day: "Lun", used: 5, redeemed: 2 },
+  { day: "Mar", used: 9, redeemed: 4 },
+  { day: "Mié", used: 3, redeemed: 1 },
+  { day: "Jue", used: 14, redeemed: 7 },
+  { day: "Vie", used: 11, redeemed: 5 },
+  { day: "Sáb", used: 18, redeemed: 9 },
+  { day: "Dom", used: 8, redeemed: 3 },
+];
+export const MOCK_DISCOUNTS_30D = [
+  { day: "06/03", used: 6, redeemed: 2 },
+  { day: "08/03", used: 10, redeemed: 5 },
+  { day: "10/03", used: 4, redeemed: 1 },
+  { day: "12/03", used: 15, redeemed: 8 },
+  { day: "14/03", used: 9, redeemed: 4 },
+  { day: "16/03", used: 13, redeemed: 6 },
+  { day: "18/03", used: 7, redeemed: 3 },
+  { day: "20/03", used: 19, redeemed: 10 },
+  { day: "22/03", used: 8, redeemed: 4 },
+  { day: "24/03", used: 22, redeemed: 12 },
+  { day: "26/03", used: 11, redeemed: 5 },
+  { day: "28/03", used: 16, redeemed: 7 },
+  { day: "30/03", used: 9, redeemed: 4 },
+  { day: "01/04", used: 24, redeemed: 14 },
+  { day: "04/04", used: 14, redeemed: 6 },
+];
+export const MOCK_DISCOUNTS_3M = [
+  { day: "Sem 1 Feb", used: 38, redeemed: 18 },
+  { day: "Sem 2 Feb", used: 52, redeemed: 26 },
+  { day: "Sem 3 Feb", used: 41, redeemed: 20 },
+  { day: "Sem 4 Feb", used: 67, redeemed: 34 },
+  { day: "Sem 1 Mar", used: 49, redeemed: 24 },
+  { day: "Sem 2 Mar", used: 74, redeemed: 38 },
+  { day: "Sem 3 Mar", used: 58, redeemed: 29 },
+  { day: "Sem 4 Mar", used: 89, redeemed: 45 },
+  { day: "Sem 1 Abr", used: 63, redeemed: 31 },
+  { day: "Sem 2 Abr", used: 97, redeemed: 51 },
+  { day: "Sem 3 Abr", used: 78, redeemed: 40 },
+  { day: "Sem 4 Abr", used: 112, redeemed: 58 },
+];
+
+export const MOCK_SALES_30D = [
+  { day: "06/03", sales: 380, orders: 3 },
+  { day: "07/03", sales: 520, orders: 5 },
+  { day: "08/03", sales: 290, orders: 2 },
+  { day: "09/03", sales: 810, orders: 7 },
+  { day: "10/03", sales: 640, orders: 6 },
+  { day: "11/03", sales: 1120, orders: 11 },
+  { day: "12/03", sales: 430, orders: 4 },
+  { day: "13/03", sales: 760, orders: 7 },
+  { day: "14/03", sales: 920, orders: 9 },
+  { day: "15/03", sales: 340, orders: 3 },
+  { day: "16/03", sales: 1080, orders: 10 },
+  { day: "17/03", sales: 870, orders: 8 },
+  { day: "18/03", sales: 1340, orders: 13 },
+  { day: "19/03", sales: 590, orders: 5 },
+  { day: "20/03", sales: 710, orders: 6 },
+  { day: "21/03", sales: 980, orders: 9 },
+  { day: "22/03", sales: 450, orders: 4 },
+  { day: "23/03", sales: 1190, orders: 11 },
+  { day: "24/03", sales: 820, orders: 8 },
+  { day: "25/03", sales: 1560, orders: 15 },
+  { day: "26/03", sales: 670, orders: 6 },
+  { day: "27/03", sales: 420, orders: 4 },
+  { day: "28/03", sales: 850, orders: 8 },
+  { day: "29/03", sales: 320, orders: 3 },
+  { day: "30/03", sales: 1240, orders: 12 },
+  { day: "31/03", sales: 980, orders: 9 },
+  { day: "01/04", sales: 1560, orders: 15 },
+  { day: "02/04", sales: 740, orders: 7 },
+  { day: "03/04", sales: 1090, orders: 10 },
+  { day: "04/04", sales: 930, orders: 9 },
+];
+
+export const MOCK_SALES_3M = [
+  { day: "Sem 1 Feb", sales: 3840, orders: 36 },
+  { day: "Sem 2 Feb", sales: 5120, orders: 48 },
+  { day: "Sem 3 Feb", sales: 4390, orders: 41 },
+  { day: "Sem 4 Feb", sales: 6780, orders: 63 },
+  { day: "Sem 1 Mar", sales: 5210, orders: 49 },
+  { day: "Sem 2 Mar", sales: 7340, orders: 68 },
+  { day: "Sem 3 Mar", sales: 6120, orders: 57 },
+  { day: "Sem 4 Mar", sales: 8910, orders: 83 },
+  { day: "Sem 1 Abr", sales: 7230, orders: 67 },
+  { day: "Sem 2 Abr", sales: 9840, orders: 91 },
+  { day: "Sem 3 Abr", sales: 8560, orders: 79 },
+  { day: "Sem 4 Abr", sales: 11240, orders: 104 },
+];
+
+// ─── Top products ──────────────────────────────────────────────────────────────
+
+export const MOCK_TOP_PRODUCTS = [
+  {
+    id: 5,
+    name: "Pokémon Prismatic Evolutions ETB",
+    game: "pokemon",
+    units: 89,
+    revenue: 3669.69,
+    trend: +12,
+  },
+  {
+    id: 3,
+    name: "Magic: Bloomburrow Draft Booster Box",
+    game: "magic",
+    units: 54,
+    revenue: 5732.64,
+    trend: +8,
+  },
+  {
+    id: 2,
+    name: "Pokémon: Prismatic Evolutions Booster Box",
+    game: "pokemon",
+    units: 47,
+    revenue: 5163.44,
+    trend: +21,
+  },
+  {
+    id: 8,
+    name: "One Piece: OP10 Booster Box",
+    game: "one-piece",
+    units: 43,
+    revenue: 2365.0,
+    trend: -3,
+  },
+  {
+    id: 1,
+    name: "Naruto Mythos Booster Box",
+    game: "naruto",
+    units: 38,
+    revenue: 2491.28,
+    trend: +5,
+  },
+  {
+    id: 12,
+    name: "Dragon Ball SCG: Set 7 Booster",
+    game: "dragonball",
+    units: 31,
+    revenue: 1023.0,
+    trend: +14,
+  },
+  {
+    id: 6,
+    name: "Yu-Gi-Oh!: Rage of the Abyss Booster Box",
+    game: "yugioh",
+    units: 28,
+    revenue: 2548.44,
+    trend: -7,
+  },
+  {
+    id: 4,
+    name: "Lorcana: Archazia's Island Booster Box",
+    game: "lorcana",
+    units: 22,
+    revenue: 1847.56,
+    trend: +2,
+  },
+];
+
+// ─── Revenue by game ───────────────────────────────────────────────────────────
+
+export const MOCK_REVENUE_BY_GAME = [
+  { game: "Pokémon", revenue: 12480, color: "#FFCC00", pct: 38 },
+  { game: "Magic", revenue: 9320, color: "#9B4DCA", pct: 28 },
+  { game: "One Piece", revenue: 4210, color: "#EF4444", pct: 13 },
+  { game: "Yu-Gi-Oh!", revenue: 3180, color: "#F97316", pct: 10 },
+  { game: "Naruto", revenue: 1840, color: "#EAB308", pct: 6 },
+  { game: "Otros", revenue: 1730, color: "#94A3B8", pct: 5 },
+];
+
+// ─── Visits by Spanish province ───────────────────────────────────────────────
+
+export interface ProvinceVisit {
+  province: string;
+  comunidad: string;
+  visits: number;
+  orders: number;
+  revenue: number;
+}
+
+export const MOCK_PROVINCE_VISITS: ProvinceVisit[] = [
+  {
+    province: "Madrid",
+    comunidad: "Madrid",
+    visits: 8241,
+    orders: 312,
+    revenue: 28450,
+  },
+  {
+    province: "Barcelona",
+    comunidad: "Cataluña",
+    visits: 6892,
+    orders: 241,
+    revenue: 22180,
+  },
+  {
+    province: "Valencia",
+    comunidad: "C. Valenciana",
+    visits: 3214,
+    orders: 118,
+    revenue: 10920,
+  },
+  {
+    province: "Sevilla",
+    comunidad: "Andalucía",
+    visits: 2891,
+    orders: 97,
+    revenue: 8740,
+  },
+  {
+    province: "Zaragoza",
+    comunidad: "Aragón",
+    visits: 1820,
+    orders: 63,
+    revenue: 5810,
+  },
+  {
+    province: "Málaga",
+    comunidad: "Andalucía",
+    visits: 1654,
+    orders: 54,
+    revenue: 4920,
+  },
+  {
+    province: "Murcia",
+    comunidad: "R. de Murcia",
+    visits: 1421,
+    orders: 48,
+    revenue: 4380,
+  },
+  {
+    province: "Alicante",
+    comunidad: "C. Valenciana",
+    visits: 1380,
+    orders: 45,
+    revenue: 4120,
+  },
+  {
+    province: "Vizcaya",
+    comunidad: "País Vasco",
+    visits: 1290,
+    orders: 43,
+    revenue: 3980,
+  },
+  {
+    province: "Valladolid",
+    comunidad: "Castilla y León",
+    visits: 1120,
+    orders: 38,
+    revenue: 3540,
+  },
+  {
+    province: "Córdoba",
+    comunidad: "Andalucía",
+    visits: 980,
+    orders: 32,
+    revenue: 2890,
+  },
+  {
+    province: "Palmas, Las",
+    comunidad: "Canarias",
+    visits: 910,
+    orders: 29,
+    revenue: 2640,
+  },
+  {
+    province: "Coruña, A",
+    comunidad: "Galicia",
+    visits: 870,
+    orders: 27,
+    revenue: 2480,
+  },
+  {
+    province: "Granada",
+    comunidad: "Andalucía",
+    visits: 841,
+    orders: 26,
+    revenue: 2320,
+  },
+  {
+    province: "Asturias",
+    comunidad: "Asturias",
+    visits: 790,
+    orders: 25,
+    revenue: 2180,
+  },
+  {
+    province: "Tarragona",
+    comunidad: "Cataluña",
+    visits: 720,
+    orders: 23,
+    revenue: 2040,
+  },
+  {
+    province: "Santa Cruz de Tenerife",
+    comunidad: "Canarias",
+    visits: 698,
+    orders: 22,
+    revenue: 1980,
+  },
+  {
+    province: "Cantabria",
+    comunidad: "Cantabria",
+    visits: 640,
+    orders: 20,
+    revenue: 1820,
+  },
+  {
+    province: "Girona",
+    comunidad: "Cataluña",
+    visits: 610,
+    orders: 19,
+    revenue: 1720,
+  },
+  {
+    province: "Toledo",
+    comunidad: "Castilla-La Mancha",
+    visits: 590,
+    orders: 18,
+    revenue: 1640,
+  },
+  {
+    province: "Salamanca",
+    comunidad: "Castilla y León",
+    visits: 560,
+    orders: 17,
+    revenue: 1540,
+  },
+  {
+    province: "Badajoz",
+    comunidad: "Extremadura",
+    visits: 520,
+    orders: 16,
+    revenue: 1440,
+  },
+  {
+    province: "Guipúzcoa",
+    comunidad: "País Vasco",
+    visits: 498,
+    orders: 15,
+    revenue: 1380,
+  },
+  {
+    province: "Navarra",
+    comunidad: "Navarra",
+    visits: 481,
+    orders: 15,
+    revenue: 1320,
+  },
+  {
+    province: "León",
+    comunidad: "Castilla y León",
+    visits: 450,
+    orders: 14,
+    revenue: 1240,
+  },
+  {
+    province: "Almería",
+    comunidad: "Andalucía",
+    visits: 430,
+    orders: 13,
+    revenue: 1180,
+  },
+  {
+    province: "Castellón",
+    comunidad: "C. Valenciana",
+    visits: 410,
+    orders: 12,
+    revenue: 1120,
+  },
+  {
+    province: "Huelva",
+    comunidad: "Andalucía",
+    visits: 390,
+    orders: 12,
+    revenue: 1080,
+  },
+  {
+    province: "Burgos",
+    comunidad: "Castilla y León",
+    visits: 370,
+    orders: 11,
+    revenue: 1020,
+  },
+  {
+    province: "Lleida",
+    comunidad: "Cataluña",
+    visits: 350,
+    orders: 10,
+    revenue: 960,
+  },
+  {
+    province: "Albacete",
+    comunidad: "Castilla-La Mancha",
+    visits: 330,
+    orders: 10,
+    revenue: 920,
+  },
+  {
+    province: "Logroño",
+    comunidad: "La Rioja",
+    visits: 312,
+    orders: 9,
+    revenue: 880,
+  },
+  {
+    province: "Pontevedra",
+    comunidad: "Galicia",
+    visits: 298,
+    orders: 9,
+    revenue: 840,
+  },
+  {
+    province: "Jaén",
+    comunidad: "Andalucía",
+    visits: 281,
+    orders: 8,
+    revenue: 800,
+  },
+  {
+    province: "Cáceres",
+    comunidad: "Extremadura",
+    visits: 260,
+    orders: 8,
+    revenue: 760,
+  },
+  {
+    province: "Álava",
+    comunidad: "País Vasco",
+    visits: 245,
+    orders: 7,
+    revenue: 720,
+  },
+  {
+    province: "Ciudad Real",
+    comunidad: "Castilla-La Mancha",
+    visits: 230,
+    orders: 7,
+    revenue: 680,
+  },
+  {
+    province: "Lugo",
+    comunidad: "Galicia",
+    visits: 218,
+    orders: 6,
+    revenue: 640,
+  },
+  {
+    province: "Ourense",
+    comunidad: "Galicia",
+    visits: 198,
+    orders: 6,
+    revenue: 580,
+  },
+  {
+    province: "Palencia",
+    comunidad: "Castilla y León",
+    visits: 185,
+    orders: 5,
+    revenue: 540,
+  },
+  {
+    province: "Zamora",
+    comunidad: "Castilla y León",
+    visits: 172,
+    orders: 5,
+    revenue: 500,
+  },
+  {
+    province: "Segovia",
+    comunidad: "Castilla y León",
+    visits: 160,
+    orders: 4,
+    revenue: 460,
+  },
+  {
+    province: "Guadalajara",
+    comunidad: "Castilla-La Mancha",
+    visits: 148,
+    orders: 4,
+    revenue: 420,
+  },
+  {
+    province: "Ávila",
+    comunidad: "Castilla y León",
+    visits: 135,
+    orders: 4,
+    revenue: 380,
+  },
+  {
+    province: "Cuenca",
+    comunidad: "Castilla-La Mancha",
+    visits: 122,
+    orders: 3,
+    revenue: 340,
+  },
+  {
+    province: "Huesca",
+    comunidad: "Aragón",
+    visits: 112,
+    orders: 3,
+    revenue: 320,
+  },
+  {
+    province: "Teruel",
+    comunidad: "Aragón",
+    visits: 98,
+    orders: 2,
+    revenue: 280,
+  },
+  {
+    province: "Soria",
+    comunidad: "Castilla y León",
+    visits: 85,
+    orders: 2,
+    revenue: 240,
+  },
+  {
+    province: "Ceuta",
+    comunidad: "Ceuta",
+    visits: 72,
+    orders: 2,
+    revenue: 200,
+  },
+  {
+    province: "Melilla",
+    comunidad: "Melilla",
+    visits: 61,
+    orders: 1,
+    revenue: 180,
+  },
+  {
+    province: "Rioja, La",
+    comunidad: "La Rioja",
+    visits: 52,
+    orders: 1,
+    revenue: 160,
+  },
+  {
+    province: "Baleares",
+    comunidad: "I. Baleares",
+    visits: 841,
+    orders: 28,
+    revenue: 2540,
+  },
+];
+
+// ─── Traffic sources ───────────────────────────────────────────────────────────
+
+export const MOCK_TRAFFIC_SOURCES = [
+  { source: "Búsqueda orgánica", visits: 14521, pct: 35, color: "#2563eb" },
+  { source: "Directo", visits: 11240, pct: 27, color: "#7c3aed" },
+  { source: "Redes sociales", visits: 8320, pct: 20, color: "#ec4899" },
+  { source: "Email marketing", visits: 4180, pct: 10, color: "#f59e0b" },
+  { source: "Referidos", visits: 2490, pct: 6, color: "#10b981" },
+  { source: "Otros", visits: 820, pct: 2, color: "#94a3b8" },
+];
+
+// ─── Devices ───────────────────────────────────────────────────────────────────
+
+export const MOCK_DEVICES = [
+  { device: "Móvil", visits: 20480, pct: 49, color: "#2563eb" },
+  { device: "Escritorio", visits: 14620, pct: 35, color: "#7c3aed" },
+  { device: "Tablet", visits: 6670, pct: 16, color: "#10b981" },
+];
+
+// ─── Top pages ─────────────────────────────────────────────────────────────────
+
+export const MOCK_TOP_PAGES = [
+  { page: "/", label: "Inicio", visits: 18420, bounce: 32 },
+  { page: "/pokemon", label: "Pokémon", visits: 12840, bounce: 28 },
+  { page: "/magic", label: "Magic: The Gathering", visits: 8920, bounce: 31 },
+  { page: "/one-piece", label: "One Piece TCG", visits: 5640, bounce: 35 },
+  { page: "/registro", label: "Registro", visits: 3210, bounce: 58 },
+  { page: "/login", label: "Iniciar sesión", visits: 2890, bounce: 42 },
+  { page: "/yugioh", label: "Yu-Gi-Oh!", visits: 2540, bounce: 37 },
+  { page: "/mayoristas", label: "Mayoristas", visits: 1980, bounce: 22 },
+  { page: "/tiendas", label: "Tiendas", visits: 1420, bounce: 45 },
+  { page: "/eventos", label: "Eventos", visits: 980, bounce: 51 },
+];
+
+// ─── Hourly traffic ────────────────────────────────────────────────────────────
+
+export const MOCK_HOURLY_TRAFFIC = [
+  { hour: "00h", visits: 120 },
+  { hour: "01h", visits: 80 },
+  { hour: "02h", visits: 60 },
+  { hour: "03h", visits: 45 },
+  { hour: "04h", visits: 38 },
+  { hour: "05h", visits: 52 },
+  { hour: "06h", visits: 145 },
+  { hour: "07h", visits: 320 },
+  { hour: "08h", visits: 580 },
+  { hour: "09h", visits: 890 },
+  { hour: "10h", visits: 1240 },
+  { hour: "11h", visits: 1480 },
+  { hour: "12h", visits: 1320 },
+  { hour: "13h", visits: 1180 },
+  { hour: "14h", visits: 980 },
+  { hour: "15h", visits: 1090 },
+  { hour: "16h", visits: 1340 },
+  { hour: "17h", visits: 1620 },
+  { hour: "18h", visits: 1890 },
+  { hour: "19h", visits: 2140 },
+  { hour: "20h", visits: 2320 },
+  { hour: "21h", visits: 1980 },
+  { hour: "22h", visits: 1540 },
+  { hour: "23h", visits: 820 },
+];

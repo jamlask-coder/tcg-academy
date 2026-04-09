@@ -20,6 +20,8 @@ interface InlineEditProps {
   min?: string;
   /** Custom toast message (defaults to "Cambio guardado") */
   toastMessage?: string;
+  /** When true, suppress edit controls even for admin */
+  disabled?: boolean;
 }
 
 /** Toast shown after save */
@@ -40,6 +42,7 @@ export function InlineEdit({
   step,
   min,
   toastMessage,
+  disabled = false,
 }: InlineEditProps) {
   const { user } = useAuth();
   const [editing, setEditing] = useState(false);
@@ -54,7 +57,7 @@ export function InlineEdit({
     if (editing && inputRef.current) inputRef.current.focus();
   }, [editing]);
 
-  if (!isAdmin) {
+  if (!isAdmin || disabled) {
     return <span className={className}>{children ?? value}</span>;
   }
 

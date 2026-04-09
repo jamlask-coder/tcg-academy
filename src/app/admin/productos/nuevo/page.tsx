@@ -13,7 +13,7 @@ export default function NuevoProductoPage() {
     tags: string[],
     images: string[],
   ) => {
-    const product = { ...data, id: Date.now(), tags, images };
+    const product = { ...data, id: Date.now(), tags, images, createdAt: new Date().toISOString().slice(0, 10) };
     const stored = JSON.parse(
       localStorage.getItem("tcgacademy_new_products") ?? "[]",
     );
@@ -21,6 +21,7 @@ export default function NuevoProductoPage() {
       "tcgacademy_new_products",
       JSON.stringify([...stored, product]),
     );
+    window.dispatchEvent(new Event("tcga:products:updated"));
     router.push("/admin/productos");
   };
 
@@ -29,7 +30,7 @@ export default function NuevoProductoPage() {
     tags: string[],
     images: string[],
   ) => {
-    const product = { ...data, id: Date.now(), tags, images };
+    const product = { ...data, id: Date.now(), tags, images, createdAt: new Date().toISOString().slice(0, 10) };
     const stored = JSON.parse(
       localStorage.getItem("tcgacademy_new_products") ?? "[]",
     );
@@ -37,6 +38,7 @@ export default function NuevoProductoPage() {
       "tcgacademy_new_products",
       JSON.stringify([...stored, product]),
     );
+    window.dispatchEvent(new Event("tcga:products:updated"));
     window.location.reload();
   };
 

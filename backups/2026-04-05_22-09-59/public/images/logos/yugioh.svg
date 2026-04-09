@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 42">
+  <defs>
+    <linearGradient id="ygo" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="50%" stop-color="#1d4ed8"/>
+      <stop offset="100%" stop-color="#1e3a8a"/>
+    </linearGradient>
+    <linearGradient id="ygb" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <!-- Millennium Puzzle / Eye of Anubis icon -->
+  <g transform="translate(1,1)">
+    <!-- Outer triangle (inverted pyramid) -->
+    <polygon points="16,2 28,22 4,22" fill="none" stroke="url(#ygb)" stroke-width="2"/>
+    <!-- Inner shape -->
+    <polygon points="16,7 24,20 8,20" fill="none" stroke="url(#ygb)" stroke-width="1" opacity="0.5"/>
+    <!-- Eye of Ra in center -->
+    <ellipse cx="16" cy="15" rx="5" ry="3" fill="#fbbf24" opacity="0.9"/>
+    <ellipse cx="16" cy="15" rx="2.5" ry="2" fill="#1e3a8a"/>
+    <circle cx="16" cy="15" r="1" fill="#fbbf24"/>
+    <!-- Eye lines extending -->
+    <path d="M11,15 Q9,13 9,11" stroke="#fbbf24" stroke-width="0.8" fill="none"/>
+    <path d="M21,15 Q23,13 23,11" stroke="#fbbf24" stroke-width="0.8" fill="none"/>
+  </g>
+  <!-- YU-GI-OH! text with blue gradient -->
+  <text x="33" y="27"
+    font-family="Georgia, 'Palatino Linotype', 'Times New Roman', serif"
+    font-weight="900"
+    font-size="20"
+    fill="url(#ygo)"
+    stroke="#93c5fd"
+    stroke-width="0.5"
+    paint-order="stroke fill"
+    font-style="italic"
+    letter-spacing="0.5">YU-GI-OH!</text>
+  <!-- Small decorative line -->
+  <line x1="33" y1="30" x2="124" y2="30" stroke="#1d4ed8" stroke-width="0.5" opacity="0.4"/>
+  <text x="33" y="38"
+    font-family="Georgia, serif"
+    font-size="7"
+    fill="#1e40af"
+    letter-spacing="2.5">TRADING CARD GAME</text>
+</svg>

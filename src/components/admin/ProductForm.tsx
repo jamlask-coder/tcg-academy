@@ -4,7 +4,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
-import { ArrowLeft, Plus, X, ShoppingCart } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Plus, Trash2, X } from "lucide-react";
 import {
   GAME_CONFIG,
   LANGUAGE_FLAGS,
@@ -14,6 +15,7 @@ import {
 import { LanguageFlag } from "@/components/ui/LanguageFlag";
 import { CardSearchPanel } from "@/components/admin/CardSearchPanel";
 import { ImageSelector } from "@/components/admin/ImageSelector";
+import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import type { ExternalCardData } from "@/types/card";
 
 const CARD_SEARCH_GAMES = new Set(["pokemon"]);
@@ -110,7 +112,6 @@ export const productSchema = z
   .object({
     name: z.string().min(3, "Mínimo 3 caracteres").max(200),
     slug: z.string().min(3, "El slug es obligatorio").max(100),
-    shortDescription: z.string().max(500).optional(),
     description: z.string().max(5000).optional(),
     game: z.string().min(1, "Selecciona un juego").max(50),
     category: z.string().min(1, "Selecciona una categoría").max(50),
@@ -124,7 +125,7 @@ export const productSchema = z
     isNew: z.boolean(),
   })
   .refine((d) => d.wholesalePrice < d.price, {
-    message: "Mayorista debe ser menor que PVP Público",
+    message: "Mayorista debe ser menor que PV Público",
     path: ["wholesalePrice"],
   })
   .refine((d) => d.storePrice < d.wholesalePrice, {
@@ -132,7 +133,7 @@ export const productSchema = z
     path: ["storePrice"],
   })
   .refine((d) => !d.costPrice || d.costPrice < d.storePrice, {
-    message: "Coste debe ser menor que PVP Tiendas TCG",
+    message: "Precio Adquisición debe ser menor que PV Tiendas TCG Academy",
     path: ["costPrice"],
   });
 
@@ -165,6 +166,7 @@ interface ProductFormProps {
     tags: string[],
     images: string[],
   ) => void;
+  onDelete?: () => void;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
@@ -186,11 +188,23 @@ export function ProductForm({
   submitLabel,
   onSubmit,
   onSubmitAndNew,
+  onDelete,
 }: ProductFormProps) {
+  const router = useRouter();
   const [tags, setTags] = useState<string[]>(initialTags);
   const [tagInput, setTagInput] = useState("");
   const [images, setImages] = useState<string[]>(initialImages ?? []);
   const [toast, setToast] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [modal, setModal] = useState<{
+    open: boolean;
+    type: "success" | "error";
+    name?: string;
+    image?: string;
+    href?: string;
+    errors?: string[];
+    isSaveAndNew?: boolean;
+  }>({ open: false, type: "success" });
 
   const {
     register,
@@ -211,8 +225,6 @@ export function ProductForm({
   const watchedName = watch("name");
   const watchedGame = watch("game");
   const watchedLanguage = watch("language");
-  const watchedPrice = watch("price");
-  const watchedIsNew = watch("isNew");
   const watchedCategory = watch("category");
 
   useEffect(() => {
@@ -246,26 +258,62 @@ export function ProductForm({
 
   const handleSave = (data: ProductFormValues) => {
     onSubmit(data, tags, images);
-    showToast(`Producto "${data.name}" guardado`);
+    const productHref = `/${data.game}/${data.category}/${data.slug}`;
+    setModal({
+      open: true,
+      type: "success",
+      name: data.name,
+      image: images[0],
+      href: productHref,
+      isSaveAndNew: false,
+    });
   };
 
   const handleSaveAndNew = (data: ProductFormValues) => {
     onSubmitAndNew?.(data, tags, images);
-    showToast(`Producto "${data.name}" guardado`);
+    const productHref = `/${data.game}/${data.category}/${data.slug}`;
+    setModal({
+      open: true,
+      type: "success",
+      name: data.name,
+      image: images[0],
+      href: productHref,
+      isSaveAndNew: true,
+    });
+  };
+
+  const handleInvalid = () => {
+    const errorMessages = Object.values(errors)
+      .map((e) => e?.message)
+      .filter(Boolean) as string[];
+    if (errorMessages.length > 0) {
+      setModal({
+        open: true,
+        type: "error",
+        errors: errorMessages,
+      });
+    }
   };
 
   const categories = GAME_CATEGORIES[watchedGame] ?? [];
-  const gameConfig = GAME_CONFIG[watchedGame];
+  const _gameConfig = GAME_CONFIG[watchedGame];
 
   const handleCardSelect = (card: ExternalCardData) => {
     setValue("name", card.name);
-    const shortDesc = [card.setName, card.rarity, card.hp ? `HP ${card.hp}` : ""]
+    const shortDesc = [
+      card.setName,
+      card.rarity,
+      card.hp ? `HP ${card.hp}` : "",
+    ]
       .filter(Boolean)
       .join(" · ");
-    if (shortDesc) setValue("shortDescription", shortDesc);
+    if (shortDesc) setValue("description", shortDesc);
     if (card.imageUrl) {
       setImages(
-        [card.imageUrl, ...(card.imageUrlHiRes ? [card.imageUrlHiRes] : [])].slice(0, 2),
+        [
+          card.imageUrl,
+          ...(card.imageUrlHiRes ? [card.imageUrlHiRes] : []),
+        ].slice(0, 2),
       );
     }
     const autoTags = [
@@ -280,13 +328,94 @@ export function ProductForm({
     showToast(`Datos de "${card.name}" cargados`);
   };
 
+  const closeModal = () => setModal((m) => ({ ...m, open: false }));
+
   return (
     <div>
+      {/* Toast for card-search feedback only */}
       {toast && (
         <div className="fixed right-6 bottom-6 z-50 rounded-2xl bg-[#2563eb] px-5 py-3 text-sm font-medium text-white shadow-xl">
           ✓ {toast}
         </div>
       )}
+
+      {/* Confirmation / Error modal */}
+      <ConfirmationModal
+        isOpen={modal.open}
+        type={modal.type}
+        title={
+          modal.type === "success"
+            ? "Producto guardado correctamente"
+            : "Error al guardar el producto"
+        }
+        message={
+          modal.type === "success"
+            ? "El producto ha sido añadido al catálogo."
+            : "Corrige los siguientes errores antes de guardar:"
+        }
+        productName={modal.name}
+        productImage={modal.image}
+        errors={modal.errors}
+        onClose={closeModal}
+        actions={
+          modal.type === "success"
+            ? [
+                {
+                  label: "Ver producto",
+                  href: modal.href,
+                  variant: "primary" as const,
+                },
+                onSubmitAndNew
+                  ? {
+                      label: "Añadir otro",
+                      onClick: modal.isSaveAndNew
+                        ? undefined
+                        : () => {
+                            closeModal();
+                            // Trigger "Guardar y añadir otro" flow navigates via nuevo/page.tsx reload
+                            router.push("/admin/productos/nuevo");
+                          },
+                      variant: "secondary" as const,
+                    }
+                  : {
+                      label: "Volver al catálogo",
+                      href: "/admin/productos",
+                      variant: "ghost" as const,
+                    },
+              ].filter(Boolean)
+            : [
+                {
+                  label: "Corregir",
+                  onClick: closeModal,
+                  variant: "primary" as const,
+                },
+              ]
+        }
+      />
+
+      {/* Confirm delete modal */}
+      <ConfirmationModal
+        isOpen={deleteConfirmOpen}
+        type="error"
+        title="Eliminar producto"
+        message={`¿Seguro que quieres eliminar "${subtitle ?? "este producto"}"? Esta acción no se puede deshacer.`}
+        onClose={() => setDeleteConfirmOpen(false)}
+        actions={[
+          {
+            label: "Cancelar",
+            onClick: () => setDeleteConfirmOpen(false),
+            variant: "secondary" as const,
+          },
+          {
+            label: "Eliminar",
+            onClick: () => {
+              setDeleteConfirmOpen(false);
+              onDelete?.();
+            },
+            variant: "danger" as const,
+          },
+        ]}
+      />
 
       <div className="mb-6 flex items-center gap-3">
         <Link
@@ -295,7 +424,7 @@ export function ProductForm({
         >
           <ArrowLeft size={18} />
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
           {subtitle && (
             <p className="mt-0.5 max-w-md truncate text-sm text-gray-500">
@@ -303,9 +432,19 @@ export function ProductForm({
             </p>
           )}
         </div>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={() => setDeleteConfirmOpen(true)}
+            className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100 hover:border-red-300"
+          >
+            <Trash2 size={15} />
+            Eliminar producto
+          </button>
+        )}
       </div>
 
-      <form onSubmit={handleSubmit(handleSave)} noValidate>
+      <form onSubmit={handleSubmit(handleSave, handleInvalid)} noValidate>
         {/* Card API search — shown only for Pokemon (or other future supported games) */}
         {CARD_SEARCH_GAMES.has(watchedGame) && (
           <div className="mb-5">
@@ -313,8 +452,7 @@ export function ProductForm({
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="space-y-5 lg:col-span-2">
+        <div className="space-y-5">
             {/* Información básica */}
             <section className="rounded-2xl border border-gray-200 bg-white p-6">
               <h2 className="mb-5 font-bold text-gray-900">
@@ -344,16 +482,7 @@ export function ProductForm({
                   )}
                 </div>
                 <div>
-                  <label className={labelCls}>Descripción corta</label>
-                  <textarea
-                    {...register("shortDescription")}
-                    rows={2}
-                    className="w-full resize-none rounded-xl border-2 border-gray-200 px-3 py-2 text-sm transition focus:border-[#2563eb] focus:outline-none"
-                    placeholder="2-3 líneas resumen del producto"
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Descripción completa</label>
+                  <label className={labelCls}>Descripción</label>
                   <textarea
                     {...register("description")}
                     rows={5}
@@ -489,7 +618,7 @@ export function ProductForm({
               <h2 className="mb-5 font-bold text-gray-900">Precios</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className={labelCls}>PVP Público (€) *</label>
+                  <label className={labelCls}>PV Público (€) *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -503,7 +632,7 @@ export function ProductForm({
                   )}
                 </div>
                 <div>
-                  <label className={labelCls}>PVP Mayoristas (€) *</label>
+                  <label className={labelCls}>PV Mayoristas (€) *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -517,7 +646,7 @@ export function ProductForm({
                   )}
                 </div>
                 <div>
-                  <label className={labelCls}>PVP Tiendas TCG (€) *</label>
+                  <label className={labelCls}>PV Tiendas TCG Academy (€) *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -532,13 +661,18 @@ export function ProductForm({
                 </div>
                 <div>
                   <label className={labelCls}>
-                    Precio de coste (€) — solo admin
+                    Precio de adquisición (€) — solo admin
                   </label>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
-                    {...register("costPrice", { valueAsNumber: true })}
+                    {...register("costPrice", {
+                      setValueAs: (v) =>
+                        v === "" || v === null || isNaN(Number(v))
+                          ? undefined
+                          : Number(v),
+                    })}
                     className={inputCls}
                     placeholder="0.00 (opcional)"
                   />
@@ -554,7 +688,12 @@ export function ProductForm({
                     type="number"
                     step="0.01"
                     min="0"
-                    {...register("comparePrice", { valueAsNumber: true })}
+                    {...register("comparePrice", {
+                      setValueAs: (v) =>
+                        v === "" || v === null || isNaN(Number(v))
+                          ? undefined
+                          : Number(v),
+                    })}
                     className={inputCls}
                     placeholder="0.00 (opcional)"
                   />
@@ -615,7 +754,7 @@ export function ProductForm({
               {onSubmitAndNew && (
                 <button
                   type="button"
-                  onClick={handleSubmit(handleSaveAndNew)}
+                  onClick={handleSubmit(handleSaveAndNew, handleInvalid)}
                   className="min-h-[44px] flex-1 rounded-xl border-2 border-[#2563eb] px-5 py-3 text-sm font-bold text-[#2563eb] transition hover:bg-blue-50 sm:flex-none"
                 >
                   Guardar y añadir otro
@@ -629,82 +768,6 @@ export function ProductForm({
               </button>
             </div>
           </div>
-
-          {/* Live preview */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-36">
-              <p className="mb-3 text-xs font-semibold tracking-wider text-gray-500 uppercase">
-                Vista previa en tienda
-              </p>
-              <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-                <div
-                  className="relative aspect-[3/4] overflow-hidden bg-gray-50"
-                  style={{
-                    background: gameConfig
-                      ? `linear-gradient(135deg, ${gameConfig.color}18, ${gameConfig.color}30)`
-                      : "#f9fafb",
-                  }}
-                >
-                  {images[0] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={images[0]}
-                      alt="Preview"
-                      className="h-full w-full object-contain p-4"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center gap-3 p-4 h-full w-full">
-                      <span className="text-6xl">
-                        {gameConfig?.emoji ?? "🃏"}
-                      </span>
-                      <span className="line-clamp-3 px-2 text-center text-xs leading-tight font-bold text-gray-700">
-                        {watchedName || "Nombre del producto"}
-                      </span>
-                    </div>
-                  )}
-                  {watchedLanguage && (
-                    <div className="absolute top-2 left-2">
-                      <LanguageFlag language={watchedLanguage} />
-                    </div>
-                  )}
-                  {watchedIsNew && (
-                    <div className="absolute top-2 right-2">
-                      <span className="rounded-full bg-green-500 px-2 py-0.5 text-[10px] font-bold text-white">
-                        NUEVO
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className="p-3">
-                  {watchedCategory && (
-                    <p className="mb-1 text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
-                      {CATEGORY_LABELS[watchedCategory] ?? watchedCategory}
-                    </p>
-                  )}
-                  <h3 className="mb-2 line-clamp-2 text-sm leading-tight font-semibold text-gray-800">
-                    {watchedName || "Nombre del producto"}
-                  </h3>
-                  <p
-                    className="text-lg font-bold"
-                    style={{ color: gameConfig?.color ?? "#2563eb" }}
-                  >
-                    {watchedPrice
-                      ? `${Number(watchedPrice).toFixed(2)}€`
-                      : "0.00€"}
-                  </p>
-                </div>
-                <div className="px-3 pb-3">
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] py-2.5 text-sm font-semibold text-white"
-                  >
-                    <ShoppingCart size={15} /> Añadir al carrito
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </form>
     </div>
   );

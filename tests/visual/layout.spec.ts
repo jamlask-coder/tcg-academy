@@ -88,7 +88,7 @@ test("mega-menu stays at fixed Y position when switching games", async ({ page }
   await page.waitForTimeout(200)
 
   // Capture menu Y position
-  const menuBefore = await page.locator(".shadow-xl").first().boundingBox()
+  const menuBefore = await page.locator("[data-testid='mega-menu']").first().boundingBox()
   expect(menuBefore).not.toBeNull()
 
   // Move to second game logo without leaving the nav
@@ -96,7 +96,7 @@ test("mega-menu stays at fixed Y position when switching games", async ({ page }
   await secondLogo.hover()
   await page.waitForTimeout(250) // wait for content fade
 
-  const menuAfter = await page.locator(".shadow-xl").first().boundingBox()
+  const menuAfter = await page.locator("[data-testid='mega-menu']").first().boundingBox()
   expect(menuAfter).not.toBeNull()
 
   if (menuBefore && menuAfter) {

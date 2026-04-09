@@ -47,8 +47,8 @@ export function MegaMenu({ game, onClose }: Props) {
           transition: "opacity 0.12s ease-in-out",
         }}
       >
-        {/* Fixed-width columns — no layout shift on hover or game change */}
-        <div className="flex gap-5">
+        {/* Fixed-width columns + logo on the right */}
+        <div className="flex items-start gap-5">
           {columns.map((col) => (
             <div key={col.title} style={{ width: 200, flexShrink: 0 }}>
               <h3
@@ -72,6 +72,32 @@ export function MegaMenu({ game, onClose }: Props) {
               </ul>
             </div>
           ))}
+
+          {/* TCG Academy logo — far right, large, animated, game-color glow */}
+          <div
+            className="ml-auto flex flex-shrink-0 items-center justify-center"
+            style={{ minWidth: 180 }}
+          >
+            <style>{`
+              @keyframes megaLogoFloat {
+                0%,100% { transform: translateY(0px) rotate(0deg); }
+                45%     { transform: translateY(-10px) rotate(1.5deg); }
+                75%     { transform: translateY(6px) rotate(-1deg); }
+              }
+            `}</style>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/logo-tcg-shield.png"
+              alt="TCG Academy"
+              style={{
+                height: 130,
+                width: "auto",
+                opacity: 0.32,
+                filter: `invert(1) drop-shadow(0 0 14px ${color}) drop-shadow(0 0 4px ${color}88)`,
+                animation: "megaLogoFloat 6s ease-in-out infinite",
+              }}
+            />
+          </div>
         </div>
       </Container>
     </motion.div>

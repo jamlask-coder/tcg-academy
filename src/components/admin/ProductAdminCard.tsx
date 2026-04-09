@@ -7,11 +7,7 @@ interface ProductAdminCardProps {
   product: LocalProduct;
   onEdit: (p: LocalProduct) => void;
   onDelete: (p: LocalProduct) => void;
-  onPriceChange: (
-    id: number,
-    field: keyof LocalProduct,
-    value: number,
-  ) => void;
+  onPriceChange: (id: number, field: keyof LocalProduct, value: number) => void;
 }
 
 export function ProductAdminCard({
@@ -24,7 +20,9 @@ export function ProductAdminCard({
   const hasDiscount =
     product.comparePrice && product.comparePrice > product.price;
   const discountPct = hasDiscount
-    ? Math.round((1 - product.price / (product.comparePrice ?? product.price)) * 100)
+    ? Math.round(
+        (1 - product.price / (product.comparePrice ?? product.price)) * 100,
+      )
     : 0;
 
   return (
@@ -34,14 +32,14 @@ export function ProductAdminCard({
         <button
           onClick={() => onEdit(product)}
           aria-label={`Editar ${product.name}`}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md text-gray-600 transition hover:bg-[#2563eb] hover:text-white"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-gray-600 shadow-md transition hover:bg-[#2563eb] hover:text-white"
         >
           <Pencil size={12} />
         </button>
         <button
           onClick={() => onDelete(product)}
           aria-label={`Eliminar ${product.name}`}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md text-gray-600 transition hover:bg-red-500 hover:text-white"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-gray-600 shadow-md transition hover:bg-red-500 hover:text-white"
         >
           <Trash2 size={12} />
         </button>
@@ -83,19 +81,17 @@ export function ProductAdminCard({
 
       {/* Content */}
       <div className="p-3">
-        <p className="mb-3 line-clamp-2 text-xs font-semibold leading-tight text-gray-900">
+        <p className="mb-3 line-clamp-2 text-xs leading-tight font-semibold text-gray-900">
           {product.name}
         </p>
 
         {/* Prices — each editable inline */}
         <div className="space-y-1.5">
           <PriceRow
-            label="PVP Público"
+            label="PV Público"
             color="#2563eb"
             value={product.price}
-            onSave={(v) =>
-              onPriceChange(product.id, "price", Math.max(0, v))
-            }
+            onSave={(v) => onPriceChange(product.id, "price", Math.max(0, v))}
           />
           <PriceRow
             label="Mayoristas"
@@ -114,7 +110,7 @@ export function ProductAdminCard({
             }
           />
           <PriceRow
-            label="Coste"
+            label="Precio Adquisición"
             color="#7c3aed"
             value={product.costPrice ?? 0}
             onSave={(v) =>

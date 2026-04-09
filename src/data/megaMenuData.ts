@@ -16,24 +16,71 @@ export interface MegaMenuGame {
 }
 
 // ─── All games (show in navbar with mega-menu) ────────────────────────────────
-// Order: Magic → Pokemon → One Piece → Riftbound → Yu-Gi-Oh → Dragon Ball → Naruto Mythos → Topps
-// Index 0-5: always visible at lg+
-// Index 6-7: visible at xl+ directly, at lg via overflow "+" button
-// Lorcana → moved to OtrosMenu (junto a Panini y Digimon)
+// Order: Pokemon → Magic → One Piece → Riftbound → Yu-Gi-Oh! → Topps → Dragon Ball → Naruto Mythos
+// Index 0-5: always visible in navbar
+// Index 6-7: Dragon Ball + Naruto → sólo en OtrosMenu, no en navbar
+// Lorcana, Panini, Digimon → OtrosMenu
 
 export const MEGA_MENU_DATA: MegaMenuGame[] = [
+  {
+    slug: "pokemon",
+    label: "Pokemon",
+    href: "/pokemon",
+    color: "#f59e0b",
+    abbrev: "PKM",
+    logoSrc: "/images/logos/pokemon.svg",
+    columns: [
+      {
+        title: "Producto Sellado",
+        items: [
+          {
+            label: "Booster Boxes (cajas de sobres)",
+            href: "/pokemon/booster-box",
+          },
+          { label: "Sobres sueltos (Booster Packs)", href: "/pokemon/sobres" },
+          { label: "Elite Trainer Box (ETB)", href: "/pokemon/etb" },
+          { label: "Tins y colecciones especiales", href: "/pokemon/tins" },
+          { label: "Blisters y packs", href: "/pokemon/blisters" },
+        ],
+      },
+      {
+        title: "Cartas",
+        items: [
+          { label: "Cartas sueltas (singles)", href: "/pokemon/singles" },
+          {
+            label: "Cartas gradeadas (PSA/BGS/CGC)",
+            href: "/pokemon/gradeadas",
+          },
+          { label: "Cartas promo", href: "/pokemon/promo" },
+          { label: "Prize cards", href: "/pokemon/prize-cards" },
+          { label: "Lotes", href: "/pokemon/lotes" },
+        ],
+      },
+      {
+        title: "Accesorios",
+        items: [
+          { label: "Fundas (sleeves)", href: "/pokemon/sleeves" },
+          { label: "Tapetes (playmats)", href: "/pokemon/playmats" },
+          { label: "Deck boxes", href: "/pokemon/deckboxes" },
+        ],
+      },
+    ],
+  },
   {
     slug: "magic",
     label: "Magic",
     href: "/magic",
     color: "#7c3aed",
     abbrev: "MTG",
-    logoSrc: "/images/logos/magic.svg",  // Wikimedia Commons — official MTG logo
+    logoSrc: "/images/logos/magic.png",
     columns: [
       {
         title: "Producto Sellado",
         items: [
-          { label: "Booster Boxes (Draft, Set, Collector)", href: "/magic/booster-box" },
+          {
+            label: "Booster Boxes (Draft, Set, Collector)",
+            href: "/magic/booster-box",
+          },
           { label: "Sobres sueltos", href: "/magic/sobres" },
           { label: "Commander Decks", href: "/magic/commander" },
           { label: "Secret Lair", href: "/magic/secret-lair" },
@@ -54,44 +101,6 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
           { label: "Playmats", href: "/magic/playmats" },
           { label: "Deck boxes", href: "/magic/deckboxes" },
           { label: "Dados de vida", href: "/magic/dados" },
-        ],
-      },
-    ],
-  },
-  {
-    slug: "pokemon",
-    label: "Pokemon",
-    href: "/pokemon",
-    color: "#f59e0b",
-    abbrev: "PKM",
-    logoSrc: "/images/logos/pokemon.svg",
-    columns: [
-      {
-        title: "Producto Sellado",
-        items: [
-          { label: "Booster Boxes (cajas de sobres)", href: "/pokemon/booster-box" },
-          { label: "Sobres sueltos (Booster Packs)", href: "/pokemon/sobres" },
-          { label: "Elite Trainer Box (ETB)", href: "/pokemon/etb" },
-          { label: "Tins y colecciones especiales", href: "/pokemon/tins" },
-          { label: "Blisters y packs", href: "/pokemon/blisters" },
-        ],
-      },
-      {
-        title: "Cartas",
-        items: [
-          { label: "Cartas sueltas (singles)", href: "/pokemon/singles" },
-          { label: "Cartas gradeadas (PSA/BGS/CGC)", href: "/pokemon/gradeadas" },
-          { label: "Cartas promo", href: "/pokemon/promo" },
-          { label: "Prize cards", href: "/pokemon/prize-cards" },
-          { label: "Lotes", href: "/pokemon/lotes" },
-        ],
-      },
-      {
-        title: "Accesorios",
-        items: [
-          { label: "Fundas (sleeves)", href: "/pokemon/sleeves" },
-          { label: "Tapetes (playmats)", href: "/pokemon/playmats" },
-          { label: "Deck boxes", href: "/pokemon/deckboxes" },
         ],
       },
     ],
@@ -178,6 +187,36 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     ],
   },
   {
+    slug: "topps",
+    label: "Topps",
+    href: "/topps",
+    color: "#1d4ed8",
+    abbrev: "TPP",
+    logoSrc: "/images/logos/topps.svg",
+    columns: [
+      {
+        title: "Colecciones",
+        items: [
+          { label: "Cromos de fútbol", href: "/topps/futbol" },
+          { label: "Cromos NBA", href: "/topps/nba" },
+          { label: "Cromos F1", href: "/topps/f1" },
+          { label: "Cromos WWE", href: "/topps/wwe" },
+          { label: "Cromos Star Wars", href: "/topps/star-wars" },
+        ],
+      },
+      {
+        title: "Producto",
+        items: [
+          { label: "Cajas", href: "/topps/cajas" },
+          { label: "Sobres", href: "/topps/sobres" },
+          { label: "Álbumes", href: "/topps/albumes" },
+          { label: "Latas coleccionables", href: "/topps/latas" },
+        ],
+      },
+    ],
+  },
+  // ── Dragon Ball y Naruto → sólo en OtrosMenu, no en navbar ──────────────────
+  {
     slug: "dragon-ball",
     label: "Dragon Ball",
     href: "/dragon-ball",
@@ -206,7 +245,7 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
   },
   {
     slug: "naruto",
-    label: "Naruto",
+    label: "Naruto Mythos",
     href: "/naruto",
     color: "#ea580c",
     abbrev: "NAR",
@@ -226,35 +265,6 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
           { label: "Singles", href: "/naruto/singles" },
           { label: "Cartas especiales", href: "/naruto/especiales" },
           { label: "Cartas promo", href: "/naruto/promo" },
-        ],
-      },
-    ],
-  },
-  {
-    slug: "topps",
-    label: "Topps",
-    href: "/topps",
-    color: "#1d4ed8",
-    abbrev: "TPP",
-    logoSrc: "/images/logos/topps.svg",
-    columns: [
-      {
-        title: "Colecciones",
-        items: [
-          { label: "Cromos de fútbol", href: "/topps/futbol" },
-          { label: "Cromos NBA", href: "/topps/nba" },
-          { label: "Cromos F1", href: "/topps/f1" },
-          { label: "Cromos WWE", href: "/topps/wwe" },
-          { label: "Cromos Star Wars", href: "/topps/star-wars" },
-        ],
-      },
-      {
-        title: "Producto",
-        items: [
-          { label: "Cajas", href: "/topps/cajas" },
-          { label: "Sobres", href: "/topps/sobres" },
-          { label: "Álbumes", href: "/topps/albumes" },
-          { label: "Latas coleccionables", href: "/topps/latas" },
         ],
       },
     ],

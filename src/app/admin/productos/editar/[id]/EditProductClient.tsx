@@ -13,7 +13,25 @@ export default function EditProductClient({
 }) {
   const router = useRouter();
 
-  const handleSave = (data: ProductFormValues, tags: string[], images: string[]) => {
+  const handleDelete = () => {
+    const deleted = JSON.parse(
+      localStorage.getItem("tcgacademy_deleted_products") ?? "[]",
+    ) as number[];
+    if (!deleted.includes(product.id)) {
+      deleted.push(product.id);
+    }
+    localStorage.setItem(
+      "tcgacademy_deleted_products",
+      JSON.stringify(deleted),
+    );
+    router.push("/admin/productos");
+  };
+
+  const handleSave = (
+    data: ProductFormValues,
+    tags: string[],
+    images: string[],
+  ) => {
     const overrides = JSON.parse(
       localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
     );
@@ -33,7 +51,6 @@ export default function EditProductClient({
       defaultValues={{
         name: product.name,
         slug: product.slug,
-        shortDescription: product.shortDescription,
         description: product.description,
         game: product.game,
         category: product.category,
@@ -50,6 +67,7 @@ export default function EditProductClient({
       initialImages={product.images}
       submitLabel="Actualizar producto"
       onSubmit={handleSave}
+      onDelete={handleDelete}
     />
   );
 }

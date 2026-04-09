@@ -16,9 +16,9 @@ export interface PriceInfo {
   priceWithoutVAT: number;
   showVATBreakdown: boolean;
   // Reference prices — visible only to the roles described below
-  retailPrice?: number;   // PVP Público — visible a mayorista, tienda y admin (para ver margen)
-  wholesaleRef?: number;  // PVP Mayoristas — visible a tienda y admin
-  costPrice?: number;     // Precio de coste — SOLO admin
+  retailPrice?: number; // PV Público — visible a mayorista, tienda y admin (para ver margen)
+  wholesaleRef?: number; // PV Mayoristas — visible a tienda y admin
+  costPrice?: number; // Precio de adquisición — SOLO admin
 }
 
 /** @deprecated Use SITE_CONFIG.vatRate */

@@ -66,9 +66,6 @@ export function ProductEditModal({
 
   // ── Form state ─────────────────────────────────────────────────────────────
   const [name, setName] = useState(product?.name ?? "");
-  const [shortDescription, setShortDescription] = useState(
-    product?.shortDescription ?? "",
-  );
   const [description, setDescription] = useState(product?.description ?? "");
   const [game, setGame] = useState(initGame);
   const [category, setCategory] = useState(product?.category ?? "");
@@ -90,9 +87,7 @@ export function ProductEditModal({
   );
   const [inStock, setInStock] = useState(product?.inStock ?? true);
   const [isNew, setIsNew] = useState(product?.isNew ?? false);
-  const [tagsStr, setTagsStr] = useState(
-    product?.tags?.join(", ") ?? "",
-  );
+  const [tagsStr, setTagsStr] = useState(product?.tags?.join(", ") ?? "");
   const [imageUrl, setImageUrl] = useState(product?.images?.[0] ?? "");
   const [_tagInput, _setTagInput] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +106,7 @@ export function ProductEditModal({
     const compare = compareStr ? parseFloat(compareStr) : undefined;
 
     if (isNaN(price) || price <= 0) {
-      setError("PVP Público inválido");
+      setError("PV Público inválido");
       return;
     }
     if (isNaN(wholesale) || wholesale <= 0) {
@@ -123,19 +118,19 @@ export function ProductEditModal({
       return;
     }
     if (cost !== undefined && (isNaN(cost) || cost <= 0)) {
-      setError("Precio de coste inválido");
+      setError("Precio de adquisición inválido");
       return;
     }
     if (cost !== undefined && cost > store) {
-      setError("El coste no puede superar el precio para Tiendas");
+      setError("El precio de adquisición no puede superar el precio para Tiendas");
       return;
     }
     if (store > wholesale) {
-      setError("PVP Tiendas no puede superar PVP Mayoristas");
+      setError("PV Tiendas no puede superar PV Mayoristas");
       return;
     }
     if (wholesale > price) {
-      setError("PVP Mayoristas no puede superar PVP Público");
+      setError("PV Mayoristas no puede superar PV Público");
       return;
     }
 
@@ -148,7 +143,6 @@ export function ProductEditModal({
       id: product?.id ?? nextId,
       name: name.trim(),
       slug: product?.slug ?? toSlug(name.trim()),
-      shortDescription: shortDescription.trim(),
       description: description.trim(),
       game,
       category,
@@ -162,8 +156,7 @@ export function ProductEditModal({
       isNew,
       tags,
       images: imageUrl ? [imageUrl] : (product?.images ?? []),
-      createdAt:
-        product?.createdAt ?? new Date().toISOString().slice(0, 10),
+      createdAt: product?.createdAt ?? new Date().toISOString().slice(0, 10),
       isFeatured: product?.isFeatured,
       vatRate: product?.vatRate,
     };
@@ -205,7 +198,7 @@ export function ProductEditModal({
                 <img
                   src={imageUrl}
                   alt="preview"
-                  className="h-16 w-16 shrink-0 rounded-xl border border-gray-200 object-contain bg-gray-50"
+                  className="h-16 w-16 shrink-0 rounded-xl border border-gray-200 bg-gray-50 object-contain"
                 />
               )}
               <input
@@ -231,21 +224,9 @@ export function ProductEditModal({
             />
           </div>
 
-          {/* Short description */}
-          <div>
-            <FieldLabel>Descripción corta</FieldLabel>
-            <input
-              type="text"
-              value={shortDescription}
-              onChange={(e) => setShortDescription(e.target.value)}
-              maxLength={300}
-              className={inputCls}
-            />
-          </div>
-
           {/* Description */}
           <div>
-            <FieldLabel>Descripción completa</FieldLabel>
+            <FieldLabel>Descripción</FieldLabel>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -309,14 +290,14 @@ export function ProductEditModal({
 
           {/* Prices */}
           <div>
-            <p className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">
-              Precios — Coste ≤ Tiendas ≤ Mayoristas ≤ PVP Público
+            <p className="mb-3 text-xs font-bold tracking-wider text-gray-400 uppercase">
+              Precios — Precio Adquisición ≤ Tiendas ≤ Mayoristas ≤ PV Público
             </p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {(
                 [
                   {
-                    label: "PVP Público",
+                    label: "PV Público",
                     color: "#2563eb",
                     value: priceStr,
                     set: setPriceStr,
@@ -334,7 +315,7 @@ export function ProductEditModal({
                     set: setStoreStr,
                   },
                   {
-                    label: "Coste (admin)",
+                    label: "Precio Adquisición (admin)",
                     color: "#7c3aed",
                     value: costStr,
                     set: setCostStr,
@@ -461,7 +442,7 @@ export function ProductEditModal({
           </button>
           <button
             onClick={handleSave}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
           >
             <Save size={15} />
             {isCreate ? "Crear producto" : "Guardar cambios"}
@@ -490,8 +471,16 @@ function Toggle({
       className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition"
       style={
         checked
-          ? { backgroundColor: colorOn + "20", color: colorOn, border: `1.5px solid ${colorOn}40` }
-          : { backgroundColor: "#f3f4f6", color: "#6b7280", border: "1.5px solid transparent" }
+          ? {
+              backgroundColor: colorOn + "20",
+              color: colorOn,
+              border: `1.5px solid ${colorOn}40`,
+            }
+          : {
+              backgroundColor: "#f3f4f6",
+              color: "#6b7280",
+              border: "1.5px solid transparent",
+            }
       }
     >
       <span

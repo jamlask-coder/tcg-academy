@@ -18,7 +18,6 @@ import {
   Copy,
   ExternalLink,
   Printer,
-  ChevronRight,
   Info,
   Ban,
   RotateCcw,
@@ -77,9 +76,27 @@ const STATUS_CFG: Record<
 };
 
 const ROLE_CFG = {
-  cliente: { label: "Cliente", color: "#6b7280", bg: "#f3f4f6", rowBg: "", borderClass: "" },
-  mayorista: { label: "Mayoristas", color: "#1d4ed8", bg: "#dbeafe", rowBg: "bg-blue-100", borderClass: "border-l-4 border-l-blue-400" },
-  tienda: { label: "Tiendas TCG", color: "#15803d", bg: "#dcfce7", rowBg: "bg-green-100", borderClass: "border-l-4 border-l-green-400" },
+  cliente: {
+    label: "Cliente",
+    color: "#6b7280",
+    bg: "#f3f4f6",
+    rowBg: "",
+    borderClass: "",
+  },
+  mayorista: {
+    label: "Mayoristas",
+    color: "#1d4ed8",
+    bg: "#dbeafe",
+    rowBg: "bg-blue-100",
+    borderClass: "border-l-4 border-l-blue-400",
+  },
+  tienda: {
+    label: "Tiendas TCG",
+    color: "#15803d",
+    bg: "#dcfce7",
+    rowBg: "bg-green-100",
+    borderClass: "border-l-4 border-l-green-400",
+  },
 };
 
 const INCIDENT_TYPES: Record<string, string> = {
@@ -96,7 +113,7 @@ const STATUS_FLOW: AdminOrderStatus[] = [
   "finalizado",
 ];
 // Terminal states not in main flow
-const TERMINAL_STATES: AdminOrderStatus[] = ["cancelado", "devolucion"];
+const _TERMINAL_STATES: AdminOrderStatus[] = ["cancelado", "devolucion"];
 
 const EMAIL_TEMPLATES = [
   {
@@ -165,9 +182,7 @@ function hoursAgo(iso: string) {
 
 function isUrgent(order: AdminOrder) {
   if (order.adminStatus !== "pendiente_envio") return false;
-  const entry = order.statusHistory.find(
-    (h) => h.status === "pendiente_envio",
-  );
+  const entry = order.statusHistory.find((h) => h.status === "pendiente_envio");
   return entry ? hoursAgo(entry.date) >= 48 : false;
 }
 
@@ -585,17 +600,25 @@ function OrderPanel({
         {tab === "envio" && (
           <div className="space-y-5">
             {/* Terminal state banner */}
-            {(order.adminStatus === "cancelado" || order.adminStatus === "devolucion") && (
+            {(order.adminStatus === "cancelado" ||
+              order.adminStatus === "devolucion") && (
               <div
                 className={`flex items-center gap-3 rounded-xl p-3 ${order.adminStatus === "cancelado" ? "bg-gray-100" : "bg-purple-50"}`}
               >
                 {order.adminStatus === "cancelado" ? (
                   <Ban size={16} className="flex-shrink-0 text-gray-500" />
                 ) : (
-                  <RotateCcw size={16} className="flex-shrink-0 text-purple-500" />
+                  <RotateCcw
+                    size={16}
+                    className="flex-shrink-0 text-purple-500"
+                  />
                 )}
-                <p className={`text-sm font-semibold ${order.adminStatus === "cancelado" ? "text-gray-600" : "text-purple-700"}`}>
-                  {order.adminStatus === "cancelado" ? "Pedido cancelado" : "Devolución en proceso"}
+                <p
+                  className={`text-sm font-semibold ${order.adminStatus === "cancelado" ? "text-gray-600" : "text-purple-700"}`}
+                >
+                  {order.adminStatus === "cancelado"
+                    ? "Pedido cancelado"
+                    : "Devolución en proceso"}
                 </p>
               </div>
             )}
@@ -659,19 +682,23 @@ function OrderPanel({
 
             {/* Action based on status */}
             <div className="rounded-xl border border-gray-200 p-4">
-              {order.adminStatus === "pendiente_envio" && !order.trackingNumber && (
-                <div className="flex items-center gap-3">
-                  <Package size={16} className="flex-shrink-0 text-orange-500" />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-800">
-                      Pendiente de envío — en preparación
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Introduce el número de seguimiento cuando lo envíes.
-                    </p>
+              {order.adminStatus === "pendiente_envio" &&
+                !order.trackingNumber && (
+                  <div className="flex items-center gap-3">
+                    <Package
+                      size={16}
+                      className="flex-shrink-0 text-orange-500"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-800">
+                        Pendiente de envío — en preparación
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Introduce el número de seguimiento cuando lo envíes.
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {order.adminStatus === "pendiente_envio" && (
                 <div className="space-y-3">
@@ -799,7 +826,10 @@ function OrderPanel({
 
               {order.adminStatus === "devolucion" && (
                 <div className="flex items-center gap-3 rounded-xl bg-purple-50 p-3">
-                  <RotateCcw size={16} className="flex-shrink-0 text-purple-500" />
+                  <RotateCcw
+                    size={16}
+                    className="flex-shrink-0 text-purple-500"
+                  />
                   <p className="text-sm font-semibold text-purple-700">
                     Devolución en proceso
                   </p>
@@ -807,7 +837,9 @@ function OrderPanel({
               )}
 
               {/* Cancel button — available for all active (non-terminal) states */}
-              {!["cancelado", "devolucion", "finalizado"].includes(order.adminStatus) && (
+              {!["cancelado", "devolucion", "finalizado"].includes(
+                order.adminStatus,
+              ) && (
                 <div className="mt-3 border-t border-gray-100 pt-3">
                   <button
                     onClick={() => onUpdateStatus(order.id, "cancelado")}
@@ -1119,7 +1151,8 @@ export default function AdminPedidosPage() {
   // ── Summary counts ──
   const counts = useMemo(
     () => ({
-      pendientes: orders.filter((o) => o.adminStatus === "pendiente_envio").length,
+      pendientes: orders.filter((o) => o.adminStatus === "pendiente_envio")
+        .length,
       enviados: orders.filter((o) => o.adminStatus === "enviado").length,
       incidencias: orders.filter((o) => o.adminStatus === "incidencia").length,
       cancelados: orders.filter((o) => o.adminStatus === "cancelado").length,
@@ -1534,7 +1567,7 @@ export default function AdminPedidosPage() {
                   <>
                     <tr
                       key={order.id}
-                      className={`cursor-pointer transition ${roleCfg.rowBg} ${roleCfg.borderClass} hover:brightness-95 ${isOpen ? "ring-1 ring-inset ring-blue-200" : ""} ${urgent ? "border-l-[6px] border-l-amber-400" : ""}`}
+                      className={`cursor-pointer transition ${roleCfg.rowBg} ${roleCfg.borderClass} hover:brightness-95 ${isOpen ? "ring-1 ring-blue-200 ring-inset" : ""} ${urgent ? "border-l-[6px] border-l-amber-400" : ""}`}
                       onClick={() => setExpanded(isOpen ? null : order.id)}
                     >
                       <td className="px-4 py-3">

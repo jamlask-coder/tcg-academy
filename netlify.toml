@@ -1,0 +1,12 @@
+[build]
+  command = "npm run build"
+  publish = "out"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback: si Netlify no encuentra el archivo sirve el 404 de Next.js
+[[redirects]]
+  from = "/*"
+  to = "/404.html"
+  status = 404

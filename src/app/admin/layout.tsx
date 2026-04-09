@@ -6,32 +6,27 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   LayoutDashboard,
-  LayoutGrid,
   Package,
   Tag,
   ShoppingBag,
   Users,
-  Ticket,
-  Star,
-  Mail,
-  Wrench,
-  BookOpen,
   LogOut,
   ChevronRight,
+  ChevronDown,
   Menu,
   X,
   ArrowLeft,
   Receipt,
-  Percent,
-  MessageSquare,
   Inbox,
+  BarChart2,
+  PackagePlus,
+  BadgeDollarSign,
+  UserCircle,
 } from "lucide-react";
 
 const SOLICITUDES_KEY = "tcgacademy_solicitudes";
 import {
   ADMIN_ORDERS,
-  MOCK_MESSAGES,
-  MSG_STORAGE_KEY,
   ORDER_STORAGE_KEY,
 } from "@/data/mockData";
 
@@ -40,67 +35,45 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<{ size?: number }>;
   exact?: boolean;
+  sub?: NavItem[];
 }
 
-const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
+const NAV_ITEMS: NavItem[] = [
   {
-    label: "Principal",
-    items: [
-      {
-        href: "/admin",
-        label: "Panel principal",
-        icon: LayoutDashboard,
-        exact: true,
-      },
-    ],
+    href: "/admin",
+    label: "Panel principal",
+    icon: LayoutDashboard,
+    exact: true,
+  },
+  { href: "/admin/pedidos", label: "Últimos pedidos", icon: ShoppingBag },
+  {
+    href: "/admin/productos/nuevo",
+    label: "Añadir producto",
+    icon: PackagePlus,
   },
   {
-    label: "Catálogo",
-    items: [
-      { href: "/admin/catalogo", label: "Catálogo visual", icon: LayoutGrid },
+    href: "/admin/precios",
+    label: "Precios",
+    icon: BadgeDollarSign,
+    sub: [
       { href: "/admin/productos", label: "Gestión de precios", icon: Package },
-      { href: "/admin/precios", label: "Precios", icon: Percent },
       { href: "/admin/descuentos", label: "Descuentos", icon: Tag },
     ],
   },
-  {
-    label: "Clientes",
-    items: [
-      { href: "/admin/pedidos", label: "Pedidos", icon: ShoppingBag },
-      { href: "/admin/mensajes", label: "Mensajes", icon: MessageSquare },
-      { href: "/admin/solicitudes", label: "Solicitudes B2B", icon: Inbox },
-    ],
-  },
-  {
-    label: "Ventas",
-    items: [
-      { href: "/admin/usuarios", label: "Usuarios", icon: Users },
-      { href: "/admin/fiscal", label: "Gestión Fiscal", icon: Receipt },
-    ],
-  },
-  {
-    label: "Fidelización",
-    items: [
-      { href: "/admin/cupones", label: "Cupones", icon: Ticket },
-      { href: "/admin/bonos", label: "Bonos y puntos", icon: Star },
-    ],
-  },
-  {
-    label: "Comunicación",
-    items: [{ href: "/admin/emails", label: "Emails", icon: Mail }],
-  },
-  {
-    label: "Sistema",
-    items: [
-      { href: "/admin/herramientas", label: "Herramientas", icon: Wrench },
-      { href: "/admin/manual", label: "Manual de uso", icon: BookOpen },
-    ],
-  },
+  { href: "/admin/usuarios", label: "Usuarios", icon: Users },
+  { href: "/admin/solicitudes", label: "Solicitudes B2B", icon: Inbox },
+  { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart2 },
+  { href: "/admin/fiscal", label: "Gestión Fiscal", icon: Receipt },
+  { href: "/admin/cuenta", label: "Mis datos", icon: UserCircle },
 ];
+
+// Flat list of all items (including sub-items) for breadcrumb lookup
+const ALL_NAV_ITEMS: NavItem[] = NAV_ITEMS.flatMap((i) =>
+  i.sub ? [i, ...i.sub] : [i],
+);
 
 function useSidebarBadges() {
   const [newOrders, setNewOrders] = useState(0);
-  const [unreadMsgs, setUnreadMsgs] = useState(0);
   const [newSolicitudes, setNewSolicitudes] = useState(0);
 
   useEffect(() => {
@@ -114,22 +87,10 @@ function useSidebarBadges() {
             (o) => o.adminStatus === "pendiente_envio",
           ).length,
         );
-        const saved = JSON.parse(
-          localStorage.getItem(MSG_STORAGE_KEY) ?? "null",
-        );
-        const msgs = saved ?? MOCK_MESSAGES;
-        setUnreadMsgs(
-          (msgs as { toUserId: string; read: boolean }[]).filter(
-            (m) => m.toUserId === "admin" && !m.read,
-          ).length,
-        );
-        const sols = JSON.parse(
-          localStorage.getItem(SOLICITUDES_KEY) ?? "[]",
-        );
+        const sols = JSON.parse(localStorage.getItem(SOLICITUDES_KEY) ?? "[]");
         setNewSolicitudes(
-          (sols as { estado: string }[]).filter(
-            (s) => s.estado === "nueva",
-          ).length,
+          (sols as { estado: string }[]).filter((s) => s.estado === "nueva")
+            .length,
         );
       } catch {}
     };
@@ -138,7 +99,49 @@ function useSidebarBadges() {
     return () => clearInterval(id);
   }, []);
 
-  return { newOrders, unreadMsgs, newSolicitudes };
+  return { newOrders, newSolicitudes };
+}
+
+function NavLink({
+  item,
+  pathname,
+  onClose,
+  badges,
+  isSub = false,
+}: {
+  item: NavItem;
+  pathname: string;
+  onClose?: () => void;
+  badges: { newOrders: number; newSolicitudes: number };
+  isSub?: boolean;
+}) {
+  const { href, label, icon: Icon, exact } = item;
+  const active = exact ? pathname === href : pathname.startsWith(href);
+  return (
+    <Link
+      href={href}
+      onClick={onClose}
+      className={`flex min-h-[44px] items-center justify-between border-b border-gray-100 px-4 py-2.5 text-sm transition last:border-0 ${
+        isSub ? "pl-10" : ""
+      } ${active ? "bg-[#2563eb] text-white" : "text-gray-700 hover:bg-gray-50"}`}
+    >
+      <span className="flex items-center gap-3">
+        <Icon size={isSub ? 13 : 15} />
+        {label}
+        {href === "/admin/pedidos" && badges.newOrders > 0 && (
+          <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] leading-none font-bold text-white">
+            {badges.newOrders}
+          </span>
+        )}
+        {href === "/admin/solicitudes" && badges.newSolicitudes > 0 && (
+          <span className="ml-auto rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] leading-none font-bold text-white">
+            {badges.newSolicitudes}
+          </span>
+        )}
+      </span>
+      {active && <ChevronRight size={13} />}
+    </Link>
+  );
 }
 
 function SidebarContent({
@@ -152,7 +155,12 @@ function SidebarContent({
 }) {
   const router = useRouter();
   const { logout } = useAuth();
-  const { newOrders, unreadMsgs, newSolicitudes } = useSidebarBadges();
+  const badges = useSidebarBadges();
+  const [preciosOpen, setPreciosOpen] = useState(() =>
+    pathname.startsWith("/admin/productos") ||
+    pathname.startsWith("/admin/descuentos") ||
+    pathname.startsWith("/admin/precios"),
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -174,54 +182,60 @@ function SidebarContent({
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-3 overflow-y-auto">
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.label}>
-            <p className="mb-1 px-3 text-[10px] font-bold tracking-widest text-gray-400 uppercase">
-              {section.label}
-            </p>
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-              {section.items.map(({ href, label, icon: Icon, exact }) => {
-                const active = exact
-                  ? pathname === href
-                  : pathname.startsWith(href);
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={onClose}
-                    className={`flex min-h-[44px] items-center justify-between border-b border-gray-100 px-4 py-2.5 text-sm transition last:border-0 ${
-                      active
+      <nav className="flex-1 overflow-y-auto">
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+          {NAV_ITEMS.map((item) => {
+            if (item.sub) {
+              const parentActive =
+                pathname.startsWith(item.href) ||
+                item.sub.some((s) => pathname.startsWith(s.href));
+              return (
+                <div key={item.href} className="border-b border-gray-100 last:border-0">
+                  <button
+                    onClick={() => setPreciosOpen((o) => !o)}
+                    className={`flex min-h-[44px] w-full items-center justify-between px-4 py-2.5 text-sm transition ${
+                      parentActive
                         ? "bg-[#2563eb] text-white"
                         : "text-gray-700 hover:bg-gray-50"
                     }`}
                   >
                     <span className="flex items-center gap-3">
-                      <Icon size={15} />
-                      {label}
-                      {href === "/admin/pedidos" && newOrders > 0 && (
-                        <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] leading-none font-bold text-white">
-                          {newOrders}
-                        </span>
-                      )}
-                      {href === "/admin/mensajes" && unreadMsgs > 0 && (
-                        <span className="ml-auto rounded-full bg-blue-500 px-1.5 py-0.5 text-[9px] leading-none font-bold text-white">
-                          {unreadMsgs}
-                        </span>
-                      )}
-                      {href === "/admin/solicitudes" && newSolicitudes > 0 && (
-                        <span className="ml-auto rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] leading-none font-bold text-white">
-                          {newSolicitudes}
-                        </span>
-                      )}
+                      <item.icon size={15} />
+                      {item.label}
                     </span>
-                    {active && <ChevronRight size={13} />}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+                    <ChevronDown
+                      size={13}
+                      className={`transition-transform duration-200 ${preciosOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  {preciosOpen && (
+                    <div className="border-t border-gray-100 bg-gray-50">
+                      {item.sub.map((sub) => (
+                        <NavLink
+                          key={sub.href}
+                          item={sub}
+                          pathname={pathname}
+                          onClose={onClose}
+                          badges={badges}
+                          isSub
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <NavLink
+                key={item.href}
+                item={item}
+                pathname={pathname}
+                onClose={onClose}
+                badges={badges}
+              />
+            );
+          })}
+        </div>
       </nav>
 
       {/* Footer */}
@@ -247,8 +261,7 @@ function SidebarContent({
 }
 
 function Breadcrumb({ pathname }: { pathname: string }) {
-  const allItems = NAV_SECTIONS.flatMap((s) => s.items);
-  const current = allItems.find((i) =>
+  const current = ALL_NAV_ITEMS.find((i) =>
     i.exact ? pathname === i.href : pathname.startsWith(i.href),
   );
   if (!current || pathname === "/admin") return null;

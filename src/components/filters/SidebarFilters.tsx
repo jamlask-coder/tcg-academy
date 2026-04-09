@@ -2,7 +2,8 @@
 import { useState, useCallback } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { SlidersHorizontal, X, ChevronDown, ChevronUp } from "lucide-react";
-import { LANGUAGE_FLAGS, LANGUAGE_NAMES } from "@/data/products";
+import { LANGUAGE_NAMES } from "@/data/products";
+import { LanguageFlag } from "@/components/ui/LanguageFlag";
 
 interface Props {
   availableLanguages: string[];
@@ -21,8 +22,12 @@ function useFilters() {
 
   const langs = params.get("lang")?.split(",").filter(Boolean) ?? [];
   const inStock = params.get("inStock") === "1";
-  const priceMin = params.get("priceMin") ? Number(params.get("priceMin")) : null;
-  const priceMax = params.get("priceMax") ? Number(params.get("priceMax")) : null;
+  const priceMin = params.get("priceMin")
+    ? Number(params.get("priceMin"))
+    : null;
+  const priceMax = params.get("priceMax")
+    ? Number(params.get("priceMax"))
+    : null;
 
   const update = useCallback(
     (key: string, value: string | null) => {
@@ -53,14 +58,12 @@ function useFilters() {
   );
 
   const setPriceMin = useCallback(
-    (v: number | null) =>
-      update("priceMin", v !== null ? String(v) : null),
+    (v: number | null) => update("priceMin", v !== null ? String(v) : null),
     [update],
   );
 
   const setPriceMax = useCallback(
-    (v: number | null) =>
-      update("priceMax", v !== null ? String(v) : null),
+    (v: number | null) => update("priceMax", v !== null ? String(v) : null),
     [update],
   );
 
@@ -69,7 +72,10 @@ function useFilters() {
   }, [router, pathname]);
 
   const activeCount =
-    langs.length + (inStock ? 1 : 0) + (priceMin !== null ? 1 : 0) + (priceMax !== null ? 1 : 0);
+    langs.length +
+    (inStock ? 1 : 0) +
+    (priceMin !== null ? 1 : 0) +
+    (priceMax !== null ? 1 : 0);
 
   return {
     langs,
@@ -151,7 +157,7 @@ function FilterContent({
                   return (
                     <label
                       key={lang}
-                      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-1 py-1.5 hover:bg-gray-50 select-none"
+                      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-1 py-1.5 select-none hover:bg-gray-50"
                     >
                       <input
                         type="checkbox"
@@ -166,7 +172,9 @@ function FilterContent({
                             ? "border-[var(--filter-color)] bg-[var(--filter-color)]"
                             : "border-gray-300"
                         }`}
-                        style={{ "--filter-color": color } as React.CSSProperties}
+                        style={
+                          { "--filter-color": color } as React.CSSProperties
+                        }
                       >
                         {active && (
                           <svg
@@ -184,8 +192,8 @@ function FilterContent({
                           </svg>
                         )}
                       </div>
-                      <span className="mr-1 text-base leading-none">
-                        {LANGUAGE_FLAGS[lang] ?? lang}
+                      <span className="mr-1 leading-none">
+                        <LanguageFlag language={lang} />
                       </span>
                       <span className="text-sm text-gray-700">
                         {LANGUAGE_NAMES[lang] ?? lang}
@@ -280,7 +288,7 @@ function FilterContent({
       <div className="my-1 h-px bg-gray-100" />
 
       {/* 3 — In stock toggle */}
-      <label className="flex cursor-pointer items-center justify-between rounded-xl p-3 hover:bg-gray-50 select-none">
+      <label className="flex cursor-pointer items-center justify-between rounded-xl p-3 select-none hover:bg-gray-50">
         <span className="text-sm font-medium text-gray-700">Solo en stock</span>
         <button
           role="switch"
@@ -375,7 +383,9 @@ export function MobileFilterButton({
     <button
       onClick={onClick}
       className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-semibold transition lg:hidden ${
-        activeCount > 0 ? "border-transparent text-white" : "border-gray-200 text-gray-700"
+        activeCount > 0
+          ? "border-transparent text-white"
+          : "border-gray-200 text-gray-700"
       }`}
       style={
         activeCount > 0 ? { backgroundColor: color, borderColor: color } : {}

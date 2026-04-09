@@ -1,0 +1,29 @@
+// ─── API Keys placeholder ──────────────────────────────────────────────────────
+// Free TCG APIs (no key required):
+//   • Pokemon TCG API  https://api.pokemontcg.io/v2   — 1000 req/day without key
+//   • Scryfall         https://api.scryfall.com        — free, 50–100 ms between requests
+//   • YGOProDeck       https://db.ygoprodeck.com/api   — free, no key
+//
+// Paid / OAuth APIs (keys required — fill in when ready):
+//   • Cardmarket       https://www.cardmarket.com/en/Magic/Help/API-Documentation
+//     OAuth 1.0a — requires App Token + App Secret + Access Token + Access Secret
+
+export const API_KEYS = {
+  /**
+   * Cardmarket OAuth 1.0a credentials.
+   * Obtain at https://www.cardmarket.com/en/Magic/Account/API
+   * All four values are required to sign requests.
+   */
+  cardmarket: {
+    appToken: process.env.NEXT_PUBLIC_MKM_APP_TOKEN ?? "",
+    appSecret: process.env.NEXT_PUBLIC_MKM_APP_SECRET ?? "",
+    accessToken: process.env.NEXT_PUBLIC_MKM_ACCESS_TOKEN ?? "",
+    accessSecret: process.env.NEXT_PUBLIC_MKM_ACCESS_SECRET ?? "",
+  },
+
+  /**
+   * Pokemon TCG API key (optional — raises rate limit from 1000 to 20 000 req/day).
+   * Obtain at https://dev.pokemontcg.io/
+   */
+  pokemonTcg: process.env.NEXT_PUBLIC_POKEMON_TCG_KEY ?? "",
+} as const;

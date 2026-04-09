@@ -11,7 +11,9 @@ import {
   Ticket,
   ArrowRight,
 } from "lucide-react";
-import { PRODUCTS } from "@/data/products";
+import { useState, useEffect } from "react";
+import { getMergedProducts } from "@/lib/productStore";
+import type { KpiMode } from "@/components/admin/SalesChart";
 import { useDiscounts } from "@/context/DiscountContext";
 import {
   ALL_ORDERS,
@@ -39,16 +41,34 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function AdminDashboard() {
+  const [activeKpi, setActiveKpi] = useState<KpiMode>("ventas");
   const { discounts } = useDiscounts();
   const activeDiscounts = Object.values(discounts).filter(
     (d) => d.active,
   ).length;
 
+  const [productCount, setProductCount] = useState(() => getMergedProducts().length);
+  const [lowStockCount, setLowStockCount] = useState(
+    () => getMergedProducts().filter((p) => !p.inStock).length,
+  );
+  useEffect(() => {
+    const reload = () => {
+      const merged = getMergedProducts();
+      setProductCount(merged.length);
+      setLowStockCount(merged.filter((p) => !p.inStock).length);
+    };
+    window.addEventListener("tcga:products:updated", reload);
+    window.addEventListener("storage", reload);
+    return () => {
+      window.removeEventListener("tcga:products:updated", reload);
+      window.removeEventListener("storage", reload);
+    };
+  }, []);
+
   const todayOrders = ALL_ORDERS.filter((o) => o.date === "2025-01-28");
   const todayRevenue = todayOrders.reduce((s, o) => s + o.total, 0);
-  const lowStockCount = PRODUCTS.filter((p) => !p.inStock).length;
-  const weekRevenue = MOCK_SALES_7D.reduce((s, d) => s + d.sales, 0);
-  const weekOrders = MOCK_SALES_7D.reduce((s, d) => s + d.orders, 0);
+  const _weekRevenue = MOCK_SALES_7D.reduce((s, d) => s + d.sales, 0);
+  const _weekOrders = MOCK_SALES_7D.reduce((s, d) => s + d.orders, 0);
 
   const expiringCoupons = MOCK_ADMIN_COUPONS.filter(
     (c) => c.active && new Date(c.endsAt) <= new Date("2025-02-28"),
@@ -69,73 +89,92 @@ export default function AdminDashboard() {
         </p>
       </div>
 
-      {/* KPI cards */}
+      {/* KPI cards — clickables para cambiar el gráfico */}
       <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {[
-          {
-            label: "Ingresos hoy",
-            value: `${todayRevenue.toFixed(2)}€`,
-            sub: `${todayOrders.length} pedidos`,
-            icon: TrendingUp,
-            color: "#2563eb",
-          },
-          {
-            label: "Productos",
-            value: PRODUCTS.length,
-            sub: `${lowStockCount} sin stock`,
-            icon: Package,
-            color: "#7c3aed",
-          },
-          {
-            label: "Usuarios",
-            value: MOCK_USERS.length,
-            sub: `${MOCK_USERS.filter((u) => u.active).length} activos`,
-            icon: Users,
-            color: "#0891b2",
-          },
-          {
-            label: "Descuentos activos",
-            value:
-              activeDiscounts +
-              MOCK_ADMIN_COUPONS.filter((c) => c.active).length,
-            sub: "cupones + descuentos",
-            icon: Tag,
-            color: "#dc2626",
-          },
-        ].map(({ label, value, sub, icon: Icon, color }) => (
-          <div
-            key={label}
-            className="rounded-2xl border border-gray-200 bg-white p-5"
-          >
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-medium text-gray-500">{label}</p>
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded-xl"
-                style={{ backgroundColor: `${color}18` }}
-              >
-                <Icon size={16} style={{ color }} />
+        {(
+          [
+            {
+              kpi: "ventas" as KpiMode,
+              label: "Ingresos hoy",
+              value: `${todayRevenue.toFixed(2)}€`,
+              sub: `${todayOrders.length} pedidos`,
+              icon: TrendingUp,
+              color: "#2563eb",
+            },
+            {
+              kpi: "productos" as KpiMode,
+              label: "Productos",
+              value: productCount,
+              sub: `${lowStockCount} sin stock`,
+              icon: Package,
+              color: "#7c3aed",
+            },
+            {
+              kpi: "usuarios" as KpiMode,
+              label: "Usuarios",
+              value: MOCK_USERS.length,
+              sub: `${MOCK_USERS.filter((u) => u.active).length} activos`,
+              icon: Users,
+              color: "#0891b2",
+            },
+            {
+              kpi: "descuentos" as KpiMode,
+              label: "Descuentos activos",
+              value:
+                activeDiscounts +
+                MOCK_ADMIN_COUPONS.filter((c) => c.active).length,
+              sub: "cupones + descuentos",
+              icon: Tag,
+              color: "#dc2626",
+            },
+          ] as const
+        ).map(({ kpi, label, value, sub, icon: Icon, color }) => {
+          const isActive = activeKpi === kpi;
+          return (
+            <button
+              key={kpi}
+              onClick={() => setActiveKpi(kpi)}
+              className="rounded-2xl border bg-white p-5 text-left transition hover:shadow-md"
+              style={{
+                borderColor: isActive ? color : "#e5e7eb",
+                boxShadow: isActive ? `0 0 0 2px ${color}30` : undefined,
+              }}
+            >
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-medium text-gray-500">{label}</p>
+                <div
+                  className="flex h-8 w-8 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: `${color}${isActive ? "28" : "18"}` }}
+                >
+                  <Icon size={16} style={{ color }} />
+                </div>
               </div>
-            </div>
-            <p className="text-2xl leading-none font-bold text-gray-900">
-              {value}
-            </p>
-            <p className="mt-1 text-xs text-gray-400">{sub}</p>
-          </div>
-        ))}
+              <p className="text-2xl leading-none font-bold text-gray-900">
+                {value}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">{sub}</p>
+              {isActive && (
+                <p className="mt-2 text-xs font-semibold" style={{ color }}>
+                  Ver evolución ↓
+                </p>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="mb-6 grid gap-6 lg:grid-cols-3">
-        {/* Sales chart */}
+        {/* Chart — adapta según KPI activo */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5 lg:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="font-bold text-gray-900">Ventas últimos 7 días</h2>
-              <p className="text-sm text-gray-500">
-                {weekRevenue.toFixed(2)}€ · {weekOrders} pedidos
-              </p>
-            </div>
+          <div className="mb-1">
+            <h2 className="font-bold text-gray-900">
+              {activeKpi === "ventas" && "Evolución de ventas"}
+              {activeKpi === "productos" && "Evolución del catálogo"}
+              {activeKpi === "usuarios" && "Evolución de usuarios"}
+              {activeKpi === "descuentos" && "Uso de descuentos y cupones"}
+            </h2>
           </div>
-          <SalesChart />
+          <SalesChart mode={activeKpi} />
         </div>
 
         {/* Alerts */}

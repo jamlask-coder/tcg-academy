@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Download,
   Database,
@@ -10,7 +10,8 @@ import {
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
-import { PRODUCTS } from "@/data/products";
+import { type LocalProduct } from "@/data/products";
+import { getMergedProducts } from "@/lib/productStore";
 import { MOCK_USERS, ALL_ORDERS } from "@/data/mockData";
 
 function downloadCSV(filename: string, rows: string[][], headers: string[]) {
@@ -30,18 +31,18 @@ function downloadCSV(filename: string, rows: string[][], headers: string[]) {
   URL.revokeObjectURL(url);
 }
 
-function exportCatalog() {
+function exportCatalog(products: LocalProduct[]) {
   const headers = [
     "ID",
     "Nombre",
     "Juego",
-    "PVP Público",
-    "PVP Mayoristas",
-    "PVP Tiendas TCG",
-    "Coste",
+    "PV Público",
+    "PV Mayoristas",
+    "PV Tiendas TCG Academy",
+    "Precio Adquisición",
     "En stock",
   ];
-  const rows = PRODUCTS.map((p) => [
+  const rows = products.map((p) => [
     String(p.id),
     p.name,
     p.game,
@@ -132,6 +133,21 @@ const SYSTEM_CHECKS = [
 export default function AdminHerramientasPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [allProducts, setAllProducts] = useState<LocalProduct[]>(() =>
+    getMergedProducts(),
+  );
+
+  useEffect(() => {
+    const reload = () =>
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setAllProducts(getMergedProducts());
+    window.addEventListener("tcga:products:updated", reload);
+    window.addEventListener("storage", reload);
+    return () => {
+      window.removeEventListener("tcga:products:updated", reload);
+      window.removeEventListener("storage", reload);
+    };
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -140,6 +156,7 @@ export default function AdminHerramientasPage() {
 
   const handleRefresh = () => {
     setRefreshing(true);
+    setAllProducts(getMergedProducts());
     setTimeout(() => {
       setRefreshing(false);
       showToast("Estado del sistema actualizado");
@@ -148,19 +165,19 @@ export default function AdminHerramientasPage() {
 
   const totalRevenue = ALL_ORDERS.reduce((s, o) => s + o.total, 0);
   const avgOrderValue = totalRevenue / ALL_ORDERS.length;
-  const inStockCount = PRODUCTS.filter((p) => p.inStock).length;
-  const outOfStockCount = PRODUCTS.filter((p) => !p.inStock).length;
+  const inStockCount = allProducts.filter((p) => p.inStock).length;
+  const outOfStockCount = allProducts.filter((p) => !p.inStock).length;
   const activeUsers = MOCK_USERS.filter((u) => u.active).length;
   const totalPointsIssued = MOCK_USERS.reduce((s, u) => s + u.points, 0);
 
   const exports = [
     {
       title: "Exportar catálogo",
-      description: `${PRODUCTS.length} productos · campos: nombre, juego, precios, stock`,
+      description: `${allProducts.length} productos · campos: nombre, juego, precios, stock`,
       icon: Database,
       color: "#2563eb",
       action: () => {
-        exportCatalog();
+        exportCatalog(allProducts);
         showToast("Catálogo exportado correctamente");
       },
     },
@@ -201,7 +218,7 @@ export default function AdminHerramientasPage() {
     },
     {
       label: "Productos en stock",
-      value: `${inStockCount} / ${PRODUCTS.length}`,
+      value: `${inStockCount} / ${allProducts.length}`,
       icon: Database,
       color: "#059669",
     },

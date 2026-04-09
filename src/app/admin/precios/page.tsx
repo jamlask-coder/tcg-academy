@@ -17,11 +17,11 @@ import {
   Percent,
 } from "lucide-react";
 import {
-  PRODUCTS,
   GAME_CONFIG,
   CATEGORY_LABELS,
   type LocalProduct,
 } from "@/data/products";
+import { getMergedProducts } from "@/lib/productStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,10 +31,10 @@ interface PriceRow {
   game: string;
   category: string;
   image: string;
-  price: number; // PVP Público
-  wholesalePrice: number; // PVP Mayoristas
-  storePrice: number; // PVP Tiendas TCG
-  costPrice?: number; // Precio de coste (admin only)
+  price: number; // PV Público
+  wholesalePrice: number; // PV Mayoristas
+  storePrice: number; // PV Tiendas TCG Academy
+  costPrice?: number; // Precio de adquisición (admin only)
   comparePrice?: number; // precio tachado original
   discountActive: boolean;
   discountStart?: string; // ISO date string
@@ -72,7 +72,7 @@ function todayStr(): string {
 }
 
 function initRows(): PriceRow[] {
-  return PRODUCTS.map((p: LocalProduct) => ({
+  return getMergedProducts().map((p: LocalProduct) => ({
     id: p.id,
     name: p.name,
     game: p.game,
@@ -95,17 +95,17 @@ function exportCSV(rows: PriceRow[]) {
     "Nombre",
     "Juego",
     "Categoría",
-    "PVP Público",
-    "PVP Mayoristas",
-    "PVP Tiendas TCG",
-    "Coste",
+    "PV Público",
+    "PV Mayoristas",
+    "PV Tiendas TCG Academy",
+    "Precio Adquisición",
     "Precio Original",
     "Dto%",
     "Dto Activo",
     "Inicio Dto",
     "Fin Dto",
     "Precio Final",
-    "Margen% (vs coste)",
+    "Margen% (vs precio adquisición)",
   ];
   const body = rows.map((r) => {
     const pct = calcDiscountPct(r.price, r.comparePrice);
@@ -113,7 +113,9 @@ function exportCSV(rows: PriceRow[]) {
       r.discountActive && r.comparePrice && r.comparePrice > r.price
         ? r.price
         : (r.comparePrice ?? r.price);
-    const margin = r.costPrice ? calcMargin(r.price, r.costPrice) : calcMargin(r.price, r.wholesalePrice);
+    const margin = r.costPrice
+      ? calcMargin(r.price, r.costPrice)
+      : calcMargin(r.price, r.wholesalePrice);
     return [
       r.id,
       `"${r.name}"`,
@@ -503,14 +505,14 @@ export default function PreciosPage() {
 
   const dirtySummary = rows.filter((r) => dirtyIds.has(r.id));
 
-  const uniqueGames = [...new Set(PRODUCTS.map((p) => p.game))].sort();
+  const uniqueGames = [...new Set(rows.map((r) => r.game))].sort();
   const uniqueCategories = filterGame
     ? [
         ...new Set(
-          PRODUCTS.filter((p) => p.game === filterGame).map((p) => p.category),
+          rows.filter((r) => r.game === filterGame).map((r) => r.category),
         ),
       ].sort()
-    : [...new Set(PRODUCTS.map((p) => p.category))].sort();
+    : [...new Set(rows.map((r) => r.category))].sort();
 
   return (
     <div className="flex min-h-0 flex-col">
@@ -706,7 +708,7 @@ export default function PreciosPage() {
                     className="ml-auto flex items-center gap-1 font-semibold text-gray-600 hover:text-[#2563eb]"
                     onClick={() => setSort("price")}
                   >
-                    PVP Público{" "}
+                    PV Público{" "}
                     <SortIcon
                       field="price"
                       sortField={sortField}
@@ -714,14 +716,14 @@ export default function PreciosPage() {
                     />
                   </button>
                 </th>
-                <th className="px-2 py-2.5 text-right font-semibold text-gray-600">
-                  PVP Mayoristas
+                <th className="max-w-[80px] px-2 py-2.5 text-right font-semibold leading-tight text-gray-600">
+                  PV Mayoristas
                 </th>
-                <th className="px-2 py-2.5 text-right font-semibold text-gray-600">
-                  PVP Tiendas TCG
+                <th className="max-w-[72px] px-2 py-2.5 text-right font-semibold leading-tight text-gray-600">
+                  PV Tiendas TCG Academy
                 </th>
-                <th className="px-2 py-2.5 text-right font-semibold text-purple-600">
-                  Coste
+                <th className="max-w-[72px] px-2 py-2.5 text-right font-semibold leading-tight text-purple-600">
+                  Precio Adquisición
                 </th>
                 <th className="px-2 py-2.5 text-right">
                   <button
@@ -805,7 +807,7 @@ export default function PreciosPage() {
                     </td>
                     <td className="px-2 py-1.5 text-gray-300">{row.id}</td>
                     <td className="px-3 py-1.5">
-                      <div className="flex max-w-[280px] min-w-[180px] items-center gap-2">
+                      <div className="flex max-w-[360px] min-w-[220px] items-center gap-2">
                         {row.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -855,15 +857,11 @@ export default function PreciosPage() {
                       />
                     </td>
                     <td className="min-w-[76px] px-2 py-1.5">
-                      {row.costPrice !== undefined ? (
-                        <NumCell
-                          value={row.costPrice}
-                          onChange={(v) => update(row.id, { costPrice: v })}
-                          dirty={isDirty}
-                        />
-                      ) : (
-                        <span className="text-xs text-gray-300">—</span>
-                      )}
+                      <NumCell
+                        value={row.costPrice ?? 0}
+                        onChange={(v) => update(row.id, { costPrice: v })}
+                        dirty={isDirty}
+                      />
                     </td>
                     <td className="min-w-[64px] px-2 py-1.5">
                       <DiscountPctCell
