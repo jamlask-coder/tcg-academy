@@ -32,7 +32,7 @@ export default function AdminUsuariosPage() {
   const [users, setUsers] = useState<AdminUser[]>(MOCK_USERS);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
-  const [sortByRecent, setSortByRecent] = useState(false);
+  const [sortByRecent, setSortByRecent] = useState(true);
   const [selected, setSelected] = useState<AdminUser | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingChange | null>(null);
@@ -226,53 +226,23 @@ export default function AdminUsuariosPage() {
       {/* Main layout: table left (3/4) + counters/detail right (1/4) */}
       <div className="grid gap-6 lg:grid-cols-4">
 
-        {/* LEFT: recent registrations + table */}
-        <div className="space-y-4 lg:col-span-3">
-          {/* Recent registrations */}
-          <div className="rounded-2xl border border-gray-200 bg-white">
+        {/* LEFT: unified table */}
+        <div className="lg:col-span-3">
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
               <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900">
-                <Clock size={15} className="text-[#2563eb]" /> Últimos registrados
+                <Clock size={15} className="text-[#2563eb]" />
+                {roleFilter ? `Últimos registrados · ${ROLE_LABELS[roleFilter]}` : "Últimos registrados"}
               </h2>
-              <span className="text-xs text-gray-400">5 más recientes</span>
+              <span className="text-xs text-gray-400">{filtered.length} usuarios</span>
             </div>
-            <div className="divide-y divide-gray-50">
-              {[...users]
-                .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime())
-                .slice(0, 5)
-                .map((u) => (
-                  <div key={u.id} className="flex items-center gap-3 px-5 py-3 transition hover:bg-gray-50">
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-xs font-bold text-white">
-                      {u.name[0]}{u.lastName[0]}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-gray-900">{u.name} {u.lastName}</p>
-                      <p className="truncate text-xs text-gray-400">{u.email}</p>
-                    </div>
-                    <span className={`hidden flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold sm:inline-block ${ROLE_COLORS[u.role]}`}>
-                      {ROLE_LABELS[u.role]}
-                    </span>
-                    <span className="flex-shrink-0 text-xs text-gray-400">{u.registeredAt}</span>
-                    <button
-                      onClick={() => setSelected(selected?.id === u.id ? null : u)}
-                      className="flex-shrink-0 rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#2563eb]"
-                      aria-label="Ver opciones"
-                    >
-                      <ArrowRight size={14} />
-                    </button>
-                  </div>
-                ))}
-            </div>
-          </div>
-
-          {/* Table */}
-          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50 text-xs tracking-wider text-gray-500 uppercase">
                     <th className="px-4 py-3 text-left font-semibold">Usuario</th>
                     <th className="hidden px-3 py-3 text-center font-semibold sm:table-cell">Rol</th>
+                    <th className="hidden px-3 py-3 text-right font-semibold md:table-cell">Registrado</th>
                     <th className="hidden px-3 py-3 text-right font-semibold md:table-cell">Pedidos</th>
                     <th className="hidden px-4 py-3 text-right font-semibold md:table-cell">Gasto total</th>
                     <th className="px-4 py-3 text-right font-semibold">Acciones</th>
@@ -297,10 +267,11 @@ export default function AdminUsuariosPage() {
                         </div>
                       </td>
                       <td className="hidden px-3 py-3 text-center sm:table-cell">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold capitalize ${ROLE_COLORS[user.role]}`}>
-                          {user.role}
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${ROLE_COLORS[user.role]}`}>
+                          {ROLE_LABELS[user.role]}
                         </span>
                       </td>
+                      <td className="hidden px-3 py-3 text-right text-xs text-gray-500 md:table-cell">{user.registeredAt}</td>
                       <td className="hidden px-3 py-3 text-right font-medium text-gray-700 md:table-cell">{user.totalOrders}</td>
                       <td className="hidden px-4 py-3 text-right font-bold text-gray-900 md:table-cell">{user.totalSpent.toFixed(2)}€</td>
                       <td className="px-4 py-3 text-right">
