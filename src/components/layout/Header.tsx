@@ -590,7 +590,7 @@ export function Header() {
       <MobileTrustBar />
 
       {/* ── Main bar: todo en una sola fila, de izquierda a derecha ──── */}
-      <Container className="flex h-16 items-center gap-3">
+      <Container className="flex h-16 items-center justify-between gap-3">
         {/* Logo — banner "TCG ACADEMY" a la izquierda del buscador */}
         <Link href="/" className="flex flex-shrink-0 items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -606,7 +606,7 @@ export function Header() {
 
         {/* Desktop search */}
         <div
-          className="relative hidden w-[230px] flex-shrink-0 lg:block xl:w-[460px]"
+          className="relative hidden flex-1 lg:block xl:max-w-[500px]"
           ref={desktopSearchRef}
         >
           <form onSubmit={handleDesktopSubmit}>
