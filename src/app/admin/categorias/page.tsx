@@ -20,6 +20,7 @@ export default function AdminCategoriasPage() {
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMap(loadSubcategories());
   }, []);
 

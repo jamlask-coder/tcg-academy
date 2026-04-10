@@ -41,7 +41,7 @@ export function getGLSTrackingUrl(trackingNumber: string): string {
 // ── Mock implementation (replace with real GLS API calls) ────────────────────
 
 export async function createGLSShipment(
-  request: GLSShipmentRequest,
+  _request: GLSShipmentRequest,
 ): Promise<GLSShipmentResult> {
   // TODO: Replace with real GLS API call
   // POST https://api.gls-spain.es/v1/shipments

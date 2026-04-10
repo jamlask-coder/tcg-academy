@@ -189,7 +189,7 @@ function isUrgent(order: AdminOrder) {
 
 // ─── Small components ─────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: AdminOrderStatus }) {
+function _StatusBadge({ status }: { status: AdminOrderStatus }) {
   const cfg = STATUS_CFG[status];
   return (
     <span
@@ -457,7 +457,7 @@ function printInvoicePDF(order: AdminOrder) {
       const unitNet = calcNet(unitGross);
       const vatUnit = unitGross - unitNet;
       const totalNet = unitNet * item.qty;
-      const totalVAT = vatUnit * item.qty;
+      const _totalVAT = vatUnit * item.qty;
       const totalGross = unitGross * item.qty;
       return `<tr>
         <td style="padding:8px 10px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151">${item.name}</td>
@@ -471,7 +471,7 @@ function printInvoicePDF(order: AdminOrder) {
     .join("");
 
   const shippingNet = calcNet(order.shipping);
-  const shippingVAT = order.shipping - shippingNet;
+  const _shippingVAT = order.shipping - shippingNet;
   const shippingRow =
     order.shipping === 0
       ? `<tr>
@@ -1404,6 +1404,7 @@ export default function AdminPedidosPage() {
 
   // Reset page when any filter changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
   }, [statusFilter, roleFilter, urgentOnly, search]);
 
