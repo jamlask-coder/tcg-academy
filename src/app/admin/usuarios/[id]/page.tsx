@@ -27,7 +27,6 @@ const ROLE_COLORS: Record<string, string> = {
   admin: "bg-amber-100 text-amber-700",
 };
 
-const MONTH_LABELS = ["Oct", "Nov", "Dic", "Ene", "Feb", "Mar"];
 
 export default async function AdminUsuarioDetailPage({
   params,
@@ -48,8 +47,42 @@ export default async function AdminUsuarioDetailPage({
       inv.clientName?.toLowerCase().includes(user.name.toLowerCase()),
   ).slice(0, 5);
 
-  const monthlyData = MONTH_LABELS.map((month) => ({ month, gasto: 0 }));
-  const gameData: { game: string; gasto: number }[] = [];
+  // Monthly spend: last 6 months derived from order dates
+  const MONTH_MAP: Record<string, string> = {
+    "10": "Oct", "11": "Nov", "12": "Dic",
+    "01": "Ene", "02": "Feb", "03": "Mar",
+    "04": "Abr", "05": "May", "06": "Jun",
+    "07": "Jul", "08": "Ago", "09": "Sep",
+  };
+  const now = new Date();
+  const last6: { month: string; key: string }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = MONTH_MAP[String(d.getMonth() + 1).padStart(2, "0")] ?? key;
+    last6.push({ month: label, key });
+  }
+  const monthlySpend: Record<string, number> = {};
+  for (const { key } of last6) monthlySpend[key] = 0;
+  for (const order of userOrders) {
+    const key = order.date.slice(0, 7);
+    if (key in monthlySpend) monthlySpend[key] += order.total;
+  }
+  const monthlyData = last6.map(({ month, key }) => ({ month, gasto: monthlySpend[key] }));
+
+  // Spend by game: aggregate item totals across all user orders
+  const gameSpend: Record<string, number> = {};
+  for (const order of userOrders) {
+    for (const item of order.items) {
+      if (item.game) {
+        gameSpend[item.game] = (gameSpend[item.game] ?? 0) + item.price * item.qty;
+      }
+    }
+  }
+  const gameData = Object.entries(gameSpend)
+    .map(([game, gasto]) => ({ game, gasto }))
+    .sort((a, b) => b.gasto - a.gasto)
+    .slice(0, 6);
 
   const roleColor =
     user.role === "tienda"
