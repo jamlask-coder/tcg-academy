@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   Search,
   ChevronDown,
@@ -32,6 +32,7 @@ import {
 } from "@/data/mockData";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+const PAGE_SIZE = 50;
 
 const STATUS_CFG: Record<
   AdminOrderStatus,
@@ -201,6 +202,76 @@ function StatusBadge({ status }: { status: AdminOrderStatus }) {
     >
       {cfg.label}
     </span>
+  );
+}
+
+function StatusDropdown({
+  status,
+  onUpdate,
+}: {
+  status: AdminOrderStatus;
+  onUpdate: (s: AdminOrderStatus) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const cfg = STATUS_CFG[status];
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold transition hover:opacity-75"
+        style={{ color: cfg.color, backgroundColor: cfg.bg, borderColor: cfg.border }}
+        title="Cambiar estado"
+        aria-label={`Estado: ${cfg.label}. Pulsa para cambiar`}
+      >
+        {cfg.label}
+        <ChevronDown
+          size={10}
+          className={`transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="absolute top-full left-1/2 z-50 mt-1.5 w-48 -translate-x-1/2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+          {(Object.keys(STATUS_CFG) as AdminOrderStatus[]).map((s) => {
+            const c = STATUS_CFG[s];
+            const active = s === status;
+            return (
+              <button
+                key={s}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!active) onUpdate(s);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold transition hover:bg-gray-50 ${active ? "cursor-default opacity-40" : ""}`}
+              >
+                <span
+                  className="h-2 w-2 flex-shrink-0 rounded-full"
+                  style={{ backgroundColor: c.color }}
+                />
+                {c.label}
+                {active && <Check size={10} className="ml-auto text-gray-400" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1135,6 +1206,12 @@ export default function AdminPedidosPage() {
     "date",
   );
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [page, setPage] = useState(1);
+
+  // Reset page when any filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, roleFilter, urgentOnly, search]);
 
   const persistOrders = (next: AdminOrder[]) => {
     setOrders(next);
@@ -1213,6 +1290,9 @@ export default function AdminPedidosPage() {
     sortField,
     sortDir,
   ]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // ── Handlers ──
 
@@ -1433,11 +1513,16 @@ export default function AdminPedidosPage() {
         ].map(({ label, value, color, bg, filter }) => (
           <button
             key={label}
-            onClick={() =>
-              filter
-                ? setStatusFilter(statusFilter === filter ? "" : filter)
-                : setUrgentOnly(!urgentOnly)
-            }
+            onClick={() => {
+              if (filter) {
+                const next = statusFilter === filter ? "" : filter;
+                setStatusFilter(next);
+                if (next) { setSortField("date"); setSortDir("desc"); }
+              } else {
+                setUrgentOnly((u) => !u);
+              }
+              setPage(1);
+            }}
             className={`rounded-xl border-2 p-3 text-left transition ${(filter ? statusFilter === filter : urgentOnly) ? "border-current" : "border-transparent"}`}
             style={{ backgroundColor: bg, color }}
           >
@@ -1559,7 +1644,7 @@ export default function AdminPedidosPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.map((order) => {
+              {paginated.map((order) => {
                 const isOpen = expanded === order.id;
                 const urgent = isUrgent(order);
                 const roleCfg = ROLE_CFG[order.userRole];
@@ -1613,8 +1698,11 @@ export default function AdminPedidosPage() {
                       <td className="px-3 py-3 text-right font-bold whitespace-nowrap text-gray-900">
                         {order.total.toFixed(2)}€
                       </td>
-                      <td className="px-3 py-3 text-center">
-                        <StatusBadge status={order.adminStatus} />
+                      <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <StatusDropdown
+                          status={order.adminStatus}
+                          onUpdate={(s) => handleUpdateStatus(order.id, s)}
+                        />
                       </td>
                       <td className="px-3 py-3 text-gray-400">
                         {isOpen ? (
@@ -1650,6 +1738,49 @@ export default function AdminPedidosPage() {
             <p className="text-sm">
               No se encontraron pedidos con los filtros aplicados
             </p>
+          </div>
+        )}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-4 py-3">
+            <p className="text-xs text-gray-500">
+              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length} pedidos
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-40"
+              >
+                ← Anterior
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                .reduce<(number | "…")[]>((acc, p, idx, arr) => {
+                  if (idx > 0 && (arr[idx - 1] as number) < p - 1) acc.push("…");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) =>
+                  p === "…" ? (
+                    <span key={`ellipsis-${i}`} className="px-1 text-xs text-gray-400">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p as number)}
+                      className={`min-w-[28px] rounded-lg border px-2 py-1.5 text-xs font-semibold transition ${page === p ? "border-[#2563eb] bg-[#2563eb] text-white" : "border-gray-200 text-gray-600 hover:bg-gray-100"}`}
+                    >
+                      {p}
+                    </button>
+                  ),
+                )}
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-40"
+              >
+                Siguiente →
+              </button>
+            </div>
           </div>
         )}
       </div>
