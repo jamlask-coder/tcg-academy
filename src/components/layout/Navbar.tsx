@@ -11,113 +11,9 @@ import { OtrosMenu } from "./OtrosMenu";
 import { MEGA_MENU_DATA } from "@/data/megaMenuData";
 import { Container } from "@/components/ui/Container";
 
-// ─── Cardmarket sprite sheet ───────────────────────────────────────────────────
-const CM_SPRITE = "/images/ssGamesBig.png";
-const SPRITE_SHEET_H = 140; // original sprite sheet height in px
-const TARGET_H = 36;        // display height for normal logos
-const TARGET_W = 100;       // normalized visual width for all logos
-
-// [origW, origX, vOffset, filter?]
-// All logos are rendered at TARGET_W wide and TARGET_H tall (object-contain style)
-const CM_SPRITES: Record<string, [number, number, number, string?]> = {
-  magic: [408, 0, 0],
-  yugioh: [392, 696, 0],
-  pokemon: [273, 1228, 0],
-  "dragon-ball": [382, 3288, 0],
-  "one-piece": [482, 4642, 0, "brightness(0) invert(1)"],
-  lorcana: [310, 5124, 0],
-  riftbound: [319, 5976, 0, "brightness(0) invert(1)"],
-};
-
-// NAV_HEIGHT: total navbar height in px — drives the center line position
-const NAV_HEIGHT = 56;
-// CENTER_LINE_Y: where the center of logo names sits (50% of nav)
-const CENTER_LINE_Y = NAV_HEIGHT / 2;
-
-// Total sprite sheet width (rightmost: riftbound origX=5976 + origW=319)
-const SHEET_ORIG_W = 6295;
-
-function CmSpriteLogo({ slug, label }: { slug: string; label: string }) {
-  const data = CM_SPRITES[slug];
-  if (!data) return null;
-  const [origW, origX, , cssFilter] = data;
-
-  // object-contain: scale by whichever axis fills the box first
-  const scale = Math.min(TARGET_W / origW, TARGET_H / SPRITE_SHEET_H);
-  // Use the actual rendered logo dimensions — no fixed-width container that would
-  // expose adjacent sprite-sheet content on either side of narrower logos.
-  const displayW = Math.round(origW * scale);
-  const displayH = Math.round(SPRITE_SHEET_H * scale);
-  const sheetW = Math.round(SHEET_ORIG_W * scale);
-  // Position the sheet so the logo's left edge aligns with the span's left edge.
-  const bgX = (-origX * scale).toFixed(1);
-
-  return (
-    <span
-      aria-label={label}
-      style={{
-        display: "inline-block",
-        width: displayW,
-        height: displayH,
-        backgroundImage: `url('${CM_SPRITE}')`,
-        backgroundRepeat: "no-repeat",
-        backgroundSize: `${sheetW}px ${displayH}px`,
-        backgroundPosition: `${bgX}px 0px`,
-        filter: cssFilter,
-        transition: "transform 0.2s",
-        flexShrink: 0,
-      }}
-      className="group-hover/logo:scale-105"
-    />
-  );
-}
-
-// ─── Logo component ────────────────────────────────────────────────────────────
-function GameLogo({
-  slug,
-  src,
-  abbrev,
-  color,
-  label,
-}: {
-  slug: string;
-  src: string;
-  abbrev: string;
-  color: string;
-  label: string;
-}) {
-  const [errored, setErrored] = useState(false);
-
-  if (CM_SPRITES[slug]) {
-    return <CmSpriteLogo slug={slug} label={label} />;
-  }
-
-  if (errored) {
-    return (
-      <div
-        className="flex h-7 items-center justify-center rounded-md px-2 text-[9px] font-black tracking-wide whitespace-nowrap text-white"
-        style={{ backgroundColor: color }}
-      >
-        {abbrev}
-      </div>
-    );
-  }
-
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={label}
-      width={110}
-      height={28}
-      className="relative z-10 h-9 object-contain transition-transform duration-200 group-hover/logo:scale-105"
-      style={{ width: TARGET_W, maxWidth: TARGET_W }}
-      onError={() => setErrored(true)}
-    />
-  );
-}
-
 // ─── Constants ─────────────────────────────────────────────────────────────────
+// NAV_HEIGHT: total navbar height in px
+const NAV_HEIGHT = 56;
 const TIENDAS_KEY = "tiendas";
 const MAYORISTAS_KEY = "mayoristas";
 const OTROS_KEY = "otros";
@@ -180,21 +76,6 @@ export function Navbar() {
         className="relative overflow-hidden border-b border-white/10"
         style={{ background: "#1f2937", minHeight: NAV_HEIGHT }}
       >
-        {/* ── Centro de alineación — línea horizontal en el centro del nombre ── */}
-        <div
-          aria-hidden="true"
-          style={{
-            position: "absolute",
-            top: CENTER_LINE_Y,
-            left: 0,
-            right: 0,
-            height: 1,
-            background: "transparent",
-            pointerEvents: "none",
-            zIndex: 0,
-          }}
-        />
-
         <Container>
           <div className="flex items-center justify-center" style={{ minHeight: NAV_HEIGHT }}>
             {/* ── Games group ───────────────────────────────────────────────── */}

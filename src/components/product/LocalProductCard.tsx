@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   GAME_CONFIG,
   CATEGORY_LABELS,
+  CARD_CATEGORIES,
   isNewProduct,
   type LocalProduct,
 } from "@/data/products";
@@ -15,20 +16,6 @@ import { DiscountBadgeEdit } from "@/components/ui/DiscountBadgeEdit";
 import { usePrice } from "@/hooks/usePrice";
 import { HoloCard } from "@/components/product/HoloCard";
 import { isLocalProduct } from "@/lib/productStore";
-
-// Categories where individual cards are sold — holo effect applies
-const CARD_CATEGORIES = new Set([
-  "singles",
-  "foil",
-  "enchanted",
-  "starlight",
-  "prize-cards",
-  "alternate-art",
-  "secret-lair",
-  "gradeadas",
-  "scr",
-  "field-centers",
-]);
 
 interface Props {
   product: LocalProduct;

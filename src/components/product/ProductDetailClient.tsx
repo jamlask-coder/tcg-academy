@@ -20,6 +20,7 @@ import {
   type LocalProduct,
   GAME_CONFIG,
   CATEGORY_LABELS,
+  CARD_CATEGORIES,
   LANGUAGE_NAMES,
 } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
@@ -32,19 +33,6 @@ import { ShareButtons } from "@/components/ui/ShareButtons";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { HoloCard } from "@/components/product/HoloCard";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
-
-const CARD_CATEGORIES = new Set([
-  "singles",
-  "foil",
-  "enchanted",
-  "starlight",
-  "prize-cards",
-  "alternate-art",
-  "secret-lair",
-  "gradeadas",
-  "scr",
-  "field-centers",
-]);
 
 interface GameConfig {
   name: string;
