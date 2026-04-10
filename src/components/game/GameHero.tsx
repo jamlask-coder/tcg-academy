@@ -255,36 +255,38 @@ export function GameHero({ game, config }: Props) {
             </motion.p>
           </motion.div>
 
-          {/* CENTER: Card fan (compact) */}
+          {/* CENTER: Card fan (Pokemon only) */}
           <div className="flex items-center justify-center">
-            <div
-              style={{
-                position: "relative",
-                width: 300,
-                height: 128,
-                flexShrink: 0,
-              }}
-            >
-              {cards.slice(0, 5).map((card, i) => {
-                const f = FAN_5[i];
-                return (
-                  <HoloCard
-                    key={i}
-                    card={card}
-                    color={color}
-                    emoji={emoji}
-                    width={88}
-                    height={123}
-                    fanRotate={f.rotate}
-                    fanX={f.x * 0.5}
-                    fanY={f.y * 0.3}
-                    zIndex={f.zIndex}
-                    entryDelay={0.2 + i * 0.12}
-                    floatPhase={f.floatPhase}
-                  />
-                );
-              })}
-            </div>
+            {game === "pokemon" && (
+              <div
+                style={{
+                  position: "relative",
+                  width: 300,
+                  height: 128,
+                  flexShrink: 0,
+                }}
+              >
+                {cards.slice(0, 5).map((card, i) => {
+                  const f = FAN_5[i];
+                  return (
+                    <HoloCard
+                      key={i}
+                      card={card}
+                      color={color}
+                      emoji={emoji}
+                      width={88}
+                      height={123}
+                      fanRotate={f.rotate}
+                      fanX={f.x * 0.5}
+                      fanY={f.y * 0.3}
+                      zIndex={f.zIndex}
+                      entryDelay={0.2 + i * 0.12}
+                      floatPhase={f.floatPhase}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* RIGHT: Character illustration */}
@@ -331,7 +333,7 @@ export function GameHero({ game, config }: Props) {
           </div>
         </motion.div>
 
-        {mobileCards.length > 0 && (
+        {game === "pokemon" && mobileCards.length > 0 && (
           <div className="flex justify-center">
             <div
               style={{

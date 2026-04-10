@@ -175,7 +175,7 @@ function InvoiceCard({ inv }: { inv: Invoice }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:shadow-sm">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 p-5">
         <div>
           <div className="mb-1 flex flex-wrap items-center gap-2">
             <span className="font-mono font-bold text-gray-900">{inv.id}</span>
@@ -187,17 +187,12 @@ function InvoiceCard({ inv }: { inv: Invoice }) {
             {inv.date}
           </p>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-3">
-          <span className="text-xl font-bold text-[#2563eb]">
-            {grandTotal.toFixed(2)}€
-          </span>
-          <button
-            onClick={() => downloadInvoicePDF(inv)}
-            className="flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-[#2563eb] transition hover:bg-blue-50"
-          >
-            <Download size={15} /> Descargar
-          </button>
-        </div>
+        <button
+          onClick={() => downloadInvoicePDF(inv)}
+          className="flex min-h-[44px] items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-[#2563eb] transition hover:bg-blue-50"
+        >
+          <Download size={15} /> Descargar
+        </button>
       </div>
 
       {/* Professional table */}
@@ -305,6 +300,22 @@ function InvoiceCard({ inv }: { inv: Invoice }) {
             </tr>
           </tfoot>
         </table>
+      </div>
+
+      {/* Bottom totals bar */}
+      <div className="grid grid-cols-3 divide-x divide-gray-100 border-t border-gray-100">
+        <div className="px-5 py-4 text-center">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">Base imponible</p>
+          <p className="text-base font-bold text-gray-700">{baseTotal.toFixed(2)}€</p>
+        </div>
+        <div className="px-5 py-4 text-center">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">IVA</p>
+          <p className="text-base font-bold text-gray-700">{vatTotal.toFixed(2)}€</p>
+        </div>
+        <div className="px-5 py-4 text-center">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">Total factura</p>
+          <p className="text-2xl font-black text-[#2563eb] leading-none">{grandTotal.toFixed(2)}€</p>
+        </div>
       </div>
     </div>
   );

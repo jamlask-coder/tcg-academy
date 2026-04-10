@@ -5,6 +5,7 @@ import { Providers } from "@/components/layout/Providers";
 import { Header } from "@/components/layout/Header";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { ScrollToTop } from "@/components/layout/ScrollToTop";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
@@ -34,6 +35,7 @@ export default function RootLayout({
     <html lang="es">
       <body className={inter.className}>
         <Providers>
+          <ScrollToTop />
           <div className="flex min-h-screen flex-col">
             <div className="sticky top-0 z-50">
               <Header />

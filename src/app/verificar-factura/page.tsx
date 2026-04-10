@@ -17,6 +17,34 @@ export default function VerificarFacturaPage() {
     if (!trimmed) return;
     setLoading(true);
     await new Promise((r) => setTimeout(r, 500));
+
+    // Check CSV store first (codes generated from admin invoice PDFs)
+    try {
+      const csvStore: Record<string, string> = JSON.parse(
+        localStorage.getItem("tcgacademy_invoice_csv") ?? "{}",
+      );
+      const matchedOrderId = Object.entries(csvStore).find(
+        ([, csv]) => csv.toUpperCase() === trimmed,
+      )?.[0];
+      if (matchedOrderId) {
+        const { ADMIN_ORDERS } = await import("@/data/mockData");
+        const order = ADMIN_ORDERS.find((o) => o.id === matchedOrderId);
+        if (order) {
+          setResult({
+            found: true,
+            id: `FAC-${order.id.replace("TCG-", "")}`,
+            date: order.date,
+            total: order.total,
+            clientName: order.userName,
+            status: order.adminStatus === "finalizado" ? "pagada" : "pendiente",
+          });
+          setLoading(false);
+          return;
+        }
+      }
+    } catch { /* ignore */ }
+
+    // Fallback: check mock invoices by invoice number or order ID
     const inv = MOCK_INVOICES.find(
       (i) => i.id.toUpperCase() === trimmed || i.orderId.toUpperCase() === trimmed,
     );
@@ -65,7 +93,7 @@ export default function VerificarFacturaPage() {
               value={code}
               onChange={(e) => setCode(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleVerify()}
-              placeholder="Ej: FAC-2026-0001 o TCG-20260101-001"
+              placeholder="Ej: A1B2C3-XY12-FF00 (código CSV de la factura)"
               className="h-12 flex-1 rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
             />
             <button

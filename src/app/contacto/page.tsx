@@ -9,8 +9,15 @@ import {
   MapPin,
   Send,
   CheckCircle,
-  MessageSquare,
 } from "lucide-react";
+
+function IconWhatsApp() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22" aria-hidden="true">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+    </svg>
+  );
+}
 import Link from "next/link";
 import { checkRateLimit } from "@/utils/sanitize";
 
@@ -25,16 +32,19 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const STORES_CONTACT = [
-  { name: "TCG Academy Calpe", phone: "+34 965 000 001", id: "calpe" },
-  { name: "TCG Academy Béjar", phone: "+34 923 000 002", id: "bejar" },
-  { name: "TCG Academy Madrid", phone: "+34 910 000 003", id: "madrid" },
-  { name: "TCG Academy Barcelona", phone: "+34 930 000 004", id: "barcelona" },
+  { name: "Sede (Calpe)", phone: "+34 648 63 57 23", id: "calpe" },
+  { name: "Madrid", phone: "+34 910 000 003", id: "madrid" },
+  { name: "Barcelona", phone: "+34 930 000 004", id: "barcelona" },
+  { name: "Béjar", phone: "+34 923 000 002", id: "bejar" },
 ];
 
-const WHATSAPP_NUMBER = "34600000000";
+const WHATSAPP_NUMBER = "34648635723";
+const CONTACT_EMAIL = "tcgacademycalpe@gmail.com";
+const CONTACT_PHONE = "+34 648 63 57 23";
 
 export default function ContactoPage() {
   const [submitted, setSubmitted] = useState(false);
+  const [rateLimited, setRateLimited] = useState(false);
 
   const {
     register,
@@ -44,13 +54,19 @@ export default function ContactoPage() {
     resolver: zodResolver(schema),
   });
 
-  const onSubmit = async (_data: FormData) => {
-    // Rate limit: máximo 3 mensajes cada 24 horas
+  const onSubmit = async (data: FormData) => {
     if (!checkRateLimit("contact-form", 3, 86_400_000)) {
-      alert("Has enviado demasiados mensajes hoy. Por favor, intenta de nuevo mañana.");
+      setRateLimited(true);
       return;
     }
+    setRateLimited(false);
     await new Promise((r) => setTimeout(r, 600));
+    // Open mailto with form data (static site — no server)
+    const subject = encodeURIComponent("Nuevo mensaje a través de la página web");
+    const body = encodeURIComponent(
+      `Nombre: ${data.nombre}\nEmail: ${data.email}\nTeléfono: ${data.telefono ?? "—"}\nAsunto: ${data.asunto}\n\n${data.mensaje}`,
+    );
+    window.open(`mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`);
     setSubmitted(true);
   };
 
@@ -70,51 +86,39 @@ export default function ContactoPage() {
       {/* Contact cards */}
       <div className="mx-auto max-w-[1400px] px-6 py-10">
         <div className="mb-12 grid gap-4 sm:grid-cols-3">
-          {[
-            {
-              icon: Mail,
-              title: "Email",
-              value: "info@tcgacademy.es",
-              href: "mailto:info@tcgacademy.es",
-              color: "#2563eb",
-            },
-            {
-              icon: Phone,
-              title: "Teléfono",
-              value: "+34 900 123 456",
-              href: "tel:+34900123456",
-              color: "#16a34a",
-            },
-            {
-              icon: MessageSquare,
-              title: "WhatsApp",
-              value: "Escríbenos por WhatsApp",
-              href: `https://wa.me/${WHATSAPP_NUMBER}`,
-              color: "#25d366",
-            },
-          ].map(({ icon: Icon, title, value, href, color }) => (
-            <div
-              key={title}
-              className="rounded-2xl border border-gray-200 bg-white p-6 text-center transition hover:shadow-md"
-            >
-              <div
-                className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl"
-                style={{ backgroundColor: `${color}15` }}
-              >
-                <Icon size={22} style={{ color }} />
-              </div>
-              <p className="mb-1 font-bold text-gray-900">{title}</p>
-              <a
-                href={href}
-                className="text-sm font-medium hover:underline"
-                style={{ color }}
-                target={href.startsWith("https") ? "_blank" : undefined}
-                rel={href.startsWith("https") ? "noopener noreferrer" : undefined}
-              >
-                {value}
-              </a>
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center transition hover:shadow-md">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: "#2563eb15" }}>
+              <Mail size={22} style={{ color: "#2563eb" }} />
             </div>
-          ))}
+            <p className="mb-1 font-bold text-gray-900">Email</p>
+            <a href={`mailto:${CONTACT_EMAIL}`} className="text-sm font-medium hover:underline" style={{ color: "#2563eb" }}>
+              {CONTACT_EMAIL}
+            </a>
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center transition hover:shadow-md">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: "#16a34a15" }}>
+              <Phone size={22} style={{ color: "#16a34a" }} />
+            </div>
+            <p className="mb-1 font-bold text-gray-900">Teléfono</p>
+            <a href={`tel:${CONTACT_PHONE.replace(/\s/g, "")}`} className="text-sm font-medium hover:underline" style={{ color: "#16a34a" }}>
+              {CONTACT_PHONE}
+            </a>
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center transition hover:shadow-md">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl" style={{ backgroundColor: "#25d36615" }}>
+              <IconWhatsApp />
+            </div>
+            <p className="mb-1 font-bold text-gray-900">WhatsApp</p>
+            <a
+              href={`https://wa.me/${WHATSAPP_NUMBER}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium hover:underline"
+              style={{ color: "#25d366" }}
+            >
+              Escríbenos por WhatsApp
+            </a>
+          </div>
         </div>
 
         <div className="grid gap-10 lg:grid-cols-3">
@@ -122,15 +126,12 @@ export default function ContactoPage() {
           <div className="lg:col-span-2">
             {submitted ? (
               <div className="rounded-2xl border-2 border-green-200 bg-green-50 p-12 text-center">
-                <CheckCircle
-                  size={48}
-                  className="mx-auto mb-4 text-green-500"
-                />
-                <h2 className="mb-2 text-xl font-bold text-gray-900">
-                  ¡Mensaje enviado!
+                <CheckCircle size={56} className="mx-auto mb-4 text-green-500" />
+                <h2 className="mb-2 text-2xl font-bold text-gray-900">
+                  Tu mensaje se ha enviado correctamente
                 </h2>
                 <p className="text-gray-600">
-                  Te responderemos en menos de 24 horas en el email indicado.
+                  Pronto recibirás una respuesta.
                 </p>
               </div>
             ) : (
@@ -139,7 +140,7 @@ export default function ContactoPage() {
                 className="space-y-5 rounded-2xl border border-gray-200 bg-white p-8"
               >
                 <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900">
-                  <MessageSquare size={20} className="text-[#2563eb]" /> Enviar
+                  <Send size={20} className="text-[#2563eb]" /> Enviar
                   mensaje
                 </h2>
 
@@ -233,6 +234,11 @@ export default function ContactoPage() {
                   )}
                 </div>
 
+                {rateLimited && (
+                  <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                    Has alcanzado el límite de mensajes. Inténtalo de nuevo mañana.
+                  </p>
+                )}
                 <button
                   type="submit"
                   disabled={isSubmitting}
@@ -277,7 +283,7 @@ export default function ContactoPage() {
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 rounded-xl bg-[#25d366] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1eb855]"
                 >
-                  <MessageSquare size={16} />
+                  <IconWhatsApp />
                   Contactar por WhatsApp
                 </a>
               </div>

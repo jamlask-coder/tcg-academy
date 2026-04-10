@@ -81,11 +81,13 @@ function LocalProductCardInner({ product }: Props) {
     ? `/producto?id=${product.id}`
     : `/${product.game}/${product.category}/${product.slug}`;
   const href = productHref;
-  const isCardCategory = CARD_CATEGORIES.has(product.category);
+  const isCardCategory =
+    CARD_CATEGORIES.has(product.category) &&
+    (product.game === "pokemon" || product.game === "riftbound");
 
   // Singles/card categories get portrait TCG-card aspect ratio
   const isSingles = isCardCategory;
-  const imageAspect = isSingles ? "aspect-[5/7]" : "aspect-square";
+  const imageAspect = isSingles ? "aspect-[5/7]" : "aspect-[4/5]";
   const imageObjectFit = "object-contain p-2";
   // Show second image on hover if available
   const displayImage = hovered && product.images[1] ? product.images[1] : image;

@@ -10,7 +10,7 @@ import {
   TrendingUp,
   Euro,
   ShoppingBag,
-  MessageSquare,
+  Star,
   Search,
   ChevronDown,
   CheckCircle,
@@ -560,18 +560,18 @@ export default function CuentaPage() {
 
   const QUICK_LINKS = [
     {
-      href: "/cuenta/pedidos",
-      label: "Mis pedidos",
-      icon: Package,
-      desc: "Historial y seguimiento",
-      color: "#2563eb",
+      href: "/cuenta/bonos",
+      label: "Mis bonos",
+      icon: Star,
+      desc: "Bonos disponibles",
+      color: "#f59e0b",
     },
     {
-      href: "/cuenta/datos",
-      label: "Mis datos",
-      icon: User,
-      desc: "Perfil y contraseña",
-      color: "#7c3aed",
+      href: "/cuenta/bonos",
+      label: "Mis puntos",
+      icon: TrendingUp,
+      desc: "Puntos acumulados",
+      color: "#2563eb",
     },
     ...(isB2B
       ? [
@@ -586,25 +586,25 @@ export default function CuentaPage() {
       : [
           {
             href: "/cuenta/direcciones",
-            label: "Direcciones",
+            label: "Direcciones de envío",
             icon: MapPin,
             desc: "Gestionar envíos",
             color: "#0891b2",
           },
         ]),
     {
+      href: "/cuenta/datos",
+      label: "Mis datos",
+      icon: User,
+      desc: "Perfil y contraseña",
+      color: "#7c3aed",
+    },
+    {
       href: "/cuenta/favoritos",
       label: "Favoritos",
       icon: Heart,
       desc: "Lista de deseos",
       color: "#dc2626",
-    },
-    {
-      href: "/cuenta/mensajes",
-      label: "Mensajes",
-      icon: MessageSquare,
-      desc: "Mensajes de TCG Academy",
-      color: "#7c3aed",
     },
   ];
 

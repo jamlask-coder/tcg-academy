@@ -28,12 +28,13 @@ function IconX() {
 }
 
 
-// ─── Payment icons (inline SVG, simplified official-style) ────────────────────
+// ─── Payment icons (inline SVG, official-style) ───────────────────────────────
 
 function IconVisa() {
   return (
-    <svg viewBox="0 0 48 16" className="h-4" aria-label="Visa">
-      <text x="0" y="13" fontFamily="Arial" fontWeight="bold" fontSize="14" fill="white" letterSpacing="0.5">VISA</text>
+    <svg viewBox="0 0 52 18" className="h-4" aria-label="Visa">
+      <rect x="0" y="0" width="52" height="18" rx="3" fill="#1a1f71"/>
+      <text x="6" y="13" fontFamily="Arial,sans-serif" fontWeight="bold" fontStyle="italic" fontSize="13" fill="white" letterSpacing="1">VISA</text>
     </svg>
   );
 }
@@ -41,27 +42,27 @@ function IconVisa() {
 function IconMastercard() {
   return (
     <svg viewBox="0 0 38 24" className="h-5" aria-label="Mastercard">
-      <circle cx="14" cy="12" r="10" fill="#eb001b" />
-      <circle cx="24" cy="12" r="10" fill="#f79e1b" />
-      <path d="M19 4.8A10 10 0 0124 12a10 10 0 01-5 7.2A10 10 0 0114 12a10 10 0 015-7.2z" fill="#ff5f00" />
+      <circle cx="14" cy="12" r="10" fill="#eb001b"/>
+      <circle cx="24" cy="12" r="10" fill="#f79e1b"/>
+      <path d="M19 4.8A10 10 0 0124 12a10 10 0 01-5 7.2A10 10 0 0114 12a10 10 0 015-7.2z" fill="#ff5f00"/>
     </svg>
   );
 }
 
 function IconPayPal() {
   return (
-    <svg viewBox="0 0 60 18" className="h-4" aria-label="PayPal">
-      <text x="0" y="13" fontFamily="Arial" fontWeight="bold" fontSize="13" fill="#009cde">Pay</text>
-      <text x="24" y="13" fontFamily="Arial" fontWeight="bold" fontSize="13" fill="white">Pal</text>
+    <svg viewBox="0 0 72 20" className="h-4" aria-label="PayPal">
+      <text x="0" y="14" fontFamily="Arial,sans-serif" fontWeight="900" fontSize="14" fill="#009cde">Pay</text>
+      <text x="27" y="14" fontFamily="Arial,sans-serif" fontWeight="900" fontSize="14" fill="#012169">Pal</text>
     </svg>
   );
 }
 
 function IconBizum() {
   return (
-    <svg viewBox="0 0 52 18" className="h-4" aria-label="Bizum">
-      <rect x="0" y="0" width="52" height="18" rx="3" fill="#00c1a0" />
-      <text x="6" y="13" fontFamily="Arial" fontWeight="bold" fontSize="11" fill="white">bizum</text>
+    <svg viewBox="0 0 64 20" className="h-4" aria-label="Bizum">
+      <rect x="0" y="0" width="64" height="20" rx="4" fill="#00c4a7"/>
+      <text x="8" y="14" fontFamily="Arial,sans-serif" fontWeight="800" fontSize="11" fill="white" letterSpacing="0.5">bizum</text>
     </svg>
   );
 }

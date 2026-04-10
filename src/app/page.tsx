@@ -9,12 +9,10 @@ import {
   ShoppingBag,
   Store,
   Zap,
-  Package,
 } from "lucide-react";
 import { LocalProductCard } from "@/components/product/LocalProductCard";
 import { SpainMap } from "@/components/home/SpainMap";
 import {
-  GAME_CONFIG,
   CARD_CATEGORIES,
   isNewProduct,
   type LocalProduct,
@@ -48,7 +46,6 @@ export default function HomePage() {
   const featuredProducts = allProducts
     .filter((p) => p.isFeatured && isNotCard(p))
     .slice(0, 10);
-  const games = Object.entries(GAME_CONFIG);
 
   return (
     <div>
@@ -261,10 +258,6 @@ export default function HomePage() {
                       </div>
                     </div>
 
-                    <ArrowRight
-                      size={15}
-                      className="ml-2 opacity-0 transition-all duration-200 group-hover:text-amber-300 group-hover:opacity-100"
-                    />
                   </Link>
                 ))}
               </div>
@@ -283,9 +276,9 @@ export default function HomePage() {
               [Truck, "Envío gratis", "En pedidos desde 149€", "#3b82f6"],
               [Shield, "Compra segura", "Pago 100% protegido", "#16a34a"],
               [
-                Package,
-                "+10.000 productos",
-                "Solo distribuidores ofic.",
+                Store,
+                "Mayoristas y minoristas",
+                "Precios especiales B2B",
                 "#7c3aed",
               ],
               [Users, "Atención 24h", "Chat, teléfono y tienda", "#ea580c"],
@@ -312,41 +305,6 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* GAMES GRID */}
-      <section className="mx-auto max-w-[1400px] px-4 py-10 sm:px-6 sm:py-16">
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-              Juegos TCG
-            </h2>
-            <p className="mt-1 text-gray-500">Explora cada universo</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-3 md:grid-cols-5 lg:grid-cols-9">
-          {games.map(([slug, { name, color, bgColor, emoji }]) => (
-            <Link
-              key={slug}
-              href={`/${slug}`}
-              className="group flex flex-col items-center rounded-2xl border-2 border-transparent p-3 text-center transition-all hover:shadow-lg"
-              style={{ backgroundColor: bgColor }}
-            >
-              <div
-                className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl text-xl shadow-md transition-transform group-hover:scale-110"
-                style={{ backgroundColor: color }}
-              >
-                {emoji}
-              </div>
-              <span
-                className="text-center text-[10px] leading-tight font-bold"
-                style={{ color }}
-              >
-                {name}
-              </span>
-            </Link>
-          ))}
         </div>
       </section>
 
