@@ -32,8 +32,8 @@ interface PriceRow {
   category: string;
   image: string;
   price: number; // PV Público
-  wholesalePrice: number; // PV Mayoristas
-  storePrice: number; // PV Tiendas TCG Academy
+  wholesalePrice: number; // PV Mayorista
+  storePrice: number; // PV Tiendas
   costPrice?: number; // Precio de adquisición (admin only)
   comparePrice?: number; // precio tachado original
   discountActive: boolean;
@@ -96,8 +96,8 @@ function exportCSV(rows: PriceRow[]) {
     "Juego",
     "Categoría",
     "PV Público",
-    "PV Mayoristas",
-    "PV Tiendas TCG Academy",
+    "PV Mayorista",
+    "PV Tiendas",
     "Precio Adquisición",
     "Precio Original",
     "Dto%",
@@ -717,10 +717,10 @@ export default function PreciosPage() {
                   </button>
                 </th>
                 <th className="max-w-[80px] px-2 py-2.5 text-right font-semibold leading-tight text-gray-600">
-                  PV Mayoristas
+                  PV Mayorista
                 </th>
                 <th className="max-w-[72px] px-2 py-2.5 text-right font-semibold leading-tight text-gray-600">
-                  PV Tiendas TCG Academy
+                  PV Tiendas
                 </th>
                 <th className="max-w-[72px] px-2 py-2.5 text-right font-semibold leading-tight text-purple-600">
                   Precio Adquisición

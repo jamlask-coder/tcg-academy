@@ -22,6 +22,7 @@ import {
   PackagePlus,
   BadgeDollarSign,
   UserCircle,
+  Layers,
 } from "lucide-react";
 
 const SOLICITUDES_KEY = "tcgacademy_solicitudes";
@@ -61,6 +62,7 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
+  { href: "/admin/categorias", label: "Subcategorías", icon: Layers },
   { href: "/admin/solicitudes", label: "Solicitudes B2B", icon: Inbox },
   { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart2 },
   { href: "/admin/fiscal", label: "Gestión Fiscal", icon: Receipt },

@@ -187,88 +187,59 @@ export default function AdminUsuariosPage() {
         </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {(["cliente", "mayorista", "tienda", "admin"] as UserRole[]).map(
-          (role) => (
-            <div
-              key={role}
-              className="rounded-xl border border-gray-200 bg-white p-4"
-            >
-              <p className="mb-1 text-xs text-gray-500 capitalize">{role}s</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {users.filter((u) => u.role === role).length}
-              </p>
-            </div>
-          ),
-        )}
-      </div>
-
-      {/* Recent registrations */}
-      <div className="mb-6 rounded-2xl border border-gray-200 bg-white">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900">
-            <Clock size={15} className="text-[#2563eb]" /> Últimos registrados
-          </h2>
-          <span className="text-xs text-gray-400">Mostrando los 5 más recientes</span>
-        </div>
-        <div className="divide-y divide-gray-50">
-          {[...users]
-            .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime())
-            .slice(0, 5)
-            .map((u) => (
-              <div
-                key={u.id}
-                className="flex items-center gap-3 px-5 py-3 transition hover:bg-gray-50"
-              >
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-xs font-bold text-white">
-                  {u.name[0]}{u.lastName[0]}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-gray-900">
-                    {u.name} {u.lastName}
-                  </p>
-                  <p className="truncate text-xs text-gray-400">{u.email}</p>
-                </div>
-                <span className={`hidden flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold sm:inline-block ${ROLE_COLORS[u.role]}`}>
-                  {ROLE_LABELS[u.role]}
-                </span>
-                <span className="flex-shrink-0 text-xs text-gray-400">{u.registeredAt}</span>
-                <button
-                  onClick={() => setSelected(selected?.id === u.id ? null : u)}
-                  className="flex-shrink-0 rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#2563eb]"
-                  aria-label="Ver opciones"
-                >
-                  <ArrowRight size={14} />
-                </button>
-              </div>
-            ))}
-        </div>
-      </div>
-
+      {/* Main layout: table left (2/3) + counters/detail right (1/3) */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Table */}
-        <div className={selected ? "lg:col-span-2" : "lg:col-span-3"}>
+
+        {/* LEFT: recent registrations + table */}
+        <div className="space-y-4 lg:col-span-2">
+          {/* Recent registrations */}
+          <div className="rounded-2xl border border-gray-200 bg-white">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
+              <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900">
+                <Clock size={15} className="text-[#2563eb]" /> Últimos registrados
+              </h2>
+              <span className="text-xs text-gray-400">5 más recientes</span>
+            </div>
+            <div className="divide-y divide-gray-50">
+              {[...users]
+                .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime())
+                .slice(0, 5)
+                .map((u) => (
+                  <div key={u.id} className="flex items-center gap-3 px-5 py-3 transition hover:bg-gray-50">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-xs font-bold text-white">
+                      {u.name[0]}{u.lastName[0]}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-gray-900">{u.name} {u.lastName}</p>
+                      <p className="truncate text-xs text-gray-400">{u.email}</p>
+                    </div>
+                    <span className={`hidden flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold sm:inline-block ${ROLE_COLORS[u.role]}`}>
+                      {ROLE_LABELS[u.role]}
+                    </span>
+                    <span className="flex-shrink-0 text-xs text-gray-400">{u.registeredAt}</span>
+                    <button
+                      onClick={() => setSelected(selected?.id === u.id ? null : u)}
+                      className="flex-shrink-0 rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#2563eb]"
+                      aria-label="Ver opciones"
+                    >
+                      <ArrowRight size={14} />
+                    </button>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* Table */}
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50 text-xs tracking-wider text-gray-500 uppercase">
-                    <th className="px-4 py-3 text-left font-semibold">
-                      Usuario
-                    </th>
-                    <th className="hidden px-3 py-3 text-center font-semibold sm:table-cell">
-                      Rol
-                    </th>
-                    <th className="hidden px-3 py-3 text-right font-semibold md:table-cell">
-                      Pedidos
-                    </th>
-                    <th className="hidden px-4 py-3 text-right font-semibold md:table-cell">
-                      Gasto total
-                    </th>
-                    <th className="px-4 py-3 text-right font-semibold">
-                      Acciones
-                    </th>
+                    <th className="px-4 py-3 text-left font-semibold">Usuario</th>
+                    <th className="hidden px-3 py-3 text-center font-semibold sm:table-cell">Rol</th>
+                    <th className="hidden px-3 py-3 text-right font-semibold md:table-cell">Pedidos</th>
+                    <th className="hidden px-4 py-3 text-right font-semibold md:table-cell">Gasto total</th>
+                    <th className="px-4 py-3 text-right font-semibold">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -276,44 +247,28 @@ export default function AdminUsuariosPage() {
                     <tr
                       key={user.id}
                       className={`cursor-pointer transition hover:bg-gray-50 ${selected?.id === user.id ? "bg-blue-50" : ""}`}
-                      onClick={() =>
-                        setSelected(selected?.id === user.id ? null : user)
-                      }
+                      onClick={() => setSelected(selected?.id === user.id ? null : user)}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-xs font-bold text-white">
-                            {user.name[0]}
-                            {user.lastName[0]}
+                            {user.name[0]}{user.lastName[0]}
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-gray-900">
-                              {user.name} {user.lastName}
-                            </p>
-                            <p className="truncate text-xs text-gray-500">
-                              {user.email}
-                            </p>
+                            <p className="truncate text-sm font-semibold text-gray-900">{user.name} {user.lastName}</p>
+                            <p className="truncate text-xs text-gray-500">{user.email}</p>
                           </div>
                         </div>
                       </td>
                       <td className="hidden px-3 py-3 text-center sm:table-cell">
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-bold capitalize ${ROLE_COLORS[user.role]}`}
-                        >
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold capitalize ${ROLE_COLORS[user.role]}`}>
                           {user.role}
                         </span>
                       </td>
-                      <td className="hidden px-3 py-3 text-right font-medium text-gray-700 md:table-cell">
-                        {user.totalOrders}
-                      </td>
-                      <td className="hidden px-4 py-3 text-right font-bold text-gray-900 md:table-cell">
-                        {user.totalSpent.toFixed(2)}€
-                      </td>
+                      <td className="hidden px-3 py-3 text-right font-medium text-gray-700 md:table-cell">{user.totalOrders}</td>
+                      <td className="hidden px-4 py-3 text-right font-bold text-gray-900 md:table-cell">{user.totalSpent.toFixed(2)}€</td>
                       <td className="px-4 py-3 text-right">
-                        <ChevronRight
-                          size={16}
-                          className={`ml-auto text-gray-400 transition ${selected?.id === user.id ? "rotate-90" : ""}`}
-                        />
+                        <ChevronRight size={16} className={`ml-auto text-gray-400 transition ${selected?.id === user.id ? "rotate-90" : ""}`} />
                       </td>
                     </tr>
                   ))}
@@ -321,91 +276,98 @@ export default function AdminUsuariosPage() {
               </table>
             </div>
             {filtered.length === 0 && (
-              <p className="py-8 text-center text-sm text-gray-400">
-                No se encontraron usuarios
-              </p>
+              <p className="py-8 text-center text-sm text-gray-400">No se encontraron usuarios</p>
             )}
           </div>
         </div>
 
-        {/* Detail panel */}
-        {selected && (
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-gray-200 bg-white p-5">
-              <div className="mb-4 flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-lg font-bold text-white">
-                    {selected.name[0]}
-                    {selected.lastName[0]}
-                  </div>
-                  <div>
-                    <p className="font-bold text-gray-900">
-                      {selected.name} {selected.lastName}
-                    </p>
-                    <p className="text-xs text-gray-500">{selected.email}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setSelected(null)}
-                  className="p-1 text-gray-400 hover:text-gray-600"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Registrado</span>
-                  <span className="font-medium">{selected.registeredAt}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Pedidos</span>
-                  <span className="font-medium">{selected.totalOrders}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Gasto total</span>
-                  <span className="font-bold text-[#2563eb]">
-                    {selected.totalSpent.toFixed(2)}€
+        {/* RIGHT: counters (vertical) + detail panel */}
+        <div className="space-y-4">
+          {/* Counters — vertical 1×1 */}
+          <div className="rounded-2xl border border-gray-200 bg-white">
+            <div className="border-b border-gray-100 px-5 py-3">
+              <p className="text-xs font-bold tracking-wider text-gray-500 uppercase">Resumen</p>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {(["cliente", "mayorista", "tienda", "admin"] as UserRole[]).map((role) => (
+                <div key={role} className="flex items-center justify-between px-5 py-3">
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${ROLE_COLORS[role]}`}>
+                    {ROLE_LABELS[role]}
+                  </span>
+                  <span className="text-xl font-bold text-gray-900">
+                    {users.filter((u) => u.role === role).length}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Puntos</span>
-                  <span className="font-medium">{selected.points}</span>
-                </div>
-              </div>
-              <Link
-                href={`/admin/usuarios/${selected.id}`}
-                className="mt-4 flex items-center justify-center gap-1.5 rounded-xl bg-[#2563eb] py-2.5 text-sm font-bold text-white transition hover:bg-blue-700"
-              >
-                Ver perfil completo <ArrowRight size={14} />
-              </Link>
-            </div>
-
-            {/* Change role */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-5">
-              <p className="mb-3 text-sm font-bold text-gray-900">
-                Cambiar rol
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {(
-                  ["cliente", "mayorista", "tienda", "admin"] as UserRole[]
-                ).map((role) => (
-                  <button
-                    key={role}
-                    onClick={() => requestRoleChange(selected, role)}
-                    disabled={selected.role === role}
-                    className={`min-h-[44px] rounded-xl border-2 py-2.5 text-xs font-bold transition ${
-                      selected.role === role
-                        ? "cursor-default border-[#2563eb] bg-[#2563eb] text-white"
-                        : "border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-700"
-                    }`}
-                  >
-                    {ROLE_LABELS[role]}
-                  </button>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
-        )}
+
+          {/* Detail panel */}
+          {selected && (
+            <>
+              <div className="rounded-2xl border border-gray-200 bg-white p-5">
+                <div className="mb-4 flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-lg font-bold text-white">
+                      {selected.name[0]}{selected.lastName[0]}
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900">{selected.name} {selected.lastName}</p>
+                      <p className="text-xs text-gray-500">{selected.email}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setSelected(null)} className="p-1 text-gray-400 hover:text-gray-600">
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Registrado</span>
+                    <span className="font-medium">{selected.registeredAt}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Pedidos</span>
+                    <span className="font-medium">{selected.totalOrders}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Gasto total</span>
+                    <span className="font-bold text-[#2563eb]">{selected.totalSpent.toFixed(2)}€</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Puntos</span>
+                    <span className="font-medium">{selected.points}</span>
+                  </div>
+                </div>
+                <Link
+                  href={`/admin/usuarios/${selected.id}`}
+                  className="mt-4 flex items-center justify-center gap-1.5 rounded-xl bg-[#2563eb] py-2.5 text-sm font-bold text-white transition hover:bg-blue-700"
+                >
+                  Ver perfil completo <ArrowRight size={14} />
+                </Link>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white p-5">
+                <p className="mb-3 text-sm font-bold text-gray-900">Cambiar rol</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(["cliente", "mayorista", "tienda", "admin"] as UserRole[]).map((role) => (
+                    <button
+                      key={role}
+                      onClick={() => requestRoleChange(selected, role)}
+                      disabled={selected.role === role}
+                      className={`min-h-[44px] rounded-xl border-2 py-2.5 text-xs font-bold transition ${
+                        selected.role === role
+                          ? "cursor-default border-[#2563eb] bg-[#2563eb] text-white"
+                          : "border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-700"
+                      }`}
+                    >
+                      {ROLE_LABELS[role]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

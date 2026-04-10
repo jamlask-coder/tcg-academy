@@ -133,7 +133,7 @@ export const productSchema = z
     path: ["storePrice"],
   })
   .refine((d) => !d.costPrice || d.costPrice < d.storePrice, {
-    message: "Precio Adquisición debe ser menor que PV Tiendas TCG Academy",
+    message: "Precio Adquisición debe ser menor que PV Tiendas",
     path: ["costPrice"],
   });
 
@@ -632,7 +632,7 @@ export function ProductForm({
                   )}
                 </div>
                 <div>
-                  <label className={labelCls}>PV Mayoristas (€) *</label>
+                  <label className={labelCls}>PV Mayorista (€) *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -646,7 +646,7 @@ export function ProductForm({
                   )}
                 </div>
                 <div>
-                  <label className={labelCls}>PV Tiendas TCG Academy (€) *</label>
+                  <label className={labelCls}>PV Tiendas (€) *</label>
                   <input
                     type="number"
                     step="0.01"

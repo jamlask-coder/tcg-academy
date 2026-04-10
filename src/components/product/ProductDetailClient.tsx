@@ -222,9 +222,9 @@ function PriceDisplay({
         <div className="space-y-2 rounded-xl border border-gray-200 bg-gray-50 p-3">
           <AdminPriceRow label="PV Público" value={inlinePrice} onSave={(v) => onPriceChange(String(v))} color="#2563eb" editMode={editMode} />
           <div className="border-t border-gray-200" />
-          <AdminPriceRow label="PV Mayoristas" value={inlineWholesalePrice} onSave={onWholesalePriceChange} color="#1d4ed8" editMode={editMode} />
+          <AdminPriceRow label="PV Mayorista" value={inlineWholesalePrice} onSave={onWholesalePriceChange} color="#1d4ed8" editMode={editMode} />
           <div className="border-t border-gray-200" />
-          <AdminPriceRow label="PV Tiendas TCG Academy" value={inlineStorePrice} onSave={onStorePriceChange} color="#15803d" editMode={editMode} />
+          <AdminPriceRow label="PV Tiendas" value={inlineStorePrice} onSave={onStorePriceChange} color="#15803d" editMode={editMode} />
           <div className="border-t border-gray-200" />
           <AdminPriceRow label="Precio Adquisición" value={inlineCostPrice} onSave={onCostPriceChange} color="#7c3aed" editMode={editMode} />
         </div>

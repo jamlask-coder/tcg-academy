@@ -227,7 +227,7 @@ export default function AdminProductosPage() {
         "PVP c/IVA",
         "PVP s/IVA",
         "PV Mayorista",
-        "PV Tiendas TCG Academy",
+        "PV Tiendas",
         "IVA%",
         "Stock",
         "Idioma",
@@ -511,7 +511,7 @@ export default function AdminProductosPage() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-gray-600">
-                PV Mayoristas (€)
+                PV Mayorista (€)
               </label>
               <input
                 type="number"
@@ -525,7 +525,7 @@ export default function AdminProductosPage() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-gray-600">
-                PV Tiendas TCG Academy (€)
+                PV Tiendas (€)
               </label>
               <input
                 type="number"
@@ -794,10 +794,10 @@ export default function AdminProductosPage() {
                   PV Mayorista
                 </th>
                 <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-purple-600">
-                  PV Tiendas TCG Academy
+                  PV Tiendas
                 </th>
                 <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-violet-600">
-                  Precio Adquisición
+                  P. Adquisición
                 </th>
                 <th className="hidden px-4 py-3 text-center font-semibold text-gray-500 sm:table-cell">
                   Acciones

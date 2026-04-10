@@ -19,10 +19,23 @@ const BASE_STYLES = `
     .header { background: #2563eb; padding: 28px 40px; }
     .header-logo { color: white; font-size: 22px; font-weight: 900; letter-spacing: -0.5px; }
     .header-sub { color: #93c5fd; font-size: 12px; margin-top: 4px; }
-    .hero { background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%); padding: 40px; text-align: center; }
-    .hero h1 { color: white; font-size: 26px; font-weight: 800; margin: 0 0 8px; }
-    .hero p { color: #bfdbfe; font-size: 15px; margin: 0; }
-    .content { padding: 36px 40px; }
+    .top-btns { background: #1e40af; padding: 12px 40px; text-align: center; }
+    .top-btns a { display: inline-block; background: rgba(255,255,255,0.15); color: white !important; font-size: 12px; font-weight: 700; padding: 8px 16px; border-radius: 8px; text-decoration: none; margin: 3px; }
+    .progress { padding: 24px 40px; background: #f8fafc; border-bottom: 1px solid #e5e7eb; }
+    .progress-track { display: flex; align-items: center; justify-content: center; gap: 0; }
+    .prog-step { text-align: center; width: 80px; }
+    .prog-dot { width: 16px; height: 16px; border-radius: 50%; margin: 0 auto 6px; }
+    .prog-dot.done { background: #2563eb; }
+    .prog-dot.pending { background: #e5e7eb; border: 2px solid #d1d5db; }
+    .prog-label { font-size: 11px; font-weight: 600; color: #6b7280; }
+    .prog-label.done { color: #2563eb; }
+    .prog-line { flex: 1; height: 3px; margin-bottom: 22px; }
+    .prog-line.done { background: #2563eb; }
+    .prog-line.pending { background: #e5e7eb; }
+    .hero { background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%); padding: 32px 40px; text-align: center; }
+    .hero h1 { color: white; font-size: 24px; font-weight: 800; margin: 0 0 8px; }
+    .hero p { color: #bfdbfe; font-size: 14px; margin: 0; }
+    .content { padding: 32px 40px; }
     .content p { color: #374151; font-size: 15px; line-height: 1.7; margin: 0 0 16px; }
     .btn { display: inline-block; background: #2563eb; color: white !important; font-weight: 700; font-size: 15px; padding: 14px 32px; border-radius: 12px; text-decoration: none; margin: 8px 0; }
     .btn-secondary { display: inline-block; background: white; color: #2563eb !important; font-weight: 700; font-size: 14px; padding: 12px 28px; border-radius: 10px; text-decoration: none; border: 2px solid #2563eb; margin: 8px 0; }
@@ -32,20 +45,23 @@ const BASE_STYLES = `
     .total-row td { font-weight: 700; font-size: 16px; color: #111827; background: #f0f9ff; }
     .info-box { background: #f0f9ff; border-left: 4px solid #2563eb; padding: 16px 20px; border-radius: 0 12px 12px 0; margin: 20px 0; }
     .badge { display: inline-block; background: #dbeafe; color: #1e40af; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .tracking-box { background: #f0f9ff; border: 2px solid #2563eb; border-radius: 16px; padding: 20px; text-align: center; margin: 20px 0; }
+    .tracking-num { font-size: 28px; font-weight: 900; color: #2563eb; letter-spacing: 2px; font-family: 'Courier New', monospace; }
     .points-box { background: linear-gradient(135deg, #fef3c7, #fffbeb); border: 2px solid #f59e0b; border-radius: 16px; padding: 24px; text-align: center; margin: 20px 0; }
     .points-number { font-size: 48px; font-weight: 900; color: #d97706; line-height: 1; }
     .coupon-box { border: 3px dashed #2563eb; border-radius: 16px; padding: 24px; text-align: center; margin: 20px 0; background: #f0f9ff; }
     .coupon-code { font-size: 32px; font-weight: 900; color: #2563eb; letter-spacing: 4px; font-family: 'Courier New', monospace; }
+    .legal-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px 20px; margin: 24px 0 0; }
+    .legal-box p { color: #9ca3af !important; font-size: 10px !important; line-height: 1.5; margin: 0 0 6px !important; }
     .footer { background: #f8fafc; padding: 28px 40px; border-top: 1px solid #e5e7eb; }
     .footer p { color: #9ca3af; font-size: 12px; line-height: 1.6; margin: 0 0 8px; }
     .footer a { color: #6b7280; text-decoration: none; }
-    .social-links { margin: 16px 0; }
-    .social-links a { display: inline-block; background: #2563eb; color: white; width: 32px; height: 32px; border-radius: 50%; text-align: center; line-height: 32px; font-size: 12px; margin: 0 4px; text-decoration: none; font-weight: 700; }
+    .social-links { margin: 12px 0 16px; }
+    .social-links a { display: inline-block; background: #2563eb; color: white; width: 30px; height: 30px; border-radius: 50%; text-align: center; line-height: 30px; font-size: 11px; margin: 0 3px; text-decoration: none; font-weight: 700; }
     @media (max-width: 600px) {
-      .content { padding: 24px 20px; }
-      .header { padding: 20px 24px; }
-      .hero { padding: 28px 24px; }
-      .footer { padding: 20px 24px; }
+      .content, .progress { padding: 20px; }
+      .header, .top-btns, .footer { padding: 16px 20px; }
+      .hero { padding: 24px 20px; }
       .hero h1 { font-size: 20px; }
     }
   </style>
@@ -54,21 +70,25 @@ const BASE_STYLES = `
 const FOOTER_HTML = `
   <div class="footer">
     <div class="social-links">
-      <a href="#">Ig</a>
-      <a href="#">Tw</a>
-      <a href="#">Yt</a>
-      <a href="#">Dc</a>
+      <a href="https://instagram.com/tcgacademy" aria-label="Instagram">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+      </a>
+      <a href="https://tiktok.com/@tcgacademy" aria-label="TikTok">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.88a8.2 8.2 0 004.84 1.56V7a4.85 4.85 0 01-1.07-.31z"/></svg>
+      </a>
+      <a href="https://x.com/tcgacademy" aria-label="X">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      </a>
     </div>
-    <p><strong>TCG Academy S.L.</strong> · CIF: B12345678</p>
-    <p>Av. Gabriel Miró 42, 03710 Calpe, Alicante, España</p>
-    <p>
-      <a href="mailto:hola@tcgacademy.es">hola@tcgacademy.es</a> ·
-      <a href="tel:+34965000001">+34 965 000 001</a>
-    </p>
+    <p><strong>TCG Academy</strong> · <a href="mailto:hola@tcgacademy.es">hola@tcgacademy.es</a> · <a href="tel:+34965000001">+34 965 000 001</a></p>
+    <p>Calle Libertad 16, 03710 Calp, Alicante, España</p>
     <p style="margin-top:12px; font-size:11px; color:#d1d5db;">
       Has recibido este email porque tienes una cuenta en TCG Academy.
       <a href="{{unsubscribe_link}}">Cancelar suscripción</a> ·
       <a href="https://tcgacademy.es/politica-privacidad">Política de privacidad</a>
+    </p>
+    <p style="margin-top:8px; font-size:10px; color:#d1d5db; line-height:1.5;">
+      TCG Academy es una marca de TCG Hobby S.L., con domicilio social en Calle Libertad 16, 03710 Calp, Alicante (España). CIF: B54543534. ©2026 TCG Hobby S.L. Todos los derechos reservados. Los formularios de queja están disponibles a petición del consumidor.
     </p>
   </div>
 `;
@@ -142,9 +162,32 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       "unsubscribe_link",
     ],
     html: wrapEmail(`
+      <div class="top-btns">
+        <a href="https://tcgacademy.es/cuenta/pedidos">Mis pedidos</a>
+        <a href="https://tcgacademy.es/cuenta">Mi cuenta</a>
+        <a href="https://tcgacademy.es/catalogo">Volver a comprar</a>
+      </div>
       <div class="hero">
         <h1>¡Pedido confirmado! ✅</h1>
         <p>Estamos preparando tu pedido con todo el cariño</p>
+      </div>
+      <div class="progress">
+        <div class="progress-track">
+          <div class="prog-step">
+            <div class="prog-dot done"></div>
+            <div class="prog-label done">Pedido</div>
+          </div>
+          <div class="prog-line pending"></div>
+          <div class="prog-step">
+            <div class="prog-dot pending"></div>
+            <div class="prog-label">Enviado</div>
+          </div>
+          <div class="prog-line pending"></div>
+          <div class="prog-step">
+            <div class="prog-dot pending"></div>
+            <div class="prog-label">Entregado</div>
+          </div>
+        </div>
       </div>
       <div class="content">
         <p>Hola {{nombre}},</p>
@@ -172,6 +215,11 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
           <a href="https://tcgacademy.es/cuenta/pedidos/{{order_id}}" class="btn">Ver estado del pedido</a>
         </p>
         <p>¡Gracias por confiar en nosotros!<br/><strong>El equipo de TCG Academy</strong></p>
+        <div class="legal-box">
+          <p>Este email confirma la recepción de tu pedido. El contrato de compraventa se perfecciona en el momento del pago. TCG Academy se reserva el derecho de cancelar pedidos en caso de error de precio o falta de stock.</p>
+          <p>De conformidad con el art. 102 TRLGDCU, dispones de 14 días naturales para ejercer tu derecho de desistimiento desde la recepción del pedido, salvo productos precintados de contenido digital.</p>
+          <p>TCG Academy es una marca de TCG Hobby S.L. · CIF: B54543534 · Calle Libertad 16, 03710 Calp, Alicante (España)</p>
+        </div>
       </div>
     `),
   },
@@ -190,23 +238,50 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       "unsubscribe_link",
     ],
     html: wrapEmail(`
+      <div class="top-btns">
+        <a href="https://tcgacademy.es/cuenta/pedidos">Mis pedidos</a>
+        <a href="https://tcgacademy.es/cuenta">Mi cuenta</a>
+        <a href="https://tcgacademy.es/catalogo">Volver a comprar</a>
+      </div>
       <div class="hero" style="background: linear-gradient(135deg, #059669, #10b981);">
         <h1>¡Tu pedido está en camino! 🚚</h1>
         <p>Pronto llegará a tus manos</p>
       </div>
+      <div class="progress">
+        <div class="progress-track">
+          <div class="prog-step">
+            <div class="prog-dot done"></div>
+            <div class="prog-label done">Pedido</div>
+          </div>
+          <div class="prog-line done"></div>
+          <div class="prog-step">
+            <div class="prog-dot done"></div>
+            <div class="prog-label done">Enviado</div>
+          </div>
+          <div class="prog-line pending"></div>
+          <div class="prog-step">
+            <div class="prog-dot pending"></div>
+            <div class="prog-label">Entregado</div>
+          </div>
+        </div>
+      </div>
       <div class="content">
         <p>Hola {{nombre}},</p>
         <p>¡Buenas noticias! Tu pedido <strong>#{{order_id}}</strong> ha salido de nuestro almacén y está en camino.</p>
-        <div class="info-box">
-          <p style="margin:0;"><strong>Transportista:</strong> {{carrier}}</p>
-          <p style="margin:8px 0 0;"><strong>Número de seguimiento:</strong> <span style="font-family: monospace; font-size:16px; font-weight:700; color:#2563eb;">{{tracking_number}}</span></p>
-          <p style="margin:8px 0 0;"><strong>Fecha estimada de entrega:</strong> {{estimated_date}}</p>
+        <div class="tracking-box">
+          <p style="margin:0 0 8px; font-size:12px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em;">Número de seguimiento GLS</p>
+          <div class="tracking-num">{{tracking_number}}</div>
+          <p style="margin:12px 0 0; font-size:13px; color:#374151;"><strong>Transportista:</strong> {{carrier}} · <strong>Entrega estimada:</strong> {{estimated_date}}</p>
+          <p style="margin:16px 0 0;">
+            <a href="https://www.gls-spain.es/es/seguimiento-envios/?match={{tracking_number}}" class="btn" style="font-size:13px; padding:10px 24px;">Seguir mi envío en GLS</a>
+          </p>
         </div>
-        <p style="text-align:center; margin: 28px 0;">
-          <a href="{{tracking_url}}" class="btn">Seguir mi pedido</a>
-        </p>
         <p>Si tienes algún problema con la entrega, contacta con nosotros en <a href="mailto:pedidos@tcgacademy.es">pedidos@tcgacademy.es</a>.</p>
         <p><strong>El equipo de TCG Academy</strong></p>
+        <div class="legal-box">
+          <p>El plazo de entrega es orientativo y puede variar por causas ajenas a TCG Academy. En caso de incidencia con el transportista, abriremos una reclamación en un plazo máximo de 24 h hábiles.</p>
+          <p>TCG Academy es una marca de TCG Hobby S.L. · CIF: B54543534 · Calle Libertad 16, 03710 Calp, Alicante (España)</p>
+        </div>
       </div>
     `),
   },
@@ -224,9 +299,32 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       "unsubscribe_link",
     ],
     html: wrapEmail(`
+      <div class="top-btns">
+        <a href="https://tcgacademy.es/cuenta/pedidos">Mis pedidos</a>
+        <a href="https://tcgacademy.es/cuenta">Mi cuenta</a>
+        <a href="https://tcgacademy.es/catalogo">Volver a comprar</a>
+      </div>
       <div class="hero" style="background: linear-gradient(135deg, #7c3aed, #9333ea);">
         <h1>¡Pedido entregado! 📦</h1>
         <p>Esperamos que disfrutes de tu compra</p>
+      </div>
+      <div class="progress">
+        <div class="progress-track">
+          <div class="prog-step">
+            <div class="prog-dot done"></div>
+            <div class="prog-label done">Pedido</div>
+          </div>
+          <div class="prog-line done"></div>
+          <div class="prog-step">
+            <div class="prog-dot done"></div>
+            <div class="prog-label done">Enviado</div>
+          </div>
+          <div class="prog-line done"></div>
+          <div class="prog-step">
+            <div class="prog-dot done"></div>
+            <div class="prog-label done">Entregado</div>
+          </div>
+        </div>
       </div>
       <div class="content">
         <p>Hola {{nombre}},</p>
@@ -241,6 +339,11 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
         </p>
         <p style="font-size:13px; color:#6b7280; text-align:center;">Tu opinión nos ayuda a mejorar y a otros compradores a elegir.</p>
         <p>¡Hasta la próxima partida!<br/><strong>El equipo de TCG Academy</strong></p>
+        <div class="legal-box">
+          <p>Recuerda que dispones de 14 días naturales desde la recepción para ejercer tu derecho de desistimiento (art. 102 TRLGDCU). Para devoluciones, accede a tu área de cliente o escríbenos a <a href="mailto:pedidos@tcgacademy.es" style="color:#9ca3af;">pedidos@tcgacademy.es</a>.</p>
+          <p>Los formularios de queja están disponibles a petición del consumidor en nuestras tiendas físicas y por email.</p>
+          <p>TCG Academy es una marca de TCG Hobby S.L. · CIF: B54543534 · Calle Libertad 16, 03710 Calp, Alicante (España) · ©2026 Todos los derechos reservados.</p>
+        </div>
       </div>
     `),
   },

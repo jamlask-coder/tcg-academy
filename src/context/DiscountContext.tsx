@@ -168,10 +168,10 @@ export function DiscountProvider({ children }: { children: ReactNode }) {
 
       if (role === "mayorista") {
         displayPrice = baseWholesale;
-        priceLabel = "PV Mayoristas";
+        priceLabel = "PV Mayorista";
       } else if (role === "tienda") {
         displayPrice = baseStore;
-        priceLabel = "PV Tiendas TCG Academy";
+        priceLabel = "PV Tiendas";
       } else if (role === "admin") {
         displayPrice = basePrice;
         priceLabel = "PV Público";

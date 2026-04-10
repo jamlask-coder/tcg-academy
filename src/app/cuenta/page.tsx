@@ -616,9 +616,9 @@ export default function CuentaPage() {
         <h1 className="mb-1 text-2xl font-bold">Hola, {user.name} 👋</h1>
         <p className="text-sm text-blue-200">
           {user.role === "mayorista" &&
-            "Estás viendo precios PV Mayoristas en todo el catálogo."}
+            "Estás viendo precios PV Mayorista en todo el catálogo."}
           {user.role === "tienda" &&
-            "Estás viendo precios PV Tiendas TCG Academy en todo el catálogo."}
+            "Estás viendo precios PV Tiendas en todo el catálogo."}
           {user.role === "cliente" &&
             "Explora el catálogo y gestiona tus pedidos desde aquí."}
         </p>

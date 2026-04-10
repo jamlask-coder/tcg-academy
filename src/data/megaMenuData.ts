@@ -100,20 +100,11 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
       {
         title: "Producto Sellado",
         items: [
-          { label: "Booster Boxes", href: "/one-piece/booster-box" },
           { label: "Sobres sueltos", href: "/one-piece/sobres" },
-          { label: "Starter Decks", href: "/one-piece/starter" },
-          { label: "Premium Packs", href: "/one-piece/premium" },
-          { label: "Sets especiales", href: "/one-piece/especiales" },
-        ],
-      },
-      {
-        title: "Cartas",
-        items: [
-          { label: "Singles", href: "/one-piece/singles" },
-          { label: "Cartas promo", href: "/one-piece/promo" },
-          { label: "Cartas Gradeadas", href: "/one-piece/gradeadas" },
-          { label: "Servicio de gradeo", href: "/one-piece/gradeo" },
+          { label: "Cajas de sobres", href: "/one-piece/booster-box" },
+          { label: "Cases", href: "/one-piece/cases" },
+          { label: "EB (Extra Booster)", href: "/one-piece/eb" },
+          { label: "Otros productos", href: "/one-piece/otros" },
         ],
       },
     ],
@@ -129,17 +120,10 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
       {
         title: "Producto Sellado",
         items: [
-          { label: "Booster Boxes", href: "/riftbound/booster-box" },
+          { label: "Sobres sueltos", href: "/riftbound/sobres" },
+          { label: "Cajas de sobres", href: "/riftbound/booster-box" },
           { label: "Starter Decks", href: "/riftbound/starter" },
-          { label: "Bundle Boxes", href: "/riftbound/bundle" },
-        ],
-      },
-      {
-        title: "Cartas",
-        items: [
-          { label: "Singles", href: "/riftbound/singles" },
-          { label: "Cartas promo", href: "/riftbound/promo" },
-          { label: "Cartas Gradeadas", href: "/riftbound/gradeadas" },
+          { label: "Tapetes", href: "/riftbound/tapetes" },
         ],
       },
     ],
@@ -155,20 +139,10 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
       {
         title: "Producto Sellado",
         items: [
-          { label: "Booster Boxes", href: "/yugioh/booster-box" },
           { label: "Sobres sueltos", href: "/yugioh/sobres" },
-          { label: "Tins de colección", href: "/yugioh/tins" },
-          { label: "Structure Decks", href: "/yugioh/structure-decks" },
-        ],
-      },
-      {
-        title: "Cartas",
-        items: [
-          { label: "Singles", href: "/yugioh/singles" },
-          { label: "Starlight Rare", href: "/yugioh/starlight" },
-          { label: "Field Centers", href: "/yugioh/field-centers" },
-          { label: "Cartas Gradeadas", href: "/yugioh/gradeadas" },
-          { label: "Servicio de gradeo", href: "/yugioh/gradeo" },
+          { label: "Cajas de Sobres", href: "/yugioh/booster-box" },
+          { label: "Structure Deck", href: "/yugioh/structure-decks" },
+          { label: "Otros productos", href: "/yugioh/otros" },
         ],
       },
     ],
@@ -184,20 +158,7 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
       {
         title: "Colecciones",
         items: [
-          { label: "Cromos de fútbol", href: "/topps/futbol" },
-          { label: "Cromos NBA", href: "/topps/nba" },
-          { label: "Cromos F1", href: "/topps/f1" },
-          { label: "Cromos WWE", href: "/topps/wwe" },
-          { label: "Cromos Star Wars", href: "/topps/star-wars" },
-        ],
-      },
-      {
-        title: "Producto",
-        items: [
-          { label: "Cajas", href: "/topps/cajas" },
-          { label: "Sobres", href: "/topps/sobres" },
-          { label: "Álbumes", href: "/topps/albumes" },
-          { label: "Latas coleccionables", href: "/topps/latas" },
+          { label: "Ver todo Topps", href: "/topps" },
         ],
       },
     ],

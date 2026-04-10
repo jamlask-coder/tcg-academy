@@ -126,11 +126,11 @@ export function ProductEditModal({
       return;
     }
     if (store > wholesale) {
-      setError("PV Tiendas no puede superar PV Mayoristas");
+      setError("PV Tiendas no puede superar PV Mayorista");
       return;
     }
     if (wholesale > price) {
-      setError("PV Mayoristas no puede superar PV Público");
+      setError("PV Mayorista no puede superar PV Público");
       return;
     }
 

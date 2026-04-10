@@ -37,8 +37,8 @@ function exportCatalog(products: LocalProduct[]) {
     "Nombre",
     "Juego",
     "PV Público",
-    "PV Mayoristas",
-    "PV Tiendas TCG Academy",
+    "PV Mayorista",
+    "PV Tiendas",
     "Precio Adquisición",
     "En stock",
   ];
