@@ -217,10 +217,12 @@ export function Navbar() {
                         className="relative z-10 flex items-center justify-center rounded-lg px-3 transition-all duration-200"
                         style={{
                           background:
-                            active || open ? `${color}18` : "transparent",
+                            active || open
+                              ? `radial-gradient(ellipse at center, ${color}44 0%, ${color}1a 50%, transparent 75%)`
+                              : "transparent",
                           filter:
                             active || open
-                              ? `drop-shadow(0 0 8px ${color}90)`
+                              ? `drop-shadow(0 0 10px ${color}70)`
                               : "none",
                         }}
                         title={label}

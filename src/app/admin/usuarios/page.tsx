@@ -1,8 +1,9 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { Search, ChevronDown, Users, X, ChevronRight, ShieldCheck, Clock, ArrowRight } from "lucide-react";
 import { MOCK_USERS, type AdminUser } from "@/data/mockData";
+import type { User } from "@/types/user";
 
 const ROLE_COLORS = {
   cliente: "bg-gray-100 text-gray-600",
@@ -12,9 +13,9 @@ const ROLE_COLORS = {
 };
 
 const ROLE_LABELS: Record<string, string> = {
-  cliente: "Cliente estándar",
+  cliente: "Cliente",
   mayorista: "Mayorista",
-  tienda: "Tienda TCG",
+  tienda: "Tiendas",
   admin: "Administrador",
 };
 
@@ -31,9 +32,41 @@ export default function AdminUsuariosPage() {
   const [users, setUsers] = useState<AdminUser[]>(MOCK_USERS);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
+  const [sortByRecent, setSortByRecent] = useState(false);
   const [selected, setSelected] = useState<AdminUser | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingChange | null>(null);
+
+  // Load registered users from localStorage and merge with mock users
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("tcgacademy_registered");
+      if (!stored) return;
+      const registered = JSON.parse(stored) as Record<string, { password: string; user: User }>;
+      const mockIds = new Set(MOCK_USERS.map((u) => u.email));
+      const newUsers: AdminUser[] = Object.values(registered)
+        .filter((entry) => !mockIds.has(entry.user.email))
+        .map((entry) => ({
+          id: entry.user.id,
+          name: entry.user.name,
+          lastName: entry.user.lastName,
+          email: entry.user.email,
+          role: entry.user.role as AdminUser["role"],
+          registeredAt: entry.user.createdAt.slice(0, 10),
+          totalOrders: 0,
+          totalSpent: 0,
+          points: 0,
+          active: true,
+          phone: entry.user.phone,
+        }));
+      if (newUsers.length > 0) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setUsers([...MOCK_USERS, ...newUsers]);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -54,10 +87,13 @@ export default function AdminUsuariosPage() {
         }
         return true;
       })
-      .sort((a, b) =>
-        `${a.name} ${a.lastName}`.localeCompare(`${b.name} ${b.lastName}`, "es"),
-      );
-  }, [users, search, roleFilter]);
+      .sort((a, b) => {
+        if (sortByRecent) {
+          return new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime();
+        }
+        return `${a.name} ${a.lastName}`.localeCompare(`${b.name} ${b.lastName}`, "es");
+      });
+  }, [users, search, roleFilter, sortByRecent]);
 
   const requestRoleChange = (user: AdminUser, newRole: UserRole) => {
     if (user.role === newRole) return;
@@ -171,7 +207,7 @@ export default function AdminUsuariosPage() {
         <div className="relative">
           <select
             value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value as UserRole | "")}
+            onChange={(e) => { setRoleFilter(e.target.value as UserRole | ""); setSortByRecent(false); }}
             className="h-10 appearance-none rounded-xl border border-gray-200 bg-white pr-8 pl-3 text-sm text-gray-700 focus:border-[#2563eb] focus:outline-none"
           >
             <option value="">Todos los roles</option>
@@ -187,11 +223,11 @@ export default function AdminUsuariosPage() {
         </div>
       </div>
 
-      {/* Main layout: table left (2/3) + counters/detail right (1/3) */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      {/* Main layout: table left (3/4) + counters/detail right (1/4) */}
+      <div className="grid gap-6 lg:grid-cols-4">
 
         {/* LEFT: recent registrations + table */}
-        <div className="space-y-4 lg:col-span-2">
+        <div className="space-y-4 lg:col-span-3">
           {/* Recent registrations */}
           <div className="rounded-2xl border border-gray-200 bg-white">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
@@ -290,14 +326,21 @@ export default function AdminUsuariosPage() {
             </div>
             <div className="divide-y divide-gray-100">
               {(["cliente", "mayorista", "tienda", "admin"] as UserRole[]).map((role) => (
-                <div key={role} className="flex items-center justify-between px-5 py-3">
+                <button
+                  key={role}
+                  onClick={() => {
+                    setRoleFilter(role);
+                    setSortByRecent(true);
+                  }}
+                  className={`flex w-full items-center justify-between px-5 py-3 text-left transition hover:bg-gray-50 ${roleFilter === role ? "bg-blue-50" : ""}`}
+                >
                   <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${ROLE_COLORS[role]}`}>
                     {ROLE_LABELS[role]}
                   </span>
                   <span className="text-xl font-bold text-gray-900">
                     {users.filter((u) => u.role === role).length}
                   </span>
-                </div>
+                </button>
               ))}
             </div>
           </div>

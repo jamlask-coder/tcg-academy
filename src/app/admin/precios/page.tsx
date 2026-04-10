@@ -4,7 +4,6 @@ import {
   Search,
   ChevronUp,
   ChevronDown,
-  Download,
   Save,
   Trash2,
   RotateCcw,
@@ -67,9 +66,6 @@ function isExpiringSoon(end?: string): boolean {
   return diff > 0 && diff < 3 * 24 * 60 * 60 * 1000;
 }
 
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function initRows(): PriceRow[] {
   return getMergedProducts().map((p: LocalProduct) => ({
@@ -89,60 +85,6 @@ function initRows(): PriceRow[] {
   }));
 }
 
-function exportCSV(rows: PriceRow[]) {
-  const headers = [
-    "ID",
-    "Nombre",
-    "Juego",
-    "Categoría",
-    "PV Público",
-    "PV Mayorista",
-    "PV Tiendas",
-    "Precio Adquisición",
-    "Precio Original",
-    "Dto%",
-    "Dto Activo",
-    "Inicio Dto",
-    "Fin Dto",
-    "Precio Final",
-    "Margen% (vs precio adquisición)",
-  ];
-  const body = rows.map((r) => {
-    const pct = calcDiscountPct(r.price, r.comparePrice);
-    const finalPrice =
-      r.discountActive && r.comparePrice && r.comparePrice > r.price
-        ? r.price
-        : (r.comparePrice ?? r.price);
-    const margin = r.costPrice
-      ? calcMargin(r.price, r.costPrice)
-      : calcMargin(r.price, r.wholesalePrice);
-    return [
-      r.id,
-      `"${r.name}"`,
-      r.game,
-      r.category,
-      r.price.toFixed(2),
-      r.wholesalePrice.toFixed(2),
-      r.storePrice.toFixed(2),
-      r.costPrice?.toFixed(2) ?? "",
-      r.comparePrice?.toFixed(2) ?? "",
-      pct || "",
-      r.discountActive ? "Sí" : "No",
-      r.discountStart ?? "",
-      r.discountEnd ?? "",
-      finalPrice.toFixed(2),
-      margin,
-    ].join(",");
-  });
-  const csv = [headers.join(","), ...body].join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `precios-${todayStr()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 // ─── Inline cell ──────────────────────────────────────────────────────────────
 
@@ -195,7 +137,7 @@ function NumCell({
         setDraft(String(value));
         setEditing(true);
       }}
-      className={`w-full cursor-text rounded px-1.5 py-0.5 text-right font-mono transition hover:bg-blue-50 ${small ? "text-[11px]" : "text-xs"} ${dirty ? "font-bold text-[#2563eb]" : "text-gray-700"}`}
+      className={`w-full cursor-text rounded px-1.5 py-0.5 text-right font-mono whitespace-nowrap transition hover:bg-blue-50 ${small ? "text-[11px]" : "text-xs"} ${dirty ? "font-bold text-[#2563eb]" : "text-gray-700"}`}
     >
       {value.toFixed(2)}€
     </button>
@@ -532,12 +474,6 @@ export default function PreciosPage() {
             )}
           </p>
         </div>
-        <button
-          onClick={() => exportCSV(filtered)}
-          className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition hover:bg-gray-50"
-        >
-          <Download size={13} /> Exportar CSV
-        </button>
       </div>
 
       {/* ── Filters ── */}
@@ -829,8 +765,7 @@ export default function PreciosPage() {
                             {row.name}
                           </p>
                           <p className="text-[10px] text-gray-400">
-                            {GAME_CONFIG[row.game]?.name ?? row.game} ·{" "}
-                            {CATEGORY_LABELS[row.category] ?? row.category}
+                            {GAME_CONFIG[row.game]?.name ?? row.game}
                           </p>
                         </div>
                       </div>
