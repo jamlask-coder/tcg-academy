@@ -4,7 +4,6 @@ export function generateStaticParams() {
   return MOCK_USERS.map((u) => ({ id: u.id }));
 }
 
-
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
@@ -19,6 +18,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { B2BCharts } from "@/components/account/B2BCharts";
+import { SendCouponButton } from "@/components/admin/SendCouponModal";
 
 const ROLE_COLORS: Record<string, string> = {
   cliente: "bg-gray-100 text-gray-600",
@@ -93,13 +93,23 @@ export default async function AdminUsuarioDetailPage({
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6">
-      {/* Back */}
-      <Link
-        href="/admin/usuarios"
-        className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-800"
-      >
-        <ArrowLeft size={16} /> Volver a usuarios
-      </Link>
+      {/* Back + actions */}
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <Link
+          href="/admin/usuarios"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-800"
+        >
+          <ArrowLeft size={16} /> Volver a usuarios
+        </Link>
+        <div className="ml-auto">
+          <SendCouponButton
+            userId={user.id}
+            userName={user.name}
+            userLastName={user.lastName}
+            userEmail={user.email}
+          />
+        </div>
+      </div>
 
       {/* Header card */}
       <div className="mb-6 rounded-2xl bg-gradient-to-br from-[#2563eb] to-[#3b82f6] p-6 text-white">

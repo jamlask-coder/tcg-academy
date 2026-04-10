@@ -27,11 +27,12 @@ type Step = "datos" | "envio" | "pago" | "confirmado";
 interface PendingCheckout {
   appliedCoupon: {
     code: string;
-    discountType: "percent" | "fixed";
+    discountType: "percent" | "fixed" | "shipping";
     value: number;
     description: string;
   } | null;
   couponDiscount: number;
+  freeShippingCoupon?: boolean;
   appliedPoints: { points: number; euros: number } | null;
   pointsDiscount: number;
   finalTotal: number;
@@ -68,12 +69,14 @@ export default function CheckoutPage() {
   });
 
   const isStorePickup = form.envio === "tienda";
+  const hasFreeShippingCoupon = pending?.freeShippingCoupon === true;
 
-  const shipping = isStorePickup
-    ? 0
-    : total >= SITE_CONFIG.shippingThreshold
+  const shipping =
+    isStorePickup || hasFreeShippingCoupon
       ? 0
-      : 3.99;
+      : total >= SITE_CONFIG.shippingThreshold
+        ? 0
+        : 3.99;
   const couponDiscount = pending?.couponDiscount ?? 0;
   const pointsDiscount = pending?.pointsDiscount ?? 0;
   const finalTotal = Math.max(
@@ -549,7 +552,7 @@ export default function CheckoutPage() {
               <span className="text-gray-600">Subtotal</span>
               <span className="font-semibold">{total.toFixed(2)}€</span>
             </div>
-            {pending?.appliedCoupon && (
+            {pending?.appliedCoupon && pending.appliedCoupon.discountType !== "shipping" && (
               <div className="flex justify-between text-sm">
                 <span className="flex items-center gap-1 font-medium text-green-600">
                   <Tag size={12} /> {pending.appliedCoupon.code}
@@ -570,15 +573,13 @@ export default function CheckoutPage() {
               </div>
             )}
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Envio</span>
-              <span
-                className={
-                  shipping === 0
-                    ? "font-semibold text-green-600"
-                    : "font-semibold"
-                }
-              >
-                {shipping === 0 ? "Gratis" : `${shipping.toFixed(2)}€`}
+              <span className="text-gray-600">Envío</span>
+              <span className="font-semibold text-green-600">
+                {shipping === 0
+                  ? hasFreeShippingCoupon
+                    ? `Gratis · ${pending!.appliedCoupon!.code}`
+                    : "Gratis"
+                  : `${shipping.toFixed(2)}€`}
               </span>
             </div>
             <div className="flex justify-between border-t border-gray-100 pt-2 text-base font-bold">

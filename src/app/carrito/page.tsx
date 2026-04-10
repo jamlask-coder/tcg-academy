@@ -17,18 +17,12 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import {
-  MOCK_ADMIN_COUPONS,
   MOCK_POINTS_BALANCE,
   POINTS_REDEMPTION_TABLE,
 } from "@/data/mockData";
 import { PRODUCTS } from "@/data/products";
-
-interface AppliedCoupon {
-  code: string;
-  discountType: "percent" | "fixed";
-  value: number;
-  description: string;
-}
+import { validateCoupon, calcCouponDiscount, type AppliedCoupon } from "@/services/couponService";
+import { useAuth } from "@/context/AuthContext";
 
 interface AppliedPoints {
   points: number;
@@ -38,6 +32,7 @@ interface AppliedPoints {
 export default function CartPage() {
   const router = useRouter();
   const { items, count, total, removeItem, updateQty, clearCart } = useCart();
+  const { user } = useAuth();
 
   const [couponInput, setCouponInput] = useState("");
   const [couponError, setCouponError] = useState("");
@@ -50,12 +45,13 @@ export default function CartPage() {
     null,
   );
 
-  const shipping = total >= SITE_CONFIG.shippingThreshold ? 0 : 3.99;
+  const hasFreeShipping =
+    total >= SITE_CONFIG.shippingThreshold ||
+    appliedCoupon?.discountType === "shipping";
+  const shipping = hasFreeShipping ? 0 : 3.99;
 
   const couponDiscount = appliedCoupon
-    ? appliedCoupon.discountType === "percent"
-      ? total * (appliedCoupon.value / 100)
-      : Math.min(appliedCoupon.value, total)
+    ? calcCouponDiscount(appliedCoupon, total)
     : 0;
 
   const pointsDiscount = appliedPoints?.euros ?? 0;
@@ -67,24 +63,16 @@ export default function CartPage() {
 
   const applyCoupon = () => {
     setCouponError("");
-    const code = couponInput.trim().toUpperCase();
+    const code = couponInput.trim();
     if (!code) return;
 
-    const found = MOCK_ADMIN_COUPONS.find(
-      (c) => c.code === code && c.active && new Date(c.endsAt) >= new Date(),
-    );
-
-    if (!found) {
-      setCouponError("Código no válido o caducado");
+    const result = validateCoupon(code, user?.email);
+    if (!result.valid || !result.coupon) {
+      setCouponError(result.error ?? "Código no válido o caducado");
       return;
     }
 
-    setAppliedCoupon({
-      code: found.code,
-      discountType: found.discountType,
-      value: found.value,
-      description: found.description,
-    });
+    setAppliedCoupon(result.coupon);
     setCouponInput("");
   };
 
@@ -108,6 +96,7 @@ export default function CartPage() {
       JSON.stringify({
         appliedCoupon,
         couponDiscount,
+        freeShippingCoupon: appliedCoupon?.discountType === "shipping",
         appliedPoints,
         pointsDiscount,
         finalTotal,
@@ -287,14 +276,12 @@ export default function CartPage() {
               )}
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Envío</span>
-                <span
-                  className={
-                    shipping === 0
-                      ? "font-semibold text-green-600"
-                      : "font-semibold"
-                  }
-                >
-                  {shipping === 0 ? "Gratis" : `${shipping.toFixed(2)}€`}
+                <span className="font-semibold text-green-600">
+                  {shipping === 0
+                    ? appliedCoupon?.discountType === "shipping"
+                      ? `Gratis · ${appliedCoupon.code}`
+                      : "Gratis"
+                    : `${shipping.toFixed(2)}€`}
                 </span>
               </div>
               {shipping > 0 && (

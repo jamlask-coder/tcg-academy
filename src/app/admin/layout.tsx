@@ -23,6 +23,7 @@ import {
   BadgeDollarSign,
   UserCircle,
   Layers,
+  Ticket,
 } from "lucide-react";
 
 const SOLICITUDES_KEY = "tcgacademy_solicitudes";
@@ -66,7 +67,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/solicitudes", label: "Solicitudes B2B", icon: Inbox },
   { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart2 },
   { href: "/admin/fiscal", label: "Gestión Fiscal", icon: Receipt },
-  { href: "/admin/cuenta", label: "Mis datos", icon: UserCircle },
+  { href: "/admin/cupones", label: "Cupones", icon: Ticket },
+  { href: "/cuenta/datos", label: "Mis datos", icon: UserCircle },
 ];
 
 // Flat list of all items (including sub-items) for breadcrumb lookup

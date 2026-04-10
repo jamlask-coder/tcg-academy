@@ -107,9 +107,9 @@ const LINKS: [string, string][] = [
 
 const LEGAL: [string, string][] = [
   ["Envíos y plazos", "/contacto"],
-  ["Política de privacidad", "/cuenta/datos"],
-  ["Términos y condiciones", "/contacto"],
-  ["Cookies", "/contacto"],
+  ["Política de privacidad", "/privacidad"],
+  ["Términos y condiciones", "/terminos"],
+  ["Cookies", "/privacidad"],
 ];
 
 function FooterLink({
