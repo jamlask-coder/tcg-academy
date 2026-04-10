@@ -323,7 +323,7 @@ export function SidebarFilters({
     <>
       {/* Desktop sidebar */}
       <aside className="hidden w-[240px] flex-shrink-0 lg:block">
-        <div className="sticky top-[80px] rounded-2xl border border-gray-200 bg-white p-4">
+        <div className="sticky top-[var(--header-h)] rounded-2xl border border-gray-200 bg-white p-4">
           <FilterContent
             availableLanguages={availableLanguages}
             minPrice={minPrice}

@@ -33,35 +33,20 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
       {
         title: "Producto Sellado",
         items: [
-          {
-            label: "Booster Boxes (cajas de sobres)",
-            href: "/pokemon/booster-box",
-          },
-          { label: "Sobres sueltos (Booster Packs)", href: "/pokemon/sobres" },
-          { label: "Elite Trainer Box (ETB)", href: "/pokemon/etb" },
-          { label: "Tins y colecciones especiales", href: "/pokemon/tins" },
-          { label: "Blisters y packs", href: "/pokemon/blisters" },
+          { label: "Sobres de mejora", href: "/pokemon/sobres-mejora" },
+          { label: "Cajas de sobres", href: "/pokemon/booster-box" },
+          { label: "Cajas de colección", href: "/pokemon/coleccion" },
+          { label: "ETB", href: "/pokemon/etb" },
+          { label: "Blister y Latas", href: "/pokemon/blisters" },
+          { label: "Pack de Cartas", href: "/pokemon/pack-cartas" },
         ],
       },
       {
         title: "Cartas",
         items: [
-          { label: "Cartas sueltas (singles)", href: "/pokemon/singles" },
-          {
-            label: "Cartas gradeadas (PSA/BGS/CGC)",
-            href: "/pokemon/gradeadas",
-          },
-          { label: "Cartas promo", href: "/pokemon/promo" },
-          { label: "Prize cards", href: "/pokemon/prize-cards" },
-          { label: "Lotes", href: "/pokemon/lotes" },
-        ],
-      },
-      {
-        title: "Accesorios",
-        items: [
-          { label: "Fundas (sleeves)", href: "/pokemon/sleeves" },
-          { label: "Tapetes (playmats)", href: "/pokemon/playmats" },
-          { label: "Deck boxes", href: "/pokemon/deckboxes" },
+          { label: "Cartas Gradeadas", href: "/pokemon/gradeadas" },
+          { label: "Servicio de gradeo", href: "/pokemon/gradeo" },
+          { label: "Otros productos", href: "/pokemon/otros" },
         ],
       },
     ],
@@ -77,10 +62,7 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
       {
         title: "Producto Sellado",
         items: [
-          {
-            label: "Booster Boxes (Draft, Set, Collector)",
-            href: "/magic/booster-box",
-          },
+          { label: "Booster Boxes (Draft, Set, Collector)", href: "/magic/booster-box" },
           { label: "Sobres sueltos", href: "/magic/sobres" },
           { label: "Commander Decks", href: "/magic/commander" },
           { label: "Secret Lair", href: "/magic/secret-lair" },
@@ -92,6 +74,8 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
           { label: "Singles", href: "/magic/singles" },
           { label: "Cartas foil y premium", href: "/magic/foil" },
           { label: "Tierras full art", href: "/magic/full-art-lands" },
+          { label: "Cartas Gradeadas", href: "/magic/gradeadas" },
+          { label: "Servicio de gradeo", href: "/magic/gradeo" },
         ],
       },
       {
@@ -124,10 +108,12 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
         ],
       },
       {
-        title: "Cartas y Accesorios",
+        title: "Cartas",
         items: [
           { label: "Singles", href: "/one-piece/singles" },
           { label: "Cartas promo", href: "/one-piece/promo" },
+          { label: "Cartas Gradeadas", href: "/one-piece/gradeadas" },
+          { label: "Servicio de gradeo", href: "/one-piece/gradeo" },
         ],
       },
     ],
@@ -144,15 +130,16 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
         title: "Producto Sellado",
         items: [
           { label: "Booster Boxes", href: "/riftbound/booster-box" },
-          { label: "Sobres sueltos", href: "/riftbound/sobres" },
           { label: "Starter Decks", href: "/riftbound/starter" },
+          { label: "Bundle Boxes", href: "/riftbound/bundle" },
         ],
       },
       {
-        title: "Cartas y Accesorios",
+        title: "Cartas",
         items: [
           { label: "Singles", href: "/riftbound/singles" },
           { label: "Cartas promo", href: "/riftbound/promo" },
+          { label: "Cartas Gradeadas", href: "/riftbound/gradeadas" },
         ],
       },
     ],
@@ -179,9 +166,9 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
         items: [
           { label: "Singles", href: "/yugioh/singles" },
           { label: "Starlight Rare", href: "/yugioh/starlight" },
-          { label: "Prize cards", href: "/yugioh/prize-cards" },
-          { label: "Alternate Art", href: "/yugioh/alternate-art" },
           { label: "Field Centers", href: "/yugioh/field-centers" },
+          { label: "Cartas Gradeadas", href: "/yugioh/gradeadas" },
+          { label: "Servicio de gradeo", href: "/yugioh/gradeo" },
         ],
       },
     ],

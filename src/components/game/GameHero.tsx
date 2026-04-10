@@ -154,7 +154,7 @@ function GameLogo({
     <img
       src={src}
       alt={name}
-      className={`object-contain drop-shadow-lg ${mobile ? "h-28" : "h-40"}`}
+      className={`object-contain drop-shadow-lg ${mobile ? "h-16" : "h-20"}`}
       style={{
         width: "auto",
         maxWidth: "none",
@@ -186,7 +186,7 @@ export function GameHero({ game, config }: Props) {
       className="relative overflow-hidden"
       style={{
         background: `linear-gradient(135deg,#0a0f1a 0%,${color}22 45%,${color}35 100%)`,
-        minHeight: 320,
+        minHeight: 140,
       }}
       aria-label={`Hero ${name}`}
     >
@@ -216,11 +216,11 @@ export function GameHero({ game, config }: Props) {
         <div
           className="grid items-center"
           style={{
-            gridTemplateColumns: "220px 1fr 220px",
-            gap: "1.5rem",
-            minHeight: 310,
-            paddingTop: "0.75rem",
-            paddingBottom: "0.75rem",
+            gridTemplateColumns: "200px 1fr 200px",
+            gap: "1rem",
+            minHeight: 138,
+            paddingTop: "0.5rem",
+            paddingBottom: "0.5rem",
           }}
         >
           {/* LEFT: Logo */}
@@ -255,13 +255,13 @@ export function GameHero({ game, config }: Props) {
             </motion.p>
           </motion.div>
 
-          {/* CENTER: Card fan */}
+          {/* CENTER: Card fan (compact) */}
           <div className="flex items-center justify-center">
             <div
               style={{
                 position: "relative",
-                width: 460,
-                height: 310,
+                width: 300,
+                height: 128,
                 flexShrink: 0,
               }}
             >
@@ -273,11 +273,11 @@ export function GameHero({ game, config }: Props) {
                     card={card}
                     color={color}
                     emoji={emoji}
-                    width={179}
-                    height={250}
+                    width={88}
+                    height={123}
                     fanRotate={f.rotate}
-                    fanX={f.x}
-                    fanY={f.y}
+                    fanX={f.x * 0.5}
+                    fanY={f.y * 0.3}
                     zIndex={f.zIndex}
                     entryDelay={0.2 + i * 0.12}
                     floatPhase={f.floatPhase}
@@ -297,7 +297,7 @@ export function GameHero({ game, config }: Props) {
               ease: [0.22, 1, 0.36, 1],
             }}
             className="flex items-center justify-center"
-            style={{ height: 310 }}
+            style={{ height: 138 }}
           >
             <GameCharacterIllustration game={game} color={color} />
           </motion.div>
@@ -305,7 +305,7 @@ export function GameHero({ game, config }: Props) {
       </Container>
 
       {/* ── MOBILE ───────────────────────────────────────────────────────── */}
-      <div className="relative px-4 pt-4 pb-5 lg:hidden">
+      <div className="relative px-4 pt-3 pb-3 lg:hidden">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}

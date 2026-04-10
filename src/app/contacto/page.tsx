@@ -7,7 +7,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  Clock,
   Send,
   CheckCircle,
   MessageSquare,
@@ -26,11 +25,13 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const STORES_CONTACT = [
-  { name: "Calpe", phone: "+34 965 000 001", id: "calpe" },
-  { name: "Béjar", phone: "+34 923 000 002", id: "bejar" },
-  { name: "Madrid", phone: "+34 910 000 003", id: "madrid" },
-  { name: "Barcelona", phone: "+34 930 000 004", id: "barcelona" },
+  { name: "TCG Academy Calpe", phone: "+34 965 000 001", id: "calpe" },
+  { name: "TCG Academy Béjar", phone: "+34 923 000 002", id: "bejar" },
+  { name: "TCG Academy Madrid", phone: "+34 910 000 003", id: "madrid" },
+  { name: "TCG Academy Barcelona", phone: "+34 930 000 004", id: "barcelona" },
 ];
+
+const WHATSAPP_NUMBER = "34600000000";
 
 export default function ContactoPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -44,8 +45,9 @@ export default function ContactoPage() {
   });
 
   const onSubmit = async (_data: FormData) => {
-    if (!checkRateLimit("contact-form", 3, 60_000)) {
-      alert("Demasiados intentos. Espera un momento antes de enviar de nuevo.");
+    // Rate limit: máximo 3 mensajes cada 24 horas
+    if (!checkRateLimit("contact-form", 3, 86_400_000)) {
+      alert("Has enviado demasiados mensajes hoy. Por favor, intenta de nuevo mañana.");
       return;
     }
     await new Promise((r) => setTimeout(r, 600));
@@ -84,11 +86,11 @@ export default function ContactoPage() {
               color: "#16a34a",
             },
             {
-              icon: Clock,
-              title: "Horario",
-              value: "Lun–Vie 10:00–19:00",
-              href: null,
-              color: "#d97706",
+              icon: MessageSquare,
+              title: "WhatsApp",
+              value: "Escríbenos por WhatsApp",
+              href: `https://wa.me/${WHATSAPP_NUMBER}`,
+              color: "#25d366",
             },
           ].map(({ icon: Icon, title, value, href, color }) => (
             <div
@@ -102,17 +104,15 @@ export default function ContactoPage() {
                 <Icon size={22} style={{ color }} />
               </div>
               <p className="mb-1 font-bold text-gray-900">{title}</p>
-              {href ? (
-                <a
-                  href={href}
-                  className="text-sm font-medium hover:underline"
-                  style={{ color }}
-                >
-                  {value}
-                </a>
-              ) : (
-                <p className="text-sm text-gray-600">{value}</p>
-              )}
+              <a
+                href={href}
+                className="text-sm font-medium hover:underline"
+                style={{ color }}
+                target={href.startsWith("https") ? "_blank" : undefined}
+                rel={href.startsWith("https") ? "noopener noreferrer" : undefined}
+              >
+                {value}
+              </a>
             </div>
           ))}
         </div>
@@ -250,13 +250,13 @@ export default function ContactoPage() {
             )}
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-4">
+          {/* Sidebar: tiendas físicas */}
+          <div>
             <div className="rounded-2xl border border-gray-200 bg-white p-6">
               <h3 className="mb-4 flex items-center gap-2 font-bold text-gray-900">
                 <MapPin size={16} className="text-[#2563eb]" /> Tiendas físicas
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {STORES_CONTACT.map((s) => (
                   <Link
                     key={s.id}
@@ -270,44 +270,16 @@ export default function ContactoPage() {
                   </Link>
                 ))}
               </div>
-            </div>
-
-            {/* Store map placeholder */}
-            <div className="rounded-2xl border border-gray-200 bg-white p-6">
-              <h3 className="mb-3 font-bold text-gray-900">Dónde estamos</h3>
-              <div className="flex h-48 items-center justify-center rounded-xl bg-gray-100">
-                <div className="text-center">
-                  <MapPin size={28} className="mx-auto mb-2 text-gray-300" />
-                  <p className="text-xs font-medium text-gray-400">
-                    Calpe · Béjar · Madrid · Barcelona
-                  </p>
-                  <p className="mt-1 text-xs text-gray-300">
-                    Mapa interactivo próximamente
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-gray-200 bg-white p-6">
-              <h3 className="mb-3 flex items-center gap-2 font-bold text-gray-900">
-                <Clock size={16} className="text-gray-400" /> Horario de
-                atención
-              </h3>
-              <div className="space-y-2 text-sm">
-                {[
-                  ["Lunes – Viernes", "10:00 – 19:00"],
-                  ["Sábado", "10:00 – 14:00"],
-                  ["Domingo", "Cerrado"],
-                ].map(([day, hours]) => (
-                  <div key={day} className="flex justify-between">
-                    <span className="text-gray-600">{day}</span>
-                    <span
-                      className={`font-semibold ${hours === "Cerrado" ? "text-red-400" : ""}`}
-                    >
-                      {hours}
-                    </span>
-                  </div>
-                ))}
+              <div className="mt-5 border-t border-gray-100 pt-4">
+                <a
+                  href={`https://wa.me/${WHATSAPP_NUMBER}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-xl bg-[#25d366] px-4 py-3 text-sm font-bold text-white transition hover:bg-[#1eb855]"
+                >
+                  <MessageSquare size={16} />
+                  Contactar por WhatsApp
+                </a>
               </div>
             </div>
           </div>

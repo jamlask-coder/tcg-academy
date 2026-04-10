@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
-  Star,
   Truck,
   Shield,
   Users,
@@ -13,6 +12,7 @@ import {
   Package,
 } from "lucide-react";
 import { LocalProductCard } from "@/components/product/LocalProductCard";
+import { SpainMap } from "@/components/home/SpainMap";
 import {
   GAME_CONFIG,
   CARD_CATEGORIES,
@@ -20,23 +20,6 @@ import {
   type LocalProduct,
 } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
-
-const STORES = [
-  { name: "Calpe", city: "Alicante", href: "/tiendas/calpe", color: "#2563eb" },
-  {
-    name: "Bejar",
-    city: "Salamanca",
-    href: "/tiendas/bejar",
-    color: "#3b82f6",
-  },
-  { name: "Madrid", city: "Madrid", href: "/tiendas/madrid", color: "#dc2626" },
-  {
-    name: "Barcelona",
-    city: "Barcelona",
-    href: "/tiendas/barcelona",
-    color: "#7c3aed",
-  },
-];
 
 function isNotCard(p: LocalProduct) {
   return !CARD_CATEGORIES.has(p.category);
@@ -132,12 +115,6 @@ export default function HomePage() {
         <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 py-10 sm:px-6 md:py-24">
           <div className="flex flex-col items-start gap-8 xl:flex-row xl:justify-between">
             <div className="w-full max-w-xl flex-1">
-              {/* Badge */}
-              <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-4 py-1.5 text-sm font-medium text-yellow-300">
-                <Star size={13} className="fill-yellow-400 text-yellow-400" />
-                Pokémon · Magic · One Piece · Yu-Gi-Oh! · Riftbound
-              </div>
-
               {/* Headline */}
               <h1 className="mb-6 text-3xl leading-[1.08] font-black tracking-tight sm:text-5xl md:text-6xl">
                 Tu tienda TCG
@@ -170,24 +147,6 @@ export default function HomePage() {
                 </Link>
               </div>
 
-              {/* Stats row */}
-              <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-6 sm:flex sm:flex-wrap sm:gap-10">
-                {[
-                  ["10.000+", "Productos"],
-                  ["4", "Tiendas físicas"],
-                  ["150K+", "Pedidos enviados"],
-                  ["24h", "Envío express"],
-                ].map(([n, l]) => (
-                  <div key={l} className="flex flex-col gap-0.5">
-                    <span className="text-2xl leading-none font-black text-yellow-400">
-                      {n}
-                    </span>
-                    <span className="text-xs font-medium tracking-wide text-blue-300/70 uppercase">
-                      {l}
-                    </span>
-                  </div>
-                ))}
-              </div>
             </div>
 
             {/* ── Center column: TCG Academy shield ───────────────────────── */}
@@ -441,39 +400,17 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* STORES */}
-      <section className="bg-gray-900 py-10 text-white sm:py-16">
-        <div className="mx-auto max-w-[1400px] px-4 sm:px-6">
-          <div className="mb-10 text-center">
-            <h2 className="mb-2 text-2xl font-bold md:text-3xl">
-              Nuestras Tiendas Fisicas
-            </h2>
-            <p className="text-gray-400">
-              Visitanos en persona — eventos, torneos y atencion personalizada
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {STORES.map(({ name, city, href, color }) => (
-              <Link
-                key={href}
-                href={href}
-                className="group rounded-2xl border border-gray-700 bg-gray-800 p-6 transition hover:border-gray-500"
-              >
-                <div
-                  className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold text-white"
-                  style={{ backgroundColor: color }}
-                >
-                  {name[0]}
-                </div>
-                <div className="font-bold text-white">{name}</div>
-                <div className="mt-0.5 text-sm text-gray-400">{city}</div>
-                <div className="mt-3 flex items-center gap-1 text-xs text-gray-500 transition group-hover:text-gray-300">
-                  Ver tienda <ArrowRight size={12} />
-                </div>
-              </Link>
-            ))}
-          </div>
+      {/* STORES — Spain map */}
+      <section className="mx-auto max-w-[1400px] px-4 py-10 sm:px-6 sm:py-16">
+        <div className="mb-8 text-center">
+          <h2 className="mb-2 text-2xl font-bold text-gray-900 md:text-3xl">
+            Nuestras Tiendas Físicas
+          </h2>
+          <p className="text-gray-500">
+            Visítanos en persona — eventos, torneos y atención personalizada
+          </p>
         </div>
+        <SpainMap />
       </section>
 
       {/* BUSINESS OPPORTUNITIES */}

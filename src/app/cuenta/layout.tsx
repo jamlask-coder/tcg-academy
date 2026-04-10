@@ -10,7 +10,6 @@ import {
   Package,
   MapPin,
   Heart,
-  FileText,
   Building2,
   LogOut,
   ChevronRight,
@@ -47,7 +46,6 @@ const NAV_ITEMS_BASE = [
   { href: "/cuenta/devoluciones", label: "Devoluciones", icon: RefreshCw },
   { href: "/cuenta/datos", label: "Mis datos", icon: UserIcon },
   { href: "/cuenta/favoritos", label: "Favoritos", icon: Heart },
-  { href: "/cuenta/facturacion", label: "Facturación", icon: FileText },
 ];
 
 const ADMIN_NAV_ITEMS = [

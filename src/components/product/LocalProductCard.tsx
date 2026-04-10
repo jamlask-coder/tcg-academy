@@ -40,6 +40,7 @@ function LocalProductCardInner({ product }: Props) {
   const isAdmin = user?.role === "admin";
 
   const [added, setAdded] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const [inlineComparePrice, setInlineComparePrice] = useState<
     number | undefined
   >(product.comparePrice);
@@ -84,22 +85,26 @@ function LocalProductCardInner({ product }: Props) {
 
   // Singles/card categories get portrait TCG-card aspect ratio
   const isSingles = isCardCategory;
-  const imageAspect = isSingles ? "aspect-[5/7]" : "aspect-[4/3]";
-  const imageObjectFit = isSingles ? "object-contain p-2" : "object-cover";
+  const imageAspect = isSingles ? "aspect-[5/7]" : "aspect-square";
+  const imageObjectFit = "object-contain p-2";
+  // Show second image on hover if available
+  const displayImage = hovered && product.images[1] ? product.images[1] : image;
 
   // Inner image block — shared between holo and non-holo variants
   const imageBlock = (
     <Link
       href={href}
       className={`relative block ${imageAspect} flex-shrink-0 overflow-hidden bg-gray-50`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      {image ? (
+      {displayImage ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={image}
+          src={displayImage}
           alt={product.name}
           loading="lazy"
-          className={`h-full w-full ${imageObjectFit} transition-transform duration-500 group-hover:scale-105 ${!product.inStock ? "opacity-50" : ""}`}
+          className={`h-full w-full ${imageObjectFit} transition-all duration-300 group-hover:scale-105 ${!product.inStock ? "opacity-50" : ""}`}
         />
       ) : (
         <div

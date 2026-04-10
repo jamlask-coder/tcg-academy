@@ -214,12 +214,14 @@ export function Navbar() {
                       <Link
                         href={href}
                         onClick={handleLinkClick}
-                        className="relative z-10 flex items-center justify-center border-b-4 px-3 transition-all duration-200"
+                        className="relative z-10 flex items-center justify-center rounded-lg px-3 transition-all duration-200"
                         style={{
-                          borderBottomColor:
-                            active || open ? color : "transparent",
                           background:
-                            active || open ? `${color}12` : "transparent",
+                            active || open ? `${color}18` : "transparent",
+                          filter:
+                            active || open
+                              ? `drop-shadow(0 0 8px ${color}90)`
+                              : "none",
                         }}
                         title={label}
                       >

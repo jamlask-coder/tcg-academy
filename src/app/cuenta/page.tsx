@@ -4,7 +4,6 @@ import {
   Package,
   MapPin,
   Heart,
-  FileText,
   Building2,
   ChevronRight,
   User,
@@ -599,13 +598,6 @@ export default function CuentaPage() {
       icon: Heart,
       desc: "Lista de deseos",
       color: "#dc2626",
-    },
-    {
-      href: "/cuenta/facturacion",
-      label: "Facturación",
-      icon: FileText,
-      desc: "Datos fiscales",
-      color: "#d97706",
     },
     {
       href: "/cuenta/mensajes",
