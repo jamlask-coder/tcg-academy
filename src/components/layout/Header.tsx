@@ -459,6 +459,10 @@ export function Header() {
   const { unreadCount } = useNotifications();
   const router = useRouter();
 
+  // Avoid hydration mismatch: cart/auth state comes from localStorage (client only)
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -704,10 +708,10 @@ export function Header() {
           <Link
             href="/carrito"
             className="relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
-            aria-label={`Carrito (${count} artículos)`}
+            aria-label={mounted ? `Carrito (${count} artículos)` : "Carrito"}
           >
             <ShoppingCart size={20} className="text-white" />
-            {count > 0 && (
+            {mounted && count > 0 && (
               <span className="absolute top-1 right-1 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[10px] leading-none font-bold text-white">
                 {count > 99 ? "99+" : count}
               </span>
