@@ -4,6 +4,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { DiscountProvider } from "@/context/DiscountContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { ToastProvider } from "@/context/ToastContext";
+import { ScrollToTop } from "./ScrollToTop";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -11,7 +12,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <DiscountProvider>
         <CartProvider>
           <NotificationProvider>
-            <ToastProvider>{children}</ToastProvider>
+            <ToastProvider>
+            <ScrollToTop />
+            {children}
+          </ToastProvider>
           </NotificationProvider>
         </CartProvider>
       </DiscountProvider>

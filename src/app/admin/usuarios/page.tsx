@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { Search, ChevronDown, Users, X, ChevronRight, ShieldCheck, Clock, ArrowRight } from "lucide-react";
 import { MOCK_USERS, type AdminUser } from "@/data/mockData";
 
@@ -40,18 +41,22 @@ export default function AdminUsuariosPage() {
   };
 
   const filtered = useMemo(() => {
-    return users.filter((u) => {
-      if (roleFilter && u.role !== roleFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        return (
-          u.name.toLowerCase().includes(q) ||
-          u.lastName.toLowerCase().includes(q) ||
-          u.email.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
+    return users
+      .filter((u) => {
+        if (roleFilter && u.role !== roleFilter) return false;
+        if (search) {
+          const q = search.toLowerCase();
+          return (
+            u.name.toLowerCase().includes(q) ||
+            u.lastName.toLowerCase().includes(q) ||
+            u.email.toLowerCase().includes(q)
+          );
+        }
+        return true;
+      })
+      .sort((a, b) =>
+        `${a.name} ${a.lastName}`.localeCompare(`${b.name} ${b.lastName}`, "es"),
+      );
   }, [users, search, roleFilter]);
 
   const requestRoleChange = (user: AdminUser, newRole: UserRole) => {
@@ -140,65 +145,6 @@ export default function AdminUsuariosPage() {
         </p>
       </div>
 
-      {/* Recent registrations */}
-      <div className="mb-6 rounded-2xl border border-gray-200 bg-white">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900">
-            <Clock size={15} className="text-[#2563eb]" /> Últimos registrados
-          </h2>
-          <span className="text-xs text-gray-400">Mostrando los 5 más recientes</span>
-        </div>
-        <div className="divide-y divide-gray-50">
-          {[...users]
-            .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime())
-            .slice(0, 5)
-            .map((u) => (
-              <div
-                key={u.id}
-                className="flex items-center gap-3 px-5 py-3 transition hover:bg-gray-50"
-              >
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-xs font-bold text-white">
-                  {u.name[0]}{u.lastName[0]}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-gray-900">
-                    {u.name} {u.lastName}
-                  </p>
-                  <p className="truncate text-xs text-gray-400">{u.email}</p>
-                </div>
-                <span className={`hidden flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold sm:inline-block ${ROLE_COLORS[u.role]}`}>
-                  {ROLE_LABELS[u.role]}
-                </span>
-                <span className="flex-shrink-0 text-xs text-gray-400">{u.registeredAt}</span>
-                <button
-                  onClick={() => setSelected(selected?.id === u.id ? null : u)}
-                  className="flex-shrink-0 rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#2563eb]"
-                  aria-label="Ver opciones"
-                >
-                  <ArrowRight size={14} />
-                </button>
-              </div>
-            ))}
-        </div>
-      </div>
-
-      {/* Summary cards */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {(["cliente", "mayorista", "tienda", "admin"] as UserRole[]).map(
-          (role) => (
-            <div
-              key={role}
-              className="rounded-xl border border-gray-200 bg-white p-4"
-            >
-              <p className="mb-1 text-xs text-gray-500 capitalize">{role}s</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {users.filter((u) => u.role === role).length}
-              </p>
-            </div>
-          ),
-        )}
-      </div>
-
       {/* Filters */}
       <div className="mb-4 flex flex-wrap gap-3">
         <div className="relative min-w-[160px] flex-1">
@@ -238,6 +184,65 @@ export default function AdminUsuariosPage() {
             size={12}
             className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-gray-400"
           />
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {(["cliente", "mayorista", "tienda", "admin"] as UserRole[]).map(
+          (role) => (
+            <div
+              key={role}
+              className="rounded-xl border border-gray-200 bg-white p-4"
+            >
+              <p className="mb-1 text-xs text-gray-500 capitalize">{role}s</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {users.filter((u) => u.role === role).length}
+              </p>
+            </div>
+          ),
+        )}
+      </div>
+
+      {/* Recent registrations */}
+      <div className="mb-6 rounded-2xl border border-gray-200 bg-white">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900">
+            <Clock size={15} className="text-[#2563eb]" /> Últimos registrados
+          </h2>
+          <span className="text-xs text-gray-400">Mostrando los 5 más recientes</span>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {[...users]
+            .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime())
+            .slice(0, 5)
+            .map((u) => (
+              <div
+                key={u.id}
+                className="flex items-center gap-3 px-5 py-3 transition hover:bg-gray-50"
+              >
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-xs font-bold text-white">
+                  {u.name[0]}{u.lastName[0]}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-gray-900">
+                    {u.name} {u.lastName}
+                  </p>
+                  <p className="truncate text-xs text-gray-400">{u.email}</p>
+                </div>
+                <span className={`hidden flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold sm:inline-block ${ROLE_COLORS[u.role]}`}>
+                  {ROLE_LABELS[u.role]}
+                </span>
+                <span className="flex-shrink-0 text-xs text-gray-400">{u.registeredAt}</span>
+                <button
+                  onClick={() => setSelected(selected?.id === u.id ? null : u)}
+                  className="flex-shrink-0 rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-[#2563eb]"
+                  aria-label="Ver opciones"
+                >
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            ))}
         </div>
       </div>
 
@@ -367,6 +372,12 @@ export default function AdminUsuariosPage() {
                   <span className="font-medium">{selected.points}</span>
                 </div>
               </div>
+              <Link
+                href={`/admin/usuarios/${selected.id}`}
+                className="mt-4 flex items-center justify-center gap-1.5 rounded-xl bg-[#2563eb] py-2.5 text-sm font-bold text-white transition hover:bg-blue-700"
+              >
+                Ver perfil completo <ArrowRight size={14} />
+              </Link>
             </div>
 
             {/* Change role */}

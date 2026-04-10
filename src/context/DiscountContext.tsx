@@ -21,6 +21,7 @@ export interface PriceOverride {
   price?: number;
   wholesalePrice?: number;
   storePrice?: number;
+  costPrice?: number;
 }
 
 interface DiscountContextValue {

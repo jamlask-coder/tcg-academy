@@ -45,6 +45,7 @@ type PriceRow = {
   price: number;
   wholesalePrice: number;
   storePrice: number;
+  costPrice: number;
 };
 
 const PAGE_SIZE = 20;
@@ -225,7 +226,7 @@ export default function AdminProductosPage() {
         "Categoria",
         "PVP c/IVA",
         "PVP s/IVA",
-        "PV Mayoristas",
+        "PV Mayorista",
         "PV Tiendas TCG Academy",
         "IVA%",
         "Stock",
@@ -289,14 +290,14 @@ export default function AdminProductosPage() {
 
   const getPrice = (
     p: LocalProduct,
-    field: "price" | "wholesalePrice" | "storePrice",
+    field: "price" | "wholesalePrice" | "storePrice" | "costPrice",
   ) => {
-    return edits[p.id]?.[field] ?? priceOverrides[p.id]?.[field] ?? p[field];
+    return edits[p.id]?.[field] ?? priceOverrides[p.id]?.[field] ?? (p[field] ?? 0);
   };
 
   const handleChange = (
     productId: number,
-    field: "price" | "wholesalePrice" | "storePrice",
+    field: "price" | "wholesalePrice" | "storePrice" | "costPrice",
     val: string,
   ) => {
     const n = parseFloat(val);
@@ -790,7 +791,7 @@ export default function AdminProductosPage() {
                   PV Público
                 </th>
                 <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-blue-600">
-                  PV Mayoristas
+                  PV Mayorista
                 </th>
                 <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-purple-600">
                   PV Tiendas TCG Academy
@@ -853,30 +854,18 @@ export default function AdminProductosPage() {
                       </span>
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <div className="flex flex-col items-end gap-0.5">
-                        <div className="flex items-center">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={rowPrice}
-                            onChange={(e) =>
-                              handleChange(p.id, "price", e.target.value)
-                            }
-                            className={inputCls}
-                          />
-                          <span className="ml-0.5 text-xs text-gray-400">
-                            €
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-gray-400">
-                          s/IVA:{" "}
-                          {calcVAT(
-                            rowPrice,
-                            IVA_GENERAL,
-                          ).priceWithoutVAT.toFixed(2)}
-                          €
-                        </span>
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={rowPrice}
+                          onChange={(e) =>
+                            handleChange(p.id, "price", e.target.value)
+                          }
+                          className={inputCls}
+                        />
+                        <span className="ml-0.5 text-xs text-gray-400">€</span>
                       </div>
                     </td>
                     <td className="px-3 py-3 text-right">
@@ -905,12 +894,21 @@ export default function AdminProductosPage() {
                       />
                       <span className="ml-0.5 text-xs text-gray-400">€</span>
                     </td>
-                    <td className="px-3 py-3 text-right text-xs text-violet-600">
-                      {p.costPrice !== undefined ? (
-                        p.costPrice.toFixed(2) + " €"
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
+                    <td className="px-3 py-3 text-right">
+                      <div className="flex items-center justify-end">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={getPrice(p, "costPrice") || ""}
+                          placeholder="—"
+                          onChange={(e) =>
+                            handleChange(p.id, "costPrice", e.target.value)
+                          }
+                          className={`${inputCls} border-violet-200 focus:border-violet-500`}
+                        />
+                        <span className="ml-0.5 text-xs text-gray-400">€</span>
+                      </div>
                     </td>
                     <td className="hidden px-4 py-3 sm:table-cell">
                       <div className="flex items-center justify-center gap-1">
