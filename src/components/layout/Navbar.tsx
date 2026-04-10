@@ -198,7 +198,7 @@ export function Navbar() {
         <Container>
           <div className="flex items-center" style={{ minHeight: NAV_HEIGHT }}>
             {/* ── Games group ───────────────────────────────────────────────── */}
-            <div className="flex min-w-0 flex-1 items-stretch" style={{ height: NAV_HEIGHT }}>
+            <div className="flex min-w-0 items-stretch" style={{ height: NAV_HEIGHT }}>
               {/* ── 6 game logos — seamless ───────────────────────────────────── */}
               {NAVBAR_GAMES.map(
                 ({ slug, label, href, color, abbrev, logoSrc }) => {
