@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo, useRef, useEffect } from "react";
+import Link from "next/link";
 import {
   Search,
   ChevronDown,
@@ -790,7 +791,12 @@ function OrderPanel({
                 </p>
                 <p>
                   <span className="text-gray-400">Nombre:</span>{" "}
-                  <span className="font-medium">{order.userName}</span>
+                  <Link
+                    href={`/admin/usuarios/${order.userId}`}
+                    className="font-medium text-[#2563eb] hover:underline"
+                  >
+                    {order.userName}
+                  </Link>
                 </p>
                 <p>
                   <span className="text-gray-400">Email:</span>{" "}
@@ -1882,9 +1888,13 @@ export default function AdminPedidosPage() {
                         </div>
                       </td>
                       <td className="hidden px-3 py-3 md:table-cell">
-                        <p className="text-sm font-medium text-gray-800">
+                        <Link
+                          href={`/admin/usuarios/${order.userId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-sm font-medium text-[#2563eb] hover:underline"
+                        >
                           {order.userName}
-                        </p>
+                        </Link>
                         <RoleBadge role={order.userRole} />
                       </td>
                       <td className="hidden px-3 py-3 text-xs whitespace-nowrap text-gray-500 sm:table-cell">

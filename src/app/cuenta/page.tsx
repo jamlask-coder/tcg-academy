@@ -187,6 +187,11 @@ function AdminDashboard() {
     {},
   );
 
+  const THIRTY_DAYS_AGO = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const recentOrders = orders.filter(
+    (o) => new Date(o.date).getTime() >= THIRTY_DAYS_AGO,
+  );
+
   const filtered = orders
     .slice()
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -245,7 +250,13 @@ function AdminDashboard() {
 
   return (
     <div>
-      {/* KPI strip */}
+      {/* KPI strip — últimos 30 días */}
+      <div className="mb-2 flex items-center gap-2">
+        <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Últimos 30 días</p>
+        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[#2563eb]">
+          {recentOrders.length} pedido{recentOrders.length !== 1 ? "s" : ""}
+        </span>
+      </div>
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
         {(
           [
@@ -260,8 +271,8 @@ function AdminDashboard() {
         ).map((key) => {
           const count =
             key === "todos"
-              ? orders.length
-              : orders.filter((o) => o.adminStatus === key).length;
+              ? recentOrders.length
+              : recentOrders.filter((o) => o.adminStatus === key).length;
           const cfg = key === "todos" ? null : STATUS_CFG[key];
           return (
             <button
@@ -355,7 +366,13 @@ function AdminDashboard() {
                     <p className="text-xs font-bold text-gray-900">
                       {order.id}
                     </p>
-                    <p className="text-xs text-gray-600">{order.userName}</p>
+                    <Link
+                      href={`/admin/usuarios/${order.userId}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-xs text-[#2563eb] hover:underline"
+                    >
+                      {order.userName}
+                    </Link>
                   </div>
 
                   {/* Total */}
