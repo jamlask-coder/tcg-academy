@@ -589,26 +589,25 @@ export function Header() {
       {/* Topbar — mobile rotating */}
       <MobileTrustBar />
 
-      {/* ── Main bar: todo en una sola fila, de izquierda a derecha ──── */}
-      <Container className="flex h-16 items-center justify-center gap-3">
-        {/* Logo — banner "TCG ACADEMY" a la izquierda del buscador */}
-        <Link href="/" className="flex flex-shrink-0 items-center">
+      {/* ── Main bar: logo LEFT · search FILL · icons RIGHT ──── */}
+      <Container className="flex h-16 items-center gap-3">
+        {/* Logo — siempre a la izquierda */}
+        <Link href="/" className="flex shrink-0 items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/images/logo-tcg.png"
             alt="TCG Academy"
-            style={{
-              height: 42,
-              width: "auto",
-            }}
+            style={{ height: 42, width: "auto" }}
           />
         </Link>
 
-        {/* Desktop search */}
-        <div
-          className="relative hidden w-[340px] shrink-0 lg:block xl:w-[420px]"
-          ref={desktopSearchRef}
-        >
+        {/* Middle zone: search + auth — flex-1 actúa de spacer en móvil */}
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          {/* Desktop search — rellena el espacio disponible */}
+          <div
+            className="relative hidden min-w-0 flex-1 lg:block"
+            ref={desktopSearchRef}
+          >
           <form onSubmit={handleDesktopSubmit}>
             <input
               type="search"
@@ -643,13 +642,15 @@ export function Header() {
               onHistorySearch={(q) => submitSearch(q)}
             />
           )}
+          </div>
+
+          {/* Desktop inline login / greeting */}
+          <HeaderInlineAuth />
         </div>
+        {/* Fin zona central */}
 
-        {/* Desktop inline login / greeting */}
-        <HeaderInlineAuth />
-
-        {/* Iconos — directamente después del login, sin spacer */}
-        <div className="flex flex-shrink-0 items-center gap-0.5">
+        {/* Iconos — siempre a la derecha */}
+        <div className="flex shrink-0 items-center gap-0.5">
           {/* Mobile search toggle */}
           <button
             onClick={() => {
