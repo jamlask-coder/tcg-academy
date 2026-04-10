@@ -2,13 +2,12 @@
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { Container } from "@/components/ui/Container";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   ShoppingCart,
   Heart,
   User,
   Search,
-  Menu,
   X,
   Settings,
   Bell,
@@ -18,6 +17,8 @@ import {
   ChevronDown,
   LogOut,
   LayoutDashboard,
+  Home,
+  Gamepad2,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
@@ -458,8 +459,8 @@ export function Header() {
   const { unreadCount } = useNotifications();
   const router = useRouter();
 
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   const [desktopQuery, setDesktopQuery] = useState("");
   const debouncedDesktopQuery = useDebounce(desktopQuery, 300);
@@ -499,7 +500,7 @@ export function Header() {
   }, []);
 
   const submitSearch = useCallback(
-    (q: string, isMobile = false) => {
+    (q: string) => {
       if (!q.trim()) return;
       saveRecentSearch(q.trim());
       router.push(`/busqueda?q=${encodeURIComponent(q.trim())}`);
@@ -507,7 +508,6 @@ export function Header() {
       setDesktopQuery("");
       setMobileDropdownOpen(false);
       setMobileQuery("");
-      if (isMobile) setMobileSearchOpen(false);
     },
     [router],
   );
@@ -523,7 +523,7 @@ export function Header() {
   const handleMobileSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      submitSearch(mobileQuery, true);
+      submitSearch(mobileQuery);
     },
     [mobileQuery, submitSearch],
   );
@@ -539,6 +539,7 @@ export function Header() {
   }, []);
 
   return (
+    <>
     <header
       className="border-b border-white/10"
       style={{
@@ -651,21 +652,6 @@ export function Header() {
 
         {/* Iconos — siempre a la derecha */}
         <div className="flex shrink-0 items-center gap-0.5">
-          {/* Mobile search toggle */}
-          <button
-            onClick={() => {
-              setMobileSearchOpen(!mobileSearchOpen);
-              if (mobileSearchOpen) {
-                setMobileQuery("");
-                setMobileDropdownOpen(false);
-              }
-            }}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10 lg:hidden"
-            aria-label="Buscar"
-          >
-            <Search size={20} className="text-white" />
-          </button>
-
           {/* Admin shortcut (sm, not desktop where panel admin is in greeting menu) */}
           {user?.role === "admin" && (
             <Link
@@ -693,24 +679,6 @@ export function Header() {
             </Link>
           )}
 
-          {/* Mobile: user icon → /admin (admin) | /cuenta (user) | /login (guest) */}
-          <Link
-            href={user ? (user.role === "admin" ? "/admin" : "/cuenta") : "/login"}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
-            aria-label={user?.role === "admin" ? "Panel de administración" : "Mi cuenta"}
-          >
-            <User size={20} className="text-white" />
-          </Link>
-
-          {/* Favorites */}
-          <Link
-            href="/cuenta/favoritos"
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
-            aria-label="Favoritos"
-          >
-            <Heart size={20} className="text-white" />
-          </Link>
-
           {/* Cart */}
           <Link
             href="/carrito"
@@ -725,63 +693,48 @@ export function Header() {
             )}
           </Link>
 
-          {/* Mobile hamburger */}
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10 lg:hidden"
-            aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
-          >
-            {menuOpen ? (
-              <X size={20} className="text-white" />
-            ) : (
-              <Menu size={20} className="text-white" />
-            )}
-          </button>
         </div>
       </Container>
 
-      {/* Mobile search panel */}
-      {mobileSearchOpen && (
-        <div
-          className="border-t border-white/10 px-4 pb-3 lg:hidden"
-          ref={mobileSearchRef}
-        >
-          <form onSubmit={handleMobileSubmit} className="relative">
-            <input
-              type="search"
-              value={mobileQuery}
-              onChange={(e) => {
-                setMobileQuery(e.target.value);
-                setMobileDropdownOpen(true);
+      {/* Mobile search bar — always visible */}
+      <div
+        className="border-t border-white/10 px-4 pt-2 pb-3 lg:hidden"
+        ref={mobileSearchRef}
+      >
+        <form onSubmit={handleMobileSubmit} className="relative">
+          <input
+            type="search"
+            value={mobileQuery}
+            onChange={(e) => {
+              setMobileQuery(e.target.value);
+              setMobileDropdownOpen(true);
+            }}
+            onFocus={() => setMobileDropdownOpen(true)}
+            placeholder="Buscar cartas, sobres..."
+            className="h-11 w-full rounded-xl border-0 bg-white/15 pr-10 pl-4 text-sm text-white placeholder:text-white/60 focus:bg-white/25 focus:outline-none"
+            autoComplete="off"
+          />
+          <button
+            type="submit"
+            className="absolute top-1/2 right-3 -translate-y-1/2 text-white/70 hover:text-white"
+            aria-label="Buscar"
+          >
+            <Search size={18} />
+          </button>
+        </form>
+        {mobileDropdownOpen && (
+          <div className="mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+            <SearchDropdown
+              query={debouncedMobileQuery}
+              onSelect={() => {
+                saveRecentSearch(mobileQuery);
+                closeMobileSearch();
               }}
-              onFocus={() => setMobileDropdownOpen(true)}
-              placeholder="Buscar productos..."
-              autoFocus
-              className="h-11 w-full rounded-xl border-2 border-[#2563eb] pr-10 pl-4 text-sm focus:outline-none"
-              autoComplete="off"
+              onHistorySearch={(q) => submitSearch(q)}
             />
-            <button
-              type="submit"
-              className="absolute top-1/2 right-3 -translate-y-1/2 text-[#2563eb]"
-              aria-label="Buscar"
-            >
-              <Search size={18} />
-            </button>
-          </form>
-          {mobileDropdownOpen && (
-            <div className="mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
-              <SearchDropdown
-                query={debouncedMobileQuery}
-                onSelect={() => {
-                  saveRecentSearch(mobileQuery);
-                  closeMobileSearch();
-                }}
-                onHistorySearch={(q) => submitSearch(q, true)}
-              />
-            </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       {/* Mobile full-screen drawer */}
       <div
@@ -800,8 +753,8 @@ export function Header() {
 
         {/* Drawer panel */}
         <div
-          className="absolute top-0 right-0 flex h-full w-[85vw] max-w-[340px] flex-col bg-white shadow-2xl transition-transform duration-300 ease-out"
-          style={{ transform: menuOpen ? "translateX(0)" : "translateX(100%)" }}
+          className="absolute top-0 left-0 flex h-full w-[85vw] max-w-[340px] flex-col bg-white shadow-2xl transition-transform duration-300 ease-out"
+          style={{ transform: menuOpen ? "translateX(0)" : "translateX(-100%)" }}
         >
           {/* Drawer header */}
           <div
@@ -1050,5 +1003,46 @@ export function Header() {
         }
       `}</style>
     </header>
+
+    {/* ── Fixed bottom navigation — mobile only ───────────────────────────── */}
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white lg:hidden"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      aria-label="Navegación principal"
+    >
+      <div className="flex items-stretch">
+        <Link
+          href="/"
+          className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${pathname === "/" ? "text-[#2563eb]" : "text-gray-500"}`}
+        >
+          <Home size={22} />
+          <span>Inicio</span>
+        </Link>
+        <button
+          onClick={() => setMenuOpen(true)}
+          aria-label="Abrir menú de juegos"
+          className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${menuOpen ? "text-[#2563eb]" : "text-gray-500"}`}
+        >
+          <Gamepad2 size={22} />
+          <span>Juegos</span>
+        </button>
+        <Link
+          href="/cuenta/favoritos"
+          className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${pathname === "/cuenta/favoritos" ? "text-[#2563eb]" : "text-gray-500"}`}
+        >
+          <Heart size={22} />
+          <span>Favoritos</span>
+        </Link>
+        <Link
+          href={user ? "/cuenta" : "/login"}
+          className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${pathname.startsWith("/cuenta") || pathname === "/login" ? "text-[#2563eb]" : "text-gray-500"}`}
+          aria-label="Mi cuenta"
+        >
+          <User size={22} />
+          <span>Cuenta</span>
+        </Link>
+      </div>
+    </nav>
+    </>
   );
 }

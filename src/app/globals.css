@@ -141,7 +141,7 @@
    Used by category filter bars, account nav, etc. to sit right below the header.
    ────────────────────────────────────────────────────────────────────────── */
 :root {
-  --header-h: 92px;
+  --header-h: 160px; /* trust bar (28) + main bar (64) + search bar (68) */
 }
 @media (min-width: 1024px) {
   :root {
