@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
-import Link from "next/link";
-import { Search, ChevronDown, Users, X, ChevronRight, ShieldCheck, Clock, ArrowRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Search, ChevronDown, Users, X, ChevronRight, Clock } from "lucide-react";
 import { MOCK_USERS, type AdminUser } from "@/data/mockData";
 import type { User } from "@/types/user";
 
@@ -21,21 +21,12 @@ const ROLE_LABELS: Record<string, string> = {
 
 type UserRole = AdminUser["role"];
 
-interface PendingChange {
-  userId: string;
-  userName: string;
-  currentRole: UserRole;
-  newRole: UserRole;
-}
-
 export default function AdminUsuariosPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<AdminUser[]>(MOCK_USERS);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
   const [sortByRecent, setSortByRecent] = useState(true);
-  const [selected, setSelected] = useState<AdminUser | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const [pending, setPending] = useState<PendingChange | null>(null);
 
   // Load registered users from localStorage and merge with mock users
   useEffect(() => {
@@ -68,11 +59,6 @@ export default function AdminUsuariosPage() {
     }
   }, []);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  };
-
   const filtered = useMemo(() => {
     return users
       .filter((u) => {
@@ -95,83 +81,8 @@ export default function AdminUsuariosPage() {
       });
   }, [users, search, roleFilter, sortByRecent]);
 
-  const requestRoleChange = (user: AdminUser, newRole: UserRole) => {
-    if (user.role === newRole) return;
-    setPending({
-      userId: user.id,
-      userName: `${user.name} ${user.lastName}`,
-      currentRole: user.role,
-      newRole,
-    });
-  };
-
-  const confirmRoleChange = () => {
-    if (!pending) return;
-    setUsers((prev) =>
-      prev.map((u) => (u.id === pending.userId ? { ...u, role: pending.newRole } : u)),
-    );
-    if (selected?.id === pending.userId)
-      setSelected((p) => (p ? { ...p, role: pending.newRole } : null));
-    showToast(`Rol de ${pending.userName} actualizado a ${ROLE_LABELS[pending.newRole]}`);
-    setPending(null);
-  };
-
   return (
     <div>
-      {/* Toast */}
-      {toast && (
-        <div className="fixed right-6 bottom-6 z-50 rounded-2xl bg-[#2563eb] px-5 py-3 text-sm font-medium text-white shadow-xl">
-          ✓ {toast}
-        </div>
-      )}
-
-      {/* Confirmation modal */}
-      {pending && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-          onClick={() => setPending(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
-              <ShieldCheck size={22} className="text-amber-600" />
-            </div>
-            <h2 className="mb-1 text-lg font-bold text-gray-900">
-              Cambiar rol de usuario
-            </h2>
-            <p className="mb-5 text-sm text-gray-500">
-              ¿Confirmas el cambio de rol para{" "}
-              <span className="font-semibold text-gray-800">{pending.userName}</span>?
-            </p>
-            <div className="mb-5 flex items-center gap-3 rounded-xl bg-gray-50 p-3">
-              <span className={`rounded-full px-2.5 py-1 text-xs font-bold capitalize ${ROLE_COLORS[pending.currentRole]}`}>
-                {ROLE_LABELS[pending.currentRole]}
-              </span>
-              <ChevronRight size={14} className="flex-shrink-0 text-gray-400" />
-              <span className={`rounded-full px-2.5 py-1 text-xs font-bold capitalize ${ROLE_COLORS[pending.newRole]}`}>
-                {ROLE_LABELS[pending.newRole]}
-              </span>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setPending(null)}
-                className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmRoleChange}
-                className="flex-1 rounded-xl bg-[#2563eb] py-2.5 text-sm font-bold text-white transition hover:bg-blue-700"
-              >
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="mb-6">
         <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
           <Users size={22} className="text-[#2563eb]" /> Gestión de usuarios
@@ -252,8 +163,8 @@ export default function AdminUsuariosPage() {
                   {filtered.map((user) => (
                     <tr
                       key={user.id}
-                      className={`cursor-pointer transition hover:bg-gray-50 ${selected?.id === user.id ? "bg-blue-50" : ""}`}
-                      onClick={() => setSelected(selected?.id === user.id ? null : user)}
+                      className="cursor-pointer transition hover:bg-gray-50"
+                      onClick={() => router.push(`/admin/usuarios/${user.id}`)}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -275,7 +186,7 @@ export default function AdminUsuariosPage() {
                       <td className="hidden px-3 py-3 text-right font-medium text-gray-700 md:table-cell">{user.totalOrders}</td>
                       <td className="hidden px-4 py-3 text-right font-bold text-gray-900 md:table-cell">{user.totalSpent.toFixed(2)}€</td>
                       <td className="px-4 py-3 text-right">
-                        <ChevronRight size={16} className={`ml-auto text-gray-400 transition ${selected?.id === user.id ? "rotate-90" : ""}`} />
+                        <ChevronRight size={16} className="ml-auto text-gray-400" />
                       </td>
                     </tr>
                   ))}
@@ -316,71 +227,6 @@ export default function AdminUsuariosPage() {
             </div>
           </div>
 
-          {/* Detail panel */}
-          {selected && (
-            <>
-              <div className="rounded-2xl border border-gray-200 bg-white p-5">
-                <div className="mb-4 flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-lg font-bold text-white">
-                      {selected.name[0]}{selected.lastName[0]}
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-900">{selected.name} {selected.lastName}</p>
-                      <p className="text-xs text-gray-500">{selected.email}</p>
-                    </div>
-                  </div>
-                  <button onClick={() => setSelected(null)} className="p-1 text-gray-400 hover:text-gray-600">
-                    <X size={16} />
-                  </button>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Registrado</span>
-                    <span className="font-medium">{selected.registeredAt}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Pedidos</span>
-                    <span className="font-medium">{selected.totalOrders}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Gasto total</span>
-                    <span className="font-bold text-[#2563eb]">{selected.totalSpent.toFixed(2)}€</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Puntos</span>
-                    <span className="font-medium">{selected.points}</span>
-                  </div>
-                </div>
-                <Link
-                  href={`/admin/usuarios/${selected.id}`}
-                  className="mt-4 flex items-center justify-center gap-1.5 rounded-xl bg-[#2563eb] py-2.5 text-sm font-bold text-white transition hover:bg-blue-700"
-                >
-                  Ver perfil completo <ArrowRight size={14} />
-                </Link>
-              </div>
-
-              <div className="rounded-2xl border border-gray-200 bg-white p-5">
-                <p className="mb-3 text-sm font-bold text-gray-900">Cambiar rol</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {(["cliente", "mayorista", "tienda", "admin"] as UserRole[]).map((role) => (
-                    <button
-                      key={role}
-                      onClick={() => requestRoleChange(selected, role)}
-                      disabled={selected.role === role}
-                      className={`min-h-[44px] rounded-xl border-2 py-2.5 text-xs font-bold transition ${
-                        selected.role === role
-                          ? "cursor-default border-[#2563eb] bg-[#2563eb] text-white"
-                          : "border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-700"
-                      }`}
-                    >
-                      {ROLE_LABELS[role]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
         </div>
       </div>
     </div>
