@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
+import { awardPurchasePoints, deductPoints } from "@/services/pointsService";
 import {
   Shield,
   Truck,
@@ -11,7 +13,9 @@ import {
   Tag,
   Star,
   Store,
+  Trophy,
 } from "lucide-react";
+import { POINTS_PER_EURO } from "@/services/pointsService";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -40,6 +44,7 @@ interface PendingCheckout {
 
 export default function CheckoutPage() {
   const { items, total, count, clearCart } = useCart();
+  const { user } = useAuth();
   const [step, setStep] = useState<Step>("datos");
   const [pending] = useState<PendingCheckout | null>(() => {
     try {
@@ -131,6 +136,14 @@ export default function CheckoutPage() {
       localStorage.removeItem("tcgacademy_pending_checkout");
     } catch {}
 
+    // Award purchase points and propagate to referral chain (cliente only)
+    if (user?.role === "cliente") {
+      if (pending?.appliedPoints?.points) {
+        deductPoints(user.id, pending.appliedPoints.points);
+      }
+      awardPurchasePoints(user.id, finalTotal);
+    }
+
     clearCart();
     setStep("confirmado");
   };
@@ -162,10 +175,20 @@ export default function CheckoutPage() {
         <p className="mb-2 text-gray-600">
           Gracias por tu compra. Te hemos enviado un email de confirmacion.
         </p>
-        <p className="mb-8 text-sm text-gray-500">
+        <p className="mb-4 text-sm text-gray-500">
           Numero de pedido:{" "}
           <span className="font-bold text-gray-800">{orderId}</span>
         </p>
+        {user?.role === "cliente" && finalTotal > 0 && (
+          <div className="mx-auto mb-6 flex max-w-xs items-center justify-center gap-2 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            <Trophy size={16} className="flex-shrink-0 text-amber-500" />
+            <span>
+              Has ganado{" "}
+              <strong>+{Math.floor(finalTotal * POINTS_PER_EURO)} puntos</strong>{" "}
+              por esta compra
+            </span>
+          </div>
+        )}
         <div className="flex flex-col justify-center gap-3 sm:flex-row">
           <Link
             href="/cuenta/pedidos"
