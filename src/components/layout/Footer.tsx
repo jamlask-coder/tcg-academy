@@ -156,8 +156,9 @@ export function Footer() {
           <div>
             <Link href="/" className="mb-4 inline-flex items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/logo-tcg-shield.svg" alt="TCG Academy" style={{ height: 32, width: "auto" }} />
-              <span className="text-lg font-bold text-white">TCG Academy</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/logo-tcg-shield.svg" alt="" style={{ height: 40, width: "auto" }} />
+              <span className="text-xl font-black tracking-tight text-white">TCG <span className="text-amber-400">Academy</span></span>
             </Link>
             <p className="mb-4 text-xs text-slate-500">
               4 tiendas físicas · Envío en 24h con GLS

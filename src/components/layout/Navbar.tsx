@@ -199,41 +199,44 @@ export function Navbar() {
           <div className="flex items-center justify-center" style={{ minHeight: NAV_HEIGHT }}>
             {/* ── Games group ───────────────────────────────────────────────── */}
             <div className="flex min-w-0 items-stretch" style={{ height: NAV_HEIGHT }}>
-              {/* ── 6 game logos — seamless ───────────────────────────────────── */}
+              {/* ── 6 game names — text only, no logos, no scale animations ── */}
               {NAVBAR_GAMES.map(
-                ({ slug, label, href, color, abbrev, logoSrc }) => {
+                ({ slug, label, href, color }) => {
                   const active =
                     pathname === href || pathname.startsWith(href + "/");
                   const open = activeItem === slug;
+                  const highlighted = active || open;
+                  // Pokémon already has good subtle glow; others get stronger effect
+                  const glowStrength = slug === "pokemon" ? "55" : "90";
+                  const bgStrength = slug === "pokemon" ? "33" : "55";
                   return (
                     <div
                       key={slug}
-                      className="group/logo flex items-stretch"
+                      className="flex items-stretch"
                       onMouseEnter={() => openItem(slug)}
                     >
                       <Link
                         href={href}
                         onClick={handleLinkClick}
-                        className="relative z-10 flex items-center justify-center rounded-lg px-3 transition-all duration-200"
+                        className="relative z-10 flex items-center justify-center rounded-lg px-4 transition-colors duration-150"
                         style={{
-                          background:
-                            active || open
-                              ? `radial-gradient(ellipse at center, ${color}44 0%, ${color}1a 50%, transparent 75%)`
-                              : "transparent",
-                          filter:
-                            active || open
-                              ? `drop-shadow(0 0 10px ${color}70)`
-                              : "none",
+                          background: highlighted
+                            ? `radial-gradient(ellipse at center, ${color}${bgStrength} 0%, ${color}22 60%, transparent 85%)`
+                            : "transparent",
                         }}
                         title={label}
                       >
-                        <GameLogo
-                          slug={slug}
-                          src={logoSrc}
-                          abbrev={abbrev}
-                          color={color}
-                          label={label}
-                        />
+                        <span
+                          className="text-sm font-bold tracking-wide whitespace-nowrap"
+                          style={{
+                            color: highlighted ? color : "rgba(255,255,255,0.85)",
+                            textShadow: highlighted
+                              ? `0 0 14px ${color}${glowStrength}, 0 0 28px ${color}44`
+                              : "none",
+                          }}
+                        >
+                          {label}
+                        </span>
                       </Link>
                     </div>
                   );

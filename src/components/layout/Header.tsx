@@ -593,13 +593,16 @@ export function Header() {
       {/* ── Main bar: logo LEFT · search FILL · icons RIGHT ──── */}
       <Container className="flex h-16 items-center gap-3">
         {/* Logo — siempre a la izquierda */}
-        <Link href="/" className="flex shrink-0 items-center">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/images/logo-tcg-shield.svg"
             alt="TCG Academy"
-            style={{ height: 40, width: "auto" }}
+            style={{ height: 44, width: "auto", filter: "drop-shadow(0 0 8px rgba(255,255,255,0.25))" }}
           />
+          <span className="hidden text-sm font-black tracking-tight text-white xl:block">
+            TCG <span className="text-amber-300">Academy</span>
+          </span>
         </Link>
 
         {/* Middle zone: search + auth — flex-1 actúa de spacer en móvil */}
@@ -678,6 +681,24 @@ export function Header() {
               )}
             </Link>
           )}
+
+          {/* Favorites */}
+          <Link
+            href="/cuenta/favoritos"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
+            aria-label="Favoritos"
+          >
+            <Heart size={20} className="text-white" />
+          </Link>
+
+          {/* User icon → /admin (admin) | /cuenta (user) | /login (guest) */}
+          <Link
+            href={user ? (user.role === "admin" ? "/admin" : "/cuenta") : "/login"}
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
+            aria-label={user?.role === "admin" ? "Panel de administración" : "Mi cuenta"}
+          >
+            <User size={20} className="text-white" />
+          </Link>
 
           {/* Cart */}
           <Link

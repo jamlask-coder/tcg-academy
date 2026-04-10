@@ -73,12 +73,19 @@ function GridContent({ products, color, game, category }: Props) {
     ? Number(params.get("priceMax"))
     : null;
 
-  // Derive available languages and price bounds from all products
-  const availableLanguages = useMemo(
-    () =>
-      [...new Set(mergedProducts.map((p) => p.language).filter(Boolean))] as string[],
-    [mergedProducts],
-  );
+  // Derive available languages — ordered: ES, EN, JP, KO, then rest alphabetically
+  const LANG_ORDER = ["ES", "EN", "JP", "KO"];
+  const availableLanguages = useMemo(() => {
+    const langs = [...new Set(mergedProducts.map((p) => p.language).filter(Boolean))] as string[];
+    return langs.sort((a, b) => {
+      const ai = LANG_ORDER.indexOf(a.toUpperCase());
+      const bi = LANG_ORDER.indexOf(b.toUpperCase());
+      if (ai !== -1 && bi !== -1) return ai - bi;
+      if (ai !== -1) return -1;
+      if (bi !== -1) return 1;
+      return a.localeCompare(b);
+    });
+  }, [mergedProducts]);
 
   const { minPrice, maxPrice } = useMemo(() => {
     if (!mergedProducts.length) return { minPrice: 0, maxPrice: 100 };

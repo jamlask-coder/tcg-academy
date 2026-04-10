@@ -186,13 +186,13 @@ export function isNewProduct(product: LocalProduct): boolean {
 // ─── Language flag helper ─────────────────────────────────────────────────────
 
 export const LANGUAGE_FLAGS: Record<string, string> = {
-  EN: "🇬🇧",
   ES: "🇪🇸",
+  EN: "🇬🇧",
   JP: "🇯🇵",
+  KO: "🇰🇷",
   FR: "🇫🇷",
   DE: "🇩🇪",
   IT: "🇮🇹",
-  KO: "🇰🇷",
   PT: "🇧🇷",
 };
 
@@ -200,10 +200,10 @@ export const LANGUAGE_NAMES: Record<string, string> = {
   ES: "Español",
   EN: "Inglés",
   JP: "Japonés",
+  KO: "Coreano",
   FR: "Francés",
   DE: "Alemán",
   IT: "Italiano",
-  KO: "Coreano",
   PT: "Portugués",
 };
 

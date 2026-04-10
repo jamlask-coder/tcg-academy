@@ -1,9 +1,64 @@
 "use client";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ChevronDown, Users, X, ChevronRight, Clock } from "lucide-react";
+import { Search, ChevronDown, Users, X, ChevronRight, Clock, Download, Upload, CheckCircle2 } from "lucide-react";
 import { MOCK_USERS, type AdminUser } from "@/data/mockData";
 import type { User } from "@/types/user";
+
+// ─── DB export / import helpers ───────────────────────────────────────────────
+
+type RegisteredEntry = { password: string; user: User };
+
+function loadRegistered(): Record<string, RegisteredEntry> {
+  try {
+    return JSON.parse(localStorage.getItem("tcgacademy_registered") ?? "{}") as Record<string, RegisteredEntry>;
+  } catch { return {}; }
+}
+
+function exportJSON() {
+  const data = loadRegistered();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tcgacademy-users-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportCSV() {
+  const data = loadRegistered();
+  const rows = Object.values(data).map(({ user }) =>
+    [user.id, user.name, user.lastName, user.email, user.role, user.phone ?? "", user.createdAt?.slice(0, 10) ?? ""]
+      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+      .join(","),
+  );
+  const csv = ["ID,Nombre,Apellidos,Email,Rol,Telefono,Registro", ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tcgacademy-users-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importJSON(file: File, onDone: (count: number) => void) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const imported = JSON.parse(e.target?.result as string) as Record<string, RegisteredEntry>;
+      const current = loadRegistered();
+      let count = 0;
+      for (const [email, entry] of Object.entries(imported)) {
+        if (!current[email]) { current[email] = entry; count++; }
+      }
+      localStorage.setItem("tcgacademy_registered", JSON.stringify(current));
+      onDone(count);
+    } catch { onDone(-1); }
+  };
+  reader.readAsText(file);
+}
 
 const ROLE_COLORS = {
   cliente: "bg-gray-100 text-gray-600",
@@ -27,9 +82,10 @@ export default function AdminUsuariosPage() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
   const [sortByRecent, setSortByRecent] = useState(true);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load registered users from localStorage and merge with mock users
-  useEffect(() => {
+  const refreshUsers = () => {
     try {
       const stored = localStorage.getItem("tcgacademy_registered");
       if (!stored) return;
@@ -51,12 +107,15 @@ export default function AdminUsuariosPage() {
           phone: entry.user.phone,
         }));
       if (newUsers.length > 0) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setUsers([...MOCK_USERS, ...newUsers]);
       }
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
+  };
+
+  // Load registered users from localStorage and merge with mock users
+  useEffect(() => {
+    refreshUsers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filtered = useMemo(() => {
@@ -90,6 +149,53 @@ export default function AdminUsuariosPage() {
         <p className="mt-1 text-sm text-gray-500">
           {filtered.length} usuarios registrados
         </p>
+      </div>
+
+      {/* DB toolbar */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <button
+          onClick={exportJSON}
+          className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+        >
+          <Download size={14} className="text-[#2563eb]" /> Exportar JSON
+        </button>
+        <button
+          onClick={exportCSV}
+          className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+        >
+          <Download size={14} className="text-green-600" /> Exportar CSV
+        </button>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+        >
+          <Upload size={14} className="text-amber-600" /> Importar JSON
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            importJSON(file, (count) => {
+              if (count >= 0) {
+                setImportMsg(`${count} usuario(s) importados`);
+                refreshUsers();
+              } else {
+                setImportMsg("Error al importar el archivo");
+              }
+              setTimeout(() => setImportMsg(null), 4000);
+            });
+            e.target.value = "";
+          }}
+        />
+        {importMsg && (
+          <span className="flex items-center gap-1 text-sm font-semibold text-green-600">
+            <CheckCircle2 size={14} /> {importMsg}
+          </span>
+        )}
       </div>
 
       {/* Filters */}
