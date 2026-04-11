@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { SlidersHorizontal, X, ChevronDown, ChevronUp } from "lucide-react";
 import { LANGUAGE_NAMES } from "@/data/products";
@@ -120,6 +120,31 @@ function FilterContent({
 
   const currentMin = priceMin ?? minPrice;
   const currentMax = priceMax ?? maxPrice;
+
+  const [inputMin, setInputMin] = useState(String(currentMin));
+  const [inputMax, setInputMax] = useState(String(currentMax));
+
+  // Sync inputs when slider moves
+  useEffect(() => { setInputMin(String(currentMin)); }, [currentMin]);
+  useEffect(() => { setInputMax(String(currentMax)); }, [currentMax]);
+
+  function commitMin() {
+    const v = Math.round(Number(inputMin));
+    if (!isNaN(v) && v >= minPrice && v <= currentMax) {
+      setPriceMin(v === minPrice ? null : v);
+    } else {
+      setInputMin(String(currentMin));
+    }
+  }
+
+  function commitMax() {
+    const v = Math.round(Number(inputMax));
+    if (!isNaN(v) && v >= currentMin && v <= maxPrice) {
+      setPriceMax(v === maxPrice ? null : v);
+    } else {
+      setInputMax(String(currentMax));
+    }
+  }
 
   return (
     <div className="flex flex-col gap-1">
@@ -279,6 +304,32 @@ function FilterContent({
                   left: `${((currentMax - minPrice) / (maxPrice - minPrice || 1)) * 100}%`,
                   backgroundColor: color,
                 }}
+              />
+            </div>
+            {/* Inputs numéricos */}
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="number"
+                min={minPrice}
+                max={currentMax}
+                value={inputMin}
+                onChange={(e) => setInputMin(e.target.value)}
+                onBlur={commitMin}
+                onKeyDown={(e) => e.key === "Enter" && commitMin()}
+                className="w-full rounded-lg border border-gray-200 px-2 py-1 text-center text-xs text-gray-700 focus:border-gray-400 focus:outline-none"
+                aria-label="Precio mínimo"
+              />
+              <span className="shrink-0 text-xs text-gray-400">—</span>
+              <input
+                type="number"
+                min={currentMin}
+                max={maxPrice}
+                value={inputMax}
+                onChange={(e) => setInputMax(e.target.value)}
+                onBlur={commitMax}
+                onKeyDown={(e) => e.key === "Enter" && commitMax()}
+                className="w-full rounded-lg border border-gray-200 px-2 py-1 text-center text-xs text-gray-700 focus:border-gray-400 focus:outline-none"
+                aria-label="Precio máximo"
               />
             </div>
           </div>

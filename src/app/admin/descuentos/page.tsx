@@ -7,13 +7,14 @@ import {
 } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
 import { useDiscounts, type ProductDiscount } from "@/context/DiscountContext";
-import { Tag, Zap, Save, X, ChevronDown } from "lucide-react";
+import { MOCK_ADMIN_COUPONS } from "@/data/mockData";
+import { Tag, Zap, Save, X, ChevronDown, Plus, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 
 export default function AdminDescuentosPage() {
   const {
     discounts,
     setDiscount,
-    removeDiscount: _removeDiscount,
+    removeDiscount,
     bulkSetDiscount,
     saveToStorage,
   } = useDiscounts();
@@ -91,6 +92,17 @@ export default function AdminDescuentosPage() {
   };
 
   const activeCount = Object.values(discounts).filter((d) => d.active).length;
+  const activeCouponsCount = MOCK_ADMIN_COUPONS.filter((c) => c.active).length;
+
+  const activeProductDiscounts = useMemo(() => {
+    return Object.values(discounts)
+      .filter((d) => d.active && d.pct > 0)
+      .map((d) => {
+        const product = allProducts.find((p) => p.id === d.productId);
+        return { ...d, productName: product?.name ?? `Producto #${d.productId}`, game: product?.game ?? "" };
+      })
+      .sort((a, b) => b.pct - a.pct);
+  }, [discounts, allProducts]);
 
   const selectCls =
     "h-9 pl-3 pr-8 border border-gray-200 rounded-xl text-sm bg-white appearance-none focus:outline-none focus:border-[#2563eb] text-gray-700";
@@ -102,10 +114,10 @@ export default function AdminDescuentosPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Gestion de descuentos
+            Gestión de descuentos
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            {activeCount} descuentos activos
+            {activeCount + activeCouponsCount} activos · {activeCount} en productos · {activeCouponsCount} cupones
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -121,6 +133,107 @@ export default function AdminDescuentosPage() {
             <Save size={16} /> Guardar todo
           </button>
         </div>
+      </div>
+
+      {/* ── Activos ahora ─────────────────────────────────────────────────────── */}
+      <div className="rounded-2xl border border-red-100 bg-white">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-black text-white">
+              {activeCount + activeCouponsCount}
+            </span>
+            <h2 className="font-bold text-gray-900">Descuentos activos ahora</h2>
+          </div>
+          <button
+            onClick={() => {
+              const el = document.getElementById("tabla-descuentos");
+              el?.scrollIntoView({ behavior: "smooth" });
+            }}
+            className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-[#2563eb] hover:text-[#2563eb]"
+          >
+            <Plus size={12} /> Añadir descuento
+          </button>
+        </div>
+
+        {activeProductDiscounts.length === 0 && activeCouponsCount === 0 ? (
+          <p className="px-5 py-8 text-center text-sm text-gray-400">
+            No hay descuentos activos en este momento
+          </p>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {/* Product discounts */}
+            {activeProductDiscounts.map((d) => (
+              <div key={d.productId} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-900">{d.productName}</p>
+                  <p className="text-xs capitalize text-gray-400">{d.game}{d.endsAt ? ` · Caduca ${d.endsAt}` : ""}</p>
+                </div>
+                <span className="rounded-full bg-red-100 px-2.5 py-1 text-sm font-black text-red-600">
+                  -{d.pct}%
+                </span>
+                {/* Edit pct inline */}
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={d.pct}
+                    onChange={(e) => {
+                      setDiscount(d.productId, { pct: parseInt(e.target.value) || 0 });
+                    }}
+                    onBlur={saveToStorage}
+                    className="h-7 w-14 rounded-lg border border-gray-200 px-2 text-center text-xs focus:border-red-400 focus:outline-none"
+                    aria-label={`Porcentaje de descuento para ${d.productName}`}
+                  />
+                  <span className="text-xs text-gray-400">%</span>
+                </div>
+                {/* Toggle active */}
+                <button
+                  onClick={() => { setDiscount(d.productId, { active: false }); saveToStorage(); }}
+                  title="Desactivar"
+                  aria-label={`Desactivar descuento de ${d.productName}`}
+                  className="text-green-500 transition hover:text-gray-400"
+                >
+                  <ToggleRight size={20} />
+                </button>
+                {/* Delete */}
+                <button
+                  onClick={() => { removeDiscount(d.productId); saveToStorage(); }}
+                  title="Eliminar descuento"
+                  aria-label={`Eliminar descuento de ${d.productName}`}
+                  className="text-gray-300 transition hover:text-red-500"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+
+            {/* Active coupons */}
+            {MOCK_ADMIN_COUPONS.filter((c) => c.active).map((c) => (
+              <div key={c.code} className="flex flex-wrap items-center gap-3 bg-amber-50/60 px-5 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">
+                    Cupón <span className="font-mono text-amber-700">{c.code}</span>
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {c.discountType === "percent" ? `-${c.value}%` : `-${c.value}€`} · Caduca {c.endsAt}
+                  </p>
+                </div>
+                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-sm font-black text-amber-700">
+                  {c.discountType === "percent" ? `-${c.value}%` : `-${c.value}€`}
+                </span>
+                <span className="text-xs text-gray-400">Cupón</span>
+                <button
+                  aria-label={`Ir a gestión del cupón ${c.code}`}
+                  onClick={() => window.location.assign("/admin/cupones")}
+                  className="text-xs font-semibold text-amber-600 underline hover:no-underline"
+                >
+                  Gestionar →
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Bulk discount */}
@@ -237,7 +350,7 @@ export default function AdminDescuentosPage() {
       </div>
 
       {/* Per-product discounts */}
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+      <div id="tabla-descuentos" className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
         <div className="flex flex-wrap gap-3 border-b border-gray-100 px-4 py-3">
           <div className="relative min-w-[160px] flex-1">
             <input

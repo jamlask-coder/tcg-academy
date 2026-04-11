@@ -25,6 +25,7 @@ import dynamic from "next/dynamic";
 import {
   ADMIN_ORDERS,
   ORDER_STORAGE_KEY,
+  MOCK_ORDERS,
   type AdminOrder,
   type AdminOrderStatus,
 } from "@/data/mockData";
@@ -39,13 +40,6 @@ const B2BCharts = dynamic(
   },
 );
 
-const MOCK_LAST_ORDER = {
-  id: "TCG-20240128-001",
-  date: "28 Enero 2025",
-  status: "Enviado",
-  total: 109.95,
-  items: 2,
-};
 
 // Months for the chart labels
 const MONTH_LABELS = ["Oct", "Nov", "Dic", "Ene", "Feb", "Mar"];
@@ -639,44 +633,73 @@ export default function CuentaPage() {
           {user.role === "cliente" &&
             "Explora el catálogo y gestiona tus pedidos desde aquí."}
         </p>
+        {user.birthDate && (
+          <p className="mt-2 text-xs text-blue-300">
+            🎂{" "}
+            {new Date(user.birthDate + "T12:00:00").toLocaleDateString("es-ES", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
+          </p>
+        )}
       </div>
 
       {/* Last order */}
-      <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-bold text-gray-900">Último pedido</h2>
-          <Link
-            href="/cuenta/pedidos"
-            className="flex items-center gap-1 text-sm text-[#2563eb] hover:underline"
-          >
-            Ver todos <ChevronRight size={14} />
-          </Link>
-        </div>
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-gray-800">
-              {MOCK_LAST_ORDER.id}
-            </p>
-            <p className="mt-0.5 text-xs text-gray-500">
-              {MOCK_LAST_ORDER.date} · {MOCK_LAST_ORDER.items} productos
-            </p>
+      {(() => {
+        const lastOrder = MOCK_ORDERS[0];
+        if (!lastOrder) return null;
+        const statusLabels: Record<string, { label: string; color: string; bg: string }> = {
+          pedido:     { label: "Pendiente de envío", color: "#c2410c", bg: "#fff7ed" },
+          enviado:    { label: "Enviado",             color: "#7c3aed", bg: "#ede9fe" },
+          entregado:  { label: "Entregado",           color: "#16a34a", bg: "#dcfce7" },
+          incidencia: { label: "Incidencia",          color: "#dc2626", bg: "#fee2e2" },
+        };
+        const st = statusLabels[lastOrder.status] ?? statusLabels.pedido;
+        const dateStr = new Date(lastOrder.date + "T12:00:00").toLocaleDateString("es-ES", {
+          day: "numeric", month: "long", year: "numeric",
+        });
+        return (
+          <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-bold text-gray-900">Último pedido</h2>
+              <Link
+                href="/cuenta/pedidos"
+                className="flex items-center gap-1 text-sm text-[#2563eb] hover:underline"
+              >
+                Ver todos <ChevronRight size={14} />
+              </Link>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="font-mono text-sm font-semibold text-gray-800">
+                  {lastOrder.id}
+                </p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  {dateStr} · {lastOrder.items.length} producto{lastOrder.items.length !== 1 ? "s" : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <span
+                  className="rounded-full px-3 py-1 text-xs font-bold"
+                  style={{ color: st.color, backgroundColor: st.bg }}
+                >
+                  {st.label}
+                </span>
+                <span className="font-bold text-gray-900">
+                  {lastOrder.total.toFixed(2)}€
+                </span>
+                <Link
+                  href={`/cuenta/pedidos/${lastOrder.id}`}
+                  className="text-sm font-semibold text-[#2563eb] hover:underline"
+                >
+                  Ver detalle
+                </Link>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700">
-              {MOCK_LAST_ORDER.status}
-            </span>
-            <span className="font-bold text-gray-900">
-              {MOCK_LAST_ORDER.total.toFixed(2)}€
-            </span>
-            <Link
-              href={`/cuenta/pedidos/${MOCK_LAST_ORDER.id}`}
-              className="text-sm text-[#2563eb] hover:underline"
-            >
-              Ver detalle
-            </Link>
-          </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* B2B Stats section */}
       {isB2B && (

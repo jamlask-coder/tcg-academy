@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { B2BCharts } from "@/components/account/B2BCharts";
 import { SendCouponButton } from "@/components/admin/SendCouponModal";
+import { UserRoleManager } from "@/components/admin/UserRoleManager";
 
 const ROLE_COLORS: Record<string, string> = {
   cliente: "bg-gray-100 text-gray-600",
@@ -175,6 +176,14 @@ export default async function AdminUsuarioDetailPage({
               )}
             </div>
           </div>
+
+          {/* Role manager */}
+          {user.role !== "admin" && (
+            <UserRoleManager
+              userId={user.id}
+              defaultRole={user.role as "cliente" | "mayorista" | "tienda"}
+            />
+          )}
         </div>
 
         {/* Right column: orders + charts */}

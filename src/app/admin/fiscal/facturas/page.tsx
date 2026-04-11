@@ -1,11 +1,13 @@
 "use client";
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import {
   Download,
   FileText,
   ChevronDown,
   ChevronUp,
   ArrowUpDown,
+  Plus,
 } from "lucide-react";
 import { loadInvoices } from "@/services/invoiceService";
 import {
@@ -207,12 +209,20 @@ export default function FacturasPage() {
             Registro completo de facturas emitidas — RD 1619/2012
           </p>
         </div>
-        <button
-          onClick={exportAll}
-          className="flex h-9 items-center gap-2 rounded-lg bg-[#2563eb] px-4 text-sm font-semibold text-white transition hover:bg-[#1d4ed8]"
-        >
-          <Download size={15} /> Exportar todo (CSV)
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/fiscal/nueva-factura"
+            className="flex h-9 items-center gap-2 rounded-lg bg-green-600 px-4 text-sm font-semibold text-white transition hover:bg-green-700"
+          >
+            <Plus size={15} /> Emitir factura manual
+          </Link>
+          <button
+            onClick={exportAll}
+            className="flex h-9 items-center gap-2 rounded-lg bg-[#2563eb] px-4 text-sm font-semibold text-white transition hover:bg-[#1d4ed8]"
+          >
+            <Download size={15} /> Exportar CSV
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

@@ -5,7 +5,7 @@ import {
   Database,
   Users,
   ShoppingBag,
-  BarChart2,
+  Wrench,
   CheckCircle,
   AlertCircle,
   RefreshCw,
@@ -163,13 +163,6 @@ export default function AdminHerramientasPage() {
     }, 1200);
   };
 
-  const totalRevenue = ALL_ORDERS.reduce((s, o) => s + o.total, 0);
-  const avgOrderValue = totalRevenue / ALL_ORDERS.length;
-  const inStockCount = allProducts.filter((p) => p.inStock).length;
-  const outOfStockCount = allProducts.filter((p) => !p.inStock).length;
-  const activeUsers = MOCK_USERS.filter((u) => u.active).length;
-  const totalPointsIssued = MOCK_USERS.reduce((s, u) => s + u.points, 0);
-
   const exports = [
     {
       title: "Exportar catálogo",
@@ -203,45 +196,6 @@ export default function AdminHerramientasPage() {
     },
   ];
 
-  const stats = [
-    {
-      label: "Ingresos totales (demo)",
-      value: `${totalRevenue.toFixed(2)}€`,
-      icon: BarChart2,
-      color: "#2563eb",
-    },
-    {
-      label: "Ticket medio",
-      value: `${avgOrderValue.toFixed(2)}€`,
-      icon: ShoppingBag,
-      color: "#7c3aed",
-    },
-    {
-      label: "Productos en stock",
-      value: `${inStockCount} / ${allProducts.length}`,
-      icon: Database,
-      color: "#059669",
-    },
-    {
-      label: "Sin stock",
-      value: String(outOfStockCount),
-      icon: AlertCircle,
-      color: "#dc2626",
-    },
-    {
-      label: "Usuarios activos",
-      value: `${activeUsers} / ${MOCK_USERS.length}`,
-      icon: Users,
-      color: "#0891b2",
-    },
-    {
-      label: "Puntos emitidos",
-      value: totalPointsIssued.toLocaleString("es"),
-      icon: BarChart2,
-      color: "#d97706",
-    },
-  ];
-
   return (
     <div>
       {toast && (
@@ -252,10 +206,10 @@ export default function AdminHerramientasPage() {
 
       <div className="mb-6">
         <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-          <BarChart2 size={22} className="text-[#2563eb]" /> Herramientas
+          <Wrench size={22} className="text-[#2563eb]" /> Herramientas
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          Exportaciones, estadísticas y estado del sistema
+          Exportaciones y estado del sistema
         </p>
       </div>
 
@@ -286,30 +240,6 @@ export default function AdminHerramientasPage() {
                 <Download size={13} /> Descargar CSV
               </div>
             </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="mb-8">
-        <h2 className="mb-4 font-bold text-gray-900">Estadísticas generales</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {stats.map(({ label, value, icon: Icon, color }) => (
-            <div
-              key={label}
-              className="rounded-2xl border border-gray-200 bg-white p-5"
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs text-gray-500">{label}</p>
-                <div
-                  className="flex h-8 w-8 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: `${color}18` }}
-                >
-                  <Icon size={15} style={{ color }} />
-                </div>
-              </div>
-              <p className="text-xl font-bold text-gray-900">{value}</p>
-            </div>
           ))}
         </div>
       </div>

@@ -214,12 +214,15 @@ function StatusDropdown({
   onUpdate: (s: AdminOrderStatus) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
+      if (ref.current && !ref.current.contains(e.target as Node) &&
+          btnRef.current && !btnRef.current.contains(e.target as Node))
         setOpen(false);
     };
     document.addEventListener("mousedown", handler);
@@ -228,13 +231,20 @@ function StatusDropdown({
 
   const cfg = STATUS_CFG[status];
 
+  function handleToggle(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setCoords({ top: rect.bottom + 6, left: rect.left + rect.width / 2 });
+    }
+    setOpen((o) => !o);
+  }
+
   return (
-    <div ref={ref} className="relative inline-block">
+    <div className="inline-block">
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setOpen((o) => !o);
-        }}
+        ref={btnRef}
+        onClick={handleToggle}
         className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold transition hover:opacity-75"
         style={{ color: cfg.color, backgroundColor: cfg.bg, borderColor: cfg.border }}
         title="Cambiar estado"
@@ -246,8 +256,12 @@ function StatusDropdown({
           className={`transition-transform duration-150 ${open ? "rotate-180" : ""}`}
         />
       </button>
-      {open && (
-        <div className="absolute top-full left-1/2 z-50 mt-1.5 w-48 -translate-x-1/2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+      {open && coords && (
+        <div
+          ref={ref}
+          className="fixed z-[9999] w-48 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+          style={{ top: coords.top, left: coords.left, transform: "translateX(-50%)" }}
+        >
           {(Object.keys(STATUS_CFG) as AdminOrderStatus[]).map((s) => {
             const c = STATUS_CFG[s];
             const active = s === status;

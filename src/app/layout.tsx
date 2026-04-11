@@ -41,7 +41,7 @@ export default function RootLayout({
               <Header />
               <Navbar />
             </div>
-            <main className="flex-1 bg-gray-50 pb-16 lg:pb-0">{children}</main>
+            <main className="flex-1 bg-gray-100 pb-16 lg:pb-0">{children}</main>
             <Footer />
           </div>
         </Providers>

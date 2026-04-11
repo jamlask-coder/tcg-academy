@@ -15,6 +15,7 @@ import {
   Globe,
   BookOpen,
   Download,
+  Plus,
 } from "lucide-react";
 import { loadInvoices } from "@/services/invoiceService";
 import {
@@ -29,6 +30,13 @@ import type { Quarter } from "@/types/tax";
 // ─── Nav cards ────────────────────────────────────────────────────────────────
 
 const FISCAL_SECTIONS = [
+  {
+    href: "/admin/fiscal/nueva-factura",
+    icon: Plus,
+    title: "Nueva Factura Manual",
+    desc: "Crea una factura manualmente con productos del catálogo",
+    color: "#16a34a",
+  },
   {
     href: "/admin/fiscal/facturas",
     icon: FileText,

@@ -74,6 +74,7 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       addresses: [],
       favorites: [],
       createdAt: new Date().toISOString(),
+      birthDate: "1998-04-15",
     },
   },
   "mayorista@test.com": {

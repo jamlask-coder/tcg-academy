@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Calendar } from "lucide-react";
 import {
   GAME_CONFIG,
   CATEGORY_LABELS,
@@ -9,9 +8,9 @@ import {
   CARD_CATEGORIES,
   isNewProduct,
 } from "@/data/products";
+import { MEGA_MENU_DATA } from "@/data/megaMenuData";
 import { CategoryTags, type TagItem } from "@/components/filters/CategoryTags";
 import { CategoryFilteredGrid } from "@/components/filters/CategoryFilteredGrid";
-import { GameHero } from "@/components/game/GameHero";
 import type { Metadata } from "next";
 
 export function generateStaticParams() {
@@ -31,24 +30,6 @@ export async function generateMetadata({
   };
 }
 
-// Mock upcoming releases per game
-const UPCOMING: Record<string, { name: string; date: string }[]> = {
-  magic: [
-    { name: "Final Fantasy — Set completo", date: "Junio 2025" },
-    { name: "Edge of Eternities", date: "Agosto 2025" },
-  ],
-  pokemon: [
-    { name: "Terastal Festival EX", date: "Mayo 2025" },
-    { name: "Stellar Crown 2", date: "Septiembre 2025" },
-  ],
-  "one-piece": [{ name: "OP-10 — Nuevo arco", date: "Julio 2025" }],
-  riftbound: [{ name: "Expansion Pack 2", date: "Verano 2025" }],
-  lorcana: [{ name: "Into the Inklands 2", date: "Junio 2025" }],
-  "dragon-ball": [{ name: "Fusion World EX-05", date: "Mayo 2025" }],
-  yugioh: [{ name: "Legacy of Destruction 2", date: "Q3 2025" }],
-  naruto: [{ name: "Konoha Shido Vol.2", date: "Otoño 2025" }],
-};
-
 export default async function GamePage({
   params,
 }: {
@@ -58,12 +39,24 @@ export default async function GamePage({
   const config = GAME_CONFIG[game];
   if (!config) notFound();
 
-  const { name, color, bgColor: _bgColor, description: _description, emoji } = config;
+  const { name, color, bgColor } = config;
   const categories = getAllCategories(game);
   const allProducts = getProductsByGame(game);
-  const upcoming = UPCOMING[game] ?? [];
 
-  // Exclude card singles from the main grid, sort new products first
+  const menuGame = MEGA_MENU_DATA.find((g) => g.slug === game);
+  const logoSrc = menuGame?.logoSrc;
+  const abbrev = menuGame?.abbrev ?? name.slice(0, 3).toUpperCase();
+
+  // Games that use the Cardmarket sprite sheet in the navbar — use same source here
+  const CM_SPRITE = "/images/ssGamesBig.png";
+  const SPRITE_SHEET_H = 140;
+  const SHEET_ORIG_W = 6295;
+  const HERO_SPRITE_DATA: Record<string, [number, number, string?]> = {
+    magic: [408, 0],
+    "one-piece": [482, 4642, "brightness(0) invert(1) drop-shadow(0 0 6px rgba(0,0,0,0.95)) drop-shadow(0 0 12px rgba(0,0,0,0.8))"],
+  };
+  const spriteEntry = HERO_SPRITE_DATA[game];
+
   const all = allProducts
     .filter((p) => !CARD_CATEGORIES.has(p.category))
     .sort((a, b) => {
@@ -74,20 +67,76 @@ export default async function GamePage({
 
   return (
     <div>
-      {/* Hero con animación de cartas */}
-      <GameHero game={game} config={config} />
+      {/* Hero compacto — igual que subcategorías */}
+      <div
+        className="relative overflow-hidden"
+        style={{ backgroundColor: bgColor }}
+      >
+        <div className="relative mx-auto max-w-[1400px] px-4 py-5 sm:px-6">
+          <nav
+            className="mb-4 flex items-center gap-2 text-sm opacity-70"
+            style={{ color }}
+          >
+            <Link href="/" className="hover:opacity-100">
+              Inicio
+            </Link>
+            <span>/</span>
+            <span className="font-semibold">{name}</span>
+          </nav>
 
-      {/* Breadcrumb */}
-      <div className="mx-auto max-w-[1400px] px-4 pt-4 sm:px-6">
-        <nav className="flex items-center gap-2 text-sm text-gray-400">
-          <Link href="/" className="hover:text-gray-600">
-            Inicio
-          </Link>
-          <span>/</span>
-          <span className="font-semibold" style={{ color }}>
-            {name}
-          </span>
-        </nav>
+          <div className="flex items-center gap-4">
+            {spriteEntry ? (() => {
+              const [origW, origX, cssFilter] = spriteEntry;
+              const targetH = 48;
+              const targetW = 140;
+              const scale = Math.min(targetW / origW, targetH / SPRITE_SHEET_H);
+              const displayW = Math.round(origW * scale);
+              const displayH = Math.round(SPRITE_SHEET_H * scale);
+              const sheetW = Math.round(SHEET_ORIG_W * scale);
+              const bgX = (-origX * scale).toFixed(1);
+              return (
+                <span
+                  aria-label={name}
+                  style={{
+                    display: "inline-block",
+                    width: displayW,
+                    height: displayH,
+                    backgroundImage: `url('${CM_SPRITE}')`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundSize: `${sheetW}px ${displayH}px`,
+                    backgroundPosition: `${bgX}px 0px`,
+                    filter: cssFilter,
+                    flexShrink: 0,
+                  }}
+                />
+              );
+            })() : logoSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoSrc}
+                alt={name}
+                width={140}
+                height={48}
+                className="h-10 w-auto max-w-[140px] object-contain md:h-12"
+                style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.18))" }}
+              />
+            ) : (
+              <div
+                className="flex h-10 items-center rounded-lg px-3 text-xs font-black text-white md:h-12"
+                style={{ backgroundColor: color }}
+              >
+                {abbrev}
+              </div>
+            )}
+            <h1 className="text-2xl font-bold md:text-4xl" style={{ color }}>
+              {name}
+            </h1>
+          </div>
+
+          <p className="mt-2 text-gray-600">
+            {all.length} productos disponibles
+          </p>
+        </div>
       </div>
 
       {/* Category nav */}
@@ -110,7 +159,7 @@ export default async function GamePage({
         </div>
       )}
 
-      {/* Catálogo — novedades primero, con sidebar de filtros */}
+      {/* Catálogo */}
       <section className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 sm:py-10">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-900">
@@ -131,9 +180,7 @@ export default async function GamePage({
         </div>
         {all.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-gray-200 py-24 text-center">
-            <p className="font-medium text-gray-400">
-              Catálogo en construcción
-            </p>
+            <p className="font-medium text-gray-400">Catálogo en construcción</p>
             <p className="mt-1 text-sm text-gray-300">
               Pronto tendrás más productos disponibles
             </p>
@@ -147,37 +194,6 @@ export default async function GamePage({
           />
         )}
       </section>
-
-      {/* Próximos lanzamientos */}
-      {upcoming.length > 0 && (
-        <section className="mx-auto max-w-[1400px] px-4 pb-10 sm:px-6">
-          <h2 className="mb-4 flex items-center gap-2 text-base font-bold text-gray-900">
-            <Calendar size={17} style={{ color }} /> Próximos lanzamientos
-          </h2>
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {upcoming.map(({ name: relName, date }) => (
-              <div
-                key={relName}
-                className="flex min-w-[200px] flex-shrink-0 items-center gap-3 rounded-xl border p-3"
-                style={{
-                  borderColor: `${color}30`,
-                  backgroundColor: `${color}06`,
-                }}
-              >
-                <span className="text-xl">{emoji}</span>
-                <div>
-                  <p className="text-xs leading-tight font-bold text-gray-900">
-                    {relName}
-                  </p>
-                  <p className="mt-0.5 text-xs font-semibold" style={{ color }}>
-                    {date}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   );
 }

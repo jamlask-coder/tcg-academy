@@ -35,6 +35,8 @@ export interface InvoiceData {
   clientCIF?: string;
   clientAddress?: string;
   clientCity?: string;
+  clientProvince?: string;
+  clientCountry?: string;
   intracomunitario?: boolean; // CIF intracomunitario → IVA 0%
 
   // Líneas
@@ -80,6 +82,8 @@ export function generateInvoiceHTML(data: InvoiceData): string {
     clientCIF,
     clientAddress,
     clientCity,
+    clientProvince,
+    clientCountry,
     intracomunitario = false,
     items,
     shipping = 0,
@@ -171,70 +175,68 @@ export function generateInvoiceHTML(data: InvoiceData): string {
   <meta charset="UTF-8">
   <title>Factura ${invoiceNumber}</title>
   <style>
-    @page { size: A4; margin: 16mm 18mm; }
+    @page { size: A4; margin: 14mm 16mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #1a1a2e; background: white; }
     .invoice-wrap { max-width: 760px; margin: 0 auto; }
 
-    /* ── Top header bar: logo+issuer LEFT | client RIGHT ── */
-    .top-header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 18px; border-bottom: 3px solid #2563eb; margin-bottom: 0; }
+    /* ── Header table ── */
+    .header-table { width: 100%; border-collapse: collapse; border-bottom: 3px solid #2563eb; padding-bottom: 16px; margin-bottom: 22px; }
+    .header-left { vertical-align: top; width: 55%; padding-right: 20px; }
+    .header-right { vertical-align: top; width: 45%; padding-left: 20px; border-left: 1px solid #e2e8f0; }
 
-    .issuer-block { display: flex; align-items: flex-start; gap: 14px; }
-    .brand-logo { width: 52px; height: 52px; object-fit: contain; flex-shrink: 0; }
-    .brand-text { display: flex; flex-direction: column; gap: 1px; }
-    .brand-name { font-size: 17pt; font-weight: 900; color: #2563eb; letter-spacing: -0.5px; line-height: 1; }
+    /* Issuer */
+    .issuer-wrap { display: flex; align-items: flex-start; gap: 11px; }
+    .brand-logo { width: 46px; height: 46px; object-fit: contain; flex-shrink: 0; }
+    .brand-name { font-size: 16pt; font-weight: 900; color: #2563eb; letter-spacing: -0.5px; line-height: 1; }
     .brand-name span { color: #f59e0b; }
-    .brand-sub { font-size: 7pt; color: #9ca3af; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
-    .issuer-data { font-size: 8.5pt; color: #4b5563; line-height: 1.65; }
-    .issuer-data strong { color: #111827; font-size: 9pt; }
+    .brand-sub { font-size: 6.5pt; color: #b0b7c3; text-transform: uppercase; letter-spacing: 2px; margin: 3px 0 6px; }
+    .issuer-data { font-size: 8pt; color: #4b5563; line-height: 1.65; }
+    .issuer-data strong { color: #111827; }
 
-    .client-block { text-align: right; max-width: 240px; }
-    .client-label { font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #9ca3af; margin-bottom: 5px; }
-    .client-name { font-size: 10.5pt; font-weight: 700; color: #111827; }
-    .client-detail { font-size: 8.5pt; color: #4b5563; line-height: 1.65; margin-top: 2px; }
+    /* Invoice meta (right, top) */
+    .inv-meta-label { font-size: 6.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #b0b7c3; display: block; margin-bottom: 3px; }
+    .inv-number { font-size: 14pt; font-weight: 900; color: #2563eb; line-height: 1; margin-bottom: 2px; }
+    .inv-date { font-size: 8.5pt; color: #6b7280; margin-bottom: 14px; }
 
-    /* ── Invoice banner: centered below header ── */
-    .invoice-banner { background: #f8fafc; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 10px 10px; padding: 14px 24px; margin-bottom: 24px; display: flex; justify-content: center; gap: 48px; }
-    .banner-item { text-align: center; }
-    .banner-label { font-size: 7pt; text-transform: uppercase; letter-spacing: 1.5px; color: #9ca3af; font-weight: 700; display: block; margin-bottom: 3px; }
-    .banner-value { font-size: 10pt; font-weight: 700; color: #111827; }
-    .banner-value.num { font-size: 13pt; color: #2563eb; }
+    /* Client */
+    .client-label { font-size: 6.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #b0b7c3; display: block; margin-bottom: 5px; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+    .client-name { font-size: 10pt; font-weight: 700; color: #111827; margin-bottom: 4px; }
+    .client-detail { font-size: 8pt; color: #4b5563; line-height: 1.7; }
+    .client-detail strong { color: #374151; }
 
     /* ── Intracom note ── */
     .intracom-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 9px 14px; font-size: 9pt; color: #1e40af; margin-bottom: 18px; }
 
     /* ── Table ── */
-    .section-title { font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #2563eb; margin-bottom: 8px; }
+    .section-title { font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #2563eb; margin-bottom: 7px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 9.5pt; }
     thead tr { background: #1e3a8a; color: white; }
-    thead th { padding: 8px 11px; text-align: left; font-weight: 700; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; }
+    thead th { padding: 7px 10px; text-align: left; font-weight: 700; font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.5px; }
     tbody tr { border-bottom: 1px solid #f1f5f9; }
     tbody tr:nth-child(even) { background: #f9fafb; }
-    td { padding: 8px 11px; vertical-align: middle; }
-    td.desc { max-width: 260px; }
+    td { padding: 7px 10px; vertical-align: middle; }
     td.center { text-align: center; }
     td.right { text-align: right; }
     td.bold { font-weight: 700; }
 
     /* ── Totals ── */
     .totals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .vat-section h4 { font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #2563eb; margin-bottom: 8px; }
+    .vat-section h4 { font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #2563eb; margin-bottom: 7px; }
     .vat-section table { margin: 0; }
     .vat-section thead tr { background: #e8ecf0; }
     .vat-section thead th { color: #374151; }
-
-    .summary-section { }
     .sum-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 10pt; border-bottom: 1px solid #f1f5f9; }
     .sum-row span:first-child { color: #6b7280; }
-    .sum-row.final { background: #1e3a8a; color: white; border-radius: 8px; padding: 11px 16px; margin-top: 8px; font-size: 12pt; font-weight: 800; border: none; }
-    .sum-row.final span:first-child { color: rgba(255,255,255,0.7); font-size: 8.5pt; }
+    .sum-row.final { background: #1e3a8a; color: white; border-radius: 6px; padding: 10px 14px; margin-top: 8px; font-size: 12pt; font-weight: 800; border: none; }
+    .sum-row.final span:first-child { color: rgba(255,255,255,0.7); font-size: 8pt; }
 
-    /* ── Footer ── */
-    .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 7.5pt; color: #9ca3af; text-align: center; line-height: 1.65; }
+    /* ── Legal footer ── */
+    .footer { margin-top: 24px; padding-top: 10px; border-top: 1px solid #e2e8f0; font-size: 7pt; color: #b0b7c3; text-align: center; line-height: 1.65; }
 
-    /* ── VeriFactu / CSV — small, at the very bottom ── */
-    .verifactu-block { margin-top: 14px; padding: 8px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 7pt; color: #9ca3af; line-height: 1.6; }
-    .verifactu-block strong { color: #6b7280; font-size: 7pt; }
+    /* ── VeriFactu — absolute bottom, tiny ── */
+    .verifactu-block { margin-top: 16px; padding: 5px 10px; border-top: 1px solid #f1f5f9; font-size: 5pt; color: #d1d5db; line-height: 1.6; }
+    .verifactu-block strong { color: #c4c9d4; }
 
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -245,46 +247,43 @@ export function generateInvoiceHTML(data: InvoiceData): string {
 <body>
 <div class="invoice-wrap">
 
-  <!-- ── TOP HEADER: Logo+Issuer LEFT | Client RIGHT ── -->
-  <div class="top-header">
-    <div class="issuer-block">
-      <img class="brand-logo" src="/images/logo-tcg-shield.svg" alt="TCG Academy" />
-      <div class="brand-text">
-        <span class="brand-name">TCG <span>Academy</span></span>
-        <span class="brand-sub">Tienda especialista en TCG</span>
-        <div class="issuer-data">
-          <strong>${issuerName}</strong><br>
-          CIF: ${issuerCIF}<br>
-          ${issuerAddress}<br>
-          ${issuerCity}<br>
-          Tel: ${issuerPhone} &middot; ${issuerEmail}
+  <!-- ── HEADER: Logo+Emisor LEFT | Nº factura + Cliente RIGHT ── -->
+  <table class="header-table">
+    <tr>
+      <td class="header-left">
+        <div class="issuer-wrap">
+          <img class="brand-logo" src="/images/logo-tcg-shield.svg" alt="TCG Academy" />
+          <div>
+            <div class="brand-name">TCG <span>Academy</span></div>
+            <div class="brand-sub">Tienda especialista en TCG</div>
+            <div class="issuer-data">
+              <strong>${issuerName}</strong><br>
+              CIF: ${issuerCIF}<br>
+              ${issuerAddress}<br>
+              ${issuerCity}<br>
+              Tel: ${issuerPhone}<br>
+              ${issuerEmail}
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-    <div class="client-block">
-      <p class="client-label">Facturar a</p>
-      <p class="client-name">${clientName}</p>
-      <div class="client-detail">
-        ${clientCIF ? `NIF/CIF: <strong>${clientCIF}</strong><br>` : ""}
-        ${clientAddress ? `${clientAddress}<br>` : ""}
-        ${clientCity ? `${clientCity}` : ""}
-      </div>
-    </div>
-  </div>
+      </td>
+      <td class="header-right">
+        <span class="inv-meta-label">Factura</span>
+        <div class="inv-number">${invoiceNumber}</div>
+        <div class="inv-date">${formattedDate}${paymentMethod ? ` &nbsp;·&nbsp; ${paymentMethod}` : ""}${formattedDue ? `<br>Vencimiento: ${formattedDue}` : ""}</div>
 
-  <!-- ── INVOICE BANNER: centered below header ── -->
-  <div class="invoice-banner">
-    <div class="banner-item">
-      <span class="banner-label">Nº Factura</span>
-      <span class="banner-value num">${invoiceNumber}</span>
-    </div>
-    <div class="banner-item">
-      <span class="banner-label">Fecha emisión</span>
-      <span class="banner-value">${formattedDate}</span>
-    </div>
-    ${formattedDue ? `<div class="banner-item"><span class="banner-label">Vencimiento</span><span class="banner-value">${formattedDue}</span></div>` : ""}
-    ${paymentMethod ? `<div class="banner-item"><span class="banner-label">Forma de pago</span><span class="banner-value">${paymentMethod}</span></div>` : ""}
-  </div>
+        <span class="client-label">Facturar a</span>
+        <div class="client-name">${clientName}</div>
+        <div class="client-detail">
+          ${clientCIF ? `NIF/CIF: <strong>${clientCIF}</strong><br>` : ""}
+          ${clientAddress ? `${clientAddress}<br>` : ""}
+          ${clientCity ? `${clientCity}<br>` : ""}
+          ${clientProvince ? `${clientProvince}<br>` : ""}
+          ${clientCountry ? `${clientCountry}` : ""}
+        </div>
+      </td>
+    </tr>
+  </table>
 
   ${intracomunitario ? `<div class="intracom-note">⚠️ <strong>Operación intracomunitaria exenta de IVA</strong> — Art. 25 LIVA (Ley 37/1992). CIF intracomunitario verificado: ${clientCIF}</div>` : ""}
 
@@ -394,9 +393,14 @@ export function buildInvoiceFromOrder(
       direccion?: string;
       ciudad?: string;
       cp?: string;
+      provincia?: string;
       pais?: string;
     };
     pago?: string;
+    paymentMethod?: string;
+    /** Override client display name (e.g. from auth context) */
+    clientName?: string;
+    clientCIF?: string;
   },
   invoiceNumber: string,
 ): InvoiceData {
@@ -404,7 +408,7 @@ export function buildInvoiceFromOrder(
   return {
     invoiceNumber,
     date: order.date,
-    paymentMethod: order.pago ?? "Tarjeta",
+    paymentMethod: order.pago ?? order.paymentMethod ?? "Tarjeta",
     issuerName: "TCG Academy S.L.",
     issuerCIF: "B12345678",
     issuerAddress: "Calle Ejemplo 1, Local 4",
@@ -412,11 +416,16 @@ export function buildInvoiceFromOrder(
     issuerPhone: "+34 91 000 00 00",
     issuerEmail: "facturacion@tcgacademy.es",
     clientName:
-      `${addr.nombre ?? ""} ${addr.apellidos ?? ""}`.trim() || "Cliente",
+      order.clientName ||
+      `${addr.nombre ?? ""} ${addr.apellidos ?? ""}`.trim() ||
+      "—",
+    clientCIF: order.clientCIF,
     clientAddress: addr.direccion,
     clientCity: addr.cp
       ? `${addr.cp} ${addr.ciudad ?? ""}`.trim()
       : addr.ciudad,
+    clientProvince: addr.provincia,
+    clientCountry: addr.pais ?? "España",
     items: order.items.map((i) => ({
       name: i.name,
       quantity: i.quantity ?? i.qty ?? 1,

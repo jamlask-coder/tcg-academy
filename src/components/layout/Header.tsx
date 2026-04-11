@@ -322,29 +322,24 @@ function HeaderInlineAuth() {
           onClick={() => setMenuOpen((o) => !o)}
           aria-label="Mi cuenta"
           aria-expanded={menuOpen}
-          className="flex h-8 items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 transition hover:bg-white/20"
+          className="flex h-8 items-center gap-1 px-2 transition"
         >
-          <div className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-amber-400">
-            <span className="text-[9px] font-bold text-white">
-              {user.name[0]}
-            </span>
-          </div>
-          <span className="text-xs text-white/70">Hola,&nbsp;</span>
-          <span className="text-xs font-bold text-amber-300">{firstName}</span>
+          <span className="text-xs text-blue-200">Bienvenido,&nbsp;</span>
+          <span className="text-xs font-bold text-white">{firstName}</span>
           <ChevronDown
             size={10}
-            className={`text-white/50 transition-transform ${menuOpen ? "rotate-180" : ""}`}
+            className={`ml-0.5 text-white/50 transition-transform ${menuOpen ? "rotate-180" : ""}`}
           />
         </button>
 
         {/* Account dropdown */}
         {menuOpen && (
           <div className="absolute top-full right-0 z-50 mt-2 w-52 overflow-hidden rounded-2xl border border-gray-200 bg-white py-1.5 shadow-2xl">
-            <div className="border-b border-gray-100 px-4 pt-2 pb-2.5">
-              <p className="text-xs font-semibold text-gray-800">
-                Hola, {firstName}
+            <div className="border-b border-gray-100 px-4 pt-2.5 pb-2.5">
+              <p className="text-sm font-bold text-gray-900">
+                {user.name} {user.lastName}
               </p>
-              <p className="truncate text-[11px] text-gray-400">
+              <p className="mt-0.5 truncate text-[11px] text-gray-400">
                 {user.email ?? ""}
               </p>
             </div>

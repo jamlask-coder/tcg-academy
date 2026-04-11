@@ -13,21 +13,37 @@ import {
   MOCK_SALES_7D,
   MOCK_SALES_30D,
   MOCK_SALES_3M,
+  MOCK_SALES_1Y,
+  MOCK_SALES_ALL,
   MOCK_USERS_7D,
   MOCK_USERS_30D,
   MOCK_USERS_3M,
+  MOCK_USERS_1Y,
+  MOCK_USERS_ALL,
   MOCK_PRODUCTS_7D,
   MOCK_PRODUCTS_30D,
   MOCK_PRODUCTS_3M,
+  MOCK_PRODUCTS_1Y,
+  MOCK_PRODUCTS_ALL,
   MOCK_DISCOUNTS_7D,
   MOCK_DISCOUNTS_30D,
   MOCK_DISCOUNTS_3M,
+  MOCK_DISCOUNTS_1Y,
+  MOCK_DISCOUNTS_ALL,
 } from "@/data/mockData";
 
 export type KpiMode = "ventas" | "usuarios" | "productos" | "descuentos";
 
-const PERIODS = ["7d", "30d", "3m"] as const;
+const PERIODS = ["7d", "30d", "3m", "1a", "todo"] as const;
 type PeriodKey = (typeof PERIODS)[number];
+
+const PERIOD_LABELS: Record<PeriodKey, string> = {
+  "7d": "7 días",
+  "30d": "30 días",
+  "3m": "3 meses",
+  "1a": "1 año",
+  "todo": "Todo",
+};
 
 interface ModeConfig {
   periods: Record<PeriodKey, { data: object[]; prev: number }>;
@@ -44,6 +60,8 @@ const MODE_CONFIG: Record<KpiMode, ModeConfig> = {
       "7d": { data: MOCK_SALES_7D, prev: 5890 },
       "30d": { data: MOCK_SALES_30D, prev: 22400 },
       "3m": { data: MOCK_SALES_3M, prev: 68200 },
+      "1a": { data: MOCK_SALES_1Y, prev: 298400 },
+      "todo": { data: MOCK_SALES_ALL, prev: 0 },
     },
     keys: { primary: "sales", secondary: "orders" },
     colors: { primary: "#2563eb", secondary: "#7c3aed" },
@@ -64,6 +82,8 @@ const MODE_CONFIG: Record<KpiMode, ModeConfig> = {
       "7d": { data: MOCK_USERS_7D, prev: 12 },
       "30d": { data: MOCK_USERS_30D, prev: 38 },
       "3m": { data: MOCK_USERS_3M, prev: 110 },
+      "1a": { data: MOCK_USERS_1Y, prev: 18 },
+      "todo": { data: MOCK_USERS_ALL, prev: 0 },
     },
     keys: { primary: "totalUsers", secondary: "newUsers" },
     colors: { primary: "#0891b2", secondary: "#06b6d4" },
@@ -84,6 +104,8 @@ const MODE_CONFIG: Record<KpiMode, ModeConfig> = {
       "7d": { data: MOCK_PRODUCTS_7D, prev: 5 },
       "30d": { data: MOCK_PRODUCTS_30D, prev: 28 },
       "3m": { data: MOCK_PRODUCTS_3M, prev: 65 },
+      "1a": { data: MOCK_PRODUCTS_1Y, prev: 42 },
+      "todo": { data: MOCK_PRODUCTS_ALL, prev: 0 },
     },
     keys: { primary: "totalProducts", secondary: "newProducts" },
     colors: { primary: "#7c3aed", secondary: "#a855f7" },
@@ -104,6 +126,8 @@ const MODE_CONFIG: Record<KpiMode, ModeConfig> = {
       "7d": { data: MOCK_DISCOUNTS_7D, prev: 42 },
       "30d": { data: MOCK_DISCOUNTS_30D, prev: 165 },
       "3m": { data: MOCK_DISCOUNTS_3M, prev: 480 },
+      "1a": { data: MOCK_DISCOUNTS_1Y, prev: 890 },
+      "todo": { data: MOCK_DISCOUNTS_ALL, prev: 0 },
     },
     keys: { primary: "used", secondary: "redeemed" },
     colors: { primary: "#dc2626", secondary: "#f97316" },
@@ -211,7 +235,7 @@ export function SalesChart({
               }`}
               style={period === p ? { color: cfg.colors.primary } : undefined}
             >
-              {p === "7d" ? "7 días" : p === "30d" ? "30 días" : "3 meses"}
+              {PERIOD_LABELS[p]}
             </button>
           ))}
         </div>

@@ -1,6 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Package,
   Tag,
@@ -9,7 +10,6 @@ import {
   AlertCircle,
   TrendingUp,
   Ticket,
-  ArrowRight,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getMergedProducts } from "@/lib/productStore";
@@ -20,6 +20,10 @@ import {
   MOCK_USERS,
   MOCK_ADMIN_COUPONS,
   MOCK_SALES_7D,
+  MOCK_SALES_30D,
+  MOCK_SALES_3M,
+  MOCK_SALES_1Y,
+  MOCK_SALES_ALL,
 } from "@/data/mockData";
 
 const SalesChart = dynamic(
@@ -32,15 +36,9 @@ const SalesChart = dynamic(
   },
 );
 
-const STATUS_COLORS: Record<string, string> = {
-  pendiente: "bg-amber-100 text-amber-700",
-  procesando: "bg-blue-100 text-blue-700",
-  enviado: "bg-purple-100 text-purple-700",
-  entregado: "bg-green-100 text-green-700",
-  cancelado: "bg-red-100 text-red-700",
-};
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [activeKpi, setActiveKpi] = useState<KpiMode>("ventas");
   const { discounts } = useDiscounts();
   const activeDiscounts = Object.values(discounts).filter(
@@ -65,18 +63,24 @@ export default function AdminDashboard() {
     };
   }, []);
 
+  const [revPeriod, setRevPeriod] = useState<"hoy"|"7d"|"30d"|"3m"|"1a"|"todo">("hoy");
+
   const todayOrders = ALL_ORDERS.filter((o) => o.date === "2025-01-28");
   const todayRevenue = todayOrders.reduce((s, o) => s + o.total, 0);
-  const _weekRevenue = MOCK_SALES_7D.reduce((s, d) => s + d.sales, 0);
-  const _weekOrders = MOCK_SALES_7D.reduce((s, d) => s + d.orders, 0);
+
+  const REV_PERIODS = {
+    hoy:  { value: todayRevenue,  orders: todayOrders.length,  label: "Ingresos hoy" },
+    "7d": { value: MOCK_SALES_7D.reduce((s,d)=>s+d.sales,0),  orders: MOCK_SALES_7D.reduce((s,d)=>s+d.orders,0),  label: "Ingresos 7 días" },
+    "30d":{ value: MOCK_SALES_30D.reduce((s,d)=>s+d.sales,0), orders: MOCK_SALES_30D.reduce((s,d)=>s+d.orders,0), label: "Ingresos 30 días" },
+    "3m": { value: MOCK_SALES_3M.reduce((s,d)=>s+d.sales,0),  orders: MOCK_SALES_3M.reduce((s,d)=>s+d.orders,0),  label: "Ingresos 3 meses" },
+    "1a": { value: MOCK_SALES_1Y.reduce((s,d)=>s+d.sales,0),  orders: MOCK_SALES_1Y.reduce((s,d)=>s+d.orders,0),  label: "Ingresos 1 año" },
+    todo: { value: MOCK_SALES_ALL.reduce((s,d)=>s+d.sales,0), orders: MOCK_SALES_ALL.reduce((s,d)=>s+d.orders,0), label: "Ingresos totales" },
+  } as const;
+  const currentRev = REV_PERIODS[revPeriod];
 
   const expiringCoupons = MOCK_ADMIN_COUPONS.filter(
     (c) => c.active && new Date(c.endsAt) <= new Date("2025-02-28"),
   );
-
-  const recentOrders = [...ALL_ORDERS]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 5);
 
   return (
     <div>
@@ -95,9 +99,9 @@ export default function AdminDashboard() {
           [
             {
               kpi: "ventas" as KpiMode,
-              label: "Ingresos hoy",
-              value: `${todayRevenue.toFixed(2)}€`,
-              sub: `${todayOrders.length} pedidos`,
+              label: currentRev.label,
+              value: `${currentRev.value.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€`,
+              sub: `${currentRev.orders} pedidos`,
               icon: TrendingUp,
               color: "#2563eb",
             },
@@ -133,7 +137,7 @@ export default function AdminDashboard() {
           return (
             <button
               key={kpi}
-              onClick={() => setActiveKpi(kpi)}
+              onClick={() => kpi === "descuentos" ? router.push("/admin/descuentos") : setActiveKpi(kpi)}
               className="rounded-2xl border bg-white p-5 text-left transition hover:shadow-md"
               style={{
                 borderColor: isActive ? color : "#e5e7eb",
@@ -153,7 +157,28 @@ export default function AdminDashboard() {
                 {value}
               </p>
               <p className="mt-1 text-xs text-gray-400">{sub}</p>
-              {isActive && (
+              {kpi === "ventas" && (
+                <div
+                  className="mt-3 flex flex-wrap gap-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {(["hoy","7d","30d","3m","1a","todo"] as const).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setRevPeriod(p); }}
+                      className="rounded-md px-1.5 py-0.5 text-[10px] font-semibold transition"
+                      style={{
+                        background: revPeriod === p ? color : "#f3f4f6",
+                        color: revPeriod === p ? "#fff" : "#6b7280",
+                      }}
+                    >
+                      {p === "hoy" ? "Hoy" : p === "7d" ? "Sem" : p === "30d" ? "Mes" : p === "3m" ? "3M" : p === "1a" ? "Año" : "Todo"}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {isActive && kpi !== "ventas" && (
                 <p className="mt-2 text-xs font-semibold" style={{ color }}>
                   Ver evolución ↓
                 </p>
@@ -250,116 +275,6 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Recent orders */}
-      <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <h2 className="font-bold text-gray-900">Últimos pedidos</h2>
-          <Link
-            href="/admin/pedidos"
-            className="flex items-center gap-1 text-sm font-semibold text-[#2563eb] hover:underline"
-          >
-            Ver todos <ArrowRight size={14} />
-          </Link>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-xs tracking-wider text-gray-500 uppercase">
-                <th className="px-5 py-3 text-left font-semibold">Pedido</th>
-                <th className="hidden px-4 py-3 text-left font-semibold md:table-cell">
-                  Cliente
-                </th>
-                <th className="hidden px-4 py-3 text-left font-semibold sm:table-cell">
-                  Fecha
-                </th>
-                <th className="px-4 py-3 text-right font-semibold">Total</th>
-                <th className="px-4 py-3 text-center font-semibold">Estado</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {recentOrders.map((order) => (
-                <tr key={order.id} className="transition hover:bg-gray-50">
-                  <td className="px-5 py-3 font-mono text-xs font-semibold text-gray-800">
-                    {order.id}
-                  </td>
-                  <td className="hidden px-4 py-3 text-gray-600 capitalize md:table-cell">
-                    {order.userId.replace("demo_", "")}
-                  </td>
-                  <td className="hidden px-4 py-3 text-gray-500 sm:table-cell">
-                    {order.date}
-                  </td>
-                  <td className="px-4 py-3 text-right font-bold text-gray-900">
-                    {order.total.toFixed(2)}€
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-bold capitalize ${STATUS_COLORS[order.status] || "bg-gray-100 text-gray-600"}`}
-                    >
-                      {order.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Quick links */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {[
-          {
-            label: "Precios",
-            href: "/admin/productos",
-            icon: Package,
-            color: "#2563eb",
-          },
-          {
-            label: "Descuentos",
-            href: "/admin/descuentos",
-            icon: Tag,
-            color: "#dc2626",
-          },
-          {
-            label: "Pedidos",
-            href: "/admin/pedidos",
-            icon: ShoppingBag,
-            color: "#7c3aed",
-          },
-          {
-            label: "Usuarios",
-            href: "/admin/usuarios",
-            icon: Users,
-            color: "#0891b2",
-          },
-          {
-            label: "Cupones",
-            href: "/admin/cupones",
-            icon: Ticket,
-            color: "#059669",
-          },
-          {
-            label: "Herramientas",
-            href: "/admin/herramientas",
-            icon: TrendingUp,
-            color: "#d97706",
-          },
-        ].map(({ label, href, icon: Icon, color }) => (
-          <Link
-            key={href}
-            href={href}
-            className="group flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white p-4 text-center transition hover:shadow-md"
-          >
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-xl transition group-hover:scale-110"
-              style={{ backgroundColor: `${color}18` }}
-            >
-              <Icon size={20} style={{ color }} />
-            </div>
-            <span className="text-xs font-semibold text-gray-700">{label}</span>
-          </Link>
-        ))}
-      </div>
     </div>
   );
 }

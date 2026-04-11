@@ -45,6 +45,7 @@ export interface User {
     emailFacturacion: string;
   };
   createdAt: string;
+  birthDate?: string; // YYYY-MM-DD
   favorites: number[]; // product IDs
   referralCode?: string; // this user's own referral code
   referredBy?: string;   // referral code of the person who referred them

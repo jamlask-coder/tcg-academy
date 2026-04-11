@@ -695,6 +695,7 @@ export interface AdminUser {
   company?: string; // razón social (B2B)
   cif?: string; // CIF/NIF (B2B)
   lastOrderDate?: string;
+  birthDate?: string; // YYYY-MM-DD
 }
 
 export const MOCK_USERS: AdminUser[] = [
@@ -713,6 +714,7 @@ export const MOCK_USERS: AdminUser[] = [
     phone: "+34 622 345 678",
     address: "Calle Mayor 15, 2ºB, 28001 Madrid",
     lastOrderDate: "2026-03-28",
+    birthDate: "1998-04-15",
   },
   {
     id: "demo_mayorista",
@@ -2101,6 +2103,100 @@ export const MOCK_SALES_3M = [
   { day: "Sem 4 Abr", sales: 11240, orders: 104 },
 ];
 
+// ─── Datos anuales y todo ─────────────────────────────────────────────────────
+export const MOCK_SALES_1Y = [
+  { day: "May 24", sales: 18400, orders: 172 },
+  { day: "Jun 24", sales: 21300, orders: 198 },
+  { day: "Jul 24", sales: 16800, orders: 157 },
+  { day: "Ago 24", sales: 14200, orders: 133 },
+  { day: "Sep 24", sales: 22900, orders: 214 },
+  { day: "Oct 24", sales: 31400, orders: 293 },
+  { day: "Nov 24", sales: 38700, orders: 361 },
+  { day: "Dic 24", sales: 52100, orders: 487 },
+  { day: "Ene 25", sales: 28300, orders: 265 },
+  { day: "Feb 25", sales: 24100, orders: 225 },
+  { day: "Mar 25", sales: 29800, orders: 278 },
+  { day: "Abr 25", sales: 34600, orders: 323 },
+];
+export const MOCK_SALES_ALL = [
+  { day: "2023", sales: 89400, orders: 834 },
+  { day: "T1 24", sales: 54200, orders: 506 },
+  { day: "T2 24", sales: 68100, orders: 635 },
+  { day: "T3 24", sales: 61800, orders: 577 },
+  { day: "T4 24", sales: 138200, orders: 1290 },
+  { day: "T1 25", sales: 82200, orders: 768 },
+  { day: "Abr 25", sales: 34600, orders: 323 },
+];
+export const MOCK_USERS_1Y = [
+  { day: "May 24", newUsers: 28, totalUsers: 18 },
+  { day: "Jun 24", newUsers: 34, totalUsers: 52 },
+  { day: "Jul 24", newUsers: 21, totalUsers: 73 },
+  { day: "Ago 24", newUsers: 19, totalUsers: 92 },
+  { day: "Sep 24", newUsers: 41, totalUsers: 133 },
+  { day: "Oct 24", newUsers: 57, totalUsers: 190 },
+  { day: "Nov 24", newUsers: 68, totalUsers: 258 },
+  { day: "Dic 24", newUsers: 82, totalUsers: 340 },
+  { day: "Ene 25", newUsers: 49, totalUsers: 389 },
+  { day: "Feb 25", newUsers: 88, totalUsers: 477 },
+  { day: "Mar 25", newUsers: 105, totalUsers: 582 },
+  { day: "Abr 25", newUsers: 131, totalUsers: 713 },
+];
+export const MOCK_USERS_ALL = [
+  { day: "2023", newUsers: 124, totalUsers: 124 },
+  { day: "T1 24", newUsers: 87, totalUsers: 211 },
+  { day: "T2 24", newUsers: 94, totalUsers: 305 },
+  { day: "T3 24", newUsers: 78, totalUsers: 383 },
+  { day: "T4 24", newUsers: 218, totalUsers: 601 },
+  { day: "T1 25", newUsers: 242, totalUsers: 843 },
+  { day: "Abr 25", newUsers: 131, totalUsers: 974 },
+];
+export const MOCK_PRODUCTS_1Y = [
+  { day: "May 24", newProducts: 6, totalProducts: 42 },
+  { day: "Jun 24", newProducts: 9, totalProducts: 51 },
+  { day: "Jul 24", newProducts: 4, totalProducts: 55 },
+  { day: "Ago 24", newProducts: 7, totalProducts: 62 },
+  { day: "Sep 24", newProducts: 12, totalProducts: 74 },
+  { day: "Oct 24", newProducts: 18, totalProducts: 92 },
+  { day: "Nov 24", newProducts: 24, totalProducts: 116 },
+  { day: "Dic 24", newProducts: 31, totalProducts: 147 },
+  { day: "Ene 25", newProducts: 14, totalProducts: 161 },
+  { day: "Feb 25", newProducts: 19, totalProducts: 180 },
+  { day: "Mar 25", newProducts: 22, totalProducts: 202 },
+  { day: "Abr 25", newProducts: 28, totalProducts: 230 },
+];
+export const MOCK_PRODUCTS_ALL = [
+  { day: "2023", newProducts: 31, totalProducts: 31 },
+  { day: "T1 24", newProducts: 22, totalProducts: 53 },
+  { day: "T2 24", newProducts: 29, totalProducts: 82 },
+  { day: "T3 24", newProducts: 25, totalProducts: 107 },
+  { day: "T4 24", newProducts: 68, totalProducts: 175 },
+  { day: "T1 25", newProducts: 55, totalProducts: 230 },
+  { day: "Abr 25", newProducts: 28, totalProducts: 258 },
+];
+export const MOCK_DISCOUNTS_1Y = [
+  { day: "May 24", used: 89, redeemed: 44 },
+  { day: "Jun 24", used: 112, redeemed: 56 },
+  { day: "Jul 24", used: 78, redeemed: 39 },
+  { day: "Ago 24", used: 67, redeemed: 33 },
+  { day: "Sep 24", used: 134, redeemed: 67 },
+  { day: "Oct 24", used: 198, redeemed: 99 },
+  { day: "Nov 24", used: 241, redeemed: 121 },
+  { day: "Dic 24", used: 312, redeemed: 156 },
+  { day: "Ene 25", used: 156, redeemed: 78 },
+  { day: "Feb 25", used: 187, redeemed: 94 },
+  { day: "Mar 25", used: 218, redeemed: 109 },
+  { day: "Abr 25", used: 264, redeemed: 132 },
+];
+export const MOCK_DISCOUNTS_ALL = [
+  { day: "2023", used: 423, redeemed: 211 },
+  { day: "T1 24", used: 312, redeemed: 156 },
+  { day: "T2 24", used: 389, redeemed: 194 },
+  { day: "T3 24", used: 345, redeemed: 172 },
+  { day: "T4 24", used: 867, redeemed: 434 },
+  { day: "T1 25", used: 561, redeemed: 281 },
+  { day: "Abr 25", used: 264, redeemed: 132 },
+];
+
 // ─── Top products ──────────────────────────────────────────────────────────────
 
 export const MOCK_TOP_PRODUCTS = [
@@ -2619,4 +2715,63 @@ export const MOCK_HOURLY_TRAFFIC = [
   { hour: "21h", visits: 1980 },
   { hour: "22h", visits: 1540 },
   { hour: "23h", visits: 820 },
+];
+
+// ─── Age distribution ─────────────────────────────────────────────────────────
+
+export const MOCK_AGE_DISTRIBUTION = [
+  { group: "13–17", users: 89, pct: 9, color: "#a78bfa" },
+  { group: "18–24", users: 214, pct: 22, color: "#2563eb" },
+  { group: "25–34", users: 312, pct: 32, color: "#0891b2" },
+  { group: "35–44", users: 194, pct: 20, color: "#059669" },
+  { group: "45–54", users: 107, pct: 11, color: "#d97706" },
+  { group: "55+", users: 58, pct: 6, color: "#dc2626" },
+];
+
+// ─── Country visits ───────────────────────────────────────────────────────────
+
+export interface CountryVisit {
+  country: string;
+  flag: string;
+  visits: number;
+  orders: number;
+  revenue: number;
+}
+
+export const MOCK_COUNTRY_VISITS: CountryVisit[] = [
+  { country: "España", flag: "🇪🇸", visits: 38420, orders: 1240, revenue: 48200 },
+  { country: "Portugal", flag: "🇵🇹", visits: 2140, orders: 62, revenue: 2840 },
+  { country: "México", flag: "🇲🇽", visits: 1820, orders: 21, revenue: 1240 },
+  { country: "Argentina", flag: "🇦🇷", visits: 980, orders: 14, revenue: 820 },
+  { country: "Francia", flag: "🇫🇷", visits: 720, orders: 8, revenue: 640 },
+  { country: "Alemania", flag: "🇩🇪", visits: 540, orders: 5, revenue: 480 },
+  { country: "Chile", flag: "🇨🇱", visits: 420, orders: 6, revenue: 360 },
+  { country: "Colombia", flag: "🇨🇴", visits: 380, orders: 4, revenue: 280 },
+  { country: "Reino Unido", flag: "🇬🇧", visits: 310, orders: 3, revenue: 240 },
+  { country: "Otros", flag: "🌍", visits: 840, orders: 11, revenue: 620 },
+];
+
+// ─── Detailed traffic sources ─────────────────────────────────────────────────
+
+export interface TrafficSourceDetail {
+  source: string;
+  channel: "search" | "direct" | "social" | "email" | "referral" | "other";
+  visits: number;
+  pct: number;
+  color: string;
+  icon: string; // emoji icon
+}
+
+export const MOCK_TRAFFIC_SOURCES_DETAIL: TrafficSourceDetail[] = [
+  { source: "Google Orgánico", channel: "search",   visits: 11240, pct: 27, color: "#4285f4", icon: "🔍" },
+  { source: "Directo",         channel: "direct",   visits: 11240, pct: 27, color: "#6b7280", icon: "🔗" },
+  { source: "Instagram",       channel: "social",   visits: 4980,  pct: 12, color: "#e1306c", icon: "📸" },
+  { source: "Email marketing", channel: "email",    visits: 4180,  pct: 10, color: "#f59e0b", icon: "📧" },
+  { source: "Google Ads",      channel: "search",   visits: 3280,  pct: 8,  color: "#ea4335", icon: "📢" },
+  { source: "Referidos",       channel: "referral", visits: 2490,  pct: 6,  color: "#10b981", icon: "🤝" },
+  { source: "Facebook",        channel: "social",   visits: 2160,  pct: 5,  color: "#1877f2", icon: "👥" },
+  { source: "TikTok",          channel: "social",   visits: 1490,  pct: 4,  color: "#010101", icon: "🎵" },
+  { source: "YouTube",         channel: "social",   visits: 620,   pct: 1,  color: "#ff0000", icon: "▶️" },
+  { source: "Twitter / X",     channel: "social",   visits: 410,   pct: 1,  color: "#14171a", icon: "🐦" },
+  { source: "Otros",           channel: "other",    visits: 820,   pct: 2,  color: "#94a3b8", icon: "🌐" },
 ];

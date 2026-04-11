@@ -24,9 +24,9 @@ const CM_SPRITES: Record<string, [number, number, number, string?]> = {
   yugioh: [392, 696, 0],
   pokemon: [273, 1228, 0],
   "dragon-ball": [382, 3288, 0],
-  "one-piece": [482, 4642, 0, "brightness(0) invert(1)"],
+  "one-piece": [482, 4642, 0, "brightness(0) invert(1) drop-shadow(0 0 4px rgba(0,0,0,0.9)) drop-shadow(0 0 8px rgba(0,0,0,0.7))"],
   lorcana: [310, 5124, 0],
-  riftbound: [319, 5976, 0, "brightness(0) invert(1)"],
+  riftbound: [319, 5976, 0, "brightness(0) invert(1) drop-shadow(0 0 4px rgba(0,0,0,0.9)) drop-shadow(0 0 8px rgba(0,0,0,0.7))"],
 };
 
 // NAV_HEIGHT: total navbar height in px — drives the center line position
@@ -218,7 +218,7 @@ export function Navbar() {
                         style={{
                           background:
                             active || open
-                              ? `radial-gradient(ellipse at center, ${color}55 0%, ${color}22 55%, transparent 80%)`
+                              ? `radial-gradient(circle 26px at center, ${color}CC 0%, ${color}55 55%, transparent 100%)`
                               : "transparent",
                         }}
                         title={label}

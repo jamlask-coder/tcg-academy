@@ -24,6 +24,8 @@ import {
   UserCircle,
   Layers,
   Ticket,
+  Wrench,
+  FilePlus,
 } from "lucide-react";
 
 const SOLICITUDES_KEY = "tcgacademy_solicitudes";
@@ -38,6 +40,7 @@ interface NavItem {
   icon: React.ComponentType<{ size?: number }>;
   exact?: boolean;
   sub?: NavItem[];
+  excludePathPrefixes?: string[];
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -58,7 +61,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Precios",
     icon: BadgeDollarSign,
     sub: [
-      { href: "/admin/productos", label: "Gestión de precios", icon: Package },
+      { href: "/admin/productos", label: "Gestión de precios", icon: Package, excludePathPrefixes: ["/admin/productos/nuevo"] },
       { href: "/admin/descuentos", label: "Descuentos", icon: Tag },
     ],
   },
@@ -66,8 +69,17 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/categorias", label: "Subcategorías", icon: Layers },
   { href: "/admin/solicitudes", label: "Solicitudes B2B", icon: Inbox },
   { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart2 },
-  { href: "/admin/fiscal", label: "Gestión Fiscal", icon: Receipt },
+  {
+    href: "/admin/fiscal",
+    label: "Facturas",
+    icon: Receipt,
+    sub: [
+      { href: "/admin/fiscal/facturas", label: "Todas las facturas", icon: Receipt },
+      { href: "/admin/fiscal/nueva-factura", label: "Emitir factura manual", icon: FilePlus },
+    ],
+  },
   { href: "/admin/cupones", label: "Cupones", icon: Ticket },
+  { href: "/admin/herramientas", label: "Herramientas", icon: Wrench },
   { href: "/cuenta/datos", label: "Mis datos", icon: UserCircle },
 ];
 
@@ -119,8 +131,9 @@ function NavLink({
   badges: { newOrders: number; newSolicitudes: number };
   isSub?: boolean;
 }) {
-  const { href, label, icon: Icon, exact } = item;
-  const active = exact ? pathname === href : pathname.startsWith(href);
+  const { href, label, icon: Icon, exact, excludePathPrefixes } = item;
+  const excluded = (excludePathPrefixes ?? []).some((p) => pathname.startsWith(p));
+  const active = !excluded && (exact ? pathname === href : pathname.startsWith(href));
   return (
     <Link
       href={href}
@@ -160,11 +173,21 @@ function SidebarContent({
   const router = useRouter();
   const { logout } = useAuth();
   const badges = useSidebarBadges();
-  const [preciosOpen, setPreciosOpen] = useState(() =>
-    pathname.startsWith("/admin/productos") ||
-    pathname.startsWith("/admin/descuentos") ||
-    pathname.startsWith("/admin/precios"),
-  );
+  // Track which submenu groups are open by their parent href
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {};
+    for (const item of NAV_ITEMS) {
+      if (item.sub) {
+        const subActive = item.sub.some((s) => pathname.startsWith(s.href));
+        init[item.href] = pathname.startsWith(item.href) || subActive;
+      }
+    }
+    return init;
+  });
+
+  function toggleGroup(href: string) {
+    setOpenGroups((prev) => ({ ...prev, [href]: !prev[href] }));
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -190,13 +213,17 @@ function SidebarContent({
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
           {NAV_ITEMS.map((item) => {
             if (item.sub) {
+              const subActive = (s: NavItem) => {
+                const exc = (s.excludePathPrefixes ?? []).some((p) => pathname.startsWith(p));
+                return !exc && pathname.startsWith(s.href);
+              };
               const parentActive =
                 pathname.startsWith(item.href) ||
-                item.sub.some((s) => pathname.startsWith(s.href));
+                item.sub.some(subActive);
               return (
                 <div key={item.href} className="border-b border-gray-100 last:border-0">
                   <button
-                    onClick={() => setPreciosOpen((o) => !o)}
+                    onClick={() => toggleGroup(item.href)}
                     className={`flex min-h-[44px] w-full items-center justify-between px-4 py-2.5 text-sm transition ${
                       parentActive
                         ? "bg-[#2563eb] text-white"
@@ -209,10 +236,10 @@ function SidebarContent({
                     </span>
                     <ChevronDown
                       size={13}
-                      className={`transition-transform duration-200 ${preciosOpen ? "rotate-180" : ""}`}
+                      className={`transition-transform duration-200 ${openGroups[item.href] ? "rotate-180" : ""}`}
                     />
                   </button>
-                  {preciosOpen && (
+                  {openGroups[item.href] && (
                     <div className="border-t border-gray-100 bg-gray-50">
                       {item.sub.map((sub) => (
                         <NavLink

@@ -151,7 +151,7 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     slug: "topps",
     label: "Topps",
     href: "/topps",
-    color: "#1d4ed8",
+    color: "#0ea5e9",
     abbrev: "TPP",
     logoSrc: "/images/logos/topps.svg",
     columns: [
