@@ -595,25 +595,19 @@ export function Header() {
       <MobileTrustBar />
 
       {/* ── Main bar: logo LEFT · search FILL · icons RIGHT ──── */}
-      <Container className="flex h-16 items-center gap-3">
-        {/* Logo — siempre a la izquierda */}
+      <Container className="flex h-16 items-center justify-center gap-3">
+        {/* Logo — izquierda, alineado con Pokémon en la navbar */}
         <Link href="/" className="flex shrink-0 items-center gap-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/images/logo-tcg-shield.svg"
-            alt="TCG Academy"
-            style={{ height: 44, width: "auto", filter: "drop-shadow(0 0 8px rgba(255,255,255,0.25))" }}
-          />
-          <span className="hidden text-sm font-black tracking-tight text-white xl:block">
+          <span className="text-xl font-black tracking-tight text-white lg:text-2xl">
             TCG <span className="text-amber-300">Academy</span>
           </span>
         </Link>
 
-        {/* Middle zone: search + auth — flex-1 actúa de spacer en móvil */}
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          {/* Desktop search — rellena el espacio disponible */}
+        {/* Middle zone: search + auth — ancho fijo, sin separar */}
+        <div className="flex items-center gap-3">
+          {/* Desktop search — ancho fijo */}
           <div
-            className="relative hidden min-w-0 flex-1 max-w-[480px] lg:block"
+            className="relative hidden w-[600px] lg:block"
             ref={desktopSearchRef}
           >
           <form onSubmit={handleDesktopSubmit}>

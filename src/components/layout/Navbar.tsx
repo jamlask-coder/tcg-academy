@@ -11,9 +11,113 @@ import { OtrosMenu } from "./OtrosMenu";
 import { MEGA_MENU_DATA } from "@/data/megaMenuData";
 import { Container } from "@/components/ui/Container";
 
-// ─── Constants ─────────────────────────────────────────────────────────────────
-// NAV_HEIGHT: total navbar height in px
+// ─── Cardmarket sprite sheet ───────────────────────────────────────────────────
+const CM_SPRITE = "/images/ssGamesBig.png";
+const SPRITE_SHEET_H = 140; // original sprite sheet height in px
+const TARGET_H = 36;        // display height for normal logos
+const TARGET_W = 100;       // normalized visual width for all logos
+
+// [origW, origX, vOffset, filter?]
+// All logos are rendered at TARGET_W wide and TARGET_H tall (object-contain style)
+const CM_SPRITES: Record<string, [number, number, number, string?]> = {
+  magic: [408, 0, 0],
+  yugioh: [392, 696, 0],
+  pokemon: [273, 1228, 0],
+  "dragon-ball": [382, 3288, 0],
+  "one-piece": [482, 4642, 0, "brightness(0) invert(1)"],
+  lorcana: [310, 5124, 0],
+  riftbound: [319, 5976, 0, "brightness(0) invert(1)"],
+};
+
+// NAV_HEIGHT: total navbar height in px — drives the center line position
 const NAV_HEIGHT = 56;
+// CENTER_LINE_Y: where the center of logo names sits (50% of nav)
+const CENTER_LINE_Y = NAV_HEIGHT / 2;
+
+// Total sprite sheet width (rightmost: riftbound origX=5976 + origW=319)
+const SHEET_ORIG_W = 6295;
+
+function CmSpriteLogo({ slug, label }: { slug: string; label: string }) {
+  const data = CM_SPRITES[slug];
+  if (!data) return null;
+  const [origW, origX, , cssFilter] = data;
+
+  // object-contain: scale by whichever axis fills the box first
+  const scale = Math.min(TARGET_W / origW, TARGET_H / SPRITE_SHEET_H);
+  // Use the actual rendered logo dimensions — no fixed-width container that would
+  // expose adjacent sprite-sheet content on either side of narrower logos.
+  const displayW = Math.round(origW * scale);
+  const displayH = Math.round(SPRITE_SHEET_H * scale);
+  const sheetW = Math.round(SHEET_ORIG_W * scale);
+  // Position the sheet so the logo's left edge aligns with the span's left edge.
+  const bgX = (-origX * scale).toFixed(1);
+
+  return (
+    <span
+      aria-label={label}
+      style={{
+        display: "inline-block",
+        width: displayW,
+        height: displayH,
+        backgroundImage: `url('${CM_SPRITE}')`,
+        backgroundRepeat: "no-repeat",
+        backgroundSize: `${sheetW}px ${displayH}px`,
+        backgroundPosition: `${bgX}px 0px`,
+        filter: cssFilter,
+        transition: "transform 0.2s",
+        flexShrink: 0,
+      }}
+      className="group-hover/logo:scale-105"
+    />
+  );
+}
+
+// ─── Logo component ────────────────────────────────────────────────────────────
+function GameLogo({
+  slug,
+  src,
+  abbrev,
+  color,
+  label,
+}: {
+  slug: string;
+  src: string;
+  abbrev: string;
+  color: string;
+  label: string;
+}) {
+  const [errored, setErrored] = useState(false);
+
+  if (CM_SPRITES[slug]) {
+    return <CmSpriteLogo slug={slug} label={label} />;
+  }
+
+  if (errored) {
+    return (
+      <div
+        className="flex h-7 items-center justify-center rounded-md px-2 text-[9px] font-black tracking-wide whitespace-nowrap text-white"
+        style={{ backgroundColor: color }}
+      >
+        {abbrev}
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={label}
+      width={110}
+      height={28}
+      className="relative z-10 h-9 object-contain transition-transform duration-200 group-hover/logo:scale-105"
+      style={{ width: TARGET_W, maxWidth: TARGET_W }}
+      onError={() => setErrored(true)}
+    />
+  );
+}
+
+// ─── Constants ─────────────────────────────────────────────────────────────────
 const TIENDAS_KEY = "tiendas";
 const MAYORISTAS_KEY = "mayoristas";
 const OTROS_KEY = "otros";
@@ -76,48 +180,56 @@ export function Navbar() {
         className="relative overflow-hidden border-b border-white/10"
         style={{ background: "#1f2937", minHeight: NAV_HEIGHT }}
       >
+        {/* ── Centro de alineación — línea horizontal en el centro del nombre ── */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: CENTER_LINE_Y,
+            left: 0,
+            right: 0,
+            height: 1,
+            background: "transparent",
+            pointerEvents: "none",
+            zIndex: 0,
+          }}
+        />
+
         <Container>
           <div className="flex items-center justify-center" style={{ minHeight: NAV_HEIGHT }}>
-            {/* ── Games group ───────────────────────────────────────────────── */}
+            {/* ── Grupo izquierda: juegos + Otros TCG ───────────────────────── */}
             <div className="flex min-w-0 items-stretch" style={{ height: NAV_HEIGHT }}>
-              {/* ── 6 game names — text only, no logos, no scale animations ── */}
+              {/* ── 6 game logos ──────────────────────────────────────────────── */}
               {NAVBAR_GAMES.map(
-                ({ slug, label, href, color }) => {
+                ({ slug, label, href, color, abbrev, logoSrc }) => {
                   const active =
                     pathname === href || pathname.startsWith(href + "/");
                   const open = activeItem === slug;
-                  const highlighted = active || open;
-                  // Pokémon already has good subtle glow; others get stronger effect
-                  const glowStrength = slug === "pokemon" ? "55" : "90";
-                  const bgStrength = slug === "pokemon" ? "33" : "55";
                   return (
                     <div
                       key={slug}
-                      className="flex items-stretch"
+                      className="group/logo flex items-stretch"
                       onMouseEnter={() => openItem(slug)}
                     >
                       <Link
                         href={href}
                         onClick={handleLinkClick}
-                        className="relative z-10 flex items-center justify-center rounded-lg px-4 transition-colors duration-150"
+                        className="relative z-10 flex items-center justify-center px-3 transition-all duration-200"
                         style={{
-                          background: highlighted
-                            ? `radial-gradient(ellipse at center, ${color}${bgStrength} 0%, ${color}22 60%, transparent 85%)`
-                            : "transparent",
+                          background:
+                            active || open
+                              ? `radial-gradient(ellipse at center, ${color}55 0%, ${color}22 55%, transparent 80%)`
+                              : "transparent",
                         }}
                         title={label}
                       >
-                        <span
-                          className="text-sm font-bold tracking-wide whitespace-nowrap"
-                          style={{
-                            color: highlighted ? color : "rgba(255,255,255,0.85)",
-                            textShadow: highlighted
-                              ? `0 0 14px ${color}${glowStrength}, 0 0 28px ${color}44`
-                              : "none",
-                          }}
-                        >
-                          {label}
-                        </span>
+                        <GameLogo
+                          slug={slug}
+                          src={logoSrc}
+                          abbrev={abbrev}
+                          color={color}
+                          label={label}
+                        />
                       </Link>
                     </div>
                   );
@@ -150,72 +262,75 @@ export function Navbar() {
             </div>
 
             {/* ── Separator ────────────────────────────────────────────────── */}
-            <div className="relative z-10 mx-2 h-5 w-px flex-shrink-0 bg-white/20" />
+            <div className="relative z-10 mx-2 h-5 w-px flex-shrink-0 self-center bg-white/20" />
 
-            {/* ── Eventos ──────────────────────────────────────────────────── */}
-            <div
-              onMouseEnter={() => setActiveItem(null)}
-              className="flex items-stretch"
-            >
-              <Link
-                href="/eventos"
-                className={`relative z-10 -mb-px flex items-center border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition ${
-                  pathname.startsWith("/eventos")
-                    ? "border-amber-400 text-amber-300"
-                    : "border-transparent text-white/80 hover:text-white"
-                }`}
+            {/* ── Grupo derecha: Eventos · Tiendas · Profesionales ─────────── */}
+            <div className="flex items-stretch" style={{ height: NAV_HEIGHT }}>
+              {/* ── Eventos ──────────────────────────────────────────────────── */}
+              <div
+                onMouseEnter={() => setActiveItem(null)}
+                className="flex items-stretch"
               >
-                Eventos
-              </Link>
-            </div>
-
-            {/* ── Tiendas ──────────────────────────────────────────────────── */}
-            <div
-              onMouseEnter={() => openItem(TIENDAS_KEY)}
-              className="flex items-stretch"
-            >
-              <button
-                aria-label="Ver nuestras tiendas"
-                aria-expanded={activeItem === TIENDAS_KEY}
-                className={`relative z-10 -mb-px flex items-center gap-1 border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition ${
-                  activeItem === TIENDAS_KEY || pathname.startsWith("/tiendas")
-                    ? "border-amber-400 text-amber-300"
-                    : "border-transparent text-white/80 hover:text-white"
-                }`}
-              >
-                Tiendas
-                <ChevronDown
-                  size={11}
-                  className={`ml-0.5 transition-transform duration-200 ${
-                    activeItem === TIENDAS_KEY ? "rotate-180" : ""
+                <Link
+                  href="/eventos"
+                  className={`relative z-10 -mb-px flex items-center border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition ${
+                    pathname.startsWith("/eventos")
+                      ? "border-amber-400 text-amber-300"
+                      : "border-transparent text-white/80 hover:text-white"
                   }`}
-                />
-              </button>
-            </div>
+                >
+                  Eventos
+                </Link>
+              </div>
 
-            {/* ── Profesionales ────────────────────────────────────────────── */}
-            <div
-              onMouseEnter={() => openItem(MAYORISTAS_KEY)}
-              className="flex items-stretch"
-            >
-              <button
-                aria-label="Ver soluciones para profesionales"
-                aria-expanded={activeItem === MAYORISTAS_KEY}
-                className={`relative z-10 -mb-px flex items-center gap-1 border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition ${
-                  activeItem === MAYORISTAS_KEY ||
-                  pathname.startsWith("/mayoristas")
-                    ? "border-amber-400 text-amber-300"
-                    : "border-transparent text-white/80 hover:text-white"
-                }`}
+              {/* ── Tiendas ──────────────────────────────────────────────────── */}
+              <div
+                onMouseEnter={() => openItem(TIENDAS_KEY)}
+                className="flex items-stretch"
               >
-                Profesionales
-                <ChevronDown
-                  size={11}
-                  className={`ml-0.5 transition-transform duration-200 ${
-                    activeItem === MAYORISTAS_KEY ? "rotate-180" : ""
+                <button
+                  aria-label="Ver nuestras tiendas"
+                  aria-expanded={activeItem === TIENDAS_KEY}
+                  className={`relative z-10 -mb-px flex items-center gap-1 border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition ${
+                    activeItem === TIENDAS_KEY || pathname.startsWith("/tiendas")
+                      ? "border-amber-400 text-amber-300"
+                      : "border-transparent text-white/80 hover:text-white"
                   }`}
-                />
-              </button>
+                >
+                  Tiendas
+                  <ChevronDown
+                    size={11}
+                    className={`ml-0.5 transition-transform duration-200 ${
+                      activeItem === TIENDAS_KEY ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* ── Profesionales ────────────────────────────────────────────── */}
+              <div
+                onMouseEnter={() => openItem(MAYORISTAS_KEY)}
+                className="flex items-stretch"
+              >
+                <button
+                  aria-label="Ver soluciones para profesionales"
+                  aria-expanded={activeItem === MAYORISTAS_KEY}
+                  className={`relative z-10 -mb-px flex items-center gap-1 border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition ${
+                    activeItem === MAYORISTAS_KEY ||
+                    pathname.startsWith("/mayoristas")
+                      ? "border-amber-400 text-amber-300"
+                      : "border-transparent text-white/80 hover:text-white"
+                  }`}
+                >
+                  Profesionales
+                  <ChevronDown
+                    size={11}
+                    className={`ml-0.5 transition-transform duration-200 ${
+                      activeItem === MAYORISTAS_KEY ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
           </div>
         </Container>

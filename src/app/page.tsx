@@ -156,7 +156,7 @@ export default function HomePage() {
                 src="/images/logo-tcg-shield.png"
                 alt="TCG Academy"
                 style={{
-                  width: 540,
+                  width: 700,
                   height: "auto",
                   animation: "heroLogoFloat 9s ease-in-out infinite",
                 }}
