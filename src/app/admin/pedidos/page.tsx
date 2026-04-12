@@ -31,6 +31,11 @@ import {
   type AdminOrderStatus,
   type AppMessage,
 } from "@/data/mockData";
+import {
+  buildInvoiceFromOrder,
+  printInvoiceWithCSV,
+  generateInvoiceNumber,
+} from "@/utils/invoiceGenerator";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 50;
@@ -427,192 +432,32 @@ function EmailModal({
   );
 }
 
-// ─── CSV verification code ────────────────────────────────────────────────────
-
-function generateCSVCode(orderId: string, total: number, date: string): string {
-  const seed = `${orderId}|${total.toFixed(2)}|${date}`;
-  let h = 0x811c9dc5;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = (h * 0x01000193) >>> 0;
-  }
-  const rand = Math.floor(Math.random() * 0xffff);
-  const ts = Date.now().toString(36).toUpperCase().slice(-4);
-  return `${h.toString(16).toUpperCase().slice(0, 6)}-${ts}-${rand.toString(16).toUpperCase().padStart(4, "0")}`;
-}
-
-const CSV_STORE_KEY = "tcgacademy_invoice_csv";
-
-function getOrCreateCSV(orderId: string, total: number, date: string): string {
-  try {
-    const store: Record<string, string> = JSON.parse(
-      localStorage.getItem(CSV_STORE_KEY) ?? "{}",
-    );
-    if (store[orderId]) return store[orderId];
-    const code = generateCSVCode(orderId, total, date);
-    store[orderId] = code;
-    localStorage.setItem(CSV_STORE_KEY, JSON.stringify(store));
-    return code;
-  } catch {
-    return generateCSVCode(orderId, total, date);
-  }
-}
-
-// ─── Invoice PDF ──────────────────────────────────────────────────────────────
+// ─── Invoice PDF (shared generator — identical to client-side invoice) ────────
 
 function printInvoicePDF(order: AdminOrder) {
-  const VAT_RATE = 21;
-  const csvCode = getOrCreateCSV(order.id, order.total, order.date);
-
-  const calcNet = (priceInclVAT: number) => priceInclVAT / (1 + VAT_RATE / 100);
-
-  const itemRows = order.items
-    .map((item) => {
-      const unitGross = item.price;
-      const unitNet = calcNet(unitGross);
-      const vatUnit = unitGross - unitNet;
-      const totalNet = unitNet * item.qty;
-      const _totalVAT = vatUnit * item.qty;
-      const totalGross = unitGross * item.qty;
-      return `<tr>
-        <td style="padding:8px 10px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151">${item.name}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #f0f0f0;text-align:center;font-size:13px">${item.qty}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:13px">${totalNet.toFixed(2)} €</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #f0f0f0;text-align:center;font-size:13px">${VAT_RATE}%</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:13px">${unitGross.toFixed(2)} €</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:13px;font-weight:600">${totalGross.toFixed(2)} €</td>
-      </tr>`;
-    })
-    .join("");
-
-  const shippingNet = calcNet(order.shipping);
-  const _shippingVAT = order.shipping - shippingNet;
-  const shippingRow =
-    order.shipping === 0
-      ? `<tr>
-        <td style="padding:8px 10px;font-size:13px;color:#374151">Envío</td>
-        <td style="padding:8px 10px;text-align:center;font-size:13px">1</td>
-        <td style="padding:8px 10px;text-align:right;font-size:13px">0,00 €</td>
-        <td style="padding:8px 10px;text-align:center;font-size:13px">${VAT_RATE}%</td>
-        <td style="padding:8px 10px;text-align:right;font-size:13px">Gratis</td>
-        <td style="padding:8px 10px;text-align:right;font-size:13px;font-weight:600">Gratis</td>
-      </tr>`
-      : `<tr>
-        <td style="padding:8px 10px;font-size:13px;color:#374151">Envío</td>
-        <td style="padding:8px 10px;text-align:center;font-size:13px">1</td>
-        <td style="padding:8px 10px;text-align:right;font-size:13px">${shippingNet.toFixed(2)} €</td>
-        <td style="padding:8px 10px;text-align:center;font-size:13px">${VAT_RATE}%</td>
-        <td style="padding:8px 10px;text-align:right;font-size:13px">${order.shipping.toFixed(2)} €</td>
-        <td style="padding:8px 10px;text-align:right;font-size:13px;font-weight:600">${order.shipping.toFixed(2)} €</td>
-      </tr>`;
-
-  const baseTotal = order.items.reduce(
-    (s, i) => s + calcNet(i.price) * i.qty,
-    0,
-  ) + (order.shipping > 0 ? shippingNet : 0);
-  const vatTotal = order.total - baseTotal;
-  const invoiceNum = `FAC-${order.id.replace("TCG-", "")}`;
-
-  const html = `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"><title>Factura ${invoiceNum}</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #111827; padding: 40px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px; }
-  .company-info { font-size: 12px; color: #6b7280; line-height: 1.7; }
-  .company-name { font-size: 20px; font-weight: 800; color: #2563eb; margin-bottom: 4px; }
-  .invoice-right { text-align: right; }
-  .invoice-title { font-size: 28px; font-weight: 900; color: #111827; letter-spacing: -0.5px; }
-  .invoice-sub { font-size: 12px; color: #6b7280; margin-top: 6px; line-height: 1.7; }
-  .client-box { background: #f8fafc; border-left: 4px solid #2563eb; padding: 16px 20px; border-radius: 0 8px 8px 0; margin-bottom: 28px; }
-  .client-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; margin-bottom: 6px; }
-  .client-name { font-size: 16px; font-weight: 700; color: #111827; }
-  .client-detail { font-size: 12px; color: #6b7280; margin-top: 3px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-  thead th { background: #2563eb; color: white; padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
-  .totals-table { margin-left: auto; width: 300px; }
-  .totals-table td { padding: 6px 10px; font-size: 13px; }
-  .totals-table .total-row td { font-size: 16px; font-weight: 800; color: #2563eb; border-top: 2px solid #2563eb; padding-top: 10px; }
-  .legal { margin-top: 32px; padding: 16px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 10px; color: #9ca3af; line-height: 1.6; }
-  .csv-box { text-align: center; margin: 24px 0; padding: 14px; border: 2px dashed #d1d5db; border-radius: 8px; }
-  .csv-code { font-family: 'Courier New', monospace; font-size: 18px; font-weight: 900; letter-spacing: 3px; color: #2563eb; }
-  .csv-label { font-size: 10px; color: #9ca3af; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.1em; }
-  @media print { body { padding: 20px; } }
-</style></head>
-<body>
-<div class="header">
-  <div>
-    <div class="company-name">🃏 TCG Academy</div>
-    <div class="company-info">
-      TCG Hobby, S.L.<br>
-      CIF: B54543534<br>
-      Calle Libertad 16, 03710 Calp, Alicante (España)<br>
-      tcgacademycalpe@gmail.com · tcgacademy.es
-    </div>
-  </div>
-  <div class="invoice-right">
-    <div class="invoice-title">FACTURA</div>
-    <div class="invoice-sub">
-      <strong>Nº:</strong> ${invoiceNum}<br>
-      <strong>Pedido:</strong> ${order.id}<br>
-      <strong>Fecha:</strong> ${fmtDate(order.date)}<br>
-      <strong>Pago:</strong> ${order.paymentMethod}
-    </div>
-  </div>
-</div>
-
-<div class="client-box">
-  <div class="client-title">Cliente</div>
-  <div class="client-name">${order.userName}</div>
-  <div class="client-detail">${order.userEmail}</div>
-  <div class="client-detail">${order.address}</div>
-</div>
-
-<table>
-  <thead>
-    <tr>
-      <th style="text-align:left">Descripción</th>
-      <th style="text-align:center;width:60px">Cantidad</th>
-      <th style="text-align:right;width:100px">Base Imponible</th>
-      <th style="text-align:center;width:70px">I.V.A.</th>
-      <th style="text-align:right;width:110px">P. Unit. (IVA incl.)</th>
-      <th style="text-align:right;width:110px">Precio Total (IVA incl.)</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${itemRows}
-    ${shippingRow}
-  </tbody>
-</table>
-
-<table class="totals-table">
-  <tbody>
-    <tr><td style="color:#6b7280">Base imponible</td><td style="text-align:right">${baseTotal.toFixed(2)} €</td></tr>
-    <tr><td style="color:#6b7280">IVA (${VAT_RATE}%)</td><td style="text-align:right">${vatTotal.toFixed(2)} €</td></tr>
-    <tr class="total-row"><td>TOTAL FACTURA</td><td style="text-align:right">${order.total.toFixed(2)} €</td></tr>
-  </tbody>
-</table>
-
-<div class="csv-box">
-  <div class="csv-label">Código de verificación (CSV)</div>
-  <div class="csv-code">${csvCode}</div>
-  <div style="font-size:10px;color:#9ca3af;margin-top:4px">Verifica esta factura en www.tcgacademy.es/verificar-factura</div>
-</div>
-
-<div class="legal">
-  <p>Esta operación ha sido sujeta al IVA del Estado Miembro de llegada de la mercancía y será declarada bajo el número de identificación de IVA que aparece en esta factura.</p>
-  <p style="margin-top:6px">TCG Hobby, S.L. · CIF: B54543534 · Inscrita en el Registro Mercantil de Alicante · Régimen general IVA. Ante cualquier duda puede acceder al formulario en www.tcgacademy.es/contacto</p>
-  <p style="margin-top:6px;text-align:right">Página 1 de 1</p>
-</div>
-</body></html>`;
-
-  const win = window.open("", "_blank");
-  if (win) {
-    win.document.write(html);
-    win.document.close();
-    win.print();
-  }
+  const invNum = generateInvoiceNumber(order.id);
+  const addrParts = order.address ? order.address.split(",").map((s) => s.trim()) : [];
+  const data = buildInvoiceFromOrder(
+    {
+      id: order.id,
+      date: order.date,
+      items: order.items.map((i) => ({ name: i.name, quantity: i.qty, price: i.price })),
+      shipping: order.shipping,
+      total: order.total,
+      paymentMethod: order.paymentMethod,
+      clientName: order.userName,
+      shippingAddress: {
+        nombre: order.userName,
+        email: order.userEmail,
+        direccion: addrParts[0],
+        cp: addrParts[1]?.match(/\d{5}/)?.[0],
+        ciudad: addrParts[1]?.replace(/\d{5}\s*/, "").trim() || addrParts[2],
+        pais: "España",
+      },
+    },
+    invNum,
+  );
+  void printInvoiceWithCSV(data);
 }
 
 // ─── Albarán print ────────────────────────────────────────────────────────────

@@ -8,14 +8,14 @@ import {
   type ReactNode,
 } from "react";
 import type { User, UserRole, RegisterData } from "@/types/user";
-import { generateReferralCode, ensureReferralCode, registerWithReferral } from "@/services/pointsService";
+import { ensureReferralCode, registerWithReferral } from "@/services/pointsService";
 
 interface AuthContextValue {
   user: User | null;
   role: UserRole | null;
   isLoading: boolean;
   login: (
-    email: string,
+    emailOrUsername: string,
     password: string,
   ) => Promise<{ ok: boolean; error?: string }>;
   logout: () => void;
@@ -23,6 +23,7 @@ interface AuthContextValue {
   updateProfile: (
     updates: Partial<Pick<User, "name" | "lastName" | "phone">>,
   ) => void;
+  checkUsernameAvailable: (username: string) => boolean;
   toggleFavorite: (productId: number) => void;
   isFavorite: (productId: number) => boolean;
 }
@@ -30,7 +31,26 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const STORAGE_KEY = "tcgacademy_user";
+const REGISTERED_KEY = "tcgacademy_registered";
+const USERNAMES_KEY = "tcgacademy_usernames"; // username (lowercase) → email
 const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+/** Normalize username: lowercase, trim */
+function normalizeUsername(u: string): string {
+  return u.toLowerCase().trim();
+}
+
+/** Load the username→email index from localStorage */
+function loadUsernameIndex(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(USERNAMES_KEY) ?? "{}") as Record<string, string>;
+  } catch { return {}; }
+}
+
+/** Save the username→email index */
+function saveUsernameIndex(index: Record<string, string>) {
+  try { localStorage.setItem(USERNAMES_KEY, JSON.stringify(index)); } catch { /* ignore */ }
+}
 
 // ─── Crypto helpers ───────────────────────────────────────────────────────────
 // Salts are client-side only (static export). They prevent casual localStorage
@@ -216,10 +236,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (
-      email: string,
+      emailOrUsername: string,
       password: string,
     ): Promise<{ ok: boolean; error?: string }> => {
-      const key = email.toLowerCase();
+      // Resolve username → email if input has no @
+      let resolvedEmail = emailOrUsername.trim();
+      if (!resolvedEmail.includes("@")) {
+        const index = loadUsernameIndex();
+        const mapped = index[normalizeUsername(resolvedEmail)];
+        if (!mapped) {
+          return { ok: false, error: "Usuario o contraseña incorrectos" };
+        }
+        resolvedEmail = mapped;
+      }
+
+      const key = resolvedEmail.toLowerCase();
 
       // Demo users — plaintext comparison (by design; no real backend)
       const demo = DEMO_USERS[key];
@@ -232,7 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // fall back to plaintext for accounts created before hashing was added
       try {
         const registered = JSON.parse(
-          localStorage.getItem("tcgacademy_registered") ?? "{}",
+          localStorage.getItem(REGISTERED_KEY) ?? "{}",
         ) as Record<string, { password: string; user: User }>;
         const entry = registered[key];
         if (entry) {
@@ -240,13 +271,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const matches =
             entry.password === hashed || entry.password === password;
           if (matches) {
-            // Opportunistic upgrade: if stored as plaintext, re-hash it now
             if (entry.password === password) {
               entry.password = hashed;
-              localStorage.setItem(
-                "tcgacademy_registered",
-                JSON.stringify(registered),
-              );
+              localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered));
             }
             persist(entry.user);
             return { ok: true };
@@ -255,7 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         /* ignore */
       }
-      return { ok: false, error: "Email o contraseña incorrectos" };
+      return { ok: false, error: "Usuario o contraseña incorrectos" };
     },
     [persist],
   );
@@ -267,20 +294,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(
     async (data: RegisterData): Promise<{ ok: boolean; error?: string }> => {
       const email = data.email.toLowerCase();
+      const username = data.username ? normalizeUsername(data.username) : undefined;
+
       if (DEMO_USERS[email])
-        return { ok: false, error: "Este email ya esta registrado" };
+        return { ok: false, error: "Este email ya está registrado" };
+
       try {
         const registered = JSON.parse(
-          localStorage.getItem("tcgacademy_registered") ?? "{}",
+          localStorage.getItem(REGISTERED_KEY) ?? "{}",
         ) as Record<string, unknown>;
         if (registered[email])
-          return { ok: false, error: "Este email ya esta registrado" };
+          return { ok: false, error: "Este email ya está registrado" };
+
+        // Check username uniqueness
+        if (username) {
+          const index = loadUsernameIndex();
+          if (index[username])
+            return { ok: false, error: "Este nombre de usuario ya está en uso" };
+        }
 
         const newUserId = `user-${crypto.randomUUID()}`;
-        const refCode = generateReferralCode(newUserId);
+        const refCode = ensureReferralCode(newUserId);
         const newUser: User = {
           id: newUserId,
           email,
+          ...(username ? { username } : {}),
           name: data.name,
           lastName: data.lastName,
           phone: data.phone,
@@ -298,33 +336,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           referralCode: refCode,
         };
 
-        // Handle referral: register relationship and store code→user mapping
-        ensureReferralCode(newUserId); // registers code in refcodes map
+        ensureReferralCode(newUserId);
         if (data.referralCode) {
           const refResult = registerWithReferral(newUserId, data.referralCode);
-          if (refResult.ok) {
-            newUser.referredBy = data.referralCode;
-          }
+          if (refResult.ok) newUser.referredBy = data.referralCode;
         }
 
-        // Store password as SHA-256 hash — never plaintext
         const hashedPw = await hashPassword(data.password);
         registered[email] = { password: hashedPw, user: newUser };
-        localStorage.setItem(
-          "tcgacademy_registered",
-          JSON.stringify(registered),
-        );
+        localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered));
+
+        // Register username in the index
+        if (username) {
+          const index = loadUsernameIndex();
+          index[username] = email;
+          saveUsernameIndex(index);
+        }
+
         persist(newUser);
         return { ok: true };
       } catch {
-        return {
-          ok: false,
-          error: "Error al crear la cuenta. Intentalo de nuevo.",
-        };
+        return { ok: false, error: "Error al crear la cuenta. Inténtalo de nuevo." };
       }
     },
     [persist],
   );
+
+  const checkUsernameAvailable = useCallback((username: string): boolean => {
+    const key = normalizeUsername(username);
+    const index = loadUsernameIndex();
+    return !index[key];
+  }, []);
 
   const updateProfile = useCallback(
     (updates: Partial<Pick<User, "name" | "lastName" | "phone">>) => {
@@ -378,6 +420,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         register,
         updateProfile,
+        checkUsernameAvailable,
         toggleFavorite,
         isFavorite,
       }}

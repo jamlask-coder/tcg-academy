@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Container } from "@/components/ui/Container";
 
 // ─── Social icons (official brand SVGs, monochrome white) ─────────────────────
@@ -28,44 +29,6 @@ function IconX() {
 }
 
 
-// ─── Payment icons (inline SVG, official-style) ───────────────────────────────
-
-function IconVisa() {
-  return (
-    <svg viewBox="0 0 52 18" className="h-4" aria-label="Visa">
-      <rect x="0" y="0" width="52" height="18" rx="3" fill="#1a1f71"/>
-      <text x="6" y="13" fontFamily="Arial,sans-serif" fontWeight="bold" fontStyle="italic" fontSize="13" fill="white" letterSpacing="1">VISA</text>
-    </svg>
-  );
-}
-
-function IconMastercard() {
-  return (
-    <svg viewBox="0 0 38 24" className="h-5" aria-label="Mastercard">
-      <circle cx="14" cy="12" r="10" fill="#eb001b"/>
-      <circle cx="24" cy="12" r="10" fill="#f79e1b"/>
-      <path d="M19 4.8A10 10 0 0124 12a10 10 0 01-5 7.2A10 10 0 0114 12a10 10 0 015-7.2z" fill="#ff5f00"/>
-    </svg>
-  );
-}
-
-function IconPayPal() {
-  return (
-    <svg viewBox="0 0 72 20" className="h-4" aria-label="PayPal">
-      <text x="0" y="14" fontFamily="Arial,sans-serif" fontWeight="900" fontSize="14" fill="#009cde">Pay</text>
-      <text x="27" y="14" fontFamily="Arial,sans-serif" fontWeight="900" fontSize="14" fill="#012169">Pal</text>
-    </svg>
-  );
-}
-
-function IconBizum() {
-  return (
-    <svg viewBox="0 0 64 20" className="h-4" aria-label="Bizum">
-      <rect x="0" y="0" width="64" height="20" rx="4" fill="#00c4a7"/>
-      <text x="8" y="14" fontFamily="Arial,sans-serif" fontWeight="800" fontSize="11" fill="white" letterSpacing="0.5">bizum</text>
-    </svg>
-  );
-}
 
 // ─── GLS logo ─────────────────────────────────────────────────────────────────
 
@@ -178,21 +141,17 @@ export function Footer() {
             </div>
             {/* Payment logos */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="flex h-7 items-center rounded-md border border-white/10 bg-white/6 px-2.5">
-                <IconVisa />
-              </span>
-              <span className="flex h-7 items-center rounded-md border border-white/10 bg-white/6 px-2">
-                <IconMastercard />
-              </span>
-              <span className="flex h-7 items-center rounded-md border border-white/10 bg-white/6 px-2">
-                <IconPayPal />
-              </span>
-              <span className="flex h-7 items-center rounded-md border border-white/10 bg-white/6 px-2">
-                <IconBizum />
-              </span>
-              <span className="rounded-md border border-white/8 bg-white/6 px-2 py-0.5 text-[10px] font-semibold text-slate-400">
-                Transferencia
-              </span>
+              {[
+                { src: "/images/payment/visa.svg", alt: "Visa", w: 42, h: 14, bg: "bg-white" },
+                { src: "/images/payment/mastercard.svg", alt: "Mastercard", w: 38, h: 24, bg: "bg-white" },
+                { src: "/images/payment/paypal.svg", alt: "PayPal", w: 60, h: 16, bg: "bg-white" },
+                { src: "/images/payment/bizum.svg", alt: "Bizum", w: 52, h: 16, bg: "bg-white" },
+                { src: "/images/payment/sepa.svg", alt: "Transferencia SEPA", w: 52, h: 18, bg: "bg-white" },
+              ].map(({ src, alt, w, h, bg }) => (
+                <span key={alt} className={`flex h-8 items-center justify-center rounded-md border border-white/10 px-2 ${bg}`}>
+                  <Image src={src} alt={alt} width={w} height={h} className="object-contain" />
+                </span>
+              ))}
             </div>
           </div>
 

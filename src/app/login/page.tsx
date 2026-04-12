@@ -2,17 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  Eye,
-  EyeOff,
-  Lock,
-  Mail,
-  LogIn,
-  Package,
-  Clock,
-  ShieldCheck,
-  Star,
-} from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, LogIn } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { checkRateLimit } from "@/utils/sanitize";
 
@@ -21,13 +11,6 @@ const DEMO_ACCOUNTS = [
   { email: "mayorista@test.com", role: "Mayorista" },
   { email: "tienda@test.com", role: "Tienda" },
   { email: "admin@tcgacademy.com", role: "Admin" },
-];
-
-const FEATURES = [
-  { icon: Package, text: "100% productos originales" },
-  { icon: Clock, text: "Envío en menos de 24h" },
-  { icon: ShieldCheck, text: "Precios exclusivos para profesionales" },
-  { icon: Star, text: "Programa de puntos y recompensas" },
 ];
 
 export default function LoginPage() {
@@ -102,93 +85,18 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen">
-      {/* ── Left panel ───────────────────────────── */}
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
       <div
-        className="relative hidden flex-col justify-between overflow-hidden p-12 lg:flex lg:w-[45%]"
+        className="w-full max-w-md"
         style={{
-          background:
-            "linear-gradient(135deg, #1e40af 0%, #2563eb 55%, #1d4ed8 100%)",
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? "translateY(0)" : "translateY(16px)",
+          transition: "opacity 0.4s ease, transform 0.4s ease",
         }}
       >
-        {/* Decorative blobs */}
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
-          <div className="absolute bottom-10 -left-20 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
-          {/* Decorative card shapes */}
-          <div
-            className="absolute top-32 right-8 h-36 w-24 rotate-12 rounded-xl bg-white/5 shadow-2xl"
-            style={{ border: "1px solid rgba(255,255,255,0.1)" }}
-          />
-          <div
-            className="absolute top-44 right-20 h-36 w-24 rotate-6 rounded-xl bg-white/5 shadow-2xl"
-            style={{ border: "1px solid rgba(255,255,255,0.1)" }}
-          />
-          <div
-            className="absolute right-10 bottom-32 h-28 w-20 -rotate-6 rounded-xl bg-amber-400/10 shadow-2xl"
-            style={{ border: "1px solid rgba(251,191,36,0.15)" }}
-          />
-        </div>
-
-        {/* Logo */}
-        <Link href="/" className="relative z-10 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 shadow-lg backdrop-blur-sm">
-            <span className="text-xl font-bold text-white">T</span>
-          </div>
-          <span className="text-2xl font-bold text-white">TCG Academy</span>
-        </Link>
-
-        {/* Main copy */}
-        <div className="relative z-10">
-          <h1 className="mb-4 text-4xl leading-tight font-bold text-white">
-            Bienvenido a la mejor tienda TCG de España
-          </h1>
-          <p className="mb-10 text-lg text-blue-200">
-            Miles de productos, precios competitivos y envíos rápidos.
-          </p>
-          <ul className="space-y-4">
-            {FEATURES.map(({ icon: Icon, text }) => (
-              <li key={text} className="flex items-center gap-3">
-                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/10">
-                  <Icon size={18} className="text-amber-300" />
-                </div>
-                <span className="text-base font-medium text-blue-100">
-                  {text}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <p className="relative z-10 text-xs text-blue-300/60">
-          © 2025 TCG Academy · Todos los derechos reservados
-        </p>
-      </div>
-
-      {/* ── Right panel ──────────────────────────── */}
-      <div className="flex flex-1 flex-col items-center justify-center bg-white px-6 py-12">
-        {/* Mobile logo */}
-        <Link href="/" className="mb-8 flex items-center gap-2 lg:hidden">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#2563eb]">
-            <span className="font-bold text-white">T</span>
-          </div>
-          <span className="text-xl font-bold text-[#2563eb]">TCG Academy</span>
-        </Link>
-
-        <div
-          className="w-full max-w-md"
-          style={{
-            opacity: mounted ? 1 : 0,
-            transform: mounted ? "translateY(0)" : "translateY(16px)",
-            transition: "opacity 0.4s ease, transform 0.4s ease",
-          }}
-        >
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold text-gray-900">Inicia sesión</h2>
-            <p className="mt-1 text-gray-500">
-              Accede a tu cuenta de TCG Academy
-            </p>
-          </div>
+        <div className="rounded-2xl border border-gray-200 bg-white px-8 pt-7 pb-8 shadow-sm">
+          <h1 className="mb-1 text-2xl font-bold text-gray-900">Inicia sesión</h1>
+          <p className="mb-6 text-sm text-gray-500">Accede a tu cuenta de TCG Academy</p>
 
           <form
             onSubmit={handleSubmit}
@@ -199,10 +107,10 @@ export default function LoginPage() {
                 : {}
             }
           >
-            {/* Email */}
+            {/* Email or username */}
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                Email
+                Email o nombre de usuario
               </label>
               <div className="relative">
                 <Mail
@@ -210,12 +118,13 @@ export default function LoginPage() {
                   className="absolute top-1/2 left-3.5 -translate-y-1/2 text-gray-400"
                 />
                 <input
-                  type="email"
+                  type="text"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="tu@email.com"
+                  placeholder="tu@email.com o tu_usuario"
                   maxLength={254}
+                  autoComplete="username"
                   className="h-12 w-full rounded-xl border-2 border-gray-200 pr-4 pl-10 text-base transition-all focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/10 focus:outline-none"
                 />
               </div>

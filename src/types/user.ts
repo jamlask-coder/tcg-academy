@@ -29,6 +29,7 @@ export interface BillingInfo {
 export interface User {
   id: string;
   email: string;
+  username?: string;   // unique @handle, optional (not set for demo/legacy users)
   name: string;
   lastName: string;
   phone: string;
@@ -53,10 +54,11 @@ export interface User {
 
 export interface RegisterData {
   email: string;
+  username?: string;
   password: string;
   name: string;
   lastName: string;
   phone: string;
   address: Omit<Address, "id" | "predeterminada" | "label">;
-  referralCode?: string; // optional referral code entered at registration
+  referralCode?: string;
 }

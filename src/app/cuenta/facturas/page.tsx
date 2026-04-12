@@ -12,7 +12,7 @@ import {
 import { MOCK_INVOICES, type Invoice, type InvoiceItem } from "@/data/mockData";
 import { useAuth } from "@/context/AuthContext";
 import { calcVAT } from "@/hooks/usePrice";
-import { printInvoice, type InvoiceData } from "@/utils/invoiceGenerator";
+import { printInvoiceWithCSV, type InvoiceData } from "@/utils/invoiceGenerator";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,7 +61,7 @@ function buildInvoiceData(inv: Invoice): InvoiceData {
 }
 
 function openInvoicePDF(inv: Invoice) {
-  printInvoice(buildInvoiceData(inv));
+  void printInvoiceWithCSV(buildInvoiceData(inv));
 }
 
 // ─── Generate purchase report CSV ─────────────────────────────────────────────

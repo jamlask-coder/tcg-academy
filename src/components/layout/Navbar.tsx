@@ -17,6 +17,18 @@ const SPRITE_SHEET_H = 140; // original sprite sheet height in px
 const TARGET_H = 36;        // display height for normal logos
 const TARGET_W = 100;       // normalized visual width for all logos
 
+// Per-logo target overrides [maxW, maxH] — increase both to scale the logo up
+const CM_SPRITE_TARGET: Record<string, [number, number]> = {
+  pokemon: [112, 42],
+  magic: [108, 38],
+  "one-piece": [103, 39],
+};
+
+// Per-slug width/height overrides for image-based logos (not sprites)
+const LOGO_SIZE_OVERRIDE: Record<string, { w: number; h: string }> = {
+  topps: { w: 72, h: "h-7" },
+};
+
 // [origW, origX, vOffset, filter?]
 // All logos are rendered at TARGET_W wide and TARGET_H tall (object-contain style)
 const CM_SPRITES: Record<string, [number, number, number, string?]> = {
@@ -42,33 +54,40 @@ function CmSpriteLogo({ slug, label }: { slug: string; label: string }) {
   if (!data) return null;
   const [origW, origX, , cssFilter] = data;
 
+  const [targetW, targetH] = CM_SPRITE_TARGET[slug] ?? [TARGET_W, TARGET_H];
   // object-contain: scale by whichever axis fills the box first
-  const scale = Math.min(TARGET_W / origW, TARGET_H / SPRITE_SHEET_H);
-  // Use the actual rendered logo dimensions — no fixed-width container that would
-  // expose adjacent sprite-sheet content on either side of narrower logos.
+  const scale = Math.min(targetW / origW, targetH / SPRITE_SHEET_H);
   const displayW = Math.round(origW * scale);
   const displayH = Math.round(SPRITE_SHEET_H * scale);
   const sheetW = Math.round(SHEET_ORIG_W * scale);
-  // Position the sheet so the logo's left edge aligns with the span's left edge.
   const bgX = (-origX * scale).toFixed(1);
 
   return (
     <span
       aria-label={label}
       style={{
-        display: "inline-block",
+        display: "inline-flex",
+        alignItems: "center",
         width: displayW,
-        height: displayH,
-        backgroundImage: `url('${CM_SPRITE}')`,
-        backgroundRepeat: "no-repeat",
-        backgroundSize: `${sheetW}px ${displayH}px`,
-        backgroundPosition: `${bgX}px 0px`,
-        filter: cssFilter,
-        transition: "transform 0.2s",
+        height: NAV_HEIGHT,
         flexShrink: 0,
+        transition: "transform 0.2s",
       }}
       className="group-hover/logo:scale-105"
-    />
+    >
+      <span
+        style={{
+          display: "inline-block",
+          width: displayW,
+          height: displayH,
+          backgroundImage: `url('${CM_SPRITE}')`,
+          backgroundRepeat: "no-repeat",
+          backgroundSize: `${sheetW}px ${displayH}px`,
+          backgroundPosition: `${bgX}px 0px`,
+          filter: cssFilter,
+        }}
+      />
+    </span>
   );
 }
 
@@ -103,6 +122,10 @@ function GameLogo({
     );
   }
 
+  const sizeOverride = LOGO_SIZE_OVERRIDE[slug];
+  const w = sizeOverride?.w ?? TARGET_W;
+  const hClass = sizeOverride?.h ?? "h-9";
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -110,8 +133,8 @@ function GameLogo({
       alt={label}
       width={110}
       height={28}
-      className="relative z-10 h-9 object-contain transition-transform duration-200 group-hover/logo:scale-105"
-      style={{ width: TARGET_W, maxWidth: TARGET_W }}
+      className={`relative z-10 ${hClass} object-contain transition-transform duration-200 group-hover/logo:scale-105`}
+      style={{ width: w, maxWidth: w }}
       onError={() => setErrored(true)}
     />
   );
@@ -218,7 +241,7 @@ export function Navbar() {
                         style={{
                           background:
                             active || open
-                              ? `radial-gradient(circle 26px at center, ${color}CC 0%, ${color}55 55%, transparent 100%)`
+                              ? `radial-gradient(circle 42px at center, ${color}CC 0%, ${color}55 55%, transparent 100%)`
                               : "transparent",
                         }}
                         title={label}

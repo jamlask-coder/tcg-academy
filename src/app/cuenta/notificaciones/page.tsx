@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Settings,
   CheckCheck,
+  Users,
 } from "lucide-react";
 import { useNotifications } from "@/context/NotificationContext";
 import type { Notification } from "@/data/mockData";
@@ -29,6 +30,7 @@ const TYPE_CONFIG: Record<
     bg: "bg-orange-100",
   },
   sistema: { icon: Settings, color: "text-gray-500", bg: "bg-gray-100" },
+  asociacion: { icon: Users, color: "text-[#2563eb]", bg: "bg-blue-100" },
 };
 
 function timeAgo(dateStr: string): string {

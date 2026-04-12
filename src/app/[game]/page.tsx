@@ -44,18 +44,6 @@ export default async function GamePage({
   const allProducts = getProductsByGame(game);
 
   const menuGame = MEGA_MENU_DATA.find((g) => g.slug === game);
-  const logoSrc = menuGame?.logoSrc;
-  const abbrev = menuGame?.abbrev ?? name.slice(0, 3).toUpperCase();
-
-  // Games that use the Cardmarket sprite sheet in the navbar — use same source here
-  const CM_SPRITE = "/images/ssGamesBig.png";
-  const SPRITE_SHEET_H = 140;
-  const SHEET_ORIG_W = 6295;
-  const HERO_SPRITE_DATA: Record<string, [number, number, string?]> = {
-    magic: [408, 0],
-    "one-piece": [482, 4642, "brightness(0) invert(1) drop-shadow(0 0 6px rgba(0,0,0,0.95)) drop-shadow(0 0 12px rgba(0,0,0,0.8))"],
-  };
-  const spriteEntry = HERO_SPRITE_DATA[game];
 
   const all = allProducts
     .filter((p) => !CARD_CATEGORIES.has(p.category))
@@ -72,9 +60,9 @@ export default async function GamePage({
         className="relative overflow-hidden"
         style={{ backgroundColor: bgColor }}
       >
-        <div className="relative mx-auto max-w-[1400px] px-4 py-5 sm:px-6">
+        <div className="relative mx-auto max-w-[1400px] px-4 py-4 sm:px-6">
           <nav
-            className="mb-4 flex items-center gap-2 text-sm opacity-70"
+            className="mb-3 flex items-center gap-2 text-sm opacity-70"
             style={{ color }}
           >
             <Link href="/" className="hover:opacity-100">
@@ -84,56 +72,13 @@ export default async function GamePage({
             <span className="font-semibold">{name}</span>
           </nav>
 
-          <div className="flex items-center gap-4">
-            {spriteEntry ? (() => {
-              const [origW, origX, cssFilter] = spriteEntry;
-              const targetH = 48;
-              const targetW = 140;
-              const scale = Math.min(targetW / origW, targetH / SPRITE_SHEET_H);
-              const displayW = Math.round(origW * scale);
-              const displayH = Math.round(SPRITE_SHEET_H * scale);
-              const sheetW = Math.round(SHEET_ORIG_W * scale);
-              const bgX = (-origX * scale).toFixed(1);
-              return (
-                <span
-                  aria-label={name}
-                  style={{
-                    display: "inline-block",
-                    width: displayW,
-                    height: displayH,
-                    backgroundImage: `url('${CM_SPRITE}')`,
-                    backgroundRepeat: "no-repeat",
-                    backgroundSize: `${sheetW}px ${displayH}px`,
-                    backgroundPosition: `${bgX}px 0px`,
-                    filter: cssFilter,
-                    flexShrink: 0,
-                  }}
-                />
-              );
-            })() : logoSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={logoSrc}
-                alt={name}
-                width={140}
-                height={48}
-                className="h-10 w-auto max-w-[140px] object-contain md:h-12"
-                style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.18))" }}
-              />
-            ) : (
-              <div
-                className="flex h-10 items-center rounded-lg px-3 text-xs font-black text-white md:h-12"
-                style={{ backgroundColor: color }}
-              >
-                {abbrev}
-              </div>
-            )}
+          <div>
             <h1 className="text-2xl font-bold md:text-4xl" style={{ color }}>
               {name}
             </h1>
           </div>
 
-          <p className="mt-2 text-gray-600">
+          <p className="mt-1 text-gray-600">
             {all.length} productos disponibles
           </p>
         </div>

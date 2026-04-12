@@ -175,10 +175,10 @@ export function generateInvoiceHTML(data: InvoiceData): string {
   <meta charset="UTF-8">
   <title>Factura ${invoiceNumber}</title>
   <style>
-    @page { size: A4; margin: 14mm 16mm; }
+    @page { size: A4; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #1a1a2e; background: white; }
-    .invoice-wrap { max-width: 760px; margin: 0 auto; }
+    .invoice-wrap { max-width: 760px; margin: 0 auto; padding: 14mm 16mm; }
 
     /* ── Header table ── */
     .header-table { width: 100%; border-collapse: collapse; border-bottom: 3px solid #2563eb; padding-bottom: 16px; margin-bottom: 22px; }
@@ -359,19 +359,68 @@ export function generateInvoiceHTML(data: InvoiceData): string {
 </html>`;
 }
 
-/** Opens the invoice in a new window and triggers print dialog */
+/**
+ * Generates the SHA-256 CSV (Código Seguro de Verificación), injects it into
+ * the invoice data, then prints. This is the SINGLE entry point all parts of
+ * the app must use so every invoice is identical regardless of who prints it.
+ */
+export async function printInvoiceWithCSV(data: InvoiceData): Promise<void> {
+  try {
+    const content = [
+      data.issuerCIF,
+      data.invoiceNumber,
+      data.date,
+      data.clientName,
+      (data.items.reduce((s, i) => s + i.unitPriceWithVAT * i.quantity, 0) + (data.shipping ?? 0)).toFixed(2),
+    ].join("|");
+    const encoded = new TextEncoder().encode(content);
+    const buf = await crypto.subtle.digest("SHA-256", encoded);
+    data.verifactuHash = Array.from(new Uint8Array(buf))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    data.verifactuStatus = "PENDIENTE — Sistema VeriFactu en integración";
+  } catch {
+    /* hash generation failed — invoice still valid without CSV */
+  }
+  printInvoice(data);
+}
+
+/** Opens the invoice in a hidden iframe and triggers print/save-as-PDF dialog */
 export function printInvoice(data: InvoiceData): void {
   const html = generateInvoiceHTML(data);
   // Inject a <base> tag so relative image paths (logo, etc.) resolve from the origin
-  const baseTag = `<base href="${window.location.origin}">`;
+  const baseTag = `<base href="${window.location.origin}/">`;
   const htmlWithBase = html.replace("<head>", `<head>${baseTag}`);
-  const w = window.open("", "_blank", "width=900,height=700");
-  if (!w) return;
-  w.document.write(htmlWithBase);
-  w.document.close();
-  w.focus();
+
+  // Use a hidden iframe so popup blockers never interfere
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText =
+    "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;border:0;";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+  if (!doc) {
+    document.body.removeChild(iframe);
+    return;
+  }
+  doc.open();
+  doc.write(htmlWithBase);
+  doc.close();
+
+  // Give the iframe time to render before printing
   setTimeout(() => {
-    w.print();
+    try {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+    } finally {
+      setTimeout(() => {
+        try {
+          document.body.removeChild(iframe);
+        } catch {
+          /* ignore */
+        }
+      }, 2000);
+    }
   }, 600);
 }
 

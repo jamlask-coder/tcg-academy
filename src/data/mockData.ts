@@ -532,7 +532,8 @@ export type NotificationType =
   | "puntos"
   | "oferta"
   | "devolucion"
-  | "sistema";
+  | "sistema"
+  | "asociacion";
 
 export interface Notification {
   id: string;

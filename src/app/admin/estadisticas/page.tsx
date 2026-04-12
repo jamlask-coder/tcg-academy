@@ -15,6 +15,14 @@ import {
   ShoppingBag,
   AlertCircle,
   BarChart2,
+  Trophy,
+  Zap,
+  Gift,
+  Share2,
+  Star,
+  ArrowUpRight,
+  ArrowDownRight,
+  Crown,
 } from "lucide-react";
 import {
   MOCK_PROVINCE_VISITS,
@@ -29,6 +37,12 @@ import {
 } from "@/data/mockData";
 import { getMergedProducts } from "@/lib/productStore";
 import type { LocalProduct } from "@/data/products";
+import {
+  getPointsHistory,
+  loadPoints,
+  pointsToEuros,
+  type HistoryEntryType,
+} from "@/services/pointsService";
 
 const BarChart = dynamic(() => import("recharts").then((m) => m.BarChart), { ssr: false });
 const Bar = dynamic(() => import("recharts").then((m) => m.Bar), { ssr: false });
@@ -97,6 +111,44 @@ export default function EstadisticasPage() {
   const outOfStockCount = allProducts.filter((p) => !p.inStock).length;
   const activeUsers = MOCK_USERS.filter((u) => u.active).length;
   const totalPointsIssued = MOCK_USERS.reduce((s, u) => s + u.points, 0);
+
+  // ── Points analytics (reads from localStorage history + mock balances) ───────
+  const clientUsers = MOCK_USERS.filter((u) => u.role === "cliente");
+
+  // Aggregate all history entries across all users
+  const allHistoryEntries = clientUsers.flatMap((u) => {
+    const live = getPointsHistory(u.id);
+    return live.length > 0 ? live : [];
+  });
+
+  const ptsByType = (type: HistoryEntryType) =>
+    allHistoryEntries.filter((e) => e.type === type && e.pts > 0).reduce((s, e) => s + e.pts, 0);
+
+  const totalEarned = allHistoryEntries.filter((e) => e.pts > 0).reduce((s, e) => s + e.pts, 0);
+  const totalSpentPts = Math.abs(allHistoryEntries.filter((e) => e.pts < 0 && e.type !== "devolucion").reduce((s, e) => s + e.pts, 0));
+  const totalRefundedPts = Math.abs(allHistoryEntries.filter((e) => e.type === "devolucion" && e.pts < 0).reduce((s, e) => s + e.pts, 0));
+
+  // Current live balances per user (from localStorage, fallback to mock)
+  const userBalances = clientUsers.map((u) => {
+    const live = loadPoints(u.id);
+    return { id: u.id, name: `${u.name} ${u.lastName}`, balance: live > 0 ? live : u.points };
+  }).sort((a, b) => b.balance - a.balance);
+
+  const totalCirculating = userBalances.reduce((s, u) => s + u.balance, 0);
+
+  // Points origin breakdown (use mock proportions if no live history)
+  const earnedByType: { type: HistoryEntryType; label: string; icon: React.ElementType; color: string; pts: number }[] = [
+    { type: "compra",     label: "Compras",        icon: ShoppingBag, color: "#2563eb", pts: ptsByType("compra") || Math.round(totalPointsIssued * 0.72) },
+    { type: "checkin",    label: "Check-in diario", icon: Zap,         color: "#f59e0b", pts: ptsByType("checkin") || Math.round(totalPointsIssued * 0.15) },
+    { type: "asociacion", label: "Asociaciones",    icon: Share2,      color: "#16a34a", pts: ptsByType("asociacion") || Math.round(totalPointsIssued * 0.09) },
+    { type: "bienvenida", label: "Bienvenida",      icon: Gift,        color: "#7c3aed", pts: ptsByType("bienvenida") || Math.round(totalPointsIssued * 0.04) },
+  ];
+  const totalEarnedForPct = earnedByType.reduce((s, e) => s + e.pts, 0) || 1;
+
+  // Redemption breakdown (mock since no real spend history)
+  const totalRedeemedEuros = pointsToEuros(totalSpentPts || Math.round(totalPointsIssued * 0.18));
+  const checkinUsers = clientUsers.filter((u) => getPointsHistory(u.id).some((e) => e.type === "checkin")).length;
+  const checkinRate = clientUsers.length > 0 ? Math.round((checkinUsers / clientUsers.length) * 100) : 34;
 
   // ── Location data ───────────────────────────────────────────────────────────
   const locationRows = (() => {
@@ -514,6 +566,201 @@ export default function EstadisticasPage() {
             carguen en menos de 2s.
           </li>
         </ul>
+      </div>
+
+      {/* ── Points analytics ─────────────────────────────────────────────────── */}
+      <div className="mt-8">
+        <div className="mb-4 flex items-center gap-2">
+          <Trophy size={20} className="text-amber-500" />
+          <h2 className="text-lg font-bold text-gray-900">Programa de puntos</h2>
+        </div>
+
+        {/* KPIs */}
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            {
+              label: "Puntos en circulación",
+              value: totalCirculating.toLocaleString("es-ES"),
+              sub: `= €${pointsToEuros(totalCirculating).toFixed(2)} valor potencial`,
+              icon: Star,
+              color: "#f59e0b",
+            },
+            {
+              label: "Puntos emitidos totales",
+              value: totalPointsIssued.toLocaleString("es-ES"),
+              sub: `entre ${clientUsers.length} clientes`,
+              icon: ArrowUpRight,
+              color: "#2563eb",
+            },
+            {
+              label: "Puntos canjeados",
+              value: (totalSpentPts || Math.round(totalPointsIssued * 0.18)).toLocaleString("es-ES"),
+              sub: `= €${totalRedeemedEuros.toFixed(2)} descontados`,
+              icon: ArrowDownRight,
+              color: "#dc2626",
+            },
+            {
+              label: "Tasa de uso check-in",
+              value: `${checkinRate}%`,
+              sub: `${checkinUsers || Math.round(clientUsers.length * 0.34)} usuarios activos`,
+              icon: Zap,
+              color: "#16a34a",
+            },
+          ].map(({ label, value, sub, icon: Icon, color }) => (
+            <div key={label} className="rounded-2xl border border-gray-200 bg-white p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs text-gray-500">{label}</p>
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ backgroundColor: `${color}18` }}>
+                  <Icon size={14} style={{ color }} />
+                </div>
+              </div>
+              <p className="text-lg font-bold text-gray-900">{value}</p>
+              <p className="mt-0.5 text-[11px] text-gray-400">{sub}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          {/* Cómo se ganan */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-5">
+            <h3 className="mb-4 flex items-center gap-2 font-bold text-gray-900">
+              <ArrowUpRight size={16} className="text-green-500" /> Cómo se ganan
+            </h3>
+            <div className="space-y-3">
+              {earnedByType.map(({ label, icon: Icon, color, pts }) => {
+                const pct = Math.round((pts / totalEarnedForPct) * 100);
+                return (
+                  <div key={label}>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-1.5 font-medium text-gray-700">
+                        <Icon size={13} style={{ color }} />
+                        {label}
+                      </span>
+                      <span className="font-bold text-gray-900">
+                        {pts.toLocaleString("es-ES")} pts
+                        <span className="ml-1.5 text-xs font-normal text-gray-400">{pct}%</span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${pct}%`, backgroundColor: color }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-4 text-[11px] text-gray-400">
+              Total emitido: <strong>{totalEarnedForPct.toLocaleString("es-ES")} pts</strong>
+            </p>
+          </div>
+
+          {/* Cómo se gastan */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-5">
+            <h3 className="mb-4 flex items-center gap-2 font-bold text-gray-900">
+              <ArrowDownRight size={16} className="text-red-400" /> Cómo se gastan
+            </h3>
+            <div className="space-y-3">
+              {[
+                { label: "Descuento en pedido",  pct: 82, color: "#2563eb" },
+                { label: "Caducados sin usar",   pct: 11, color: "#9ca3af" },
+                { label: "Revertidos (devoluc.)", pct: 7, color: "#ef4444" },
+              ].map(({ label, pct, color }) => (
+                <div key={label}>
+                  <div className="mb-1 flex items-center justify-between text-sm">
+                    <span className="font-medium text-gray-700">{label}</span>
+                    <span className="font-bold text-gray-900">{pct}%</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-sm">
+              <p className="text-xs text-gray-500">Descuento económico total aplicado</p>
+              <p className="text-xl font-black text-[#2563eb]">€{totalRedeemedEuros.toFixed(2)}</p>
+              <p className="text-[11px] text-gray-400">
+                {((totalRedeemedEuros / totalRevenue) * 100).toFixed(1)}% sobre ingresos totales
+              </p>
+            </div>
+          </div>
+
+          {/* Top usuarios por saldo */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-5">
+            <h3 className="mb-4 flex items-center gap-2 font-bold text-gray-900">
+              <Crown size={16} className="text-amber-500" /> Top usuarios por saldo
+            </h3>
+            <div className="space-y-2">
+              {userBalances.slice(0, 7).map((u, i) => (
+                <div key={u.id} className="flex items-center gap-3">
+                  <span
+                    className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-black ${
+                      i === 0 ? "bg-amber-400 text-white" :
+                      i === 1 ? "bg-gray-300 text-gray-700" :
+                      i === 2 ? "bg-orange-300 text-white" :
+                      "bg-gray-100 text-gray-500"
+                    }`}
+                  >
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-gray-800">{u.name}</p>
+                    <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className="h-full rounded-full bg-amber-400"
+                        style={{ width: `${Math.round((u.balance / (userBalances[0]?.balance || 1)) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                  <span className="flex-shrink-0 text-sm font-bold text-amber-600">
+                    {u.balance.toLocaleString("es-ES")}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-[11px] text-gray-400">
+              Saldo medio por cliente: <strong>{Math.round(totalCirculating / Math.max(clientUsers.length, 1)).toLocaleString("es-ES")} pts</strong>
+            </p>
+          </div>
+        </div>
+
+        {/* Extra stats row */}
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            {
+              label: "Clientes sin puntos",
+              value: `${userBalances.filter((u) => u.balance === 0).length}`,
+              sub: "nunca han ganado o canjeado todo",
+              color: "#6b7280",
+            },
+            {
+              label: "Clientes con +500 pts",
+              value: `${userBalances.filter((u) => u.balance >= 500).length}`,
+              sub: `= €5+ pendientes de usar`,
+              color: "#2563eb",
+            },
+            {
+              label: "Puntos revertidos",
+              value: totalRefundedPts.toLocaleString("es-ES"),
+              sub: "por devoluciones de pedidos",
+              color: "#ef4444",
+            },
+            {
+              label: "Valor potencial pendiente",
+              value: `€${pointsToEuros(totalCirculating).toFixed(2)}`,
+              sub: "si todos canjearan su saldo",
+              color: "#7c3aed",
+            },
+          ].map(({ label, value, sub, color }) => (
+            <div key={label} className="rounded-2xl border border-gray-200 bg-white p-4">
+              <p className="text-xs text-gray-500">{label}</p>
+              <p className="mt-1 text-lg font-bold" style={{ color }}>{value}</p>
+              <p className="mt-0.5 text-[11px] text-gray-400">{sub}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

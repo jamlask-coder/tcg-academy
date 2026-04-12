@@ -1,9 +1,16 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
-import { awardPurchasePoints, deductPoints } from "@/services/pointsService";
+import {
+  awardPurchasePoints,
+  deductPoints,
+  loadPoints,
+  buildRedemptionTiers,
+  POINTS_PER_EURO,
+  POINTS_MAX_DISCOUNT_PCT,
+} from "@/services/pointsService";
 import {
   Shield,
   Truck,
@@ -14,8 +21,9 @@ import {
   Star,
   Store,
   Trophy,
+  ChevronDown,
+  X,
 } from "lucide-react";
-import { POINTS_PER_EURO } from "@/services/pointsService";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -37,9 +45,6 @@ interface PendingCheckout {
   } | null;
   couponDiscount: number;
   freeShippingCoupon?: boolean;
-  appliedPoints: { points: number; euros: number } | null;
-  pointsDiscount: number;
-  finalTotal: number;
 }
 
 export default function CheckoutPage() {
@@ -58,6 +63,14 @@ export default function CheckoutPage() {
     }
   });
   const [orderId, setOrderId] = useState("");
+  const [appliedPoints, setAppliedPoints] = useState<{ points: number; euros: number } | null>(null);
+  const [showPointsPanel, setShowPointsPanel] = useState(false);
+  const [userPoints, setUserPoints] = useState(0);
+
+  useEffect(() => {
+    if (user?.role === "cliente") setUserPoints(loadPoints(user.id));
+  }, [user]);
+
   const [form, setForm] = useState({
     nombre: "",
     apellidos: "",
@@ -83,11 +96,12 @@ export default function CheckoutPage() {
         ? 0
         : 3.99;
   const couponDiscount = pending?.couponDiscount ?? 0;
-  const pointsDiscount = pending?.pointsDiscount ?? 0;
-  const finalTotal = Math.max(
-    0,
-    total - couponDiscount - pointsDiscount + shipping,
-  );
+  const pointsDiscount = appliedPoints?.euros ?? 0;
+  const maxPointsDiscount = Math.floor(total * POINTS_MAX_DISCOUNT_PCT * 100) / 100;
+  const pointsTiers = buildRedemptionTiers(userPoints).filter((t) => t.euros <= maxPointsDiscount);
+  const finalTotal = Math.max(0, total - couponDiscount - pointsDiscount + shipping);
+  // Points are awarded on products only — shipping excluded
+  const pointsBase = Math.max(0, total - couponDiscount - pointsDiscount);
 
   const handleOrder = () => {
     const id = `TCG-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(Date.now()).slice(-4)}`;
@@ -107,7 +121,7 @@ export default function CheckoutPage() {
       subtotal: total,
       coupon: pending?.appliedCoupon ?? null,
       couponDiscount,
-      points: pending?.appliedPoints ?? null,
+      points: appliedPoints,
       pointsDiscount,
       shipping,
       total: finalTotal,
@@ -138,10 +152,10 @@ export default function CheckoutPage() {
 
     // Award purchase points and propagate to referral chain (cliente only)
     if (user?.role === "cliente") {
-      if (pending?.appliedPoints?.points) {
-        deductPoints(user.id, pending.appliedPoints.points);
+      if (appliedPoints?.points) {
+        deductPoints(user.id, appliedPoints.points);
       }
-      awardPurchasePoints(user.id, finalTotal);
+      awardPurchasePoints(user.id, pointsBase);
     }
 
     clearCart();
@@ -184,7 +198,7 @@ export default function CheckoutPage() {
             <Trophy size={16} className="flex-shrink-0 text-amber-500" />
             <span>
               Has ganado{" "}
-              <strong>+{Math.floor(finalTotal * POINTS_PER_EURO)} puntos</strong>{" "}
+              <strong>+{Math.floor(pointsBase * POINTS_PER_EURO)} puntos</strong>{" "}
               por esta compra
             </span>
           </div>
@@ -465,6 +479,7 @@ export default function CheckoutPage() {
                         id: "tienda",
                         label: "Pago en tienda",
                         sub: "Paga al recoger tu pedido en la tienda",
+                        logos: null,
                       },
                     ]
                   : []),
@@ -472,23 +487,36 @@ export default function CheckoutPage() {
                   ? [
                       {
                         id: "tarjeta",
-                        label: "Tarjeta de credito/debito",
+                        label: "Tarjeta de crédito/débito",
                         sub: "Visa, Mastercard, Amex",
+                        logos: [
+                          { src: "/images/payment/visa.svg", alt: "Visa", w: 36, h: 12 },
+                          { src: "/images/payment/mastercard.svg", alt: "Mastercard", w: 28, h: 18 },
+                        ],
                       },
                       {
                         id: "paypal",
                         label: "PayPal",
-                        sub: "Pago rapido con tu cuenta PayPal",
+                        sub: "Pago rápido con tu cuenta PayPal",
+                        logos: [
+                          { src: "/images/payment/paypal.svg", alt: "PayPal", w: 56, h: 15 },
+                        ],
                       },
                       {
                         id: "bizum",
                         label: "Bizum",
-                        sub: "Solo para clientes de bancos espanoles",
+                        sub: "Solo para clientes de bancos españoles",
+                        logos: [
+                          { src: "/images/payment/bizum.svg", alt: "Bizum", w: 48, h: 14 },
+                        ],
                       },
                       {
                         id: "transferencia",
-                        label: "Transferencia bancaria",
-                        sub: "Plazo adicional de 1-2 dias",
+                        label: "Transferencia SEPA",
+                        sub: "Plazo adicional de 1–2 días hábiles",
+                        logos: [
+                          { src: "/images/payment/sepa.svg", alt: "SEPA Credit Transfer", w: 52, h: 18 },
+                        ],
                       },
                     ]
                   : []),
@@ -507,7 +535,7 @@ export default function CheckoutPage() {
                     }
                     className="accent-[#2563eb]"
                   />
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
                       {opt.id === "tienda" && (
                         <Store size={14} className="text-[#2563eb]" />
@@ -518,8 +546,82 @@ export default function CheckoutPage() {
                       {opt.sub}
                     </div>
                   </div>
+                  {opt.logos && (
+                    <div className="flex flex-shrink-0 items-center gap-1.5">
+                      {opt.logos.map((logo) => (
+                        <span key={logo.alt} className="flex items-center justify-center rounded border border-gray-200 bg-white px-1.5 py-0.5">
+                          <Image src={logo.src} alt={logo.alt} width={logo.w} height={logo.h} className="object-contain" />
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </label>
               ))}
+              {/* Points redemption — only for clientes */}
+              {user?.role === "cliente" && userPoints > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="flex items-center gap-1.5 text-sm font-bold text-amber-700">
+                      <Star size={14} className="text-amber-500" />
+                      Usar mis puntos
+                    </p>
+                    <span className="text-xs font-semibold text-amber-600">
+                      {userPoints.toLocaleString("es-ES")} pts disponibles
+                    </span>
+                  </div>
+                  <p className="mb-3 text-xs text-amber-600">
+                    Máximo {(POINTS_MAX_DISCOUNT_PCT * 100).toFixed(0)}% del subtotal — hasta{" "}
+                    <strong>{maxPointsDiscount.toFixed(2)}€</strong> de descuento en esta compra.
+                  </p>
+                  {appliedPoints ? (
+                    <div className="flex items-center justify-between rounded-lg border border-amber-300 bg-white px-3 py-2.5">
+                      <p className="text-sm font-bold text-amber-700">
+                        <Star size={12} className="mr-1 inline text-amber-400" />
+                        {appliedPoints.points.toLocaleString("es-ES")} pts = <strong>-{appliedPoints.euros.toFixed(2)}€</strong>
+                      </p>
+                      <button
+                        onClick={() => setAppliedPoints(null)}
+                        aria-label="Quitar puntos"
+                        className="flex min-h-[28px] min-w-[28px] items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-400"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : pointsTiers.length === 0 ? (
+                    <p className="text-xs text-amber-600">
+                      Con tu saldo actual no puedes aplicar puntos a este pedido.
+                    </p>
+                  ) : (
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowPointsPanel(!showPointsPanel)}
+                        className="flex h-10 w-full items-center justify-between rounded-lg border border-amber-300 bg-white px-3 text-sm text-gray-700 transition hover:border-amber-400"
+                      >
+                        <span className="text-amber-700">Seleccionar cantidad a descontar...</span>
+                        <ChevronDown size={14} className={`text-amber-500 transition ${showPointsPanel ? "rotate-180" : ""}`} />
+                      </button>
+                      {showPointsPanel && (
+                        <div className="absolute top-full z-10 mt-1 w-full overflow-hidden rounded-xl border border-amber-200 bg-white shadow-lg">
+                          {pointsTiers.map((tier) => (
+                            <button
+                              key={tier.points}
+                              onClick={() => { setAppliedPoints({ points: tier.points, euros: tier.euros }); setShowPointsPanel(false); }}
+                              className="flex w-full items-center justify-between px-3 py-2.5 text-sm text-gray-800 transition hover:bg-amber-50"
+                            >
+                              <span className="flex items-center gap-1.5">
+                                <Star size={12} className="text-amber-400" />
+                                {tier.points.toLocaleString("es-ES")} puntos
+                              </span>
+                              <span className="font-bold text-amber-600">-{tier.euros.toFixed(2)}€</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="mt-2 flex items-center gap-2 rounded-xl bg-gray-50 p-3 text-xs text-gray-500">
                 <Shield size={14} className="flex-shrink-0 text-green-500" />
                 Pago 100% seguro con cifrado SSL. Tus datos bancarios nunca se
@@ -585,10 +687,10 @@ export default function CheckoutPage() {
                 </span>
               </div>
             )}
-            {pending?.appliedPoints && (
+            {appliedPoints && (
               <div className="flex justify-between text-sm">
                 <span className="flex items-center gap-1 font-medium text-amber-600">
-                  <Star size={12} /> {pending.appliedPoints.points} puntos
+                  <Star size={12} /> {appliedPoints.points.toLocaleString("es-ES")} puntos
                 </span>
                 <span className="font-semibold text-amber-600">
                   -{pointsDiscount.toFixed(2)}€

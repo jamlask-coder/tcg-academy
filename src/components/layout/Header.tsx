@@ -602,7 +602,7 @@ export function Header() {
         <div className="flex items-center gap-3">
           {/* Desktop search — ancho fijo */}
           <div
-            className="relative hidden w-[600px] lg:block"
+            className={`relative hidden lg:block ${mounted && user ? "w-[600px]" : "w-[380px]"}`}
             ref={desktopSearchRef}
           >
           <form onSubmit={handleDesktopSubmit}>

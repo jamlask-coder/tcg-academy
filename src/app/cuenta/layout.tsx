@@ -8,16 +8,13 @@ import type { User } from "@/types/user";
 import {
   User as UserIcon,
   Package,
-  MapPin,
   Heart,
   Building2,
   LogOut,
   ChevronRight,
   Receipt,
   Gift,
-  Star,
   Bell,
-  RefreshCw,
   Menu,
   X,
   PlusCircle,
@@ -29,24 +26,25 @@ import {
   BookOpen,
   Trophy,
   Share2,
+  AlertTriangle,
+  Mail,
 } from "lucide-react";
+import { countNewIncidents } from "@/services/incidentService";
 
 const PUBLIC_PATHS = ["/login", "/registro", "/recuperar-contrasena"];
 
 const NAV_ITEMS_BASE = [
   { href: "/cuenta", label: "Mi cuenta", icon: UserIcon, exact: true },
   { href: "/cuenta/pedidos", label: "Mis pedidos", icon: Package },
-  { href: "/cuenta/facturas", label: "Mis facturas", icon: Receipt },
-  { href: "/cuenta/cupones", label: "Cupones y descuentos", icon: Gift },
   { href: "/cuenta/puntos", label: "Mis puntos", icon: Trophy },
-  { href: "/cuenta/referidos", label: "Programa de referidos", icon: Share2 },
+  { href: "/cuenta/grupo", label: "Mi grupo", icon: Share2 },
+  { href: "/cuenta/cupones", label: "Cupones y descuentos", icon: Gift },
   {
     href: "/cuenta/notificaciones",
     label: "Notificaciones",
     icon: Bell,
     badge: true,
   },
-  { href: "/cuenta/devoluciones", label: "Devoluciones", icon: RefreshCw },
   { href: "/cuenta/datos", label: "Mis datos", icon: UserIcon },
   { href: "/cuenta/favoritos", label: "Favoritos", icon: Heart },
 ];
@@ -65,9 +63,11 @@ const ADMIN_NAV_ITEMS = [
   { href: "/admin/cupones", label: "Cupones", icon: Gift },
   { href: "/admin/fiscal", label: "Fiscal", icon: Receipt },
   { href: "/admin/mensajes", label: "Mensajes", icon: MessageSquare },
+  { href: "/admin/emails", label: "Emails", icon: Mail },
+  { href: "/admin/incidencias", label: "Incidencias", icon: AlertTriangle },
   { href: "/admin/herramientas", label: "Herramientas", icon: Wrench },
   { href: "/admin/manual", label: "Manual", icon: BookOpen },
-] as const;
+];
 
 function NavItem({
   href,
@@ -76,6 +76,7 @@ function NavItem({
   active,
   badge,
   unreadCount,
+  badgeCount,
   primary: _primary,
 }: {
   href: string;
@@ -84,6 +85,7 @@ function NavItem({
   active: boolean;
   badge?: boolean;
   unreadCount?: number;
+  badgeCount?: number;
   primary?: boolean;
 }) {
   return (
@@ -98,11 +100,11 @@ function NavItem({
         {label}
       </span>
       <span className="flex items-center gap-1.5">
-        {badge && unreadCount && unreadCount > 0 ? (
+        {(badge && unreadCount && unreadCount > 0) || (badgeCount && badgeCount > 0) ? (
           <span
             className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white/20 text-white" : "bg-red-500 text-white"}`}
           >
-            {unreadCount}
+            {badgeCount ?? unreadCount}
           </span>
         ) : null}
         {active && <ChevronRight size={14} />}
@@ -118,6 +120,7 @@ type NavItemConfig = {
   exact?: boolean;
   badge?: boolean;
   primary?: boolean;
+  badgeCount?: number;
 };
 
 function CuentaSidebar({
@@ -166,7 +169,7 @@ function CuentaSidebar({
 
       {/* Nav */}
       <nav className="mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white">
-        {navItems.map(({ href, label, icon, exact, badge, primary }) => {
+        {navItems.map(({ href, label, icon, exact, badge, primary, badgeCount }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
             <NavItem
@@ -177,6 +180,7 @@ function CuentaSidebar({
               active={active}
               badge={badge}
               unreadCount={unreadCount}
+              badgeCount={badgeCount}
               primary={primary}
             />
           );
@@ -200,10 +204,11 @@ export default function CuentaLayout({
   children: React.ReactNode;
 }) {
   const { user, isLoading, logout } = useAuth();
-  const { unreadCount } = useNotifications();
+  const { unreadCount, setUserId } = useNotifications();
   const pathname = usePathname();
   const router = useRouter();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [newIncidentCount, setNewIncidentCount] = useState(0);
 
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname === p);
 
@@ -212,11 +217,31 @@ export default function CuentaLayout({
     if (!user && !isPublicPath) router.push("/login");
   }, [user, isLoading, isPublicPath, router]);
 
+  // Sync notification context with the logged-in user
+  useEffect(() => {
+    setUserId(user?.id ?? null);
+  }, [user, setUserId]);
+
   // Close mobile nav on route change
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMobileNavOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const update = () => {
+      if (typeof window !== "undefined") {
+        setNewIncidentCount(countNewIncidents());
+      }
+    };
+    update();
+    window.addEventListener("tcga:incidents:updated", update);
+    window.addEventListener("storage", update);
+    return () => {
+      window.removeEventListener("tcga:incidents:updated", update);
+      window.removeEventListener("storage", update);
+    };
+  }, []);
 
   if (isPublicPath) return <>{children}</>;
 
@@ -232,11 +257,22 @@ export default function CuentaLayout({
   const isAdmin = user.role === "admin";
 
   const navItems: NavItemConfig[] = isAdmin
-    ? [...ADMIN_NAV_ITEMS]
+    ? ADMIN_NAV_ITEMS.map((item) =>
+        item.href === "/admin/incidencias"
+          ? { ...item, badgeCount: newIncidentCount }
+          : item,
+      )
     : [
         ...NAV_ITEMS_BASE,
         ...(isB2B
           ? [
+              {
+                href: "/cuenta/facturas",
+                label: "Mis facturas",
+                icon: Receipt,
+                badge: false,
+                exact: false,
+              },
               {
                 href: "/cuenta/empresa",
                 label: "Datos de empresa",
@@ -245,15 +281,7 @@ export default function CuentaLayout({
                 exact: false,
               },
             ]
-          : [
-              {
-                href: "/cuenta/direcciones",
-                label: "Direcciones",
-                icon: MapPin,
-                badge: false,
-                exact: false,
-              },
-            ]),
+          : []),
       ];
 
   const handleLogout = () => {

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -14,14 +14,23 @@ import {
   ShieldCheck,
   Star,
   Check,
+  AtSign,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { checkRateLimit } from "@/utils/sanitize";
+
+const USERNAME_REGEX = /^[a-zA-Z0-9_\.]{3,20}$/;
 
 const schema = z
   .object({
     nombre: z.string().min(1, "El nombre es obligatorio").max(100),
     apellidos: z.string().min(1, "Los apellidos son obligatorios").max(100),
+    username: z
+      .string()
+      .min(3, "Mínimo 3 caracteres")
+      .max(20, "Máximo 20 caracteres")
+      .regex(USERNAME_REGEX, "Solo letras, números, _ y . (sin espacios)"),
     email: z.string().email("Email inválido").max(254),
     telefono: z.string().max(20).optional(),
     password: z.string().min(6, "Mínimo 6 caracteres").max(128),
@@ -91,12 +100,15 @@ function PasswordStrength({ password }: { password: string }) {
   );
 }
 
+type UsernameStatus = "idle" | "checking" | "available" | "taken" | "invalid";
+
 export default function RegistroPage() {
-  const { register: authRegister, user } = useAuth();
+  const { register: authRegister, user, checkUsernameAvailable } = useAuth();
   const router = useRouter();
   const [showPwd, setShowPwd] = useState(false);
   const [serverError, setServerError] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
 
   const {
     register,
@@ -111,6 +123,21 @@ export default function RegistroPage() {
   const watchedPassword = watch("password") ?? "";
   const watchedTerminos = watch("terminos");
   const watchedComunicaciones = watch("comunicaciones");
+  const watchedUsername = watch("username") ?? "";
+
+  // Debounced username availability check
+  const checkUsername = useCallback((value: string) => {
+    if (!value || value.length < 3) { setUsernameStatus("idle"); return; }
+    if (!USERNAME_REGEX.test(value)) { setUsernameStatus("invalid"); return; }
+    setUsernameStatus("checking");
+    const available = checkUsernameAvailable(value);
+    setUsernameStatus(available ? "available" : "taken");
+  }, [checkUsernameAvailable]);
+
+  useEffect(() => {
+    const id = setTimeout(() => checkUsername(watchedUsername), 400);
+    return () => clearTimeout(id);
+  }, [watchedUsername, checkUsername]);
 
   useEffect(() => {
     setMounted(true);
@@ -121,6 +148,10 @@ export default function RegistroPage() {
   }, [user, router]);
 
   const onSubmit = async (data: FormData) => {
+    if (usernameStatus === "taken") {
+      setServerError("Ese nombre de usuario ya está en uso, elige otro.");
+      return;
+    }
     if (!checkRateLimit("registro", 5, 60_000)) {
       setServerError(
         "Demasiados intentos. Espera un minuto antes de volver a intentarlo.",
@@ -130,6 +161,7 @@ export default function RegistroPage() {
     setServerError("");
     const { ok, error } = await authRegister({
       email: data.email,
+      username: data.username,
       password: data.password,
       name: data.nombre,
       lastName: data.apellidos,
@@ -283,6 +315,44 @@ export default function RegistroPage() {
                   </p>
                 )}
               </div>
+            </div>
+
+            {/* Username */}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                Nombre de usuario *
+              </label>
+              <div className="relative">
+                <AtSign size={15} className="absolute top-1/2 left-3.5 -translate-y-1/2 text-gray-400" />
+                <input
+                  {...register("username")}
+                  type="text"
+                  placeholder="tu_usuario"
+                  maxLength={20}
+                  autoComplete="username"
+                  className={
+                    inputCls(!!errors.username || usernameStatus === "taken") +
+                    " pl-9 pr-9"
+                  }
+                />
+                <span className="absolute top-1/2 right-3 -translate-y-1/2">
+                  {usernameStatus === "checking" && <Loader2 size={15} className="animate-spin text-gray-400" />}
+                  {usernameStatus === "available" && <Check size={15} className="text-green-500" />}
+                  {usernameStatus === "taken" && <span className="text-xs font-bold text-red-500">✕</span>}
+                </span>
+              </div>
+              {errors.username && (
+                <p className="mt-1 text-xs text-red-500">{errors.username.message}</p>
+              )}
+              {!errors.username && usernameStatus === "taken" && (
+                <p className="mt-1 text-xs text-red-500">Este nombre de usuario ya está en uso</p>
+              )}
+              {!errors.username && usernameStatus === "available" && (
+                <p className="mt-1 text-xs text-green-600">¡Disponible!</p>
+              )}
+              {!errors.username && usernameStatus === "idle" && (
+                <p className="mt-1 text-xs text-gray-400">3–20 caracteres: letras, números, _ y .</p>
+              )}
             </div>
 
             {/* Email + Teléfono */}

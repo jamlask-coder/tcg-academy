@@ -11,6 +11,7 @@ import {
   formatCountdown,
   POINTS_PER_EURO,
   DAILY_CHECKIN_POINTS,
+  POINTS_MAX_DISCOUNT_PCT,
 } from "@/services/pointsService";
 import {
   Trophy,
@@ -23,6 +24,7 @@ import {
   ShoppingBag,
   Share2,
   TrendingUp,
+  Copy,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -61,6 +63,8 @@ const HISTORY_ITEMS = [
 export default function PuntosPage() {
   const { user } = useAuth();
   const [balance, setBalance] = useState(0);
+  const [myCode, setMyCode] = useState("");
+  const [copied, setCopied] = useState(false);
   const [checkinInfo, setCheckinInfo] = useState({ canCheckin: false, nextAt: null as number | null, lastAt: null as number | null });
   const [checkinState, setCheckinState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [checkinMsg, setCheckinMsg] = useState("");
@@ -68,9 +72,16 @@ export default function PuntosPage() {
   const refresh = useCallback(() => {
     if (!user) return;
     setBalance(loadPoints(user.id));
+    setMyCode(ensureReferralCode(user.id));
     setCheckinInfo(getCheckinInfo(user.id));
-    ensureReferralCode(user.id);
   }, [user]);
+
+  const handleCopy = () => {
+    if (!myCode) return;
+    navigator.clipboard.writeText(myCode).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   useEffect(() => {
     refresh();
@@ -143,8 +154,8 @@ export default function PuntosPage() {
               <p className="font-bold">+{DAILY_CHECKIN_POINTS} pts</p>
             </div>
             <div className="border-l border-white/20 pl-4">
-              <p className="text-blue-300">100 puntos =</p>
-              <p className="font-bold text-amber-300">€0.10 descuento</p>
+              <p className="text-blue-300">1 punto =</p>
+              <p className="font-bold text-amber-300">€0.01 descuento</p>
             </div>
           </div>
         </div>
@@ -231,6 +242,42 @@ export default function PuntosPage() {
         </div>
       </div>
 
+      {/* Referral code */}
+      {myCode && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-5">
+          <h2 className="mb-1 flex items-center gap-2 font-bold text-gray-900">
+            <Share2 size={18} className="text-[#2563eb]" /> Tu código de bienvenida
+          </h2>
+          <p className="mb-4 text-sm text-gray-500">
+            Comparte este código con nuevos usuarios. Al registrarse con él recibirán
+            puntos de bienvenida automáticamente.
+          </p>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 rounded-xl border-2 border-dashed border-[#2563eb]/30 bg-blue-50 px-4 py-3 text-center">
+              <p className="font-mono text-xl font-black tracking-widest text-[#2563eb]">
+                {myCode}
+              </p>
+            </div>
+            <button
+              onClick={handleCopy}
+              aria-label="Copiar código"
+              className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl transition ${
+                copied
+                  ? "bg-green-500 text-white"
+                  : "border border-gray-200 text-gray-500 hover:border-[#2563eb] hover:text-[#2563eb]"
+              }`}
+            >
+              {copied ? <CheckCircle2 size={18} /> : <Copy size={18} />}
+            </button>
+          </div>
+          {copied && (
+            <p className="mt-2 text-xs font-semibold text-green-600">
+              ✓ Código copiado al portapapeles
+            </p>
+          )}
+        </div>
+      )}
+
       {/* How to earn */}
       <div className="rounded-2xl border border-gray-200 bg-white p-5">
         <h2 className="mb-4 flex items-center gap-2 font-bold text-gray-900">
@@ -242,8 +289,8 @@ export default function PuntosPage() {
               icon: ShoppingBag,
               color: "#2563eb",
               title: "Compras",
-              desc: `${POINTS_PER_EURO} puntos por cada €1 gastado`,
-              example: "Compra de €50 → 500 pts",
+              desc: `${POINTS_PER_EURO} punto por cada €1 gastado`,
+              example: "Compra de €100 → 100 pts = €1.00",
             },
             {
               icon: Zap,
@@ -251,13 +298,6 @@ export default function PuntosPage() {
               title: "Check-in diario",
               desc: `${DAILY_CHECKIN_POINTS} puntos gratis cada día`,
               example: "30 días seguidos → 300 pts",
-            },
-            {
-              icon: Share2,
-              color: "#16a34a",
-              title: "Referidos",
-              desc: "Gana cuando tus amigos compran",
-              example: "Tu amigo gasta €30 → tú recibes 300 pts",
             },
           ].map(({ icon: Icon, color, title, desc, example }) => (
             <div key={title} className="rounded-xl border border-gray-100 p-4">
@@ -272,6 +312,28 @@ export default function PuntosPage() {
               <p className="mt-1.5 text-xs text-gray-400">{example}</p>
             </div>
           ))}
+
+          {/* Asociaciones — needs bilateral explanation */}
+          <div className="rounded-xl border border-gray-100 p-4">
+            <div
+              className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl"
+              style={{ backgroundColor: "#16a34a15" }}
+            >
+              <Share2 size={18} style={{ color: "#16a34a" }} />
+            </div>
+            <p className="font-bold text-gray-900">Asociaciones</p>
+            <p className="mt-0.5 text-sm text-gray-600">
+              50 pts por cada €100 que gaste un asociado — y ellos ganan lo mismo de tus compras
+            </p>
+            <div className="mt-2 space-y-1">
+              <p className="text-xs text-gray-400">
+                <span className="font-semibold text-green-600">Asociado compra €100</span> → tú recibes <span className="font-semibold">+50 pts</span> (= €0.50)
+              </p>
+              <p className="text-xs text-gray-400">
+                <span className="font-semibold text-[#2563eb]">Tú compras €100</span> → cada asociado recibe <span className="font-semibold">+50 pts</span> (= €0.50)
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -304,13 +366,22 @@ export default function PuntosPage() {
       {/* Info box */}
       <div className="flex gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700">
         <Info size={16} className="mt-0.5 flex-shrink-0 text-blue-400" />
-        <div>
-          <strong>Condiciones del programa de puntos:</strong> Los puntos son personales e intransferibles.
-          Caducan a los 24 meses sin actividad. No aplicable a usuarios profesionales (mayoristas/tiendas).
-          Para más información sobre el programa de referidos,{" "}
-          <Link href="/cuenta/referidos" className="font-semibold underline">
-            visita la sección de referidos
-          </Link>.
+        <div className="space-y-1">
+          <p>
+            <strong>Condiciones del programa de puntos:</strong> Los puntos son personales e intransferibles.
+            Caducan a los 24 meses sin actividad. No aplicable a usuarios profesionales (mayoristas/tiendas).
+          </p>
+          <p>
+            <strong>Límite de canje:</strong> Los puntos pueden descontar como máximo el{" "}
+            <strong>{(POINTS_MAX_DISCOUNT_PCT * 100).toFixed(0)}% del subtotal de productos</strong> de cada pedido
+            (envío excluido). Ejemplo: en una compra de €100, el descuento máximo por puntos es de €50.
+          </p>
+          <p>
+            Para más información sobre el programa de grupos,{" "}
+            <Link href="/cuenta/grupo" className="font-semibold underline">
+              visita la sección Mi grupo
+            </Link>.
+          </p>
         </div>
       </div>
     </div>

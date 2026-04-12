@@ -2,7 +2,6 @@
 import Link from "next/link";
 import {
   Package,
-  MapPin,
   Heart,
   Building2,
   ChevronRight,
@@ -10,7 +9,10 @@ import {
   TrendingUp,
   Euro,
   ShoppingBag,
-  Star,
+  Gift,
+  Share2,
+  Trophy,
+  Receipt,
   Search,
   ChevronDown,
   CheckCircle,
@@ -571,38 +573,33 @@ export default function CuentaPage() {
 
   const QUICK_LINKS = [
     {
-      href: "/cuenta/bonos",
-      label: "Mis bonos",
-      icon: Star,
-      desc: "Bonos disponibles",
+      href: "/cuenta/pedidos",
+      label: "Mis pedidos",
+      icon: Package,
+      desc: "Historial de compras",
+      color: "#2563eb",
+    },
+    {
+      href: "/cuenta/puntos",
+      label: "Mis puntos",
+      icon: Trophy,
+      desc: "Puntos acumulados",
       color: "#f59e0b",
     },
     {
-      href: "/cuenta/bonos",
-      label: "Mis puntos",
-      icon: TrendingUp,
-      desc: "Puntos acumulados",
-      color: "#2563eb",
+      href: "/cuenta/grupo",
+      label: "Mi grupo",
+      icon: Share2,
+      desc: "Comprad juntos y todos ganáis puntos",
+      color: "#0891b2",
     },
-    ...(isB2B
-      ? [
-          {
-            href: "/cuenta/empresa",
-            label: "Empresa",
-            icon: Building2,
-            desc: "Datos de empresa",
-            color: "#0f766e",
-          },
-        ]
-      : [
-          {
-            href: "/cuenta/direcciones",
-            label: "Direcciones de envío",
-            icon: MapPin,
-            desc: "Gestionar envíos",
-            color: "#0891b2",
-          },
-        ]),
+    {
+      href: "/cuenta/cupones",
+      label: "Cupones y descuentos",
+      icon: Gift,
+      desc: "Tus cupones activos",
+      color: "#16a34a",
+    },
     {
       href: "/cuenta/datos",
       label: "Mis datos",
@@ -617,6 +614,24 @@ export default function CuentaPage() {
       desc: "Lista de deseos",
       color: "#dc2626",
     },
+    ...(isB2B
+      ? [
+          {
+            href: "/cuenta/facturas",
+            label: "Mis facturas",
+            icon: Receipt,
+            desc: "Descarga tus facturas",
+            color: "#0f766e",
+          },
+          {
+            href: "/cuenta/empresa",
+            label: "Datos de empresa",
+            icon: Building2,
+            desc: "Datos fiscales",
+            color: "#374151",
+          },
+        ]
+      : []),
   ];
 
   return (

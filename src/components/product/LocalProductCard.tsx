@@ -1,5 +1,5 @@
 "use client";
-import { memo, useState } from "react";
+import { memo, useState, useEffect } from "react";
 import Link from "next/link";
 import { ShoppingCart, Heart, Check } from "lucide-react";
 import { useCart } from "@/context/CartContext";
@@ -64,10 +64,12 @@ function LocalProductCardInner({ product }: Props) {
     toggleFavorite(product.id);
   };
 
-  const productHref = isLocalProduct(product.id)
-    ? `/producto?id=${product.id}`
-    : `/${product.game}/${product.category}/${product.slug}`;
-  const href = productHref;
+  // Defer localStorage check to after hydration to avoid SSR mismatch
+  const staticHref = `/${product.game}/${product.category}/${product.slug}`;
+  const [href, setHref] = useState(staticHref);
+  useEffect(() => {
+    if (isLocalProduct(product.id)) setHref(`/producto?id=${product.id}`);
+  }, [product.id, staticHref]);
   const isCardCategory =
     CARD_CATEGORIES.has(product.category) &&
     (product.game === "pokemon" || product.game === "riftbound");
@@ -83,7 +85,8 @@ function LocalProductCardInner({ product }: Props) {
   const imageBlock = (
     <Link
       href={href}
-      className={`relative block ${imageAspect} flex-shrink-0 overflow-hidden bg-gray-50`}
+      className={`relative block ${imageAspect} flex-shrink-0 overflow-hidden`}
+      style={{ background: `linear-gradient(145deg, ${color}0d, ${color}18)` }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -93,7 +96,7 @@ function LocalProductCardInner({ product }: Props) {
           src={displayImage}
           alt={product.name}
           loading="lazy"
-          className={`h-full w-full ${imageObjectFit} transition-all duration-300 group-hover:scale-105 ${!product.inStock ? "opacity-50" : ""}`}
+          className={`h-full w-full ${imageObjectFit} transition-all duration-300 ${!product.inStock ? "opacity-50" : ""}`}
         />
       ) : (
         <div
@@ -194,7 +197,7 @@ function LocalProductCardInner({ product }: Props) {
 
   return (
     <>
-      <div className="group flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-lg">
+      <div className="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl" style={{ borderColor: `${color}22` }}>
         {isCardCategory ? (
           <HoloCard intensity="subtle">{imageBlock}</HoloCard>
         ) : (
@@ -202,47 +205,45 @@ function LocalProductCardInner({ product }: Props) {
         )}
 
         {/* ── INFO ── */}
-        <div className="flex flex-col gap-0.5 p-2">
+        <div className="flex flex-col gap-1 px-2.5 py-2">
           <span className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
             {CATEGORY_LABELS[product.category] ?? product.category}
           </span>
           <Link href={href}>
-            <h3 className="line-clamp-1 text-xs leading-tight font-semibold text-gray-800 transition hover:text-[#2563eb]">
+            <h3 className="line-clamp-2 text-xs leading-snug font-semibold text-gray-800 transition hover:text-[#2563eb]">
               {product.name}
             </h3>
           </Link>
           <div className="flex items-center justify-between pt-0.5">
-            <div className="flex flex-col gap-0">
-              <div className="flex items-center gap-1.5">
-                {etiquetaRol && (
-                  <span
-                    className="rounded-full px-1.5 py-0.5 text-[9px] font-bold"
-                    style={{
-                      backgroundColor:
-                        etiquetaRol === "Precio Mayoristas"
-                          ? "#1e40af18"
-                          : "#15803d18",
-                      color:
-                        etiquetaRol === "Precio Mayoristas"
-                          ? "#1e40af"
-                          : "#15803d",
-                    }}
-                  >
-                    {etiquetaRol}
-                  </span>
-                )}
-                <span className="text-sm font-bold" style={{ color }}>
-                  {displayPrice.toFixed(2)}€
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              {etiquetaRol && (
+                <span
+                  className="rounded-full px-1.5 py-0.5 text-[9px] font-bold"
+                  style={{
+                    backgroundColor:
+                      etiquetaRol === "Precio Mayoristas"
+                        ? "#1e40af18"
+                        : "#15803d18",
+                    color:
+                      etiquetaRol === "Precio Mayoristas"
+                        ? "#1e40af"
+                        : "#15803d",
+                  }}
+                >
+                  {etiquetaRol}
                 </span>
-                {effectiveHasDiscount && (
-                  <span className="text-sm text-gray-400 line-through">
-                    {effectiveComparePrice!.toFixed(2)}€
-                  </span>
-                )}
-                <span className="text-[10px] text-gray-400">IVA incluido</span>
-              </div>
+              )}
+              <span className="text-sm font-bold" style={{ color }}>
+                {displayPrice.toFixed(2)}€
+              </span>
+              {effectiveHasDiscount && (
+                <span className="text-xs text-gray-400 line-through">
+                  {effectiveComparePrice!.toFixed(2)}€
+                </span>
+              )}
             </div>
           </div>
+          <span className="text-[10px] text-gray-300">IVA incluido</span>
         </div>
       </div>
 

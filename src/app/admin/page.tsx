@@ -15,6 +15,7 @@ import { useState, useEffect } from "react";
 import { getMergedProducts } from "@/lib/productStore";
 import type { KpiMode } from "@/components/admin/SalesChart";
 import { useDiscounts } from "@/context/DiscountContext";
+import { countNewIncidents } from "@/services/incidentService";
 import {
   ALL_ORDERS,
   MOCK_USERS,
@@ -60,6 +61,18 @@ export default function AdminDashboard() {
     return () => {
       window.removeEventListener("tcga:products:updated", reload);
       window.removeEventListener("storage", reload);
+    };
+  }, []);
+
+  const [newIncidents, setNewIncidents] = useState(0);
+  useEffect(() => {
+    const update = () => setNewIncidents(countNewIncidents());
+    update();
+    window.addEventListener("tcga:incidents:updated", update);
+    window.addEventListener("storage", update);
+    return () => {
+      window.removeEventListener("tcga:incidents:updated", update);
+      window.removeEventListener("storage", update);
     };
   }, []);
 
@@ -187,6 +200,24 @@ export default function AdminDashboard() {
           );
         })}
       </div>
+
+      {newIncidents > 0 && (
+        <Link
+          href="/admin/incidencias"
+          className="mb-6 flex items-center gap-4 rounded-2xl border-2 border-red-200 bg-red-50 px-5 py-4 transition hover:border-red-300"
+        >
+          <AlertCircle size={22} className="flex-shrink-0 text-red-500" />
+          <div className="flex-1">
+            <p className="font-bold text-red-700">
+              {newIncidents} incidencia{newIncidents > 1 ? "s" : ""} nueva{newIncidents > 1 ? "s" : ""} sin atender
+            </p>
+            <p className="text-sm text-red-500">Haz clic para ver y responder</p>
+          </div>
+          <span className="flex-shrink-0 rounded-full bg-red-500 px-3 py-1 text-sm font-bold text-white">
+            {newIncidents}
+          </span>
+        </Link>
+      )}
 
       <div className="mb-6 grid gap-6 lg:grid-cols-3">
         {/* Chart — adapta según KPI activo */}

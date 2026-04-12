@@ -554,4 +554,81 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       </div>
     `),
   },
+  {
+    id: "asociacion_invitacion",
+    name: "Invitación al grupo",
+    subject: "{{fromName}} te invita a unirte a su grupo en TCG Academy",
+    description: "Se envía cuando un usuario invita a otro a su grupo de fidelización.",
+    variables: ["toName", "fromName", "fromInitial"],
+    html: `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Invitación al grupo — TCG Academy</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b}
+    .wrap{max-width:600px;margin:40px auto;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.10)}
+    .hdr{background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 100%);padding:40px 32px 36px;text-align:center}
+    .badge{display:inline-block;background:#f59e0b;color:#fff;font-size:11px;font-weight:800;padding:5px 16px;border-radius:999px;letter-spacing:.8px;text-transform:uppercase;margin-bottom:18px}
+    .logo{font-size:26px;font-weight:900;color:#fff;margin-bottom:6px}
+    .logo-sub{font-size:14px;color:#bfdbfe}
+    .body{padding:36px 32px 28px}
+    .greeting{font-size:22px;font-weight:800;color:#0f172a;margin-bottom:10px}
+    .intro{font-size:15px;color:#475569;line-height:1.75;margin-bottom:28px}
+    .box{background:linear-gradient(135deg,#eff6ff 0%,#f0fdf4 100%);border:2px solid #bfdbfe;border-radius:16px;padding:24px;margin-bottom:28px}
+    .sender-row{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+    .av{width:54px;height:54px;background:#2563eb;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff}
+    .sender-name{font-size:17px;font-weight:800;color:#0f172a}
+    .sender-lbl{font-size:12px;color:#64748b;margin-top:3px}
+    hr{border:none;border-top:1px solid #e2e8f0;margin:0 0 16px}
+    .ben{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid #e2e8f0}
+    .ben:last-child{border-bottom:none;padding-bottom:0}
+    .ben-icon{width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:14px}
+    .ben-text{font-size:14px;color:#374151;line-height:1.6}
+    .cta-wrap{text-align:center;margin:28px 0 24px}
+    .cta{display:inline-block;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;font-size:16px;font-weight:800;padding:15px 40px;border-radius:14px;text-decoration:none}
+    .note{background:#fef9c3;border-left:4px solid #f59e0b;border-radius:10px;padding:14px 18px;font-size:13px;color:#92400e;line-height:1.7;margin-bottom:24px}
+    .small{font-size:13px;color:#94a3b8;line-height:1.65}
+    .ftr{background:#f8fafc;border-top:1px solid #e9edf2;padding:24px 32px;text-align:center}
+    .ftr p{font-size:12px;color:#94a3b8;line-height:1.75}
+    .ftr a{color:#2563eb;text-decoration:none}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <div class="badge">Invitación al grupo</div>
+    <div class="logo">🎮 TCG Academy</div>
+    <div class="logo-sub">Tu tienda de cartas coleccionables</div>
+  </div>
+  <div class="body">
+    <p class="greeting">¡Hola, {{toName}}!</p>
+    <p class="intro">Has recibido una <strong>solicitud de asociación</strong> en TCG Academy. Si la aceptas, ambos ganaréis puntos automáticamente cada vez que cualquiera de vosotros realice una compra.</p>
+    <div class="box">
+      <div class="sender-row">
+        <div class="av">{{fromInitial}}</div>
+        <div>
+          <div class="sender-name">{{fromName}}</div>
+          <div class="sender-lbl">te invita a unirte a su grupo</div>
+        </div>
+      </div>
+      <hr/>
+      <div class="ben"><div class="ben-icon" style="background:#eff6ff">🛒</div><div class="ben-text">Cuando <strong>{{fromName}}</strong> compre, <strong>tú recibes 50 pts por cada €100</strong> de su pedido (= €0.50 de descuento)</div></div>
+      <div class="ben"><div class="ben-icon" style="background:#f0fdf4">💰</div><div class="ben-text">Cuando <strong>tú compres</strong>, <strong>{{fromName}} recibe 50 pts por cada €100</strong> de tu pedido (= €0.50 de descuento)</div></div>
+      <div class="ben"><div class="ben-icon" style="background:#fef3c7">⭐</div><div class="ben-text"><strong>100 puntos = €1 de descuento</strong> en cualquier compra. Los puntos no caducan</div></div>
+    </div>
+    <div class="cta-wrap"><a href="https://tcgacademy.es/cuenta/grupo" class="cta">Ver solicitud →</a></div>
+    <div class="note">💡 <strong>¿Cómo funciona?</strong> Accede a tu cuenta, entra en <em>Mi grupo</em> y acepta o rechaza la solicitud. Puedes tener hasta <strong>4 personas en tu grupo</strong>.</div>
+    <p class="small">Si no conoces a <strong>{{fromName}}</strong> o no esperabas esta solicitud, simplemente ignórala o recházala desde tu cuenta.</p>
+  </div>
+  <div class="ftr">
+    <p>© 2026 TCG Academy — <a href="https://tcgacademy.es">tcgacademy.es</a> · <a href="https://tcgacademy.es/cuenta/grupo">Mi grupo</a></p>
+    <p style="margin-top:8px">Este correo fue generado automáticamente.</p>
+  </div>
+</div>
+</body>
+</html>`,
+  },
 ];

@@ -11,20 +11,14 @@ import {
   ShoppingCart,
   ArrowRight,
   Tag,
-  Star,
   X,
-  ChevronDown,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { PRODUCTS } from "@/data/products";
 import { validateCoupon, calcCouponDiscount, type AppliedCoupon } from "@/services/couponService";
 import { useAuth } from "@/context/AuthContext";
-import { loadPoints, buildRedemptionTiers, ensureReferralCode } from "@/services/pointsService";
+import { ensureReferralCode } from "@/services/pointsService";
 
-interface AppliedPoints {
-  points: number;
-  euros: number;
-}
 
 export default function CartPage() {
   const router = useRouter();
@@ -37,16 +31,8 @@ export default function CartPage() {
     null,
   );
 
-  const [showPointsPanel, setShowPointsPanel] = useState(false);
-  const [appliedPoints, setAppliedPoints] = useState<AppliedPoints | null>(
-    null,
-  );
-
-  // Real user points (only for "cliente" role)
-  const [userPoints, setUserPoints] = useState(0);
   useEffect(() => {
     if (user?.role === "cliente") {
-      setUserPoints(loadPoints(user.id));
       ensureReferralCode(user.id);
     }
   }, [user]);
@@ -60,12 +46,7 @@ export default function CartPage() {
     ? calcCouponDiscount(appliedCoupon, total)
     : 0;
 
-  const pointsDiscount = appliedPoints?.euros ?? 0;
-
-  const finalTotal = Math.max(
-    0,
-    total - couponDiscount - pointsDiscount + shipping,
-  );
+  const finalTotal = Math.max(0, total - couponDiscount + shipping);
 
   const applyCoupon = () => {
     setCouponError("");
@@ -88,16 +69,6 @@ export default function CartPage() {
     setCouponError("");
   };
 
-  const pointsTiers = buildRedemptionTiers(userPoints);
-
-  const applyPoints = (tier: { points: number; euros: number }) => {
-    if (tier.points > userPoints) return;
-    setAppliedPoints({ points: tier.points, euros: tier.euros });
-    setShowPointsPanel(false);
-  };
-
-  const removePoints = () => setAppliedPoints(null);
-
   const handleCheckout = () => {
     localStorage.setItem(
       "tcgacademy_pending_checkout",
@@ -105,9 +76,6 @@ export default function CartPage() {
         appliedCoupon,
         couponDiscount,
         freeShippingCoupon: appliedCoupon?.discountType === "shipping",
-        appliedPoints,
-        pointsDiscount,
-        finalTotal,
       }),
     );
     router.push("/finalizar-compra");
@@ -266,22 +234,6 @@ export default function CartPage() {
                   </span>
                 </div>
               )}
-              {appliedPoints && (
-                <div className="flex justify-between text-sm">
-                  <span className="flex items-center gap-1 font-medium text-amber-600">
-                    <Star size={12} /> {appliedPoints.points} puntos
-                    <button
-                      onClick={removePoints}
-                      className="ml-1 text-gray-300 hover:text-red-400"
-                    >
-                      <X size={11} />
-                    </button>
-                  </span>
-                  <span className="font-semibold text-amber-600">
-                    -{appliedPoints.euros.toFixed(2)}€
-                  </span>
-                </div>
-              )}
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Envío</span>
                 <span className="font-semibold text-green-600">
@@ -361,65 +313,6 @@ export default function CartPage() {
               )}
             </div>
 
-            {/* Points redemption — only for clientes with points */}
-            {user?.role === "cliente" && (
-            <div className="mb-5 border-t border-gray-100 pt-4">
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-gray-600">
-                <Star size={12} className="text-amber-500" /> Canjear puntos
-                <span className="ml-auto font-bold text-amber-600">
-                  {userPoints} pts disponibles
-                </span>
-              </p>
-              {appliedPoints ? (
-                <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-                  <p className="text-sm font-bold text-amber-700">
-                    {appliedPoints.points} pts ={" "}
-                    {appliedPoints.euros.toFixed(2)}€
-                  </p>
-                  <button
-                    onClick={removePoints}
-                    className="flex min-h-[32px] min-w-[32px] items-center justify-center text-gray-400 transition hover:text-red-400"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : pointsTiers.length === 0 ? (
-                <p className="text-xs text-gray-400">Necesitas al menos 100 puntos para canjear.</p>
-              ) : (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowPointsPanel(!showPointsPanel)}
-                    className="flex h-10 w-full items-center justify-between rounded-lg border border-gray-200 px-3 text-sm text-gray-700 transition hover:border-[#2563eb]"
-                  >
-                    <span>Seleccionar cantidad...</span>
-                    <ChevronDown
-                      size={14}
-                      className={`transition ${showPointsPanel ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                  {showPointsPanel && (
-                    <div className="absolute top-full z-10 mt-1 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
-                      {pointsTiers.map((tier) => (
-                          <button
-                            key={tier.points}
-                            onClick={() => applyPoints(tier)}
-                            className="flex w-full items-center justify-between px-3 py-2.5 text-sm text-gray-800 transition hover:bg-amber-50"
-                          >
-                            <span className="flex items-center gap-1.5">
-                              <Star size={12} className="text-amber-400" />
-                              {tier.points} puntos
-                            </span>
-                            <span className="font-bold text-amber-600">
-                              {tier.euros.toFixed(2)}€
-                            </span>
-                          </button>
-                        ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            )}
 
             {/* Total */}
             <div className="mb-5 border-t border-gray-100 pt-4">
@@ -439,10 +332,15 @@ export default function CartPage() {
               Finalizar compra <ArrowRight size={18} />
             </button>
 
-            <div className="mt-4 flex items-center justify-center gap-4 text-xs text-gray-400">
-              {["Visa", "Mastercard", "PayPal", "Bizum"].map((p) => (
-                <span key={p} className="font-medium">
-                  {p}
+            <div className="mt-4 flex items-center justify-center gap-2">
+              {[
+                { src: "/images/payment/visa.svg", alt: "Visa", w: 38, h: 13 },
+                { src: "/images/payment/mastercard.svg", alt: "Mastercard", w: 30, h: 19 },
+                { src: "/images/payment/paypal.svg", alt: "PayPal", w: 54, h: 14 },
+                { src: "/images/payment/bizum.svg", alt: "Bizum", w: 48, h: 14 },
+              ].map(({ src, alt, w, h }) => (
+                <span key={alt} className="flex items-center justify-center rounded border border-gray-200 bg-white px-1.5 py-1">
+                  <Image src={src} alt={alt} width={w} height={h} className="object-contain" />
                 </span>
               ))}
             </div>
