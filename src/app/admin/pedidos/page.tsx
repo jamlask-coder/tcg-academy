@@ -218,80 +218,26 @@ function StatusDropdown({
   status: AdminOrderStatus;
   onUpdate: (s: AdminOrderStatus) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node) &&
-          btnRef.current && !btnRef.current.contains(e.target as Node))
-        setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
   const cfg = STATUS_CFG[status];
-
-  function handleToggle(e: React.MouseEvent) {
-    e.stopPropagation();
-    if (!open && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setCoords({ top: rect.bottom + 6, left: rect.left + rect.width / 2 });
-    }
-    setOpen((o) => !o);
-  }
-
   return (
-    <div className="inline-block">
-      <button
-        ref={btnRef}
-        onClick={handleToggle}
-        className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold transition hover:opacity-75"
-        style={{ color: cfg.color, backgroundColor: cfg.bg, borderColor: cfg.border }}
-        title="Cambiar estado"
-        aria-label={`Estado: ${cfg.label}. Pulsa para cambiar`}
-      >
-        {cfg.label}
-        <ChevronDown
-          size={10}
-          className={`transition-transform duration-150 ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-      {open && coords && (
-        <div
-          ref={ref}
-          className="fixed z-[9999] w-48 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
-          style={{ top: coords.top, left: coords.left, transform: "translateX(-50%)" }}
-        >
-          {(Object.keys(STATUS_CFG) as AdminOrderStatus[]).map((s) => {
-            const c = STATUS_CFG[s];
-            const active = s === status;
-            return (
-              <button
-                key={s}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!active) onUpdate(s);
-                  setOpen(false);
-                }}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold transition hover:bg-gray-50 ${active ? "cursor-default opacity-40" : ""}`}
-              >
-                <span
-                  className="h-2 w-2 flex-shrink-0 rounded-full"
-                  style={{ backgroundColor: c.color }}
-                />
-                {c.label}
-                {active && <Check size={10} className="ml-auto text-gray-400" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    <select
+      value={status}
+      onChange={(e) => onUpdate(e.target.value as AdminOrderStatus)}
+      onClick={(e) => e.stopPropagation()}
+      className="cursor-pointer appearance-none rounded-full border px-2.5 py-0.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-offset-1"
+      style={{
+        color: cfg.color,
+        backgroundColor: cfg.bg,
+        borderColor: cfg.border,
+      }}
+      aria-label={`Estado del pedido: ${cfg.label}`}
+    >
+      {(Object.keys(STATUS_CFG) as AdminOrderStatus[]).map((s) => (
+        <option key={s} value={s}>
+          {STATUS_CFG[s].label}
+        </option>
+      ))}
+    </select>
   );
 }
 

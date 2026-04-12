@@ -53,12 +53,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: LayoutDashboard,
     exact: true,
   },
+  { href: "/admin/pedidos", label: "Pedidos", icon: ShoppingBag },
   {
     href: "/admin/productos/nuevo",
     label: "Añadir producto",
     icon: PackagePlus,
   },
-  { href: "/admin/pedidos", label: "Pedidos", icon: ShoppingBag },
   {
     href: "/admin/precios",
     label: "Precios",
@@ -156,17 +156,17 @@ function NavLink({
         <Icon size={isSub ? 13 : 15} />
         {label}
         {href === "/admin/pedidos" && badges.newOrders > 0 && (
-          <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] leading-none font-bold text-white">
+          <span className="ml-auto flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold leading-none text-white">
             {badges.newOrders}
           </span>
         )}
         {href === "/admin/solicitudes" && badges.newSolicitudes > 0 && (
-          <span className="ml-auto rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] leading-none font-bold text-white">
+          <span className="ml-auto flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold leading-none text-white">
             {badges.newSolicitudes}
           </span>
         )}
         {href === "/admin/incidencias" && badges.newIncidents > 0 && (
-          <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] leading-none font-bold text-white">
+          <span className="ml-auto flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold leading-none text-white">
             {badges.newIncidents}
           </span>
         )}
