@@ -113,14 +113,11 @@ export function Footer() {
           ))}
         </div>
 
-        {/* 3-column grid */}
-        <div className="mb-6 grid grid-cols-1 gap-8 sm:grid-cols-3">
+        {/* Brand row — full width */}
+        <div className="mb-6">
           {/* Col 1: Brand + social + payment */}
           <div>
             <Link href="/" className="mb-4 inline-flex items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/logo-tcg-shield.svg" alt="" style={{ height: 40, width: "auto" }} />
               <span className="text-xl font-black tracking-tight text-white">TCG <span className="text-amber-400">Academy</span></span>
             </Link>
             <p className="mb-4 text-xs text-slate-500">
@@ -154,8 +151,10 @@ export function Footer() {
               ))}
             </div>
           </div>
+        </div>
 
-          {/* Col 2: Links */}
+        {/* Tienda + Legal — always side by side */}
+        <div className="mb-6 grid grid-cols-2 gap-8">
           <div>
             <h3 className="mb-3 text-[10px] font-bold tracking-widest text-white/40 uppercase">
               Tienda
@@ -169,7 +168,6 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Col 3: Legal */}
           <div>
             <h3 className="mb-3 text-[10px] font-bold tracking-widest text-white/40 uppercase">
               Legal

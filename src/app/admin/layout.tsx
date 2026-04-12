@@ -26,13 +26,16 @@ import {
   Ticket,
   Wrench,
   FilePlus,
+  AlertTriangle,
+  MessageSquare,
+  Mail,
+  BookOpen,
+  Bell,
 } from "lucide-react";
 
 const SOLICITUDES_KEY = "tcgacademy_solicitudes";
-import {
-  ADMIN_ORDERS,
-  ORDER_STORAGE_KEY,
-} from "@/data/mockData";
+import { countPendingOrders } from "@/data/mockData";
+import { countNewIncidents } from "@/services/incidentService";
 
 interface NavItem {
   href: string;
@@ -50,12 +53,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: LayoutDashboard,
     exact: true,
   },
-  { href: "/admin/pedidos", label: "Últimos pedidos", icon: ShoppingBag },
   {
     href: "/admin/productos/nuevo",
     label: "Añadir producto",
     icon: PackagePlus,
   },
+  { href: "/admin/pedidos", label: "Pedidos", icon: ShoppingBag },
   {
     href: "/admin/precios",
     label: "Precios",
@@ -78,8 +81,20 @@ const NAV_ITEMS: NavItem[] = [
       { href: "/admin/fiscal/nueva-factura", label: "Emitir factura manual", icon: FilePlus },
     ],
   },
+  { href: "/admin/incidencias", label: "Incidencias", icon: AlertTriangle },
   { href: "/admin/cupones", label: "Cupones", icon: Ticket },
-  { href: "/admin/herramientas", label: "Herramientas", icon: Wrench },
+  { href: "/admin/notificaciones", label: "Notificaciones", icon: Bell },
+  { href: "/admin/mensajes", label: "Mensajes", icon: MessageSquare },
+  { href: "/admin/emails", label: "Emails", icon: Mail },
+  {
+    href: "/admin/herramientas",
+    label: "Herramientas",
+    icon: Wrench,
+    sub: [
+      { href: "/admin/herramientas", label: "Herramientas", icon: Wrench, exact: true },
+      { href: "/admin/manual", label: "Manual", icon: BookOpen },
+    ],
+  },
   { href: "/cuenta/datos", label: "Mis datos", icon: UserCircle },
 ];
 
@@ -91,23 +106,18 @@ const ALL_NAV_ITEMS: NavItem[] = NAV_ITEMS.flatMap((i) =>
 function useSidebarBadges() {
   const [newOrders, setNewOrders] = useState(0);
   const [newSolicitudes, setNewSolicitudes] = useState(0);
+  const [newIncidents, setNewIncidents] = useState(0);
 
   useEffect(() => {
     const calc = () => {
       try {
-        const orders =
-          JSON.parse(localStorage.getItem(ORDER_STORAGE_KEY) ?? "null") ??
-          ADMIN_ORDERS;
-        setNewOrders(
-          (orders as { adminStatus: string }[]).filter(
-            (o) => o.adminStatus === "pendiente_envio",
-          ).length,
-        );
+        setNewOrders(countPendingOrders());
         const sols = JSON.parse(localStorage.getItem(SOLICITUDES_KEY) ?? "[]");
         setNewSolicitudes(
           (sols as { estado: string }[]).filter((s) => s.estado === "nueva")
             .length,
         );
+        setNewIncidents(countNewIncidents());
       } catch {}
     };
     calc();
@@ -115,7 +125,7 @@ function useSidebarBadges() {
     return () => clearInterval(id);
   }, []);
 
-  return { newOrders, newSolicitudes };
+  return { newOrders, newSolicitudes, newIncidents };
 }
 
 function NavLink({
@@ -128,7 +138,7 @@ function NavLink({
   item: NavItem;
   pathname: string;
   onClose?: () => void;
-  badges: { newOrders: number; newSolicitudes: number };
+  badges: { newOrders: number; newSolicitudes: number; newIncidents: number };
   isSub?: boolean;
 }) {
   const { href, label, icon: Icon, exact, excludePathPrefixes } = item;
@@ -153,6 +163,11 @@ function NavLink({
         {href === "/admin/solicitudes" && badges.newSolicitudes > 0 && (
           <span className="ml-auto rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] leading-none font-bold text-white">
             {badges.newSolicitudes}
+          </span>
+        )}
+        {href === "/admin/incidencias" && badges.newIncidents > 0 && (
+          <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] leading-none font-bold text-white">
+            {badges.newIncidents}
           </span>
         )}
       </span>

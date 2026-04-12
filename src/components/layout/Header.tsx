@@ -28,6 +28,7 @@ import { getMergedProducts } from "@/lib/productStore";
 import { useNotifications } from "@/context/NotificationContext";
 import { useDebounce } from "@/hooks/useDebounce";
 import { checkRateLimit } from "@/utils/sanitize";
+import { countPendingOrders } from "@/data/mockData";
 
 // ─── Recent search history helpers ────────────────────────────────────────────
 const RECENT_KEY = "tcga_recent_searches";
@@ -458,6 +459,16 @@ export function Header() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  // For admin: track pending orders to show on bell badge
+  const [pendingOrders, setPendingOrders] = useState(0);
+  useEffect(() => {
+    if (!user || user.role !== "admin") return;
+    const calc = () => setPendingOrders(countPendingOrders());
+    calc();
+    const id = setInterval(calc, 5000);
+    return () => clearInterval(id);
+  }, [user]);
+
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -662,16 +673,19 @@ export function Header() {
           {/* Notifications (visible on desktop when logged in) */}
           {user && (
             <Link
-              href="/cuenta/notificaciones"
+              href={user.role === "admin" ? "/admin/notificaciones" : "/cuenta/notificaciones"}
               className="relative hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10 lg:flex"
               aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ""}`}
             >
               <Bell size={18} className="text-white" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] leading-none font-bold text-white">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
+              {mounted && (() => {
+                const bellCount = user.role === "admin" ? pendingOrders : unreadCount;
+                return bellCount > 0 ? (
+                  <span className="absolute top-1 right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] leading-none font-bold text-white">
+                    {bellCount > 9 ? "9+" : bellCount}
+                  </span>
+                ) : null;
+              })()}
             </Link>
           )}
 
@@ -802,38 +816,46 @@ export function Header() {
               <p className="mb-3 text-[10px] font-bold tracking-widest text-gray-400 uppercase">
                 Juegos TCG
               </p>
-              <div className="space-y-1">
+              <div className="grid grid-cols-2 gap-2">
                 {(
                   [
-                    ["Magic: The Gathering", "/magic", "#7c3aed", "🧙"],
-                    ["Pokémon TCG", "/pokemon", "#f59e0b", "⚡"],
-                    ["One Piece TCG", "/one-piece", "#ef4444", "⚓"],
-                    ["Riftbound", "/riftbound", "#06b6d4", "💎"],
-                    ["Disney Lorcana", "/lorcana", "#8b5cf6", "✨"],
-                    ["Dragon Ball Super", "/dragon-ball", "#f97316", "🐉"],
-                    ["Yu-Gi-Oh!", "/yugioh", "#eab308", "👁"],
-                    ["Naruto Mythos", "/naruto", "#f97316", "🍃"],
-                    ["Digimon TCG", "/digimon", "#3b82f6", "🌐"],
-                    ["Topps", "/topps", "#10b981", "⭐"],
-                    ["Panini", "/panini", "#6366f1", "📦"],
+                    ["Magic: The Gathering", "/magic", "#7c3aed", "magic.svg"],
+                    ["Pokémon", "/pokemon", "#f59e0b", "pokemon.svg"],
+                    ["One Piece", "/one-piece", "#1d4ed8", "onepiece.svg"],
+                    ["Riftbound", "/riftbound", "#0f766e", "riftbound.svg"],
+                    ["Disney Lorcana", "/lorcana", "#0891b2", "lorcana.png"],
+                    ["Dragon Ball Super", "/dragon-ball", "#d97706", "dragonball.png"],
+                    ["Yu-Gi-Oh!", "/yugioh", "#dc2626", "yugioh.png"],
+                    ["Naruto Mythos", "/naruto", "#ea580c", "naruto.svg"],
+                    ["Digimon TCG", "/digimon", "#2563eb", "digimon.svg"],
+                    ["Topps", "/topps", "#1d4ed8", "topps.svg"],
+                    ["Panini", "/panini", "#16a34a", "panini.png"],
                   ] as [string, string, string, string][]
-                ).map(([label, href, color, emoji]) => (
+                ).map(([label, href, color, logo]) => (
                   <Link
                     key={href}
                     href={href}
                     onClick={() => setMenuOpen(false)}
-                    className="flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 transition-colors active:bg-gray-100"
+                    className="group relative overflow-hidden rounded-xl transition-transform active:scale-95"
                     style={{ WebkitTapHighlightColor: "transparent" }}
                   >
                     <div
-                      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-base"
-                      style={{ backgroundColor: `${color}20` }}
+                      className="flex flex-col items-center justify-center gap-2 px-2 py-3"
+                      style={{
+                        background: `linear-gradient(135deg, ${color}dd 0%, ${color}99 100%)`,
+                      }}
                     >
-                      <span aria-hidden="true">{emoji}</span>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`/images/logos/${logo}`}
+                        alt={label}
+                        className="h-9 w-auto object-contain drop-shadow"
+                        style={{ maxWidth: "80%" }}
+                      />
+                      <span className="text-center text-[10px] font-bold leading-tight text-white drop-shadow">
+                        {label}
+                      </span>
                     </div>
-                    <span className="text-sm font-medium text-gray-800">
-                      {label}
-                    </span>
                   </Link>
                 ))}
               </div>

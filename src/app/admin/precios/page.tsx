@@ -21,6 +21,7 @@ import {
   type LocalProduct,
 } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
+import Link from "next/link";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ interface PriceRow {
   name: string;
   game: string;
   category: string;
+  slug: string;
   image: string;
   price: number; // PV Público
   wholesalePrice: number; // PV Mayorista
@@ -68,11 +70,14 @@ function isExpiringSoon(end?: string): boolean {
 
 
 function initRows(): PriceRow[] {
-  return getMergedProducts().map((p: LocalProduct) => ({
+  return getMergedProducts()
+    .sort((a: LocalProduct, b: LocalProduct) => b.id - a.id)
+    .map((p: LocalProduct) => ({
     id: p.id,
     name: p.name,
     game: p.game,
     category: p.category,
+    slug: p.slug,
     image: p.images[0] ?? "",
     price: p.price,
     wholesalePrice: p.wholesalePrice,
@@ -623,9 +628,6 @@ export default function PreciosPage() {
                     )}
                   </button>
                 </th>
-                <th className="w-8 px-2 py-2.5 text-left font-medium text-gray-400">
-                  #
-                </th>
                 <th className="px-3 py-2.5 text-left">
                   <button
                     className="flex items-center gap-1 font-semibold text-gray-600 hover:text-[#2563eb]"
@@ -674,9 +676,6 @@ export default function PreciosPage() {
                     />
                   </button>
                 </th>
-                <th className="px-2 py-2.5 text-left font-semibold text-gray-600">
-                  Inicio dto
-                </th>
                 <th className="px-2 py-2.5 text-left">
                   <button
                     className="flex items-center gap-1 font-semibold text-gray-600 hover:text-[#2563eb]"
@@ -689,15 +688,6 @@ export default function PreciosPage() {
                       sortDir={sortDir}
                     />
                   </button>
-                </th>
-                <th className="px-2 py-2.5 text-center font-semibold text-gray-600">
-                  Activo
-                </th>
-                <th className="px-2 py-2.5 text-right font-semibold text-gray-600">
-                  P. Final
-                </th>
-                <th className="px-2 py-2.5 text-right font-semibold text-gray-600">
-                  Margen
                 </th>
               </tr>
             </thead>
@@ -741,7 +731,6 @@ export default function PreciosPage() {
                         )}
                       </button>
                     </td>
-                    <td className="px-2 py-1.5 text-gray-300">{row.id}</td>
                     <td className="px-3 py-1.5">
                       <div className="flex max-w-[360px] min-w-[220px] items-center gap-2">
                         {row.image ? (
@@ -761,9 +750,13 @@ export default function PreciosPage() {
                           </div>
                         )}
                         <div className="min-w-0">
-                          <p className="truncate leading-tight font-medium text-gray-800">
+                          <Link
+                            href={`/${row.game}/${row.category}/${row.slug}`}
+                            target="_blank"
+                            className="truncate leading-tight font-medium text-gray-800 hover:text-[#2563eb] hover:underline"
+                          >
                             {row.name}
-                          </p>
+                          </Link>
                           <p className="text-[10px] text-gray-400">
                             {GAME_CONFIG[row.game]?.name ?? row.game}
                           </p>
@@ -808,53 +801,11 @@ export default function PreciosPage() {
                     <td className="min-w-[110px] px-2 py-1.5">
                       {row.comparePrice !== undefined && (
                         <DateCell
-                          value={row.discountStart}
-                          onChange={(v) => update(row.id, { discountStart: v })}
-                        />
-                      )}
-                    </td>
-                    <td className="min-w-[110px] px-2 py-1.5">
-                      {row.comparePrice !== undefined && (
-                        <DateCell
                           value={row.discountEnd}
                           onChange={(v) => update(row.id, { discountEnd: v })}
                           expiry
                         />
                       )}
-                    </td>
-                    <td className="px-2 py-1.5 text-center">
-                      {row.comparePrice !== undefined ? (
-                        <button
-                          onClick={() =>
-                            update(row.id, {
-                              discountActive: !row.discountActive,
-                            })
-                          }
-                          className={`relative mx-auto flex h-5 w-8 flex-shrink-0 items-center rounded-full transition-colors ${
-                            row.discountActive && !expired
-                              ? "bg-green-500"
-                              : "bg-gray-200"
-                          }`}
-                        >
-                          <span
-                            className={`absolute h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                              row.discountActive && !expired
-                                ? "translate-x-3.5"
-                                : "translate-x-0.5"
-                            }`}
-                          />
-                        </button>
-                      ) : (
-                        <span className="text-gray-200">—</span>
-                      )}
-                    </td>
-                    <td className="px-2 py-1.5 text-right font-mono text-xs font-bold text-gray-800">
-                      {finalPrice.toFixed(2)}€
-                    </td>
-                    <td
-                      className={`px-2 py-1.5 text-right font-mono text-xs font-bold ${margin >= 30 ? "text-green-600" : margin >= 15 ? "text-amber-600" : "text-red-500"}`}
-                    >
-                      {margin}%
                     </td>
                   </tr>
                 );
@@ -862,7 +813,7 @@ export default function PreciosPage() {
               {pageRows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={12}
+                    colSpan={9}
                     className="px-4 py-12 text-center text-sm text-gray-400"
                   >
                     No se encontraron productos con los filtros aplicados.

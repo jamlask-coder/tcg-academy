@@ -71,8 +71,8 @@ type FormData = z.infer<typeof schema>;
 
 const TCG_GAMES = [
   "Magic: The Gathering",
-  "Pokémon TCG",
-  "One Piece TCG",
+  "Pokémon",
+  "One Piece",
   "Riftbound",
   "Yu-Gi-Oh!",
   "Disney Lorcana",

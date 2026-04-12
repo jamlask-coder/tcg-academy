@@ -1866,6 +1866,20 @@ export const MOCK_MESSAGES: AppMessage[] = [
 export const MSG_STORAGE_KEY = "tcgacademy_messages";
 export const ORDER_STORAGE_KEY = "tcgacademy_admin_orders";
 
+/** Returns the number of orders with adminStatus === "pendiente_envio". */
+export function countPendingOrders(): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = localStorage.getItem(ORDER_STORAGE_KEY);
+    const orders = (raw ? JSON.parse(raw) : null) ?? ADMIN_ORDERS;
+    return (orders as { adminStatus: string }[]).filter(
+      (o) => o.adminStatus === "pendiente_envio",
+    ).length;
+  } catch {
+    return 0;
+  }
+}
+
 // ─── Broadcast messaging ──────────────────────────────────────────────────────
 
 export type BroadcastChannel = "interno" | "email" | "ambos";

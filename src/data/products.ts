@@ -44,7 +44,7 @@ export const GAME_CONFIG: Record<
     emoji: "🧙",
   },
   pokemon: {
-    name: "Pokémon TCG",
+    name: "Pokémon",
     color: "#f59e0b",
     bgColor: "#fef3c7",
     description:
@@ -52,7 +52,7 @@ export const GAME_CONFIG: Record<
     emoji: "⚡",
   },
   "one-piece": {
-    name: "One Piece Card Game",
+    name: "One Piece",
     color: "#1d4ed8",
     bgColor: "#dbeafe",
     description:

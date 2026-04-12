@@ -87,8 +87,8 @@ const SOLUTIONS = [
 
 const GAMES = [
   { name: "Magic: The Gathering", abbrev: "MTG", color: "#7c3aed" },
-  { name: "Pokémon TCG", abbrev: "PKM", color: "#f59e0b" },
-  { name: "One Piece TCG", abbrev: "OP", color: "#dc2626" },
+  { name: "Pokémon", abbrev: "PKM", color: "#f59e0b" },
+  { name: "One Piece", abbrev: "OP", color: "#dc2626" },
   { name: "Riftbound", abbrev: "RB", color: "#0f766e" },
   { name: "Yu-Gi-Oh!", abbrev: "YGO", color: "#b45309" },
   { name: "Disney Lorcana", abbrev: "LOR", color: "#0891b2" },

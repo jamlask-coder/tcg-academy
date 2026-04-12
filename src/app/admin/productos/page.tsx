@@ -775,9 +775,6 @@ export default function AdminProductosPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="w-10 px-4 py-3 text-left font-semibold text-gray-600">
-                  #
-                </th>
                 <th className="px-3 py-3 text-left font-semibold text-gray-600">
                   Producto
                 </th>
@@ -815,9 +812,6 @@ export default function AdminProductosPage() {
                     key={p.id}
                     className={`border-b border-gray-100 transition hover:bg-gray-50 ${hasEdit ? "bg-amber-50" : ""}`}
                   >
-                    <td className="px-4 py-3 text-xs text-gray-400">
-                      {(page - 1) * PAGE_SIZE + i + 1}
-                    </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-3">
                         {p.images[0] ? (

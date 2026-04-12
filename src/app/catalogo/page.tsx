@@ -1,12 +1,41 @@
 "use client";
 import { useState, useMemo, useEffect } from "react";
-import { Search, SlidersHorizontal, X, ChevronDown } from "lucide-react";
+import { SlidersHorizontal, X, ChevronDown, ArrowLeft, Layers } from "lucide-react";
 import { GAME_CONFIG } from "@/data/products";
 import type { LocalProduct } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
 import { LocalProductCard } from "@/components/product/LocalProductCard";
 import Link from "next/link";
-import { CategoryTags } from "@/components/filters/CategoryTags";
+
+// ── Game logo mapping ─────────────────────────────────────────────────────────
+const LOGO_MAP: Record<string, string> = {
+  magic: "magic.svg",
+  pokemon: "pokemon.svg",
+  "one-piece": "onepiece.svg",
+  riftbound: "riftbound.svg",
+  lorcana: "lorcana.png",
+  "dragon-ball": "dragonball.png",
+  yugioh: "yugioh.png",
+  naruto: "naruto.svg",
+  digimon: "digimon.svg",
+  topps: "topps.svg",
+  panini: "panini.png",
+};
+
+// Ordered following the desktop nav
+const GAMES_ORDER = [
+  "magic",
+  "pokemon",
+  "one-piece",
+  "riftbound",
+  "lorcana",
+  "dragon-ball",
+  "yugioh",
+  "naruto",
+  "digimon",
+  "topps",
+  "panini",
+];
 
 const SORT_OPTIONS = [
   { value: "new", label: "Más recientes primero" },
@@ -21,12 +50,13 @@ export default function CatalogoPage() {
   const [allProducts, setAllProducts] = useState<LocalProduct[]>(() =>
     getMergedProducts(),
   );
-  const [search, setSearch] = useState("");
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [sort, setSort] = useState("new");
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [inStockOnly, setInStockOnly] = useState(false);
+  // Mobile: start on game picker screen; go to products after selecting a game
+  const [mobilePicker, setMobilePicker] = useState(true);
 
   // Re-load when admin adds/edits products
   useEffect(() => {
@@ -41,20 +71,10 @@ export default function CatalogoPage() {
     };
   }, []);
 
-  const games = Object.entries(GAME_CONFIG);
-
   const filtered = useMemo(() => {
     let list = [...allProducts];
     if (selectedGame) list = list.filter((p) => p.game === selectedGame);
     if (inStockOnly) list = list.filter((p) => p.inStock);
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.tags.some((t) => t.toLowerCase().includes(q)),
-      );
-    }
     if (sort === "new") {
       // Sort by createdAt descending — most recently added first.
       // Admin products without createdAt fall back to their timestamp-based ID.
@@ -81,15 +101,105 @@ export default function CatalogoPage() {
       list = [...list].sort((a, b) => b.price - a.price);
     }
     return list;
-  }, [allProducts, selectedGame, inStockOnly, search, sort]);
+  }, [allProducts, selectedGame, inStockOnly, sort]);
 
   const visible = filtered.slice(0, page * PAGE_SIZE);
   const hasMore = visible.length < filtered.length;
 
+  function selectGameMobile(slug: string) {
+    setSelectedGame(slug);
+    setPage(1);
+    setMobilePicker(false);
+  }
+
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
-      {/* Header */}
-      <div className="mb-8">
+
+      {/* ── Mobile game picker screen ─────────────────────────── */}
+      {mobilePicker && (
+        <div className="md:hidden">
+          <div className="mb-6">
+            <h1 className="mb-1 text-2xl font-black text-gray-900">
+              Explorar catálogo
+            </h1>
+            <p className="text-sm text-gray-500">
+              Elige tu juego favorito
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {GAMES_ORDER.filter((slug) => GAME_CONFIG[slug]).map((slug) => {
+              const cfg = GAME_CONFIG[slug];
+              const logo = LOGO_MAP[slug];
+              return (
+                <button
+                  key={slug}
+                  onClick={() => selectGameMobile(slug)}
+                  className="group relative overflow-hidden rounded-2xl text-left transition-transform active:scale-95"
+                  style={{
+                    background: `linear-gradient(135deg, ${cfg.color}dd 0%, ${cfg.color}99 100%)`,
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                >
+                  {/* Subtle shimmer overlay */}
+                  <div className="absolute inset-0 bg-white/5" />
+                  <div className="relative flex flex-col items-center justify-center px-3 py-5 gap-3">
+                    {/* Logo */}
+                    {logo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`/images/logos/${logo}`}
+                        alt={cfg.name}
+                        className="h-14 w-auto object-contain drop-shadow-lg"
+                        style={{ maxWidth: "100%" }}
+                      />
+                    ) : (
+                      <span className="text-4xl" aria-hidden="true">
+                        {cfg.emoji}
+                      </span>
+                    )}
+                    {/* Name */}
+                    <span className="text-center text-xs font-bold leading-tight text-white drop-shadow">
+                      {cfg.name}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Ver todo */}
+          <button
+            onClick={() => {
+              setSelectedGame(null);
+              setMobilePicker(false);
+            }}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-gray-200 py-4 text-sm font-semibold text-gray-600 transition active:bg-gray-50"
+          >
+            <Layers size={16} />
+            Ver todo el catálogo
+          </button>
+        </div>
+      )}
+
+      {/* ── Mobile: products view (after picking a game) ─────── */}
+      {!mobilePicker && (
+        <div className="mb-4 md:hidden">
+          <button
+            onClick={() => setMobilePicker(true)}
+            className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 transition active:bg-gray-50"
+          >
+            <ArrowLeft size={15} />
+            Todos los juegos
+          </button>
+        </div>
+      )}
+
+      {/* ── Rest of page: hidden on mobile picker view ───────── */}
+      <div className={mobilePicker ? "hidden md:block" : ""}>
+
+      {/* Header — desktop only (mobile has its own above) */}
+      <div className="mb-8 hidden md:block">
         <h1 className="mb-1 text-2xl font-bold text-gray-900 md:text-3xl">
           Catálogo completo
         </h1>
@@ -98,64 +208,9 @@ export default function CatalogoPage() {
         </p>
       </div>
 
-      {/* Game filter pills */}
-      <div className="mb-6">
-        <CategoryTags
-          items={[
-            {
-              id: "all",
-              label: "Todos",
-              onClick: () => {
-                setSelectedGame(null);
-                setPage(1);
-              },
-            },
-            ...games.map(([slug, { name }]) => ({
-              id: slug,
-              label: name,
-              onClick: () => {
-                setSelectedGame(selectedGame === slug ? null : slug);
-                setPage(1);
-              },
-            })),
-          ]}
-          activeId={selectedGame ?? "all"}
-          color={
-            selectedGame
-              ? (GAME_CONFIG[selectedGame]?.color ?? "#2563eb")
-              : "#2563eb"
-          }
-        />
-      </div>
-
-      {/* Search + sort + filters bar */}
-      <div className="mb-6 flex flex-wrap gap-3">
+      {/* Sort + filters bar */}
+      <div className="mb-6 flex gap-3">
         <div className="relative flex-1">
-          <Search
-            size={16}
-            className="absolute top-1/2 left-3.5 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Buscar cartas, sobres, mazos..."
-            className="h-11 w-full rounded-xl border-2 border-gray-200 pr-4 pl-10 text-sm transition focus:border-[#2563eb] focus:outline-none"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
-
-        <div className="relative">
           <select
             value={sort}
             onChange={(e) => {
@@ -237,9 +292,9 @@ export default function CatalogoPage() {
         </div>
       )}
 
-      {/* Active game filter label */}
+      {/* Game name label (desktop) */}
       {selectedGame && (
-        <div className="mb-4 text-sm text-gray-500">
+        <div className="mb-4 hidden items-center gap-2 text-sm text-gray-500 md:flex">
           Mostrando:{" "}
           <Link
             href={`/${selectedGame}`}
@@ -249,7 +304,8 @@ export default function CatalogoPage() {
           </Link>
           <button
             onClick={() => setSelectedGame(null)}
-            className="ml-2 text-gray-400 hover:text-gray-600"
+            aria-label="Quitar filtro de juego"
+            className="ml-1 text-gray-400 hover:text-gray-600"
           >
             <X size={12} />
           </button>
@@ -259,22 +315,20 @@ export default function CatalogoPage() {
       {/* Products grid */}
       {filtered.length === 0 ? (
         <div className="py-24 text-center">
-          <Search size={48} className="mx-auto mb-4 text-gray-200" />
           <h2 className="mb-2 text-xl font-bold text-gray-700">
             No se encontraron productos
           </h2>
           <p className="mb-6 text-gray-500">
-            Prueba con otros términos o elimina los filtros
+            Prueba a cambiar los filtros
           </p>
           <button
             onClick={() => {
-              setSearch("");
               setSelectedGame(null);
               setInStockOnly(false);
             }}
             className="rounded-xl bg-[#2563eb] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
           >
-            Limpiar todo
+            Limpiar filtros
           </button>
         </div>
       ) : (
@@ -299,6 +353,7 @@ export default function CatalogoPage() {
           )}
         </>
       )}
+      </div>{/* end products wrapper */}
     </div>
   );
 }

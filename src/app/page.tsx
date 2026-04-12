@@ -121,11 +121,41 @@ export default function HomePage() {
                 </span>
               </h1>
 
-              <p className="mb-10 max-w-xl text-lg leading-relaxed text-blue-200/80 md:text-xl">
+              {/* Desktop subtitle */}
+              <p className="mb-10 hidden max-w-xl text-lg leading-relaxed text-blue-200/80 md:block md:text-xl">
                 Pokémon, Magic, One Piece, Riftbound y más.
-                <br className="hidden md:block" />
+                <br />
                 Envío en menos de 24 horas. 4 tiendas físicas.
               </p>
+
+              {/* Mobile: stores grid + B2B pill */}
+              <div className="mb-10 md:hidden">
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  {[
+                    { city: "Madrid", href: "/tiendas/madrid" },
+                    { city: "Barcelona", href: "/tiendas/barcelona" },
+                    { city: "Calpe", href: "/tiendas/calpe" },
+                    { city: "Béjar", href: "/tiendas/bejar" },
+                  ].map(({ city, href }) => (
+                    <Link
+                      key={city}
+                      href={href}
+                      className="flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2.5 transition active:bg-white/20"
+                      style={{ WebkitTapHighlightColor: "transparent" }}
+                    >
+                      <span className="h-2 w-2 flex-shrink-0 rounded-full bg-blue-300" aria-hidden="true" />
+                      <span className="text-sm font-semibold text-white">{city}</span>
+                    </Link>
+                  ))}
+                </div>
+                <Link
+                  href="/mayoristas/b2b"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 px-3 py-1.5 text-xs font-bold text-amber-300 transition active:bg-amber-400/30"
+                >
+                  <Store size={11} />
+                  Profesionales B2B — hasta 30% dto.
+                </Link>
+              </div>
 
               {/* CTAs */}
               <div className="mb-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
