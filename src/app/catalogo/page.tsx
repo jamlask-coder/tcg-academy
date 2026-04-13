@@ -1,7 +1,8 @@
 "use client";
-import { useState, useMemo, useEffect } from "react";
+import { Suspense, useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { SlidersHorizontal, X, ChevronDown, ArrowLeft, Layers } from "lucide-react";
-import { GAME_CONFIG } from "@/data/products";
+import { GAME_CONFIG, isNewProduct } from "@/data/products";
 import type { LocalProduct } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
 import { LocalProductCard } from "@/components/product/LocalProductCard";
@@ -46,7 +47,16 @@ const SORT_OPTIONS = [
 
 const PAGE_SIZE = 24;
 
-export default function CatalogoPage() {
+export default function CatalogoPageWrapper() {
+  return (
+    <Suspense>
+      <CatalogoPage />
+    </Suspense>
+  );
+}
+
+function CatalogoPage() {
+  const searchParams = useSearchParams();
   const [allProducts, setAllProducts] = useState<LocalProduct[]>(() =>
     getMergedProducts(),
   );
@@ -55,8 +65,19 @@ export default function CatalogoPage() {
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [inStockOnly, setInStockOnly] = useState(false);
+  const [newOnly, setNewOnly] = useState(false);
   // Mobile: start on game picker screen; go to products after selecting a game
   const [mobilePicker, setMobilePicker] = useState(true);
+
+  // Apply ?filter=nuevo from URL on mount
+  useEffect(() => {
+    if (searchParams.get("filter") === "nuevo") {
+      setNewOnly(true);
+      setFiltersOpen(true);
+      setMobilePicker(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Re-load when admin adds/edits products
   useEffect(() => {
@@ -75,6 +96,7 @@ export default function CatalogoPage() {
     let list = [...allProducts];
     if (selectedGame) list = list.filter((p) => p.game === selectedGame);
     if (inStockOnly) list = list.filter((p) => p.inStock);
+    if (newOnly) list = list.filter((p) => isNewProduct(p));
     if (sort === "new") {
       // Sort by createdAt descending — most recently added first.
       // Admin products without createdAt fall back to their timestamp-based ID.
@@ -101,7 +123,7 @@ export default function CatalogoPage() {
       list = [...list].sort((a, b) => b.price - a.price);
     }
     return list;
-  }, [allProducts, selectedGame, inStockOnly, sort]);
+  }, [allProducts, selectedGame, inStockOnly, newOnly, sort]);
 
   const visible = filtered.slice(0, page * PAGE_SIZE);
   const hasMore = visible.length < filtered.length;
@@ -113,7 +135,7 @@ export default function CatalogoPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
+    <div className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6 sm:py-5">
 
       {/* ── Mobile game picker screen ─────────────────────────── */}
       {mobilePicker && (
@@ -199,17 +221,8 @@ export default function CatalogoPage() {
       <div className={mobilePicker ? "hidden md:block" : ""}>
 
       {/* Header — desktop only (mobile has its own above) */}
-      <div className="mb-8 hidden md:block">
-        <h1 className="mb-1 text-2xl font-bold text-gray-900 md:text-3xl">
-          Catálogo completo
-        </h1>
-        <p className="text-gray-500">
-          {allProducts.length} referencias de los mejores juegos TCG
-        </p>
-      </div>
-
       {/* Sort + filters bar */}
-      <div className="mb-6 flex gap-3">
+      <div className="mb-3 flex gap-3">
         <div className="relative flex-1">
           <select
             value={sort}
@@ -247,7 +260,7 @@ export default function CatalogoPage() {
 
       {/* Filter panel */}
       {filtersOpen && (
-        <div className="mb-6 flex flex-wrap items-center gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-5">
+        <div className="mb-3 flex flex-wrap items-center gap-4 rounded-2xl border border-gray-200 bg-gray-50 p-4">
           <label className="flex cursor-pointer items-center gap-2.5 select-none">
             <div
               className={`flex h-5 w-5 items-center justify-center rounded border-2 transition ${
@@ -280,10 +293,45 @@ export default function CatalogoPage() {
               Solo en stock
             </span>
           </label>
-          {inStockOnly && (
+          <label className="flex cursor-pointer items-center gap-2.5 select-none">
+            <div
+              className={`flex h-5 w-5 items-center justify-center rounded border-2 transition ${
+                newOnly
+                  ? "border-[#2563eb] bg-[#2563eb]"
+                  : "border-gray-300"
+              }`}
+              onClick={() => {
+                setNewOnly(!newOnly);
+                setPage(1);
+              }}
+            >
+              {newOnly && (
+                <svg
+                  className="h-3 w-3 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={3}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              )}
+            </div>
+            <span className="text-sm font-medium text-gray-700">
+              Solo novedades
+            </span>
+          </label>
+          {(inStockOnly || newOnly) && (
             <button
               aria-label="Limpiar filtros"
-              onClick={() => setInStockOnly(false)}
+              onClick={() => {
+                setInStockOnly(false);
+                setNewOnly(false);
+              }}
               className="flex items-center gap-1 text-sm font-medium text-red-500 hover:text-red-600"
             >
               <X size={13} /> Limpiar filtros
@@ -294,7 +342,7 @@ export default function CatalogoPage() {
 
       {/* Game name label (desktop) */}
       {selectedGame && (
-        <div className="mb-4 hidden items-center gap-2 text-sm text-gray-500 md:flex">
+        <div className="mb-2 hidden items-center gap-2 text-sm text-gray-500 md:flex">
           Mostrando:{" "}
           <Link
             href={`/${selectedGame}`}
@@ -325,6 +373,7 @@ export default function CatalogoPage() {
             onClick={() => {
               setSelectedGame(null);
               setInStockOnly(false);
+              setNewOnly(false);
             }}
             className="rounded-xl bg-[#2563eb] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
           >
@@ -333,9 +382,6 @@ export default function CatalogoPage() {
         </div>
       ) : (
         <>
-          <p className="mb-4 text-sm text-gray-500">
-            {filtered.length} productos
-          </p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {visible.map((p) => (
               <LocalProductCard key={p.id} product={p} />
@@ -347,7 +393,7 @@ export default function CatalogoPage() {
                 onClick={() => setPage((prev) => prev + 1)}
                 className="rounded-xl border-2 border-[#2563eb] bg-white px-10 py-3.5 font-bold text-[#2563eb] transition hover:bg-[#2563eb] hover:text-white"
               >
-                Cargar mas productos
+                Cargar más productos
               </button>
             </div>
           )}

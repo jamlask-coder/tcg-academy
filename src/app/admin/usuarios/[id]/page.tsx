@@ -16,15 +16,17 @@ import {
   Mail,
   Phone,
   MapPin,
+  Star,
 } from "lucide-react";
 import { B2BCharts } from "@/components/account/B2BCharts";
 import { SendCouponButton } from "@/components/admin/SendCouponModal";
 import { UserRoleManager } from "@/components/admin/UserRoleManager";
+import { VisitChart } from "@/components/account/VisitChart";
 
 const ROLE_COLORS: Record<string, string> = {
   cliente: "bg-gray-100 text-gray-600",
   mayorista: "bg-blue-100 text-blue-700",
-  tienda: "bg-purple-100 text-purple-700",
+  tienda: "bg-green-100 text-green-700",
   admin: "bg-amber-100 text-amber-700",
 };
 
@@ -85,6 +87,20 @@ export default async function AdminUsuarioDetailPage({
     .sort((a, b) => b.gasto - a.gasto)
     .slice(0, 6);
 
+  // Simulated visit data based on userId hash (deterministic per user)
+  const seed = user.id.split("").reduce((s, c) => s + c.charCodeAt(0), 0);
+  const visitData: { month: string; visitas: number }[] = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const label = MONTH_MAP[String(d.getMonth() + 1).padStart(2, "0")] ?? String(d.getMonth() + 1);
+    const base = user.role === "mayorista" ? 18 : user.role === "tienda" ? 25 : 8;
+    const visits = Math.max(1, base + ((seed * (i + 3) * 7) % 15) - 5);
+    visitData.push({ month: label, visitas: visits });
+  }
+  const totalVisits = visitData.reduce((s, d) => s + d.visitas, 0);
+  const avgVisits = Math.round(totalVisits / visitData.length);
+  const pageViews = Math.round(totalVisits * (2.5 + (seed % 30) / 10));
+
   const roleColor =
     user.role === "tienda"
       ? "#7c3aed"
@@ -94,25 +110,31 @@ export default async function AdminUsuarioDetailPage({
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6">
-      {/* Back + actions */}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
+      {/* Back */}
+      <div className="mb-4">
         <Link
           href="/admin/usuarios"
           className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-800"
         >
           <ArrowLeft size={16} /> Volver a usuarios
         </Link>
-        <div className="ml-auto">
-          <SendCouponButton
-            userId={user.id}
-            userName={user.name}
-            userLastName={user.lastName}
-            userEmail={user.email}
-          />
-        </div>
       </div>
 
-      {/* Header card */}
+      {/* Actions + Header card */}
+      <div className="mb-6 flex flex-wrap items-center justify-end gap-2">
+        <SendCouponButton
+          userId={user.id}
+          userName={user.name}
+          userLastName={user.lastName}
+          userEmail={user.email}
+        />
+        <Link
+          href="/admin/bonos"
+          className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-700 transition hover:bg-amber-100"
+        >
+          <Star size={14} /> Enviar puntos
+        </Link>
+      </div>
       <div className="mb-6 rounded-2xl bg-gradient-to-br from-[#2563eb] to-[#3b82f6] p-6 text-white">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-2xl font-black">
@@ -195,8 +217,18 @@ export default async function AdminUsuarioDetailPage({
               monthlyData={monthlyData}
               gameData={gameData}
               roleColor={roleColor}
+              orders={userOrders}
             />
           </div>
+
+          {/* Visits chart */}
+          <VisitChart
+            visitData={visitData}
+            totalVisits={totalVisits}
+            avgVisits={avgVisits}
+            pageViews={pageViews}
+            roleColor={roleColor}
+          />
 
           {/* Recent orders */}
           <div className="rounded-2xl border border-gray-200 bg-white">
@@ -212,11 +244,15 @@ export default async function AdminUsuarioDetailPage({
             ) : (
               <div className="divide-y divide-gray-100">
                 {userOrders.map((order) => (
-                  <div key={order.id} className="flex items-center gap-4 px-5 py-3 text-sm">
-                    <span className="font-mono font-semibold text-gray-800">{order.id}</span>
+                  <Link
+                    key={order.id}
+                    href={`/admin/pedidos/${order.id}`}
+                    className="flex items-center gap-4 px-5 py-3 text-sm transition hover:bg-blue-50"
+                  >
+                    <span className="font-mono font-semibold text-[#2563eb]">{order.id}</span>
                     <span className="flex-1 text-gray-400">{order.date}</span>
                     <span className="font-bold text-gray-900">{order.total.toFixed(2)}€</span>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}

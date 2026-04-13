@@ -15,11 +15,11 @@ export const metadata: Metadata = { title: "Eventos TCG — TCG Academy" };
 const EVENTS = [
   {
     id: 1,
-    game: "Pokemon",
+    game: "Pokémon",
     gameColor: "#f59e0b",
     gameBg: "#fef3c7",
     type: "Pre-Release",
-    title: "Pre-Release Escarlata y Purpura: Mascaras del Crepusculo",
+    title: "Pre-Release Escarlata y Púrpura: Máscaras del Crepúsculo",
     date: "2026-04-05",
     time: "11:00",
     store: "Calpe",
@@ -28,7 +28,7 @@ const EVENTS = [
     slotsLeft: 8,
     price: 30,
     desc: "Participa en la pre-release oficial del nuevo set. Recibe tu kit exclusivo y compite por premios.",
-    badge: "PROXIMAMENTE",
+    badge: "PRÓXIMAMENTE",
   },
   {
     id: 2,
@@ -62,7 +62,7 @@ const EVENTS = [
     slotsLeft: 22,
     price: 20,
     desc: "Torneo regional con formato Advanced oficial. Sistema suizo + top 8. Premios exclusivos para los mejores.",
-    badge: "INSCRIPCION ABIERTA",
+    badge: "INSCRIPCIÓN ABIERTA",
   },
   {
     id: 4,
@@ -73,7 +73,7 @@ const EVENTS = [
     title: "Liga Lorcana — Semana 12",
     date: "2026-04-06",
     time: "17:00",
-    store: "Bejar",
+    store: "Béjar",
     storeId: "bejar",
     slots: 24,
     slotsLeft: 12,
@@ -83,7 +83,7 @@ const EVENTS = [
   },
   {
     id: 5,
-    game: "Dragon Ball Super CG",
+    game: "Dragon Ball",
     gameColor: "#d97706",
     gameBg: "#fef3c7",
     type: "Torneo Mensual",
@@ -95,12 +95,12 @@ const EVENTS = [
     slots: 32,
     slotsLeft: 18,
     price: 10,
-    desc: "El torneo mensual de Dragon Ball Super CG. Sistema suizo, formato oficial. Premios para top 4.",
-    badge: "INSCRIPCION ABIERTA",
+    desc: "El torneo mensual de Dragon Ball. Sistema suizo, formato oficial. Premios para top 4.",
+    badge: "INSCRIPCIÓN ABIERTA",
   },
   {
     id: 6,
-    game: "Pokemon",
+    game: "Pokémon",
     gameColor: "#f59e0b",
     gameBg: "#fef3c7",
     type: "Campeonato",
@@ -127,7 +127,7 @@ const PAST_EVENTS = [
   },
   {
     title: "Pre-Release Temporal Forces",
-    game: "Pokemon",
+    game: "Pokémon",
     date: "2026-03-16",
     participants: 28,
     gameColor: "#f59e0b",
@@ -184,7 +184,7 @@ export default function EventosPage() {
       <div className="border-b border-gray-100 bg-white">
         <div className="mx-auto flex max-w-[1400px] flex-wrap justify-center gap-6 px-6 py-4">
           {[
-            ["6", "Eventos proximos"],
+            ["6", "Eventos próximos"],
             ["4", "Tiendas con torneos"],
             ["6", "Juegos representados"],
             ["Gratis", "Entrada ligas casuales"],
@@ -200,7 +200,7 @@ export default function EventosPage() {
       {/* Events */}
       <div className="mx-auto max-w-[1400px] px-6 py-12">
         <h2 className="mb-6 flex items-center gap-2 text-xl font-bold text-gray-900">
-          <Calendar size={20} className="text-[#2563eb]" /> Proximos eventos
+          <Calendar size={20} className="text-[#2563eb]" /> Próximos eventos
         </h2>
 
         <div className="space-y-4">
@@ -256,7 +256,7 @@ export default function EventosPage() {
                         )}
                         {days <= 7 && days >= 0 && (
                           <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-bold text-orange-600">
-                            {days === 0 ? "HOY" : `En ${days} dias`}
+                            {days === 0 ? "HOY" : `En ${days} días`}
                           </span>
                         )}
                       </div>
@@ -327,7 +327,7 @@ export default function EventosPage() {
               <h3 className="text-xl font-bold">Organiza tu propio torneo</h3>
             </div>
             <p className="max-w-md text-sm text-blue-200">
-              Tenemos espacio, mesas y todo lo necesario. Contactanos y montamos
+              Tenemos espacio, mesas y todo lo necesario. Contáctanos y montamos
               el evento perfecto para tu comunidad.
             </p>
           </div>

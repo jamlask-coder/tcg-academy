@@ -22,11 +22,12 @@ interface Props {
 }
 
 function LocalProductCardInner({ product }: Props) {
-  const { addItem } = useCart();
+  const { addItem, items, updateQty, removeItem } = useCart();
   const { user, toggleFavorite, isFavorite } = useAuth();
   const isAdmin = user?.role === "admin";
 
   const [added, setAdded] = useState(false);
+  const [limitMsg, setLimitMsg] = useState<string | undefined>(undefined);
   const [hovered, setHovered] = useState(false);
   const [inlineComparePrice, setInlineComparePrice] = useState<
     number | undefined
@@ -49,12 +50,22 @@ function LocalProductCardInner({ product }: Props) {
 
   const favorited = isFavorite(product.id);
 
+  const isOutOfStock = !product.inStock || (typeof product.stock === "number" && product.stock === 0);
+  const cartKey = `item_${product.id}`;
+  const cartItem = items.find((i) => i.key === cartKey);
+  const cartQty = cartItem?.quantity ?? 0;
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (!product.inStock) return;
-    addItem(product.id, product.name, displayPrice, image ?? "");
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
+    if (isOutOfStock) return;
+    const result = addItem(product.id, product.name, displayPrice, image ?? "");
+    if (result.added) {
+      setAdded(true);
+      setTimeout(() => setAdded(false), 2000);
+    } else {
+      setLimitMsg(result.reason);
+      setTimeout(() => setLimitMsg(undefined), 3000);
+    }
   };
 
   const handleFavoriteToggle = (e: React.MouseEvent) => {
@@ -76,7 +87,7 @@ function LocalProductCardInner({ product }: Props) {
 
   // Singles/card categories get portrait TCG-card aspect ratio
   const isSingles = isCardCategory;
-  const imageAspect = isSingles ? "aspect-[5/7]" : "aspect-[4/5]";
+  const imageAspect = isSingles ? "aspect-[5/7]" : "aspect-square";
   const imageObjectFit = "object-contain p-2";
   // Show second image on hover if available
   const displayImage = hovered && product.images[1] ? product.images[1] : image;
@@ -86,7 +97,7 @@ function LocalProductCardInner({ product }: Props) {
     <Link
       href={href}
       className={`relative block ${imageAspect} flex-shrink-0 overflow-hidden`}
-      style={{ background: `linear-gradient(145deg, ${color}0d, ${color}18)` }}
+      style={{ background: "#ffffff" }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -102,7 +113,7 @@ function LocalProductCardInner({ product }: Props) {
         <div
           className={`flex h-full w-full flex-col items-center justify-center gap-3 p-4 ${!product.inStock ? "opacity-50" : ""}`}
           style={{
-            background: `linear-gradient(135deg, ${color}18, ${color}30)`,
+            background: "#ffffff",
           }}
         >
           <span className="text-5xl">{config?.emoji ?? "🃏"}</span>
@@ -127,7 +138,7 @@ function LocalProductCardInner({ product }: Props) {
           comparePrice={effectiveComparePrice}
           onSave={setInlineComparePrice}
         />
-        {user && (
+        {user && user.role !== "admin" && (
           <button
             onClick={handleFavoriteToggle}
             aria-label={favorited ? "Quitar de favoritos" : "Añadir a favoritos"}
@@ -144,53 +155,87 @@ function LocalProductCardInner({ product }: Props) {
 
       {/* ── ESQUINA SUPERIOR DERECHA: bandera de idioma + estado stock ── */}
       <div className="absolute top-2 right-2 z-10 flex flex-col items-end gap-1">
-        {product.language && <LanguageFlag language={product.language} />}
-        {!product.inStock && (
+        {product.language && <LanguageFlag language={product.language} size="md" />}
+        {isOutOfStock && (
           <span className="rounded-full bg-gray-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
             AGOTADO
           </span>
         )}
       </div>
 
-      {/* ── FRANJA INFERIOR: Añadir al carrito + Vista rápida (desktop hover) ── */}
-      {product.inStock && (
+      {/* ── FRANJA INFERIOR: Añadir al carrito (desktop hover) ── */}
+      {!isOutOfStock && (
         <div className="absolute right-0 bottom-0 left-0 hidden translate-y-2 opacity-0 transition-all duration-200 ease-out group-hover:translate-y-0 group-hover:opacity-100 sm:block">
           <div className="bg-gradient-to-t from-black/60 via-black/25 to-transparent px-2 pt-8 pb-2">
-            <div className="flex gap-1.5">
+            {cartQty > 0 ? (
+              <div className="flex items-center justify-center gap-0.5">
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (cartQty <= 1) removeItem(cartKey);
+                    else updateQty(cartKey, cartQty - 1);
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-l-lg bg-white text-gray-700 shadow-lg transition hover:bg-gray-100"
+                  aria-label="Quitar uno"
+                >
+                  −
+                </button>
+                <span className="flex h-8 min-w-[32px] items-center justify-center bg-white px-2 text-sm font-bold text-gray-900 shadow-lg">
+                  {cartQty}
+                </span>
+                <button
+                  onClick={handleAddToCart}
+                  className="flex h-8 w-8 items-center justify-center rounded-r-lg bg-white text-gray-700 shadow-lg transition hover:bg-gray-100"
+                  aria-label="Añadir uno más"
+                >
+                  +
+                </button>
+              </div>
+            ) : (
               <button
                 onClick={handleAddToCart}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-bold shadow-lg transition-all ${
-                  added
-                    ? "bg-green-500 text-white"
-                    : "bg-white text-gray-900 hover:bg-gray-50"
-                }`}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-white py-2 text-sm font-bold text-gray-900 shadow-lg transition-all duration-200 hover:bg-amber-50 hover:text-amber-700 hover:scale-[1.02]"
               >
-                {added ? (
-                  <>
-                    <Check size={14} /> Añadido
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart size={14} /> Añadir
-                  </>
-                )}
+                <ShoppingCart size={14} /> Añadir
               </button>
-            </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* ── MÓVIL: icono carrito (abajo a la derecha, siempre visible) ── */}
-      {product.inStock && (
-        <button
-          onClick={handleAddToCart}
-          aria-label="Añadir al carrito"
-          className={`absolute right-2 bottom-2 z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-md transition-all sm:hidden ${
-            added ? "bg-green-500 text-white" : "bg-white text-gray-700"
-          }`}
-        >
-          {added ? <Check size={15} /> : <ShoppingCart size={15} />}
-        </button>
+      {/* ── MÓVIL: carrito (abajo a la derecha, siempre visible) ── */}
+      {!isOutOfStock && (
+        cartQty > 0 ? (
+          <div className="absolute right-1.5 bottom-1.5 z-10 flex items-center gap-0 rounded-full bg-white shadow-md sm:hidden">
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                if (cartQty <= 1) removeItem(cartKey);
+                else updateQty(cartKey, cartQty - 1);
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-l-full text-xs font-bold text-gray-700"
+              aria-label="Quitar uno"
+            >
+              −
+            </button>
+            <span className="min-w-[18px] text-center text-xs font-bold text-gray-900">{cartQty}</span>
+            <button
+              onClick={handleAddToCart}
+              className="flex h-7 w-7 items-center justify-center rounded-r-full text-xs font-bold text-gray-700"
+              aria-label="Añadir uno más"
+            >
+              +
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleAddToCart}
+            aria-label="Añadir al carrito"
+            className="absolute right-2 bottom-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md transition-all sm:hidden"
+          >
+            <ShoppingCart size={15} className="text-gray-700" />
+          </button>
+        )
       )}
     </Link>
   );
@@ -236,6 +281,7 @@ function LocalProductCardInner({ product }: Props) {
               <span className="text-sm font-bold" style={{ color }}>
                 {displayPrice.toFixed(2)}€
               </span>
+              <span className="text-[10px] text-gray-300">IVA incl.</span>
               {effectiveHasDiscount && (
                 <span className="text-xs text-gray-400 line-through">
                   {effectiveComparePrice!.toFixed(2)}€
@@ -243,7 +289,16 @@ function LocalProductCardInner({ product }: Props) {
               )}
             </div>
           </div>
-          <span className="text-[10px] text-gray-300">IVA incluido</span>
+          {typeof product.maxPerUser === "number" && (
+            <span className="text-[10px] text-gray-400">
+              Máx. {product.maxPerUser} uds/persona
+            </span>
+          )}
+          {limitMsg && (
+            <span className="text-[10px] font-semibold text-red-500">
+              {limitMsg}
+            </span>
+          )}
         </div>
       </div>
 

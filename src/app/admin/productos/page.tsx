@@ -19,12 +19,11 @@ import {
   Pencil,
   Copy,
   Trash2,
-  Download,
+
   ChevronUp,
   Tag,
 } from "lucide-react";
 import Link from "next/link";
-import { calcVAT, IVA_GENERAL } from "@/hooks/usePrice";
 
 const EMPTY_FORM = {
   name: "",
@@ -38,6 +37,8 @@ const EMPTY_FORM = {
   inStock: true,
   isNew: true,
   tags: "",
+  stock: "",
+  maxPerUser: "",
 };
 type QuickForm = typeof EMPTY_FORM;
 
@@ -85,55 +86,6 @@ export default function AdminProductosPage() {
   });
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [bulkPct, setBulkPct] = useState("");
-  const [bulkField, setBulkField] = useState<
-    "price" | "wholesalePrice" | "storePrice"
-  >("price");
-  const [bulkScope, setBulkScope] = useState<"all" | "game" | "category">(
-    "all",
-  );
-  const [bulkConfirm, setBulkConfirm] = useState<{
-    previews: { id: number; name: string; before: number; after: number }[];
-  } | null>(null);
-
-  const applyBulkPreview = () => {
-    const pct = parseFloat(bulkPct);
-    if (isNaN(pct) || pct === 0) return;
-    const multiplier = 1 + pct / 100;
-    const scope =
-      bulkScope === "game" && gameFilter
-        ? filtered
-        : bulkScope === "category" && catFilter
-          ? filtered
-          : allProducts.filter((p) => !deletedIds.has(p.id));
-    const previews = scope.slice(0, 20).map((p) => {
-      const before = getPrice(p, bulkField);
-      const after = Math.round(before * multiplier * 100) / 100;
-      return { id: p.id, name: p.name, before, after };
-    });
-    setBulkConfirm({ previews });
-  };
-
-  const confirmBulkApply = () => {
-    const pct = parseFloat(bulkPct);
-    if (isNaN(pct) || pct === 0 || !bulkConfirm) return;
-    const multiplier = 1 + pct / 100;
-    const scope =
-      bulkScope === "game" && gameFilter
-        ? filtered
-        : bulkScope === "category" && catFilter
-          ? filtered
-          : allProducts.filter((p) => !deletedIds.has(p.id));
-    const newEdits: Record<number, Partial<PriceRow>> = { ...edits };
-    for (const p of scope) {
-      const before = getPrice(p, bulkField);
-      const after = Math.round(before * multiplier * 100) / 100;
-      newEdits[p.id] = { ...newEdits[p.id], [bulkField]: after };
-    }
-    setEdits(newEdits);
-    setBulkConfirm(null);
-    setBulkPct("");
-  };
   const [quickForm, setQuickForm] = useState<QuickForm>(EMPTY_FORM);
   const [quickSaved, setQuickSaved] = useState(false);
 
@@ -153,6 +105,8 @@ export default function AdminProductosPage() {
       description: quickForm.description.trim(),
       language: quickForm.language,
       inStock: quickForm.inStock,
+      stock: quickForm.stock ? parseInt(quickForm.stock) : undefined,
+      maxPerUser: quickForm.maxPerUser ? parseInt(quickForm.maxPerUser) : undefined,
       isNew: quickForm.isNew,
       tags: quickForm.tags
         .split(",")
@@ -218,53 +172,6 @@ export default function AdminProductosPage() {
     setConfirmDelete(null);
   };
 
-  const exportCSV = () => {
-    const rows = [
-      [
-        "ID",
-        "Nombre",
-        "Juego",
-        "Categoria",
-        "PVP c/IVA",
-        "PVP s/IVA",
-        "PV Mayorista",
-        "PV Tiendas",
-        "IVA%",
-        "Stock",
-        "Idioma",
-        "Tags",
-      ],
-    ];
-    for (const p of filtered) {
-      const price = getPrice(p, "price");
-      const { priceWithoutVAT } = calcVAT(price, IVA_GENERAL);
-      rows.push([
-        String(p.id),
-        p.name,
-        p.game,
-        p.category,
-        price.toFixed(2),
-        priceWithoutVAT.toFixed(2),
-        getPrice(p, "wholesalePrice").toFixed(2),
-        getPrice(p, "storePrice").toFixed(2),
-        String(IVA_GENERAL),
-        p.inStock ? "Sí" : "No",
-        p.language,
-        p.tags.join("|"),
-      ]);
-    }
-    const csv = rows.map((r) => r.map((c) => `"${c}"`).join(";")).join("\n");
-    const blob = new Blob(["\uFEFF" + csv], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "productos.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   const games = Object.entries(GAME_CONFIG);
 
   const allCats = useMemo(() => {
@@ -324,82 +231,13 @@ export default function AdminProductosPage() {
 
   return (
     <div>
-      {bulkConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setBulkConfirm(null)}
-        >
-          <div
-            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="mb-1 text-lg font-bold text-gray-900">
-              Confirmar cambio masivo
-            </h2>
-            <p className="mb-4 text-sm text-gray-500">
-              Aplicar <strong>{bulkPct}%</strong> a{" "}
-              <strong>
-                {bulkField === "price"
-                  ? "PV Público"
-                  : bulkField === "wholesalePrice"
-                    ? "mayorista"
-                    : "tienda"}
-              </strong>
-              {" · "}
-              <strong>
-                {bulkScope === "all"
-                  ? "todos los productos"
-                  : bulkScope === "game"
-                    ? `juego: ${gameFilter}`
-                    : `categoría: ${catFilter}`}
-              </strong>
-            </p>
-            <p className="mb-3 text-xs text-gray-400">
-              Primeros 20 afectados (muestra):
-            </p>
-            <div className="mb-4 max-h-52 space-y-1 overflow-y-auto">
-              {bulkConfirm.previews.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between border-b border-gray-50 py-1 text-sm"
-                >
-                  <span className="mr-3 line-clamp-1 flex-1 text-gray-700">
-                    {p.name}
-                  </span>
-                  <span className="mr-2 text-xs text-gray-400 line-through">
-                    {p.before.toFixed(2)}€
-                  </span>
-                  <span className="text-xs font-bold text-[#2563eb]">
-                    {p.after.toFixed(2)}€
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setBulkConfirm(null)}
-                className="flex-1 rounded-xl border-2 border-gray-200 py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmBulkApply}
-                className="flex-1 rounded-xl bg-[#2563eb] py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
-              >
-                Confirmar y aplicar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Gestion de precios
+            Gestión de precios
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            {filtered.length} productos · Edicion inline
+            {filtered.length} productos · Edición inline
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -420,12 +258,6 @@ export default function AdminProductosPage() {
           >
             <Tag size={15} /> Descuentos
           </Link>
-          <button
-            onClick={exportCSV}
-            className="flex min-h-[44px] items-center gap-2 rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-200"
-          >
-            <Download size={15} /> Exportar CSV
-          </button>
           <button
             onClick={() => setShowQuickAdd((v) => !v)}
             className="flex min-h-[44px] items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-green-700"
@@ -595,6 +427,34 @@ export default function AdminProductosPage() {
                 className="w-full resize-none rounded-xl border-2 border-gray-200 bg-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none"
               />
             </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-600">
+                Stock (unidades)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={quickForm.stock}
+                onChange={(e) => qf("stock", e.target.value)}
+                placeholder="Ilimitado"
+                className="h-10 w-full rounded-xl border-2 border-gray-200 bg-white px-3 text-sm focus:border-green-500 focus:outline-none"
+              />
+              <p className="mt-1 text-[11px] text-gray-400">Dejar vacío = sin límite de stock</p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-600">
+                Máx. por usuario
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={quickForm.maxPerUser}
+                onChange={(e) => qf("maxPerUser", e.target.value)}
+                placeholder="Sin límite"
+                className="h-10 w-full rounded-xl border-2 border-gray-200 bg-white px-3 text-sm focus:border-green-500 focus:outline-none"
+              />
+              <p className="mt-1 text-[11px] text-gray-400">Dejar vacío = sin límite por usuario</p>
+            </div>
             <div className="flex items-center gap-4">
               <label className="flex cursor-pointer items-center gap-2 text-sm select-none">
                 <input
@@ -701,7 +561,7 @@ export default function AdminProductosPage() {
             }}
             className="h-9 appearance-none rounded-xl border border-gray-200 bg-white pr-8 pl-3 text-sm text-gray-700 focus:border-[#2563eb] focus:outline-none"
           >
-            <option value="">Todas las categorias</option>
+            <option value="">Todas las categorías</option>
             {allCats.map((c) => (
               <option key={c} value={c}>
                 {CATEGORY_LABELS[c] ?? c}
@@ -715,66 +575,8 @@ export default function AdminProductosPage() {
         </div>
       </div>
 
-      {/* Bulk price toolbar */}
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-        <span className="text-xs font-bold tracking-wide text-amber-700 uppercase">
-          Cambio masivo de precios
-        </span>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <select
-              value={bulkField}
-              onChange={(e) => setBulkField(e.target.value as typeof bulkField)}
-              className="h-9 appearance-none rounded-lg border border-amber-300 bg-white pr-8 pl-3 text-xs text-gray-700 focus:border-amber-500 focus:outline-none"
-            >
-              <option value="price">PV Público</option>
-              <option value="wholesalePrice">Mayorista</option>
-              <option value="storePrice">Tienda</option>
-            </select>
-            <ChevronDown
-              size={11}
-              className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-gray-400"
-            />
-          </div>
-          <div className="relative">
-            <select
-              value={bulkScope}
-              onChange={(e) => setBulkScope(e.target.value as typeof bulkScope)}
-              className="h-9 appearance-none rounded-lg border border-amber-300 bg-white pr-8 pl-3 text-xs text-gray-700 focus:border-amber-500 focus:outline-none"
-            >
-              <option value="all">Todos los productos</option>
-              {gameFilter && (
-                <option value="game">Solo juego actual ({gameFilter})</option>
-              )}
-              {catFilter && (
-                <option value="category">Solo categoría actual</option>
-              )}
-            </select>
-            <ChevronDown
-              size={11}
-              className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-gray-400"
-            />
-          </div>
-          <div className="flex items-center gap-1">
-            <input
-              type="number"
-              step="0.5"
-              value={bulkPct}
-              onChange={(e) => setBulkPct(e.target.value)}
-              placeholder="+5 o -10"
-              className="h-9 w-24 rounded-lg border border-amber-300 bg-white px-3 text-center text-sm focus:border-amber-500 focus:outline-none"
-            />
-            <span className="text-sm font-bold text-gray-600">%</span>
-          </div>
-          <button
-            onClick={applyBulkPreview}
-            disabled={!bulkPct || isNaN(parseFloat(bulkPct))}
-            className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-600 disabled:opacity-40"
-          >
-            <Save size={12} /> Previsualizar y aplicar
-          </button>
-        </div>
-      </div>
+
+
 
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
@@ -788,22 +590,19 @@ export default function AdminProductosPage() {
                 <th className="px-3 py-3 text-center font-semibold whitespace-nowrap text-gray-600">
                   Juego
                 </th>
-                <th className="px-3 py-3 text-center font-semibold whitespace-nowrap text-gray-600">
-                  Categoria
-                </th>
-                <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-[#2563eb]">
+                <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-gray-600">
                   PV Público
                 </th>
-                <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-blue-600">
+                <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-gray-600">
                   PV Mayorista
                 </th>
-                <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-purple-600">
+                <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-gray-600">
                   PV Tiendas
                 </th>
-                <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-violet-600">
+                <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-gray-600">
                   P. Adquisición
                 </th>
-                <th className="hidden px-4 py-3 text-center font-semibold text-gray-500 sm:table-cell">
+                <th className="hidden px-4 py-3 text-center font-semibold text-gray-600 sm:table-cell">
                   Acciones
                 </th>
               </tr>
@@ -849,13 +648,8 @@ export default function AdminProductosPage() {
                         {p.game}
                       </span>
                     </td>
-                    <td className="px-3 py-3 text-center">
-                      <span className="text-xs text-gray-400">
-                        {CATEGORY_LABELS[p.category] ?? p.category}
-                      </span>
-                    </td>
                     <td className="px-3 py-3 text-right">
-                      <div className="flex items-center">
+                      <div className="flex items-center justify-end">
                         <input
                           type="number"
                           step="0.01"
@@ -870,30 +664,34 @@ export default function AdminProductosPage() {
                       </div>
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={rowWholesale}
-                        onChange={(e) =>
-                          handleChange(p.id, "wholesalePrice", e.target.value)
-                        }
-                        className={`${inputCls} border-blue-200 focus:border-blue-500`}
-                      />
-                      <span className="ml-0.5 text-xs text-gray-400">€</span>
+                      <div className="flex items-center justify-end">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={rowWholesale}
+                          onChange={(e) =>
+                            handleChange(p.id, "wholesalePrice", e.target.value)
+                          }
+                          className={`${inputCls} border-blue-200 focus:border-blue-500`}
+                        />
+                        <span className="ml-0.5 text-xs text-gray-400">€</span>
+                      </div>
                     </td>
                     <td className="px-3 py-3 text-right">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={rowStore}
-                        onChange={(e) =>
-                          handleChange(p.id, "storePrice", e.target.value)
-                        }
-                        className={`${inputCls} border-purple-200 focus:border-purple-500`}
-                      />
-                      <span className="ml-0.5 text-xs text-gray-400">€</span>
+                      <div className="flex items-center justify-end">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={rowStore}
+                          onChange={(e) =>
+                            handleChange(p.id, "storePrice", e.target.value)
+                          }
+                          className={`${inputCls} border-purple-200 focus:border-purple-500`}
+                        />
+                        <span className="ml-0.5 text-xs text-gray-400">€</span>
+                      </div>
                     </td>
                     <td className="px-3 py-3 text-right">
                       <div className="flex items-center justify-end">

@@ -24,7 +24,7 @@ export interface MegaMenuGame {
 export const MEGA_MENU_DATA: MegaMenuGame[] = [
   {
     slug: "pokemon",
-    label: "Pokemon",
+    label: "Pokémon",
     href: "/pokemon",
     color: "#f59e0b",
     abbrev: "PKM",
@@ -113,7 +113,7 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     slug: "riftbound",
     label: "Riftbound",
     href: "/riftbound",
-    color: "#0f766e",
+    color: "#ea580c",
     abbrev: "RB",
     logoSrc: "/images/logos/riftbound.svg",
     columns: [
@@ -193,7 +193,7 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
   },
   {
     slug: "naruto",
-    label: "Naruto Mythos",
+    label: "Naruto",
     href: "/naruto",
     color: "#ea580c",
     abbrev: "NAR",

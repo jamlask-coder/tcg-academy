@@ -8,9 +8,11 @@ import {
   ToggleLeft,
   ToggleRight,
   Trash2,
+  Pencil,
   ChevronDown,
 } from "lucide-react";
 import { MOCK_ADMIN_COUPONS, type AdminCoupon } from "@/data/mockData";
+import { GAME_CONFIG } from "@/data/products";
 
 function generateCode() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -32,6 +34,7 @@ const DEFAULT_FORM: Omit<AdminCoupon, "timesUsed" | "totalSaved"> = {
   endsAt: "",
   active: true,
   applicableTo: "all",
+  applicableValue: undefined,
   maxUses: 100,
   usesPerUser: 1,
 };
@@ -39,6 +42,7 @@ const DEFAULT_FORM: Omit<AdminCoupon, "timesUsed" | "totalSaved"> = {
 export default function AdminCuponesPage() {
   const [coupons, setCoupons] = useState<AdminCoupon[]>(MOCK_ADMIN_COUPONS);
   const [showForm, setShowForm] = useState(false);
+  const [editingCode, setEditingCode] = useState<string | null>(null);
   const [form, setForm] =
     useState<Omit<AdminCoupon, "timesUsed" | "totalSaved">>(DEFAULT_FORM);
   const [toast, setToast] = useState<string | null>(null);
@@ -60,13 +64,56 @@ export default function AdminCuponesPage() {
     showToast(`Cupón ${code} eliminado`);
   }, []);
 
+  const startEdit = (coupon: AdminCoupon) => {
+    setForm({
+      code: coupon.code,
+      description: coupon.description,
+      discountType: coupon.discountType,
+      value: coupon.value,
+      startsAt: coupon.startsAt,
+      endsAt: coupon.endsAt,
+      active: coupon.active,
+      applicableTo: coupon.applicableTo,
+      applicableValue: coupon.applicableValue,
+      maxUses: coupon.maxUses,
+      usesPerUser: coupon.usesPerUser,
+    });
+    setEditingCode(coupon.code);
+    setShowForm(true);
+  };
+
+  const startCreate = () => {
+    setForm(DEFAULT_FORM);
+    setEditingCode(null);
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingCode(null);
+    setForm(DEFAULT_FORM);
+  };
+
   const handleSubmit = () => {
     if (!form.code || !form.endsAt) return;
-    const newCoupon: AdminCoupon = { ...form, timesUsed: 0, totalSaved: 0 };
-    setCoupons((prev) => [newCoupon, ...prev]);
-    setShowForm(false);
-    setForm(DEFAULT_FORM);
-    showToast(`Cupón ${form.code} creado correctamente`);
+
+    if (editingCode) {
+      // Update existing coupon
+      setCoupons((prev) =>
+        prev.map((c) =>
+          c.code === editingCode
+            ? { ...c, ...form }
+            : c,
+        ),
+      );
+      showToast(`Cupón ${form.code} actualizado`);
+    } else {
+      // Create new coupon
+      const newCoupon: AdminCoupon = { ...form, timesUsed: 0, totalSaved: 0 };
+      setCoupons((prev) => [newCoupon, ...prev]);
+      showToast(`Cupón ${form.code} creado correctamente`);
+    }
+    closeForm();
   };
 
   const inputCls =
@@ -91,21 +138,24 @@ export default function AdminCuponesPage() {
           </p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => (showForm && !editingCode ? closeForm() : startCreate())}
           className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
         >
           <Plus size={16} /> Nuevo cupón
         </button>
       </div>
 
-      {/* Create form */}
+      {/* Create / Edit form */}
       {showForm && (
         <div className="mb-6 rounded-2xl border-2 border-[#2563eb]/20 bg-white p-6">
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="font-bold text-gray-900">Crear nuevo cupón</h2>
+            <h2 className="font-bold text-gray-900">
+              {editingCode ? `Editar cupón ${editingCode}` : "Crear nuevo cupón"}
+            </h2>
             <button
-              onClick={() => setShowForm(false)}
+              onClick={closeForm}
               className="p-1 text-gray-400 hover:text-gray-600"
+              aria-label="Cerrar formulario"
             >
               <X size={18} />
             </button>
@@ -126,15 +176,18 @@ export default function AdminCuponesPage() {
                   }
                   placeholder="Ej: VERANO25"
                   className={`${inputCls} flex-1 font-mono`}
+                  disabled={!!editingCode}
                 />
-                <button
-                  onClick={() =>
-                    setForm((f) => ({ ...f, code: generateCode() }))
-                  }
-                  className="h-10 rounded-xl bg-gray-100 px-3 text-xs font-bold whitespace-nowrap transition hover:bg-gray-200"
-                >
-                  Auto
-                </button>
+                {!editingCode && (
+                  <button
+                    onClick={() =>
+                      setForm((f) => ({ ...f, code: generateCode() }))
+                    }
+                    className="h-10 rounded-xl bg-gray-100 px-3 text-xs font-bold whitespace-nowrap transition hover:bg-gray-200"
+                  >
+                    Auto
+                  </button>
+                )}
               </div>
             </div>
             <div>
@@ -257,19 +310,24 @@ export default function AdminCuponesPage() {
               </label>
               <div className="relative">
                 <select
-                  value={form.applicableTo}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      applicableTo: e.target
-                        .value as AdminCoupon["applicableTo"],
-                    }))
-                  }
+                  value={form.applicableTo === "all" ? "all" : `game:${form.applicableValue ?? ""}`}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "all") {
+                      setForm((f) => ({ ...f, applicableTo: "all", applicableValue: undefined }));
+                    } else {
+                      const gameSlug = val.replace("game:", "");
+                      setForm((f) => ({ ...f, applicableTo: "game", applicableValue: gameSlug }));
+                    }
+                  }}
                   className={`${inputCls} appearance-none pr-8`}
                 >
                   <option value="all">Todo el catálogo</option>
-                  <option value="game">Juego específico</option>
-                  <option value="category">Categoría específica</option>
+                  {Object.entries(GAME_CONFIG).map(([slug, { name, emoji }]) => (
+                    <option key={slug} value={`game:${slug}`}>
+                      {emoji} {name}
+                    </option>
+                  ))}
                 </select>
                 <ChevronDown
                   size={12}
@@ -277,10 +335,27 @@ export default function AdminCuponesPage() {
                 />
               </div>
             </div>
+            {editingCode && (
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-gray-600">
+                  Estado
+                </label>
+                <button
+                  onClick={() => setForm((f) => ({ ...f, active: !f.active }))}
+                  className={`flex h-10 w-full items-center justify-center gap-2 rounded-xl border-2 text-sm font-bold transition ${form.active ? "border-green-300 bg-green-50 text-green-700" : "border-gray-200 bg-gray-50 text-gray-500"}`}
+                >
+                  {form.active ? (
+                    <><ToggleRight size={18} /> Activo</>
+                  ) : (
+                    <><ToggleLeft size={18} /> Inactivo</>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
           <div className="mt-5 flex gap-3">
             <button
-              onClick={() => setShowForm(false)}
+              onClick={closeForm}
               className="flex-1 rounded-xl border-2 border-gray-200 py-3 text-sm font-bold transition hover:bg-gray-50"
             >
               Cancelar
@@ -291,7 +366,7 @@ export default function AdminCuponesPage() {
               className="flex-1 rounded-xl bg-[#2563eb] py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-40"
             >
               <Check size={14} className="-mt-0.5 mr-1.5 inline" />
-              Crear cupón
+              {editingCode ? "Guardar cambios" : "Crear cupón"}
             </button>
           </div>
         </div>
@@ -320,6 +395,13 @@ export default function AdminCuponesPage() {
                       ? `${coupon.value}%`
                       : `${coupon.value}€`}
                   </span>
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">
+                    {coupon.applicableTo === "all"
+                      ? "Todo el catálogo"
+                      : coupon.applicableValue
+                        ? `${GAME_CONFIG[coupon.applicableValue]?.emoji ?? ""} ${GAME_CONFIG[coupon.applicableValue]?.name ?? coupon.applicableValue}`
+                        : "Juego específico"}
+                  </span>
                 </div>
                 <p className="truncate text-sm text-gray-600">
                   {coupon.description}
@@ -332,10 +414,18 @@ export default function AdminCuponesPage() {
                   {coupon.totalSaved.toFixed(2)}€ ahorrados
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => startEdit(coupon)}
+                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-400 transition hover:bg-blue-50 hover:text-[#2563eb]"
+                  aria-label={`Editar cupón ${coupon.code}`}
+                >
+                  <Pencil size={16} />
+                </button>
                 <button
                   onClick={() => toggleCoupon(coupon.code)}
                   className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-500 transition hover:bg-gray-100"
+                  aria-label={`${coupon.active ? "Desactivar" : "Activar"} cupón ${coupon.code}`}
                 >
                   {coupon.active ? (
                     <ToggleRight size={20} className="text-green-500" />
@@ -346,6 +436,7 @@ export default function AdminCuponesPage() {
                 <button
                   onClick={() => deleteCoupon(coupon.code)}
                   className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-500"
+                  aria-label={`Eliminar cupón ${coupon.code}`}
                 >
                   <Trash2 size={16} />
                 </button>

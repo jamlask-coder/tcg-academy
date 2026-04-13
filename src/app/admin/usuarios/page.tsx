@@ -8,7 +8,7 @@ import type { User } from "@/types/user";
 const ROLE_COLORS = {
   cliente: "bg-gray-100 text-gray-600",
   mayorista: "bg-blue-100 text-blue-700",
-  tienda: "bg-purple-100 text-purple-700",
+  tienda: "bg-green-100 text-green-700",
   admin: "bg-amber-100 text-amber-700",
 };
 
@@ -86,7 +86,7 @@ export default function AdminUsuariosPage() {
     <div>
       <div className="mb-6">
         <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-          <Users size={22} className="text-[#2563eb]" /> Gestión de usuarios
+          <Users size={22} className="text-[#2563eb]" /> Usuarios registrados
         </h1>
         <p className="mt-1 text-sm text-gray-500">
           {filtered.length} usuarios registrados

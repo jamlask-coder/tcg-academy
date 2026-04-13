@@ -22,7 +22,7 @@ export default function EmpresaPage() {
       <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center">
         <Building2 size={48} className="mx-auto mb-4 text-gray-200" />
         <p className="font-bold text-gray-700">
-          Esta seccion es solo para mayoristas y tiendas
+          Esta sección es solo para mayoristas y tiendas
         </p>
       </div>
     );
@@ -45,7 +45,7 @@ export default function EmpresaPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Datos de empresa</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Informacion comercial y fiscal de tu empresa
+          Información comercial y fiscal de tu empresa
         </p>
       </div>
 
@@ -56,17 +56,17 @@ export default function EmpresaPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           {[
             ["cif", "CIF / NIF empresa *", "B12345678"],
-            ["razonSocial", "Razon social *", "Mi Empresa S.L."],
+            ["razonSocial", "Razón social *", "Mi Empresa S.L."],
             [
               "direccionFiscal",
-              "Direccion fiscal *",
+              "Dirección fiscal *",
               "Calle Mayor 1, 28001 Madrid",
             ],
             ["personaContacto", "Persona de contacto *", "Nombre Apellido"],
-            ["telefonoEmpresa", "Telefono empresa", "+34 910 000 000"],
+            ["telefonoEmpresa", "Teléfono empresa", "+34 910 000 000"],
             [
               "emailFacturacion",
-              "Email de facturacion *",
+              "Email de facturación *",
               "facturas@empresa.com",
             ],
           ].map(([key, label, placeholder]) => (

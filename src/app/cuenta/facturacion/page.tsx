@@ -36,7 +36,7 @@ export default function FacturacionPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">
-          Datos de facturacion
+          Datos de facturación
         </h1>
         <p className="mt-1 text-sm text-gray-500">
           Tus datos fiscales para las facturas
@@ -62,7 +62,7 @@ export default function FacturacionPage() {
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-              Razon social (si empresa)
+              Razón social (si empresa)
             </label>
             <input
               type="text"
@@ -74,19 +74,19 @@ export default function FacturacionPage() {
           </div>
           <div className="sm:col-span-2">
             <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-              Direccion fiscal *
+              Dirección fiscal *
             </label>
             <input
               type="text"
               value={form.calle}
               onChange={set("calle")}
-              placeholder="Calle y numero"
+              placeholder="Calle y número"
               className={inputCls}
             />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-              Codigo postal *
+              Código postal *
             </label>
             <input
               type="text"
@@ -122,7 +122,7 @@ export default function FacturacionPage() {
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-              Pais
+              País
             </label>
             <select
               value={form.pais}

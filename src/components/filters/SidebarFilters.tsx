@@ -373,8 +373,8 @@ export function SidebarFilters({
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden w-[240px] flex-shrink-0 lg:block">
-        <div className="sticky top-[var(--header-h)] max-h-[calc(100vh-var(--header-h)-1rem)] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4">
+      <aside className="sticky top-[calc(var(--header-h)+4.5rem)] hidden max-h-[calc(100vh-var(--header-h)-6rem)] w-[240px] flex-shrink-0 self-start overflow-y-auto lg:block">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <FilterContent
             availableLanguages={availableLanguages}
             minPrice={minPrice}

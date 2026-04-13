@@ -19,7 +19,7 @@ const BENEFITS = [
   {
     icon: TrendingUp,
     title: "Precios exclusivos B2B",
-    desc: "Tarifas especiales hasta un 30% por debajo del PVP. Cuanto más compras, mejor precio.",
+    desc: "Tarifas especiales por debajo del PVP. Cuanto más compras, mejor precio.",
     color: "#2563eb",
   },
   {
@@ -31,7 +31,7 @@ const BENEFITS = [
   {
     icon: ShieldCheck,
     title: "Stock garantizado",
-    desc: "Almacén propio con reposición constante. Acceso prioritario a novedades y pre-ventas.",
+    desc: "Almacén propio con reposición constante. Acceso prioritario a novedades y preventas.",
     color: "#16a34a",
   },
   {
@@ -86,14 +86,14 @@ const SOLUTIONS = [
 ];
 
 const GAMES = [
-  { name: "Magic: The Gathering", abbrev: "MTG", color: "#7c3aed" },
   { name: "Pokémon", abbrev: "PKM", color: "#f59e0b" },
+  { name: "Magic: The Gathering", abbrev: "MTG", color: "#7c3aed" },
   { name: "One Piece", abbrev: "OP", color: "#dc2626" },
-  { name: "Riftbound", abbrev: "RB", color: "#0f766e" },
+  { name: "Riftbound", abbrev: "RB", color: "#ea580c" },
   { name: "Yu-Gi-Oh!", abbrev: "YGO", color: "#b45309" },
   { name: "Disney Lorcana", abbrev: "LOR", color: "#0891b2" },
-  { name: "Dragon Ball SCG", abbrev: "DBS", color: "#d97706" },
-  { name: "Naruto Mythos", abbrev: "NAR", color: "#ea580c" },
+  { name: "Dragon Ball", abbrev: "DBS", color: "#d97706" },
+  { name: "Naruto", abbrev: "NAR", color: "#ea580c" },
   { name: "Topps", abbrev: "TPP", color: "#1d4ed8" },
 ];
 
@@ -116,7 +116,7 @@ const TESTIMONIALS = [
   },
   {
     quote:
-      "Empezamos sin pedido mínimo y crecimos poco a poco. Ahora somos clientes Platino con un 30% de descuento. TCG Academy ha sido clave en nuestro crecimiento.",
+      "Empezamos sin pedido mínimo y crecimos poco a poco. Ahora somos clientes Platino con descuentos especiales. TCG Academy ha sido clave en nuestro crecimiento.",
     name: "Javier L.",
     role: "Director, TCG Universe — Madrid",
     avatar: "JL",

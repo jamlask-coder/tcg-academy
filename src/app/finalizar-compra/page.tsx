@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { useCart } from "@/context/CartContext";
+import { getMergedById } from "@/lib/productStore";
 import { useAuth } from "@/context/AuthContext";
 import {
   awardPurchasePoints,
@@ -28,10 +29,10 @@ import Link from "next/link";
 import Image from "next/image";
 
 const TIENDAS = [
-  { id: "calpe", name: "TCG Academy Calpe", address: "Calpe, Alicante" },
-  { id: "bejar", name: "TCG Academy Béjar", address: "Béjar, Salamanca" },
-  { id: "madrid", name: "TCG Academy Madrid", address: "Madrid" },
-  { id: "barcelona", name: "TCG Academy Barcelona", address: "Barcelona" },
+  { id: "calpe", name: "TCG Academy Calpe", address: "Av. Gabriel Miró 42, 03710 Calpe", email: "tcgacademycalpe@gmail.com" },
+  { id: "bejar", name: "TCG Academy Béjar", address: "C/ Mayor 15, 37700 Béjar", email: "bejar@tcgacademy.es" },
+  { id: "madrid", name: "TCG Academy Madrid", address: "C/ Gran Vía 28, 28013 Madrid", email: "madrid@tcgacademy.es" },
+  { id: "barcelona", name: "TCG Academy Barcelona", address: "C/ Pelai 12, 08001 Barcelona", email: "barcelona@tcgacademy.es" },
 ];
 
 type Step = "datos" | "envio" | "pago" | "confirmado";
@@ -150,6 +151,15 @@ export default function CheckoutPage() {
       localStorage.removeItem("tcgacademy_pending_checkout");
     } catch {}
 
+    // Mark payment status for manual payment methods (transfer, in-store)
+    if (form.pago === "transferencia" || form.pago === "tienda") {
+      try {
+        const ps = JSON.parse(localStorage.getItem("tcgacademy_payment_status") ?? "{}");
+        ps[id] = "pendiente";
+        localStorage.setItem("tcgacademy_payment_status", JSON.stringify(ps));
+      } catch { /* ignore */ }
+    }
+
     // Award purchase points and propagate to referral chain (cliente only)
     if (user?.role === "cliente") {
       if (appliedPoints?.points) {
@@ -157,6 +167,57 @@ export default function CheckoutPage() {
       }
       awardPurchasePoints(user.id, pointsBase);
     }
+
+    // Decrement stock for purchased items
+    try {
+      const overrides = JSON.parse(localStorage.getItem("tcgacademy_product_overrides") ?? "{}");
+      for (const item of items) {
+        const productId = parseInt(item.key?.replace("item_", "") ?? "0");
+        if (!productId) continue;
+        const product = getMergedById(productId);
+        if (product?.stock !== undefined && typeof product.stock === "number") {
+          const newStock = Math.max(0, product.stock - item.quantity);
+          overrides[productId] = { ...overrides[productId], stock: newStock };
+          if (newStock === 0) {
+            overrides[productId].inStock = false;
+          }
+        }
+      }
+      localStorage.setItem("tcgacademy_product_overrides", JSON.stringify(overrides));
+      window.dispatchEvent(new Event("tcga:products:updated"));
+    } catch { /* ignore */ }
+
+    // Log confirmation email to customer
+    try {
+      const emailLog = JSON.parse(localStorage.getItem("tcgacademy_email_log") ?? "[]");
+      emailLog.unshift({
+        date: new Date().toISOString(),
+        to: form.email,
+        subject: `Confirmación de pedido ${id}`,
+        status: "enviado",
+        orderId: id,
+        body: `Pedido ${id} confirmado. Total: ${finalTotal.toFixed(2)}€. ${isStorePickup ? `Recogida en ${TIENDAS.find(t => t.id === form.tiendaRecogida)?.name ?? "tienda"}.` : `Envío a: ${form.direccion}, ${form.ciudad}.`}`,
+      });
+
+      // If store pickup, notify the store
+      if (isStorePickup && form.tiendaRecogida) {
+        const tienda = TIENDAS.find(t => t.id === form.tiendaRecogida);
+        if (tienda) {
+          const productList = items.map(i => `${i.quantity}× ${i.name}`).join(", ");
+          emailLog.unshift({
+            date: new Date().toISOString(),
+            to: tienda.email,
+            subject: `Nuevo pedido para recoger en ${tienda.name} — ${id}`,
+            status: "enviado",
+            orderId: id,
+            body: `Nuevo pedido ${id} para recogida en ${tienda.name}.\n\nCliente: ${form.nombre} ${form.apellidos}\nEmail: ${form.email}\nTeléfono: ${form.telefono}\n\nProductos: ${productList}\nTotal: ${finalTotal.toFixed(2)}€\nPago: En tienda al recoger.\n\nPor favor, preparad el pedido para que el cliente pueda recogerlo.`,
+          });
+        }
+      }
+
+      if (emailLog.length > 100) emailLog.length = 100;
+      localStorage.setItem("tcgacademy_email_log", JSON.stringify(emailLog));
+    } catch { /* ignore */ }
 
     clearCart();
     setStep("confirmado");
@@ -166,34 +227,52 @@ export default function CheckoutPage() {
     return (
       <div className="mx-auto max-w-[600px] px-4 py-12 sm:px-6 sm:py-24 text-center">
         <h1 className="mb-4 text-2xl font-bold text-gray-700">
-          Tu carrito esta vacio
+          Tu carrito está vacío
         </h1>
         <Link
           href="/catalogo"
           className="font-semibold text-[#2563eb] hover:underline"
         >
-          Volver al catalogo
+          Volver al catálogo
         </Link>
       </div>
     );
 
-  if (step === "confirmado")
+  if (step === "confirmado") {
+    const pickupStore = form.tiendaRecogida ? TIENDAS.find(t => t.id === form.tiendaRecogida) : null;
     return (
       <div className="mx-auto max-w-[600px] px-4 py-12 sm:px-6 sm:py-24 text-center">
         <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
           <CheckCircle size={40} className="text-green-500" />
         </div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900">
-          Pedido confirmado
+          {pickupStore ? "Pedido listo para recoger" : "Pedido confirmado"}
         </h1>
         <p className="mb-2 text-gray-600">
-          Gracias por tu compra. Te hemos enviado un email de confirmacion.
+          {pickupStore
+            ? "Hemos recibido tu pedido. Te avisaremos cuando esté preparado para recoger."
+            : "Gracias por tu compra. Te hemos enviado un email de confirmación."}
         </p>
         <p className="mb-4 text-sm text-gray-500">
-          Numero de pedido:{" "}
+          Número de pedido:{" "}
           <span className="font-bold text-gray-800">{orderId}</span>
         </p>
-        {user?.role === "cliente" && finalTotal > 0 && (
+
+        {/* Store pickup info */}
+        {pickupStore && (
+          <div className="mx-auto mb-6 max-w-sm rounded-2xl border border-blue-100 bg-blue-50 p-4 text-left">
+            <p className="mb-1 text-sm font-bold text-gray-900">
+              Recogida en {pickupStore.name}
+            </p>
+            <p className="mb-1 text-sm text-gray-600">{pickupStore.address}</p>
+            <p className="mb-2 text-xs text-gray-400">Pago al recoger — {finalTotal.toFixed(2)}€</p>
+            <p className="text-xs text-blue-600">
+              Hemos notificado a la tienda. Te enviaremos un email cuando tu pedido esté listo.
+            </p>
+          </div>
+        )}
+
+        {user?.role === "cliente" && finalTotal > 0 && !pickupStore && (
           <div className="mx-auto mb-6 flex max-w-xs items-center justify-center gap-2 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
             <Trophy size={16} className="flex-shrink-0 text-amber-500" />
             <span>
@@ -219,6 +298,7 @@ export default function CheckoutPage() {
         </div>
       </div>
     );
+  }
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
@@ -231,19 +311,19 @@ export default function CheckoutPage() {
 
       {/* Steps */}
       <div className="mb-10 flex items-center gap-2">
-        {(["datos", "envio", "pago"] as Step[]).map((s, i) => (
+        {(isStorePickup ? ["datos", "envio"] as Step[] : ["datos", "envio", "pago"] as Step[]).map((s, i, arr) => (
           <div key={s} className="flex items-center gap-2">
             <div
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition ${step === s ? "bg-[#2563eb] text-white" : ["datos", "envio", "pago"].indexOf(step) > i ? "bg-green-500 text-white" : "bg-gray-200 text-gray-500"}`}
+              className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition ${step === s ? "bg-[#2563eb] text-white" : arr.indexOf(step) > i ? "bg-green-500 text-white" : "bg-gray-200 text-gray-500"}`}
             >
-              {["datos", "envio", "pago"].indexOf(step) > i ? "✓" : i + 1}
+              {arr.indexOf(step) > i ? "✓" : i + 1}
             </div>
             <span
-              className={`text-sm font-medium capitalize ${step === s ? "text-[#2563eb]" : "text-gray-400"}`}
+              className={`text-sm font-medium ${step === s ? "text-[#2563eb]" : "text-gray-400"}`}
             >
-              {s}
+              {s === "datos" ? "Datos personales" : s === "envio" ? "Envío" : "Pago"}
             </span>
-            {i < 2 && <div className="mx-1 h-0.5 w-8 bg-gray-200" />}
+            {i < arr.length - 1 && <div className="mx-1 h-0.5 w-8 bg-gray-200" />}
           </div>
         ))}
       </div>
@@ -262,7 +342,7 @@ export default function CheckoutPage() {
                     ["nombre", "Nombre *", "text", true],
                     ["apellidos", "Apellidos *", "text", true],
                     ["email", "Email *", "email", true],
-                    ["telefono", "Telefono", "tel", false],
+                    ["telefono", "Teléfono", "tel", false],
                   ] as [keyof typeof form, string, string, boolean][]
                 ).map(([key, label, type, req]) => (
                   <div key={key}>
@@ -282,11 +362,11 @@ export default function CheckoutPage() {
                 ))}
               </div>
               <h2 className="pt-4 text-lg font-bold text-gray-900">
-                Direccion de envio
+                Dirección de envío
               </h2>
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                  Direccion *
+                  Dirección *
                 </label>
                 <input
                   required
@@ -294,7 +374,7 @@ export default function CheckoutPage() {
                   onChange={(e) =>
                     setForm((f) => ({ ...f, direccion: e.target.value }))
                   }
-                  placeholder="Calle, numero, piso..."
+                  placeholder="Calle, número, piso..."
                   className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
                 />
               </div>
@@ -351,7 +431,7 @@ export default function CheckoutPage() {
           {step === "envio" && (
             <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-6">
               <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900">
-                <Truck size={20} /> Metodo de envio
+                <Truck size={20} /> Método de envío
               </h2>
               {[
                 {
@@ -454,14 +534,20 @@ export default function CheckoutPage() {
                   onClick={() => setStep("datos")}
                   className="flex-1 rounded-xl border-2 border-gray-200 py-3.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
                 >
-                  Atras
+                  Atrás
                 </button>
                 <button
-                  onClick={() => setStep("pago")}
+                  onClick={() => {
+                    if (isStorePickup) {
+                      handleOrder();
+                    } else {
+                      setStep("pago");
+                    }
+                  }}
                   disabled={isStorePickup && !form.tiendaRecogida}
                   className="flex-1 rounded-xl bg-[#2563eb] py-3.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Continuar
+                  {isStorePickup ? "Confirmar pedido" : "Continuar"}
                 </button>
               </div>
             </div>
@@ -470,7 +556,7 @@ export default function CheckoutPage() {
           {step === "pago" && (
             <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-6">
               <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900">
-                <CreditCard size={20} /> Metodo de pago
+                <CreditCard size={20} /> Método de pago
               </h2>
               {[
                 ...(isStorePickup
@@ -632,7 +718,7 @@ export default function CheckoutPage() {
                   onClick={() => setStep("envio")}
                   className="flex-1 rounded-xl border-2 border-gray-200 py-3.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
                 >
-                  Atras
+                  Atrás
                 </button>
                 <button
                   onClick={handleOrder}

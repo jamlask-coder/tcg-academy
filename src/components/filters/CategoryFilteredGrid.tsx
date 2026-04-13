@@ -115,7 +115,7 @@ function GridContent({ products, color, game, category }: Props) {
   const hasMore = visible.length < filtered.length;
 
   return (
-    <div className="flex gap-6">
+    <div className="flex items-start gap-6">
       {/* Sidebar (desktop) */}
       <SidebarFilters
         availableLanguages={availableLanguages}
@@ -129,24 +129,13 @@ function GridContent({ products, color, game, category }: Props) {
       {/* Main content */}
       <div className="min-w-0 flex-1">
         {/* Mobile filter bar */}
-        <div className="mb-4 flex items-center justify-between lg:hidden">
-          <p className="text-sm text-gray-500">{filtered.length} productos</p>
+        <div className="mb-3 flex items-center justify-end lg:hidden">
           <MobileFilterButton
             onClick={() => setMobileOpen(true)}
             activeCount={activeCount}
             color={color}
           />
         </div>
-
-        {/* Desktop product count */}
-        <p className="mb-4 hidden text-sm text-gray-500 lg:block">
-          {filtered.length} productos
-          {activeCount > 0 && (
-            <span className="ml-2 text-xs text-gray-400">
-              (filtros activos: {activeCount})
-            </span>
-          )}
-        </p>
 
         {filtered.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-gray-200 py-20 text-center">

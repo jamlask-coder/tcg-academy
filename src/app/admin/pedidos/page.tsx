@@ -94,15 +94,15 @@ const ROLE_CFG = {
     label: "Mayorista",
     color: "#1d4ed8",
     bg: "#dbeafe",
-    rowBg: "bg-blue-100",
-    borderClass: "border-l-4 border-l-blue-400",
+    rowBg: "bg-blue-50",
+    borderClass: "",
   },
   tienda: {
     label: "Tienda",
     color: "#15803d",
     bg: "#dcfce7",
-    rowBg: "bg-green-100",
-    borderClass: "border-l-4 border-l-green-400",
+    rowBg: "bg-green-50",
+    borderClass: "",
   },
 };
 
@@ -242,6 +242,7 @@ function StatusDropdown({
 }
 
 function RoleBadge({ role }: { role: "cliente" | "mayorista" | "tienda" }) {
+  if (role === "cliente") return null;
   const cfg = ROLE_CFG[role];
   return (
     <span
@@ -434,9 +435,10 @@ function printAlbaran(order: AdminOrder) {
   ].join("\n");
   const win = window.open("", "_blank");
   if (win) {
-    win.document.write(
-      `<pre style="font-family:monospace;font-size:14px;padding:24px">${content}</pre>`,
-    );
+    const pre = win.document.createElement("pre");
+    pre.style.cssText = "font-family:monospace;font-size:14px;padding:24px";
+    pre.textContent = content;
+    win.document.body.appendChild(pre);
     win.print();
   }
 }
@@ -572,12 +574,6 @@ function OrderPanel({
                         <p className="text-xs text-gray-400">
                           {item.qty}× · {item.price.toFixed(2)}€/ud
                         </p>
-                        {item.qtyShipped !== undefined &&
-                          item.qtyShipped < item.qty && (
-                            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
-                              Enviado: {item.qtyShipped}/{item.qty}
-                            </span>
-                          )}
                       </div>
                     </div>
                     <span className="flex-shrink-0 text-sm font-bold text-gray-900">
@@ -1311,6 +1307,8 @@ export default function AdminPedidosPage() {
     persistOrders(
       orders.map((o) => {
         if (o.id !== id) return o;
+        // Don't register if status hasn't changed
+        if (o.adminStatus === status) return o;
         return {
           ...o,
           adminStatus: status,
@@ -1667,13 +1665,17 @@ export default function AdminPedidosPage() {
                   <>
                     <tr
                       key={order.id}
-                      className={`cursor-pointer transition ${roleCfg.rowBg} ${roleCfg.borderClass} hover:brightness-95 ${isOpen ? "ring-1 ring-blue-200 ring-inset" : ""} ${urgent ? "border-l-[6px] border-l-red-500" : ""}`}
+                      className={`cursor-pointer transition ${roleCfg.rowBg} ${roleCfg.borderClass} hover:brightness-95 ${isOpen ? "ring-1 ring-blue-200 ring-inset" : ""} ${urgent ? "border-l-[3px] border-l-red-500" : ""}`}
                       onClick={() => setExpanded(isOpen ? null : order.id)}
                     >
                       <td className="px-4 py-3">
-                        <div className="font-mono text-xs font-bold text-[#2563eb]">
+                        <Link
+                          href={`/admin/pedidos/${order.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-mono text-xs font-bold text-[#2563eb] hover:underline"
+                        >
                           {order.id}
-                        </div>
+                        </Link>
                         <div className="mt-0.5 flex flex-wrap items-center gap-1">
                           {urgent && (
                             <span className="flex items-center gap-0.5 rounded-full bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-600">
@@ -1688,15 +1690,6 @@ export default function AdminPedidosPage() {
                           {order.couponCode && (
                             <span className="rounded-full bg-green-50 px-1.5 py-0.5 text-[9px] font-bold text-green-700">
                               Cupón {order.couponCode}
-                            </span>
-                          )}
-                          {order.items.some(
-                            (i) =>
-                              i.qtyShipped !== undefined &&
-                              i.qtyShipped < i.qty,
-                          ) && (
-                            <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
-                              Envío parcial
                             </span>
                           )}
                         </div>

@@ -36,6 +36,7 @@ const schema = z
     password: z.string().min(6, "Mínimo 6 caracteres").max(128),
     confirmPassword: z.string().min(1, "Confirma tu contraseña"),
     referralCode: z.string().max(20).optional(),
+    comoConociste: z.string().max(50).optional(),
     terminos: z.literal(true, { error: "Debes aceptar los términos" }),
     comunicaciones: z.boolean().optional(),
   })
@@ -454,6 +455,26 @@ export default function RegistroPage() {
               <p className="mt-1 text-xs text-gray-400">
                 ¿Te invitó un amigo? Introduce su código para que ambos ganéis puntos
               </p>
+            </div>
+
+            {/* ¿Cómo nos conociste? */}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                ¿Cómo nos conociste? <span className="font-normal text-gray-400">(opcional)</span>
+              </label>
+              <select
+                {...register("comoConociste")}
+                className={inputCls(false)}
+              >
+                <option value="">Seleccionar</option>
+                <option value="instagram">Instagram</option>
+                <option value="tiktok">TikTok</option>
+                <option value="facebook">Facebook</option>
+                <option value="google">Google / Buscadores</option>
+                <option value="recomendacion">Recomendación</option>
+                <option value="feria">Feria o evento</option>
+                <option value="otro">Otro</option>
+              </select>
             </div>
 
             {/* Terms */}

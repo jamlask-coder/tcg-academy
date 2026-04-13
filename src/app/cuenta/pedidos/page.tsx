@@ -444,16 +444,16 @@ export default function PedidosPage() {
         <div className="rounded-2xl border border-gray-200 bg-white p-16 text-center">
           <Package size={48} className="mx-auto mb-4 text-gray-200" />
           <p className="mb-2 font-bold text-gray-700">
-            No tienes pedidos todavia
+            No tienes pedidos todavía
           </p>
           <p className="mb-6 text-sm text-gray-500">
-            Explora el catalogo y haz tu primer pedido
+            Explora el catálogo y haz tu primer pedido
           </p>
           <Link
             href="/catalogo"
             className="rounded-xl bg-[#2563eb] px-6 py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
           >
-            Ver catalogo
+            Ver catálogo
           </Link>
         </div>
       ) : (

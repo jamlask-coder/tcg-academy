@@ -39,7 +39,7 @@ export default function FavoritosPage() {
             Aún no tienes favoritos
           </p>
           <p className="mb-6 text-sm text-gray-500">
-            Haz click en el corazón de cualquier producto para guardarlo aquí
+            Haz clic en el corazón de cualquier producto para guardarlo aquí
           </p>
           <Link
             href="/catalogo"

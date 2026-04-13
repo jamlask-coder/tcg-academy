@@ -18,7 +18,7 @@ const OTROS_GAMES = [
   },
   {
     id: "naruto",
-    name: "Naruto Mythos",
+    name: "Naruto",
     desc: "Booster Boxes, starter decks y singles",
     href: "/naruto",
     color: "#ea580c",

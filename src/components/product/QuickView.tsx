@@ -77,7 +77,7 @@ export function QuickView({ product, onClose }: Props) {
           <div
             className="flex h-56 flex-shrink-0 items-center justify-center sm:h-auto sm:w-48"
             style={{
-              background: `linear-gradient(135deg, ${color}18, ${color}30)`,
+              background: "#ffffff",
             }}
           >
             {image ? (

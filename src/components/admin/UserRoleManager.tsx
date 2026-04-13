@@ -7,9 +7,9 @@ type UserRole = "cliente" | "mayorista" | "tienda";
 const STORAGE_KEY = "tcgacademy_user_role_overrides";
 
 const ROLES: { value: UserRole; label: string; color: string; bg: string; desc: string }[] = [
-  { value: "cliente",   label: "Cliente",    color: "#6b7280", bg: "#f3f4f6", desc: "Precio público + IVA" },
-  { value: "mayorista", label: "Mayorista",  color: "#1d4ed8", bg: "#dbeafe", desc: "Precio PV Mayorista" },
-  { value: "tienda",    label: "Tienda TCG", color: "#15803d", bg: "#dcfce7", desc: "Precio PV Tiendas" },
+  { value: "cliente",   label: "Cliente",    color: "#6b7280", bg: "#f3f4f6", desc: "Cliente particular" },
+  { value: "mayorista", label: "Mayorista",  color: "#2563eb", bg: "#dbeafe", desc: "Distribuidor B2B" },
+  { value: "tienda",    label: "Tienda TCG", color: "#16a34a", bg: "#dcfce7", desc: "Tienda asociada" },
 ];
 
 function loadOverrides(): Record<string, UserRole> {
@@ -40,7 +40,7 @@ function ConfirmDialog({ from, to, onConfirm, onCancel }: ConfirmDialogProps) {
           </div>
           <div>
             <h3 className="font-bold text-gray-900">Cambiar rol de usuario</h3>
-            <p className="text-xs text-gray-500">Esta acción modifica el acceso y los precios</p>
+            <p className="text-xs text-gray-500">Esta acción modifica el nivel de acceso del usuario</p>
           </div>
         </div>
 
@@ -61,7 +61,7 @@ function ConfirmDialog({ from, to, onConfirm, onCancel }: ConfirmDialogProps) {
             </span>
           </div>
           <p className="mt-3 text-center text-xs text-gray-500">
-            El usuario verá precios de <strong>{to.desc}</strong> a partir de su próxima sesión.
+            El usuario pasará a ser <strong>{to.desc}</strong> a partir de su próxima sesión.
           </p>
         </div>
 
@@ -145,16 +145,6 @@ export function UserRoleManager({ userId, defaultRole }: Props) {
           )}
         </div>
 
-        <div className="mb-4 flex items-center gap-2.5 rounded-xl p-3" style={{ backgroundColor: current.bg }}>
-          <span
-            className="inline-block rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide"
-            style={{ backgroundColor: current.bg, color: current.color, border: `1.5px solid ${current.color}40` }}
-          >
-            {current.label}
-          </span>
-          <span className="text-xs text-gray-500">{current.desc}</span>
-        </div>
-
         <div className="space-y-2">
           {ROLES.map((r) => {
             const active = role === r.value;
@@ -162,26 +152,26 @@ export function UserRoleManager({ userId, defaultRole }: Props) {
               <button
                 key={r.value}
                 onClick={() => handleChange(r.value)}
-                className="flex w-full items-center justify-between rounded-xl border px-4 py-2.5 text-left text-sm transition"
+                className="flex w-full items-center justify-between rounded-xl border-2 px-4 py-3 text-left text-sm transition"
                 style={{
                   borderColor: active ? r.color : "#e5e7eb",
                   background: active ? r.bg : "#fff",
                 }}
               >
                 <div>
-                  <span className="font-semibold" style={{ color: active ? r.color : "#374151" }}>
+                  <span className="font-bold" style={{ color: active ? r.color : "#374151" }}>
                     {r.label}
                   </span>
                   <span className="ml-2 text-xs text-gray-400">{r.desc}</span>
                 </div>
-                {active && <Check size={14} style={{ color: r.color }} className="flex-shrink-0" />}
+                {active && <Check size={16} style={{ color: r.color }} className="flex-shrink-0" />}
               </button>
             );
           })}
         </div>
 
         <p className="mt-3 text-[11px] text-gray-400">
-          El cambio de rol modifica los precios que ve el usuario y requiere confirmación.
+          El cambio de rol modifica el nivel de acceso del usuario y requiere confirmación.
         </p>
       </div>
     </>

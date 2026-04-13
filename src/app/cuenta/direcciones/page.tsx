@@ -80,7 +80,7 @@ export default function DireccionesPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Mis direcciones</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Gestiona tus direcciones de envio
+            Gestiona tus direcciones de envío
           </p>
         </div>
         <button
@@ -90,7 +90,7 @@ export default function DireccionesPage() {
           }}
           className="flex items-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
         >
-          <Plus size={16} /> Añadir direccion
+          <Plus size={16} /> Añadir dirección
         </button>
       </div>
 
@@ -105,7 +105,7 @@ export default function DireccionesPage() {
             onClick={() => setShowForm(true)}
             className="mt-4 text-sm font-semibold text-[#2563eb] hover:underline"
           >
-            + Añadir primera direccion
+            + Añadir primera dirección
           </button>
         </div>
       )}
@@ -174,7 +174,7 @@ export default function DireccionesPage() {
       {showForm && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6">
           <h2 className="mb-4 font-bold text-gray-900">
-            {editId ? "Editar direccion" : "Nueva direccion"}
+            {editId ? "Editar dirección" : "Nueva dirección"}
           </h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -228,7 +228,7 @@ export default function DireccionesPage() {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="mb-1 block text-xs font-semibold text-gray-600">
-                  Numero
+                  Número
                 </label>
                 <input
                   type="text"
@@ -251,7 +251,7 @@ export default function DireccionesPage() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-gray-600">
-                Codigo postal
+                Código postal
               </label>
               <input
                 type="text"
@@ -284,7 +284,7 @@ export default function DireccionesPage() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-gray-600">
-                Pais
+                País
               </label>
               <select
                 value={form.pais ?? "ES"}

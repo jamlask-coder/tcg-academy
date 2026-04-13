@@ -28,6 +28,8 @@ import {
   Share2,
   AlertTriangle,
   Mail,
+  MapPin,
+  FileText,
 } from "lucide-react";
 import { countNewIncidents } from "@/services/incidentService";
 
@@ -36,9 +38,8 @@ const PUBLIC_PATHS = ["/login", "/registro", "/recuperar-contrasena"];
 const NAV_ITEMS_BASE = [
   { href: "/cuenta", label: "Mi cuenta", icon: UserIcon, exact: true },
   { href: "/cuenta/pedidos", label: "Mis pedidos", icon: Package },
-  { href: "/cuenta/puntos", label: "Mis puntos", icon: Trophy },
-  { href: "/cuenta/grupo", label: "Mi grupo", icon: Share2 },
-  { href: "/cuenta/cupones", label: "Cupones y descuentos", icon: Gift },
+  { href: "/cuenta/puntos", label: "Mis puntos", icon: Trophy, clientOnly: true },
+  { href: "/cuenta/grupo", label: "Mi grupo", icon: Share2, clientOnly: true },
   {
     href: "/cuenta/notificaciones",
     label: "Notificaciones",
@@ -46,7 +47,10 @@ const NAV_ITEMS_BASE = [
     badge: true,
   },
   { href: "/cuenta/datos", label: "Mis datos", icon: UserIcon },
+  { href: "/cuenta/direcciones", label: "Mis direcciones", icon: MapPin },
+  { href: "/cuenta/facturacion", label: "Facturación", icon: FileText },
   { href: "/cuenta/favoritos", label: "Favoritos", icon: Heart },
+  { href: "/cuenta/mensajes", label: "Mensajes", icon: MessageSquare },
 ];
 
 const ADMIN_NAV_ITEMS = [
@@ -263,7 +267,7 @@ export default function CuentaLayout({
           : item,
       )
     : [
-        ...NAV_ITEMS_BASE,
+        ...(isB2B ? NAV_ITEMS_BASE.filter((item) => !("clientOnly" in item && item.clientOnly)) : NAV_ITEMS_BASE),
         ...(isB2B
           ? [
               {

@@ -119,11 +119,11 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       createdAt: new Date().toISOString(),
     },
   },
-  "admin@tcgacademy.com": {
+  "admin@tcgacademy.es": {
     password: "test123",
     user: {
       id: "demo-admin",
-      email: "admin@tcgacademy.com",
+      email: "admin@tcgacademy.es",
       name: "Admin",
       lastName: "TCG",
       phone: "+34 666 000 000",

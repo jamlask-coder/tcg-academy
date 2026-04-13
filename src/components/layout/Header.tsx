@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import {
   ShoppingCart,
+  ShoppingBag,
   Heart,
   User,
   Search,
@@ -19,6 +20,7 @@ import {
   LayoutDashboard,
   Home,
   Gamepad2,
+  Inbox,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
@@ -29,6 +31,7 @@ import { useNotifications } from "@/context/NotificationContext";
 import { useDebounce } from "@/hooks/useDebounce";
 import { checkRateLimit } from "@/utils/sanitize";
 import { countPendingOrders } from "@/data/mockData";
+import { countNewIncidents } from "@/services/incidentService";
 
 // ─── Recent search history helpers ────────────────────────────────────────────
 const RECENT_KEY = "tcga_recent_searches";
@@ -153,7 +156,7 @@ function SearchDropdown({
               const config = GAME_CONFIG[p.game];
               const href =
                 p.id > 1_700_000_000_000
-                  ? `/producto/${p.id}`
+                  ? `/producto?id=${p.id}`
                   : `/${p.game}/${p.category}/${p.slug}`;
               return (
                 <Link
@@ -459,11 +462,20 @@ export function Header() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
-  // For admin: track pending orders to show on bell badge
+  // For admin: track separate counts for header badges
   const [pendingOrders, setPendingOrders] = useState(0);
+  const [pendingNotifs, setPendingNotifs] = useState(0);
+  const [pendingSolicitudes, setPendingSolicitudes] = useState(0);
   useEffect(() => {
     if (!user || user.role !== "admin") return;
-    const calc = () => setPendingOrders(countPendingOrders());
+    const calc = () => {
+      setPendingOrders(countPendingOrders());
+      setPendingNotifs(countNewIncidents());
+      try {
+        const sols = JSON.parse(localStorage.getItem("tcgacademy_solicitudes") ?? "[]");
+        setPendingSolicitudes((sols as { estado: string }[]).filter((s) => s.estado === "nueva").length);
+      } catch { /* ignore */ }
+    };
     calc();
     const id = setInterval(calc, 5000);
     return () => clearInterval(id);
@@ -627,7 +639,7 @@ export function Header() {
               onFocus={() => {
                 setDesktopDropdownOpen(true);
               }}
-              placeholder="Busca cartas, sobres..."
+              placeholder="Buscar cartas, sobres..."
               className="h-8 w-full rounded-xl border-2 border-white/25 bg-white/12 pr-8 pl-3 text-xs text-white transition placeholder:text-white/50 focus:border-white/60 focus:bg-white/20 focus:outline-none"
               autoComplete="off"
             />
@@ -670,33 +682,54 @@ export function Header() {
             </Link>
           )}
 
-          {/* Notifications (visible on desktop when logged in) */}
-          {user && (
+          {/* Admin: dynamic icons — only visible when there are pending items */}
+          {user && user.role === "admin" && mounted && (
+            <>
+              {([
+                { count: pendingOrders, href: "/admin/pedidos", Icon: Package, label: "pedidos pendientes", color: "bg-red-500" },
+                { count: pendingNotifs, href: "/admin/notificaciones", Icon: Bell, label: "incidencias nuevas", color: "bg-amber-500" },
+                { count: pendingSolicitudes, href: "/admin/solicitudes", Icon: Inbox, label: "solicitudes nuevas", color: "bg-blue-500" },
+              ] as const).filter(({ count }) => count > 0).map(({ count, href, Icon, label, color }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="relative hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10 lg:flex"
+                  aria-label={`${count} ${label}`}
+                >
+                  <Icon size={18} className="text-white" />
+                  <span className={`absolute top-1 right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full ${color} px-0.5 text-[9px] leading-none font-bold text-white`}>
+                    {count > 9 ? "9+" : count}
+                  </span>
+                </Link>
+              ))}
+            </>
+          )}
+          {/* User: notifications bell */}
+          {user && user.role !== "admin" && (
             <Link
-              href={user.role === "admin" ? "/admin/notificaciones" : "/cuenta/notificaciones"}
+              href="/cuenta/notificaciones"
               className="relative hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10 lg:flex"
               aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ""}`}
             >
               <Bell size={18} className="text-white" />
-              {mounted && (() => {
-                const bellCount = user.role === "admin" ? pendingOrders : unreadCount;
-                return bellCount > 0 ? (
-                  <span className="absolute top-1 right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] leading-none font-bold text-white">
-                    {bellCount > 9 ? "9+" : bellCount}
-                  </span>
-                ) : null;
-              })()}
+              {mounted && unreadCount > 0 && (
+                <span className="absolute top-1 right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] leading-none font-bold text-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
             </Link>
           )}
 
-          {/* Favorites */}
-          <Link
-            href="/cuenta/favoritos"
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
-            aria-label="Favoritos"
-          >
-            <Heart size={20} className="text-white" />
-          </Link>
+          {/* Favorites (not for admin) */}
+          {user?.role !== "admin" && (
+            <Link
+              href="/cuenta/favoritos"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
+              aria-label="Favoritos"
+            >
+              <Heart size={20} className="text-white" />
+            </Link>
+          )}
 
           {/* User icon → /admin (admin) | /cuenta (user) | /login (guest) */}
           <Link
@@ -707,19 +740,21 @@ export function Header() {
             <User size={20} className="text-white" />
           </Link>
 
-          {/* Cart */}
-          <Link
-            href="/carrito"
-            className="relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
-            aria-label={mounted ? `Carrito (${count} artículos)` : "Carrito"}
-          >
-            <ShoppingCart size={20} className="text-white" />
-            {mounted && count > 0 && (
-              <span className="absolute top-1 right-1 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[10px] leading-none font-bold text-white">
-                {count > 99 ? "99+" : count}
-              </span>
-            )}
-          </Link>
+          {/* Cart (not for admin) */}
+          {user?.role !== "admin" && (
+            <Link
+              href="/carrito"
+              className="relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
+              aria-label={mounted ? `Carrito (${count} artículos)` : "Carrito"}
+            >
+              <ShoppingCart size={20} className="text-white" />
+              {mounted && count > 0 && (
+                <span className="absolute top-1 right-1 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[10px] leading-none font-bold text-white">
+                  {count > 99 ? "99+" : count}
+                </span>
+              )}
+            </Link>
+          )}
 
         </div>
       </Container>
@@ -819,14 +854,14 @@ export function Header() {
               <div className="grid grid-cols-2 gap-2">
                 {(
                   [
-                    ["Magic: The Gathering", "/magic", "#7c3aed", "magic.svg"],
                     ["Pokémon", "/pokemon", "#f59e0b", "pokemon.svg"],
+                    ["Magic: The Gathering", "/magic", "#7c3aed", "magic.svg"],
                     ["One Piece", "/one-piece", "#1d4ed8", "onepiece.svg"],
-                    ["Riftbound", "/riftbound", "#0f766e", "riftbound.svg"],
+                    ["Riftbound", "/riftbound", "#ea580c", "riftbound.svg"],
                     ["Disney Lorcana", "/lorcana", "#0891b2", "lorcana.png"],
-                    ["Dragon Ball Super", "/dragon-ball", "#d97706", "dragonball.png"],
+                    ["Dragon Ball", "/dragon-ball", "#d97706", "dragonball.png"],
                     ["Yu-Gi-Oh!", "/yugioh", "#dc2626", "yugioh.png"],
-                    ["Naruto Mythos", "/naruto", "#ea580c", "naruto.svg"],
+                    ["Naruto", "/naruto", "#ea580c", "naruto.svg"],
                     ["Digimon TCG", "/digimon", "#2563eb", "digimon.svg"],
                     ["Topps", "/topps", "#1d4ed8", "topps.svg"],
                     ["Panini", "/panini", "#16a34a", "panini.png"],
@@ -871,7 +906,6 @@ export function Header() {
               <div className="space-y-1">
                 {(
                   [
-                    ["Eventos", "/eventos", "#f59e0b"],
                     ["Tiendas", "/tiendas", "#10b981"],
                     ["Profesionales B2B", "/mayoristas", "#2563eb"],
                   ] as [string, string, string][]
@@ -1062,20 +1096,30 @@ export function Header() {
           <Gamepad2 size={22} />
           <span>Juegos</span>
         </button>
+        {user?.role === "admin" ? (
+          <Link
+            href="/admin"
+            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${pathname.startsWith("/admin") ? "text-[#2563eb]" : "text-gray-500"}`}
+          >
+            <LayoutDashboard size={22} />
+            <span>Admin</span>
+          </Link>
+        ) : (
+          <Link
+            href="/cuenta/favoritos"
+            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${pathname === "/cuenta/favoritos" ? "text-[#2563eb]" : "text-gray-500"}`}
+          >
+            <Heart size={22} />
+            <span>Favoritos</span>
+          </Link>
+        )}
         <Link
-          href="/cuenta/favoritos"
-          className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${pathname === "/cuenta/favoritos" ? "text-[#2563eb]" : "text-gray-500"}`}
-        >
-          <Heart size={22} />
-          <span>Favoritos</span>
-        </Link>
-        <Link
-          href={user ? "/cuenta" : "/login"}
-          className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${pathname.startsWith("/cuenta") || pathname === "/login" ? "text-[#2563eb]" : "text-gray-500"}`}
-          aria-label="Mi cuenta"
+          href={user ? (user.role === "admin" ? "/admin" : "/cuenta") : "/login"}
+          className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${pathname.startsWith("/cuenta") || pathname === "/login" || (user?.role === "admin" && pathname.startsWith("/admin")) ? "text-[#2563eb]" : "text-gray-500"}`}
+          aria-label={user?.role === "admin" ? "Panel de administración" : "Mi cuenta"}
         >
           <User size={22} />
-          <span>Cuenta</span>
+          <span>{user?.role === "admin" ? "Cuenta" : "Cuenta"}</span>
         </Link>
       </div>
     </nav>

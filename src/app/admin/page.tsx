@@ -128,7 +128,7 @@ export default function AdminDashboard() {
             },
             {
               kpi: "usuarios" as KpiMode,
-              label: "Usuarios",
+              label: "Usuarios registrados",
               value: MOCK_USERS.length,
               sub: `${MOCK_USERS.filter((u) => u.active).length} activos`,
               icon: Users,
@@ -136,11 +136,9 @@ export default function AdminDashboard() {
             },
             {
               kpi: "descuentos" as KpiMode,
-              label: "Descuentos activos",
-              value:
-                activeDiscounts +
-                MOCK_ADMIN_COUPONS.filter((c) => c.active).length,
-              sub: "cupones + descuentos",
+              label: "Cupones activos",
+              value: MOCK_ADMIN_COUPONS.filter((c) => c.active).length,
+              sub: "cupones vigentes",
               icon: Tag,
               color: "#dc2626",
             },
@@ -150,7 +148,7 @@ export default function AdminDashboard() {
           return (
             <button
               key={kpi}
-              onClick={() => kpi === "descuentos" ? router.push("/admin/descuentos") : setActiveKpi(kpi)}
+              onClick={() => kpi === "descuentos" ? router.push("/admin/cupones") : setActiveKpi(kpi)}
               className="rounded-2xl border bg-white p-5 text-left transition hover:shadow-md"
               style={{
                 borderColor: isActive ? color : "#e5e7eb",
@@ -227,7 +225,7 @@ export default function AdminDashboard() {
               {activeKpi === "ventas" && "Evolución de ventas"}
               {activeKpi === "productos" && "Evolución del catálogo"}
               {activeKpi === "usuarios" && "Evolución de usuarios"}
-              {activeKpi === "descuentos" && "Uso de descuentos y cupones"}
+              {activeKpi === "descuentos" && "Uso de cupones"}
             </h2>
           </div>
           <SalesChart mode={activeKpi} />

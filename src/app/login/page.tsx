@@ -10,7 +10,7 @@ const DEMO_ACCOUNTS = [
   { email: "cliente@test.com", role: "Cliente" },
   { email: "mayorista@test.com", role: "Mayorista" },
   { email: "tienda@test.com", role: "Tienda" },
-  { email: "admin@tcgacademy.com", role: "Admin" },
+  { email: "admin@tcgacademy.es", role: "Admin" },
 ];
 
 export default function LoginPage() {

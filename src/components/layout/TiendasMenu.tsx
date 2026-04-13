@@ -9,7 +9,7 @@ const STORES = [
     id: "calpe",
     name: "TCG Academy Calpe",
     city: "Calpe, Alicante",
-    address: "Av. Gabriel Miro 42",
+    address: "Av. Gabriel Miró 42",
     phone: "+34 965 83 00 01",
     instagram: "@tcgacademy_calpe",
     color: "#2563eb",

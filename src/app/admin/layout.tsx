@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   LayoutDashboard,
-  ShoppingBag,
+  Package,
   Users,
   LogOut,
   ChevronRight,
@@ -18,17 +18,15 @@ import {
   Inbox,
   BarChart2,
   PackagePlus,
-  BadgeDollarSign,
+  Tag,
   UserCircle,
   Layers,
   Ticket,
   Wrench,
   FilePlus,
-  AlertTriangle,
   MessageSquare,
   Mail,
-  BookOpen,
-  Bell,
+  Star,
 } from "lucide-react";
 
 const SOLICITUDES_KEY = "tcgacademy_solicitudes";
@@ -51,14 +49,14 @@ const NAV_ITEMS: NavItem[] = [
     icon: LayoutDashboard,
     exact: true,
   },
-  { href: "/admin/pedidos", label: "Pedidos", icon: ShoppingBag },
+  { href: "/admin/pedidos", label: "Gestión de pedidos", icon: Package },
   {
     href: "/admin/productos/nuevo",
     label: "Añadir producto",
     icon: PackagePlus,
   },
-  { href: "/admin/productos", label: "Precios", icon: BadgeDollarSign, excludePathPrefixes: ["/admin/productos/nuevo"] },
-  { href: "/admin/usuarios", label: "Usuarios", icon: Users },
+  { href: "/admin/productos", label: "Precios", icon: Tag, excludePathPrefixes: ["/admin/productos/nuevo"] },
+  { href: "/admin/usuarios", label: "Usuarios registrados", icon: Users },
   { href: "/admin/solicitudes", label: "Solicitudes B2B", icon: Inbox },
   { href: "/admin/categorias", label: "Categorías", icon: Layers },
   { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart2 },
@@ -71,20 +69,11 @@ const NAV_ITEMS: NavItem[] = [
       { href: "/admin/fiscal/nueva-factura", label: "Emitir factura manual", icon: FilePlus },
     ],
   },
-  { href: "/admin/incidencias", label: "Incidencias", icon: AlertTriangle },
   { href: "/admin/cupones", label: "Cupones", icon: Ticket },
-  { href: "/admin/notificaciones", label: "Notificaciones", icon: Bell },
+  { href: "/admin/bonos", label: "Sistema de puntos", icon: Star },
   { href: "/admin/mensajes", label: "Mensajes", icon: MessageSquare },
-  { href: "/admin/emails", label: "Emails", icon: Mail },
-  {
-    href: "/admin/herramientas",
-    label: "Herramientas",
-    icon: Wrench,
-    sub: [
-      { href: "/admin/herramientas", label: "Herramientas", icon: Wrench, exact: true },
-      { href: "/admin/manual", label: "Manual", icon: BookOpen },
-    ],
-  },
+  { href: "/admin/emails", label: "Emails automáticos", icon: Mail },
+  { href: "/admin/herramientas", label: "Herramientas", icon: Wrench },
   { href: "/cuenta/datos", label: "Mis datos", icon: UserCircle },
 ];
 
@@ -214,7 +203,7 @@ function SidebarContent({
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
           {NAV_ITEMS.map((item) => {
             if (item.sub) {
@@ -235,9 +224,9 @@ function SidebarContent({
                         : "text-gray-700 hover:bg-gray-50"
                     }`}
                   >
-                    <span className="flex items-center gap-3">
-                      <item.icon size={15} />
-                      {item.label}
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="flex-shrink-0"><item.icon size={15} /></span>
+                      <span className="truncate">{item.label}</span>
                     </span>
                     <ChevronDown
                       size={13}
@@ -369,7 +358,7 @@ export default function AdminLayout({
       <div className="grid gap-8 lg:grid-cols-[240px_1fr]">
         {/* Desktop sidebar — sticky */}
         <div className="hidden lg:block">
-          <div className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+          <div className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto overflow-x-hidden">
             <SidebarContent pathname={pathname} user={user} />
           </div>
         </div>

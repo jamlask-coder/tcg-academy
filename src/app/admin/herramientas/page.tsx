@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import {
   Download,
   Upload,
@@ -154,7 +155,7 @@ function exportUsersCSV() {
       .map((v) => `"${String(v).replace(/"/g, '""')}"`)
       .join(","),
   );
-  const csv = ["ID,Nombre,Apellidos,Email,Rol,Telefono,Registro", ...rows].join("\n");
+  const csv = ["ID,Nombre,Apellidos,Email,Rol,Teléfono,Registro", ...rows].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -424,6 +425,26 @@ export default function AdminHerramientasPage() {
           Estado simulado para demo · Última comprobación:{" "}
           {new Date().toLocaleTimeString("es")}
         </p>
+      </div>
+
+      {/* Manual */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="flex items-center gap-2 font-bold text-gray-900">
+              <Wrench size={18} className="text-gray-400" /> Manual de administración
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Guía completa de uso del panel de administración
+            </p>
+          </div>
+          <Link
+            href="/admin/manual"
+            className="flex items-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
+          >
+            Abrir manual
+          </Link>
+        </div>
       </div>
     </div>
   );

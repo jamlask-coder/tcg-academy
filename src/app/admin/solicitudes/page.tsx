@@ -27,11 +27,59 @@ interface Solicitud {
   datos: Record<string, unknown>;
 }
 
+const SEED_SOLICITUD: Solicitud = {
+  id: "demo-b2b-001",
+  tipo: "b2b",
+  estado: "nueva",
+  fechaSolicitud: new Date().toISOString(),
+  datos: {
+    razonSocial: "Distribuciones García López S.L.",
+    cif: "B87654321",
+    cnae: "4764",
+    tipoEmpresa: "SL",
+    web: "https://www.garcialopez-tcg.es",
+    tiendaFisica: "si",
+    direccionTiendaFisica: "Calle Gran Vía 45, 28013 Madrid",
+    ventaOnline: "si",
+    urlTiendaOnline: "https://tienda.garcialopez-tcg.es",
+    juegosTCG: ["Pokémon", "Magic: The Gathering", "One Piece"],
+    volumenMensual: "5000-10000",
+    comoConociste: "instagram",
+    calle: "Calle Gran Vía",
+    numero: "45",
+    piso: "3B",
+    cp: "28013",
+    ciudad: "Madrid",
+    provincia: "Madrid",
+    pais: "España",
+    recargoEquivalencia: "no",
+    nifRepresentante: "12345678A",
+    nombreRepresentante: "Carlos García López",
+    emailFacturacion: "facturas@garcialopez-tcg.es",
+    personaContacto: "Carlos García López",
+    telefono: "+34 612 345 678",
+    emailContacto: "carlos@garcialopez-tcg.es",
+    documentos: {
+      modelo036: { name: "modelo036_garcia.pdf", type: "application/pdf" },
+      cif: { name: "cif_empresa.jpg", type: "image/jpeg" },
+      dni: { name: "dni_carlos_garcia.pdf", type: "application/pdf" },
+    },
+    aceptaTerminos: true,
+    aceptaPrivacidad: true,
+    aceptaComunicaciones: true,
+  },
+};
+
 function loadSolicitudes(): Solicitud[] {
   try {
-    return JSON.parse(
-      localStorage.getItem(SOLICITUDES_KEY) ?? "[]",
-    ) as Solicitud[];
+    const raw = localStorage.getItem(SOLICITUDES_KEY);
+    if (!raw || raw === "[]") {
+      // Seed con solicitud demo si no hay ninguna
+      const seeded = [SEED_SOLICITUD];
+      localStorage.setItem(SOLICITUDES_KEY, JSON.stringify(seeded));
+      return seeded;
+    }
+    return JSON.parse(raw) as Solicitud[];
   } catch {
     return [];
   }
@@ -70,14 +118,76 @@ function getContactName(datos: Record<string, unknown>): string {
   );
 }
 
+const FIELD_LABELS: Record<string, string> = {
+  razonSocial: "Razón social",
+  cif: "CIF",
+  cnae: "CNAE",
+  tipoEmpresa: "Tipo de empresa",
+  web: "Web de la empresa",
+  tiendaFisica: "¿Tienda física?",
+  direccionTiendaFisica: "Dirección tienda física",
+  ventaOnline: "¿Venta online?",
+  urlTiendaOnline: "URL tienda online",
+  juegosTCG: "Juegos TCG de interés",
+  volumenMensual: "Volumen mensual estimado",
+  comoConociste: "¿Cómo nos conoció?",
+  calle: "Calle",
+  numero: "Número",
+  piso: "Piso / Puerta",
+  cp: "Código postal",
+  ciudad: "Ciudad",
+  provincia: "Provincia",
+  pais: "País",
+  recargoEquivalencia: "Recargo de equivalencia",
+  nifRepresentante: "NIF representante",
+  nombreRepresentante: "Nombre representante",
+  emailFacturacion: "Email de facturación",
+  personaContacto: "Persona de contacto",
+  telefono: "Teléfono",
+  emailContacto: "Email de contacto",
+  aceptaTerminos: "Acepta términos",
+  aceptaPrivacidad: "Acepta privacidad",
+  aceptaComunicaciones: "Acepta comunicaciones",
+};
+
 function DataRow({ label, value }: { label: string; value: unknown }) {
   if (!value && value !== false && value !== 0) return null;
-  const display = Array.isArray(value) ? value.join(", ") : String(value);
+  if (label === "documentos") return null; // rendered separately
+  const display = Array.isArray(value) ? value.join(", ") : typeof value === "boolean" ? (value ? "Sí" : "No") : String(value);
   if (!display) return null;
+  const prettyLabel = FIELD_LABELS[label] ?? label.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
   return (
     <div className="flex gap-3 border-b border-gray-50 py-1.5 last:border-0">
-      <span className="w-44 flex-shrink-0 text-xs text-gray-400">{label}</span>
+      <span className="w-44 flex-shrink-0 text-xs font-medium text-gray-400">{prettyLabel}</span>
       <span className="flex-1 text-xs text-gray-700">{display}</span>
+    </div>
+  );
+}
+
+function DocRow({ docs }: { docs: Record<string, { name: string; type: string } | null> }) {
+  const entries = Object.entries(docs).filter(([, v]) => v !== null);
+  if (entries.length === 0) return null;
+  const docLabels: Record<string, string> = {
+    modelo036: "Modelo 036/037",
+    cif: "CIF empresa",
+    dni: "DNI representante",
+  };
+  return (
+    <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 p-3">
+      <p className="mb-2 text-[11px] font-bold tracking-widest text-blue-600 uppercase">
+        Documentación adjunta
+      </p>
+      <div className="space-y-1.5">
+        {entries.map(([key, file]) => (
+          <div key={key} className="flex items-center gap-2 text-xs">
+            <span className="font-medium text-blue-700">{docLabels[key] ?? key}:</span>
+            <span className="text-blue-600">{(file as { name: string }).name}</span>
+            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-500">
+              {(file as { type: string }).type.split("/")[1]?.toUpperCase() ?? "ARCHIVO"}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -200,15 +310,12 @@ function SolicitudRow({
           </div>
           <div className="rounded-xl border border-gray-200 bg-white px-4 py-2">
             {Object.entries(solicitud.datos).map(([key, value]) => (
-              <DataRow
-                key={key}
-                label={key
-                  .replace(/([A-Z])/g, " $1")
-                  .replace(/^./, (s) => s.toUpperCase())}
-                value={value}
-              />
+              <DataRow key={key} label={key} value={value} />
             ))}
           </div>
+          {typeof solicitud.datos.documentos === "object" && solicitud.datos.documentos !== null && (
+            <DocRow docs={solicitud.datos.documentos as Record<string, { name: string; type: string } | null>} />
+          )}
         </div>
       )}
     </div>

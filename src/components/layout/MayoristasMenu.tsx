@@ -12,7 +12,7 @@ const OPTIONS = [
   {
     icon: Building2,
     title: "Hazte distribuidor B2B",
-    desc: "Precios exclusivos para empresas y tiendas. Descuentos por volumen hasta el 30%.",
+    desc: "Precios exclusivos para empresas y tiendas. Descuentos especiales.",
     href: "/mayoristas",
     color: "#2563eb",
     badge: "Más popular",

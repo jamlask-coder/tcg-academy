@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Download,
@@ -9,15 +9,17 @@ import {
   ArrowUpDown,
   Plus,
 } from "lucide-react";
-import { loadInvoices } from "@/services/invoiceService";
+import { loadInvoices, createInvoice } from "@/services/invoiceService";
+import type { InvoiceLineItem } from "@/types/fiscal";
 import {
   generateCSVForAdvisor,
   filterByPeriod,
   getTaxPeriod,
 } from "@/services/taxService";
 import type { InvoiceRecord } from "@/types/fiscal";
-import { InvoiceStatus, VerifactuStatus, InvoiceType } from "@/types/fiscal";
+import { InvoiceStatus, VerifactuStatus, InvoiceType, PaymentMethod } from "@/types/fiscal";
 import type { Quarter } from "@/types/tax";
+import { ADMIN_ORDERS, ORDER_STORAGE_KEY, type AdminOrder } from "@/data/mockData";
 
 function formatDate(d: Date | string): string {
   const dt = new Date(d);
@@ -110,8 +112,85 @@ function SortIcon({
   );
 }
 
+function mapPaymentMethod(method: string): PaymentMethod {
+  const m = method.toLowerCase();
+  if (m.includes("paypal")) return PaymentMethod.PAYPAL;
+  if (m.includes("bizum")) return PaymentMethod.BIZUM;
+  if (m.includes("transferencia")) return PaymentMethod.TRANSFERENCIA;
+  if (m.includes("tienda") || m.includes("efectivo")) return PaymentMethod.EFECTIVO;
+  return PaymentMethod.TARJETA;
+}
+
+function buildLineItems(order: AdminOrder): InvoiceLineItem[] {
+  return order.items.map((item, i) => {
+    const priceWithVat = item.price * item.qty;
+    const unitWithoutVat = item.price / 1.21;
+    const base = unitWithoutVat * item.qty;
+    const vat = priceWithVat - base;
+    return {
+      lineNumber: i + 1,
+      productId: String(item.id),
+      description: item.name,
+      quantity: item.qty,
+      unitPrice: Math.round(unitWithoutVat * 100) / 100,
+      discount: 0,
+      discountAmount: 0,
+      taxableBase: Math.round(base * 100) / 100,
+      vatRate: 21 as const,
+      vatAmount: Math.round(vat * 100) / 100,
+      surchargeRate: 0 as const,
+      surchargeAmount: 0,
+      totalLine: Math.round(priceWithVat * 100) / 100,
+    };
+  });
+}
+
+async function syncPaidOrdersAsInvoices() {
+  try {
+    const raw = localStorage.getItem(ORDER_STORAGE_KEY);
+    const orders: AdminOrder[] = raw ? JSON.parse(raw) : ADMIN_ORDERS;
+    const existingInvoices = loadInvoices();
+    const invoicedOrderIds = new Set(existingInvoices.map((inv) => inv.sourceOrderId).filter(Boolean));
+
+    // Payment status
+    const paymentStatus = JSON.parse(localStorage.getItem("tcgacademy_payment_status") ?? "{}");
+
+    // Only create invoices for paid orders (not cancelled/returned, and payment confirmed)
+    const paidOrders = orders.filter((o) => {
+      if (invoicedOrderIds.has(o.id)) return false;
+      if (o.adminStatus === "cancelado" || o.adminStatus === "devolucion") return false;
+      const method = o.paymentMethod.toLowerCase();
+      const isManual = method.includes("transferencia") || method.includes("tienda") || method.includes("recogida");
+      if (isManual && paymentStatus[o.id] !== "cobrado") return false;
+      return true;
+    });
+
+    for (const order of paidOrders) {
+      await createInvoice({
+        recipient: {
+          name: order.userName,
+          countryCode: "ES",
+          email: order.userEmail,
+          address: { street: order.address, postalCode: "", city: "", province: "", country: "España", countryCode: "ES" },
+        },
+        items: buildLineItems(order),
+        paymentMethod: mapPaymentMethod(order.paymentMethod),
+        sourceOrderId: order.id,
+        invoiceDate: new Date(order.statusHistory[0]?.date ?? order.date),
+      });
+    }
+  } catch { /* ignore */ }
+}
+
 export default function FacturasPage() {
-  const [invoices] = useState<InvoiceRecord[]>(() => loadInvoices());
+  const [invoices, setInvoices] = useState<InvoiceRecord[]>(() => loadInvoices());
+
+  useEffect(() => {
+    syncPaidOrdersAsInvoices().then(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setInvoices(loadInvoices());
+    });
+  }, []);
   const [yearFilter, setYearFilter] = useState<number>(
     new Date().getFullYear(),
   );

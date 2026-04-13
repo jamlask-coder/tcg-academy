@@ -276,7 +276,16 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
 
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const [limitMsg, setLimitMsg] = useState<string | undefined>(undefined);
   const [activeImg, setActiveImg] = useState(0);
+
+  // Compute qty max from stock and maxPerUser limits
+  const qtyMax = (() => {
+    const limits: number[] = [];
+    if (typeof product.maxPerUser === "number") limits.push(product.maxPerUser);
+    if (typeof product.stock === "number") limits.push(product.stock);
+    return limits.length > 0 ? Math.min(...limits) : undefined;
+  })();
 
   // Track recently viewed
   useEffect(() => {
@@ -328,15 +337,20 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
 
   const handleAddToCart = () => {
     if (!product.inStock) return;
-    addItem(
+    const result = addItem(
       product.id,
       product.name,
       displayPrice,
       product.images[0] ?? "",
       qty,
     );
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2500);
+    if (result.added) {
+      setAdded(true);
+      setTimeout(() => setAdded(false), 2500);
+    } else {
+      setLimitMsg(result.reason);
+      setTimeout(() => setLimitMsg(undefined), 3000);
+    }
   };
 
   const handleSave = useCallback(() => {
@@ -497,7 +511,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                 <div
                   className="flex h-full w-full flex-col items-center justify-center gap-4"
                   style={{
-                    background: `linear-gradient(135deg, ${color}18, ${color}35)`,
+                    background: "#ffffff",
                   }}
                 >
                   <span className="text-8xl">{config.emoji}</span>
@@ -511,7 +525,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
               )}
               {/* ── ESQUINA SUPERIOR IZQUIERDA: corazón + badges ── */}
               <div className="absolute top-3 left-3 z-10 flex flex-col items-start gap-1.5">
-                {user && (
+                {user && user.role !== "admin" && (
                   <button
                     onClick={() => toggleFavorite(product.id)}
                     aria-label={
@@ -750,18 +764,22 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           </div>
 
           {/* 6. Qty + Add to cart */}
+          <div className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
             <div className="flex items-center overflow-hidden rounded-xl border-2 border-gray-200">
               <button
                 onClick={() => setQty(Math.max(1, qty - 1))}
                 className="flex h-12 w-10 items-center justify-center transition hover:bg-gray-50"
+                aria-label="Reducir cantidad"
               >
                 <Minus size={16} />
               </button>
               <span className="w-12 text-center text-lg font-bold">{qty}</span>
               <button
-                onClick={() => setQty(qty + 1)}
-                className="flex h-12 w-10 items-center justify-center transition hover:bg-gray-50"
+                onClick={() => setQty(qtyMax !== undefined ? Math.min(qtyMax, qty + 1) : qty + 1)}
+                disabled={qtyMax !== undefined && qty >= qtyMax}
+                className="flex h-12 w-10 items-center justify-center transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Aumentar cantidad"
               >
                 <Plus size={16} />
               </button>
@@ -784,7 +802,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                   ? "¡Añadido al carrito!"
                   : "Añadir al carrito"}
             </button>
-            {user && (
+            {user && user.role !== "admin" && (
               <button
                 onClick={() => toggleFavorite(product.id)}
                 aria-label={
@@ -808,6 +826,13 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                 />
               </button>
             )}
+          </div>
+          {typeof product.maxPerUser === "number" && (
+            <p className="text-xs text-gray-500">Máx. {product.maxPerUser} uds/persona</p>
+          )}
+          {limitMsg && (
+            <p className="text-xs font-semibold text-red-500">{limitMsg}</p>
+          )}
           </div>
 
           {/* 7. Shipping info */}

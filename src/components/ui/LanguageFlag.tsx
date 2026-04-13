@@ -36,8 +36,8 @@ export function LanguageFlag({
   if (!country) return null;
 
   const fullName = LANGUAGE_NAMES[language.toUpperCase()] ?? language;
-  const flagW = size === "md" ? 22 : 16;
-  const flagH = size === "md" ? 16 : 12;
+  const flagW = size === "md" ? 32 : 20;
+  const flagH = size === "md" ? 24 : 15;
   const labelCls = size === "md" ? "text-xs font-semibold text-gray-700" : "text-[10px] font-bold text-gray-700";
 
   return (

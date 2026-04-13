@@ -88,7 +88,7 @@ const FOOTER_HTML = `
       <a href="https://tcgacademy.es/politica-privacidad">Política de privacidad</a>
     </p>
     <p style="margin-top:8px; font-size:10px; color:#d1d5db; line-height:1.5;">
-      TCG Academy es una marca de TCG Hobby S.L., con domicilio social en Calle Libertad 16, 03710 Calp, Alicante (España). CIF: B54543534. ©2026 TCG Hobby S.L. Todos los derechos reservados. Los formularios de queja están disponibles a petición del consumidor.
+      TCG Academy es una marca de TCG Academy S.L., con domicilio social en Calle Libertad 16, 03710 Calp, Alicante (España). CIF: B12345678. ©2026 TCG Academy S.L. Todos los derechos reservados. Los formularios de queja están disponibles a petición del consumidor.
     </p>
   </div>
 `;
@@ -218,7 +218,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
         <div class="legal-box">
           <p>Este email confirma la recepción de tu pedido. El contrato de compraventa se perfecciona en el momento del pago. TCG Academy se reserva el derecho de cancelar pedidos en caso de error de precio o falta de stock.</p>
           <p>De conformidad con el art. 102 TRLGDCU, dispones de 14 días naturales para ejercer tu derecho de desistimiento desde la recepción del pedido, salvo productos precintados de contenido digital.</p>
-          <p>TCG Academy es una marca de TCG Hobby S.L. · CIF: B54543534 · Calle Libertad 16, 03710 Calp, Alicante (España)</p>
+          <p>TCG Academy es una marca de TCG Academy S.L. · CIF: B12345678 · Calle Libertad 16, 03710 Calp, Alicante (España)</p>
         </div>
       </div>
     `),
@@ -280,7 +280,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
         <p><strong>El equipo de TCG Academy</strong></p>
         <div class="legal-box">
           <p>El plazo de entrega es orientativo y puede variar por causas ajenas a TCG Academy. En caso de incidencia con el transportista, abriremos una reclamación en un plazo máximo de 24 h hábiles.</p>
-          <p>TCG Academy es una marca de TCG Hobby S.L. · CIF: B54543534 · Calle Libertad 16, 03710 Calp, Alicante (España)</p>
+          <p>TCG Academy es una marca de TCG Academy S.L. · CIF: B12345678 · Calle Libertad 16, 03710 Calp, Alicante (España)</p>
         </div>
       </div>
     `),
@@ -342,7 +342,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
         <div class="legal-box">
           <p>Recuerda que dispones de 14 días naturales desde la recepción para ejercer tu derecho de desistimiento (art. 102 TRLGDCU). Para devoluciones, accede a tu área de cliente o escríbenos a <a href="mailto:pedidos@tcgacademy.es" style="color:#9ca3af;">pedidos@tcgacademy.es</a>.</p>
           <p>Los formularios de queja están disponibles a petición del consumidor en nuestras tiendas físicas y por email.</p>
-          <p>TCG Academy es una marca de TCG Hobby S.L. · CIF: B54543534 · Calle Libertad 16, 03710 Calp, Alicante (España) · ©2026 Todos los derechos reservados.</p>
+          <p>TCG Academy es una marca de TCG Academy S.L. · CIF: B12345678 · Calle Libertad 16, 03710 Calp, Alicante (España) · ©2026 Todos los derechos reservados.</p>
         </div>
       </div>
     `),
@@ -481,7 +481,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
           <p style="margin:8px 0 0;"><strong>Plazo estimado:</strong> {{refund_days}} días hábiles</p>
         </div>
         <p>Recibirás el reembolso en el método de pago original. Si tienes alguna duda, escríbenos a <a href="mailto:devoluciones@tcgacademy.es">devoluciones@tcgacademy.es</a>.</p>
-        <p>Disculpa los inconvenientes.<br/><strong>El equipo de TCG Academy</strong></p>
+        <p>Disculpa las molestias.<br/><strong>El equipo de TCG Academy</strong></p>
       </div>
     `),
   },

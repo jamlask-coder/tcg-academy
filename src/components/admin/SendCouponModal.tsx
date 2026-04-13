@@ -602,7 +602,7 @@ function SendCouponModal({
                   TCG Academy · hola@tcgacademy.es · +34 965 000 001
                 </p>
                 <p style={{ color: "#d1d5db", fontSize: 10, margin: 0 }}>
-                  Calle Libertad 16, 03710 Calp, Alicante · CIF: B54543534
+                  Calle Libertad 16, 03710 Calp, Alicante · CIF: B12345678
                 </p>
               </div>
             </div>

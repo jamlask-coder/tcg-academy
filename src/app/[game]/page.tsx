@@ -60,9 +60,9 @@ export default async function GamePage({
         className="relative overflow-hidden"
         style={{ backgroundColor: bgColor }}
       >
-        <div className="relative mx-auto max-w-[1400px] px-4 py-4 sm:px-6">
+        <div className="relative mx-auto max-w-[1400px] px-4 py-3 sm:px-6">
           <nav
-            className="mb-3 flex items-center gap-2 text-sm opacity-70"
+            className="mb-2 flex items-center gap-2 text-sm opacity-70"
             style={{ color }}
           >
             <Link href="/" className="hover:opacity-100">
@@ -105,24 +105,7 @@ export default async function GamePage({
       )}
 
       {/* Catálogo */}
-      <section className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 sm:py-10">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">
-            Catálogo{" "}
-            <span className="text-sm font-normal text-gray-400">
-              ({all.length} productos)
-            </span>
-          </h2>
-          {allProducts.length !== all.length && (
-            <Link
-              href={`/${game}/singles`}
-              className="text-sm font-semibold hover:underline"
-              style={{ color }}
-            >
-              Ver cartas sueltas ({allProducts.length - all.length}) →
-            </Link>
-          )}
-        </div>
+      <section className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6 sm:py-6">
         {all.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-gray-200 py-24 text-center">
             <p className="font-medium text-gray-400">Catálogo en construcción</p>

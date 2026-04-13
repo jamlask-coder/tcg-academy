@@ -433,7 +433,7 @@ export default function FranquiciasPage() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-semibold text-gray-700">
-                  ¿Cómo nos has conocido?{" "}
+                  ¿Cómo nos conociste?{" "}
                   <span className="text-red-500">*</span>
                 </label>
                 <select

@@ -100,13 +100,13 @@ export default function DatosPage() {
         onSubmit={handleSave}
         className="space-y-5 rounded-2xl border border-gray-200 bg-white p-6"
       >
-        <h2 className="font-bold text-gray-900">Informacion personal</h2>
+        <h2 className="font-bold text-gray-900">Información personal</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           {(
             [
               ["name", "Nombre", form.name],
               ["lastName", "Apellidos", form.lastName],
-              ["phone", "Telefono", form.phone],
+              ["phone", "Teléfono", form.phone],
               ["email", "Email", user.email],
             ] as const
           ).map(([key, label, value]) => (
@@ -189,8 +189,8 @@ export default function DatosPage() {
           ))}
         </div>
         <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-600">
-          El cambio de contraseña estara disponible cuando se conecte con el
-          backend de autenticacion.
+          El cambio de contraseña estará disponible cuando se conecte con el
+          backend de autenticación.
         </div>
       </div>
 

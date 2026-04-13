@@ -38,7 +38,7 @@ export const MOCK_ORDERS: Order[] = [
     items: [
       {
         id: 1,
-        name: "Naruto Mythos: Konoha Shido Booster Box (24 sobres)",
+        name: "Naruto Mythos: Konoha Shidō Booster Box (24 sobres)",
         qty: 1,
         price: 79.95,
         game: "naruto",
@@ -222,7 +222,7 @@ export const MOCK_INVOICES: Invoice[] = [
     status: "pagada",
     items: [
       {
-        description: "Naruto Mythos: Konoha Shido Booster Box",
+        description: "Naruto Mythos: Konoha Shidō Booster Box",
         qty: 1,
         unitPrice: 79.95,
         total: 79.95,
@@ -377,8 +377,8 @@ export const MOCK_ADMIN_COUPONS: AdminCoupon[] = [
     description: "Cupón de bienvenida para nuevos usuarios",
     discountType: "percent",
     value: 15,
-    startsAt: "2025-01-01",
-    endsAt: "2025-12-31",
+    startsAt: "2026-01-01",
+    endsAt: "2026-12-31",
     active: true,
     applicableTo: "all",
     maxUses: 1000,
@@ -391,8 +391,8 @@ export const MOCK_ADMIN_COUPONS: AdminCoupon[] = [
     description: "Promoción sección Pokémon",
     discountType: "percent",
     value: 10,
-    startsAt: "2025-01-01",
-    endsAt: "2025-06-30",
+    startsAt: "2026-01-01",
+    endsAt: "2026-06-30",
     active: true,
     applicableTo: "game",
     applicableValue: "pokemon",
@@ -406,8 +406,8 @@ export const MOCK_ADMIN_COUPONS: AdminCoupon[] = [
     description: "Descuento fijo bienvenida",
     discountType: "fixed",
     value: 5,
-    startsAt: "2025-02-01",
-    endsAt: "2025-03-31",
+    startsAt: "2026-02-01",
+    endsAt: "2026-06-30",
     active: true,
     applicableTo: "all",
     maxUses: 200,
@@ -513,14 +513,12 @@ export const MOCK_POINTS_HISTORY: PointsTransaction[] = [
 
 export const MOCK_POINTS_BALANCE = 520;
 
-// 100 puntos = €0.10 (tasa correcta: 10 pts por €1 gastado)
+// 100 puntos = €1.00 (tasa: 100 pts por €1 de descuento)
 export const POINTS_REDEMPTION_TABLE = [
-  { points: 100, euros: 0.1 },
-  { points: 500, euros: 0.5 },
-  { points: 1000, euros: 1.0 },
-  { points: 2000, euros: 2.0 },
-  { points: 5000, euros: 5.0 },
-  { points: 10000, euros: 10.0 },
+  { points: 100, euros: 1.0 },
+  { points: 250, euros: 2.5 },
+  { points: 500, euros: 5.0 },
+  { points: 1000, euros: 10.0 },
 ];
 
 // ─── Notifications ────────────────────────────────────────────────────────────
@@ -755,7 +753,7 @@ export const MOCK_USERS: AdminUser[] = [
     id: "admin",
     name: "Admin",
     lastName: "TCG",
-    email: "admin@tcgacademy.com",
+    email: "admin@tcgacademy.es",
     role: "admin",
     registeredAt: "2024-01-01",
     totalOrders: 0,
@@ -1065,7 +1063,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     items: [
       {
         id: 10002,
-        name: "Naruto Mythos: Konoha Shido Booster Box (24 sobres)",
+        name: "Naruto Mythos: Konoha Shidō Booster Box (24 sobres)",
         qty: 3,
         price: 65.56,
         game: "naruto",
@@ -1418,7 +1416,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
       },
       {
         id: 10002,
-        name: "Naruto Mythos: Konoha Shido Booster Box (24 sobres)",
+        name: "Naruto Mythos: Konoha Shidō Booster Box (24 sobres)",
         qty: 2,
         price: 65.56,
         game: "naruto",
@@ -1585,7 +1583,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     items: [
       {
         id: 10002,
-        name: "Naruto Mythos: Konoha Shido Booster Box (24 sobres)",
+        name: "Naruto Mythos: Konoha Shidō Booster Box (24 sobres)",
         qty: 1,
         price: 79.95,
         game: "naruto",

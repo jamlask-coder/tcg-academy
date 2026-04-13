@@ -14,6 +14,8 @@ export interface LocalProduct {
   game: string; // slug del juego: 'magic', 'pokemon', etc.
   images: string[]; // URLs de imagen — vacío = muestra placeholder
   inStock: boolean;
+  stock?: number;       // Numeric stock count. undefined = unlimited
+  maxPerUser?: number;  // Max units per user per order. undefined = unlimited
   isNew: boolean;
   createdAt?: string; // ISO date — used for "Nuevo" badge (45-day window)
   isFeatured?: boolean;
@@ -35,14 +37,6 @@ export const GAME_CONFIG: Record<
     emoji: string;
   }
 > = {
-  magic: {
-    name: "Magic: The Gathering",
-    color: "#dc2626",
-    bgColor: "#fee2e2",
-    description:
-      "Booster Boxes, Commander Decks, singles y accesorios del TCG más veterano del mundo.",
-    emoji: "🧙",
-  },
   pokemon: {
     name: "Pokémon",
     color: "#f59e0b",
@@ -50,6 +44,14 @@ export const GAME_CONFIG: Record<
     description:
       "Cartas, sobres, ETBs y colecciones del juego de cartas Pokémon.",
     emoji: "⚡",
+  },
+  magic: {
+    name: "Magic: The Gathering",
+    color: "#dc2626",
+    bgColor: "#fee2e2",
+    description:
+      "Booster Boxes, Commander Decks, singles y accesorios del TCG más veterano del mundo.",
+    emoji: "🧙",
   },
   "one-piece": {
     name: "One Piece",
@@ -61,8 +63,8 @@ export const GAME_CONFIG: Record<
   },
   riftbound: {
     name: "Riftbound",
-    color: "#0f766e",
-    bgColor: "#ccfbf1",
+    color: "#ea580c",
+    bgColor: "#fff7ed",
     description:
       "El nuevo TCG de League of Legends. Booster Boxes y Starter Decks.",
     emoji: "⚔️",
@@ -83,7 +85,7 @@ export const GAME_CONFIG: Record<
     emoji: "✨",
   },
   "dragon-ball": {
-    name: "Dragon Ball Super CG",
+    name: "Dragon Ball",
     color: "#d97706",
     bgColor: "#fef3c7",
     description:
@@ -99,7 +101,7 @@ export const GAME_CONFIG: Record<
     emoji: "👁️",
   },
   naruto: {
-    name: "Naruto Mythos TCG",
+    name: "Naruto",
     color: "#ea580c",
     bgColor: "#ffedd5",
     description: "El nuevo TCG de Naruto. Primera expansión: Konoha Shidō.",
@@ -491,7 +493,7 @@ export const PRODUCTS: LocalProduct[] = [
     storePrice: 89.96,
     costPrice: 64.77,
     description:
-      "Surging Sparks (Choque Estelar en Español) trae de vuelta a Pikachu como protagonista con nuevas cartas ex y cartas ilustradas de alta rareza. Mecánica ACE SPEC revisitada con nuevas cartas poderosas para el juego competitivo.",
+      "Surging Sparks (Choque Estelar en español) trae de vuelta a Pikachu como protagonista con nuevas cartas ex y cartas ilustradas de alta rareza. Mecánica ACE SPEC revisitada con nuevas cartas poderosas para el juego competitivo.",
     category: "booster-box",
     game: "pokemon",
     images: ["https://images.pokemontcg.io/sv8/logo.png"],
@@ -727,7 +729,7 @@ export const PRODUCTS: LocalProduct[] = [
     storePrice: 63.71,
     costPrice: 45.87,
     description:
-      "OP-08 Two Legends celebra a los dos leyendas más grandes de One Piece: Gol D. Roger y Barbanegra en su época dorada. Incluye cartas Leader exclusivas y poderosas cartas de personajes del pasado.",
+      "OP-08 Two Legends celebra a las dos leyendas más grandes de One Piece: Gol D. Roger y Barbanegra en su época dorada. Incluye cartas Leader exclusivas y poderosas cartas de personajes del pasado.",
     category: "booster-box",
     game: "one-piece",
     images: ["/images/products/one-piece-op08-two-legends-booster-box.webp"],
@@ -847,7 +849,7 @@ export const PRODUCTS: LocalProduct[] = [
     storePrice: 59.96,
     costPrice: 43.17,
     description:
-      "Riftbound es el juego de cartas oficial de League of Legends desarrollado por Riot Games. El set Foundations introduce a los campeones más icónicos: Jinx, Vi, Lux, Garen y más. Mecánicas de combate únicas derivadas del juego de video.",
+      "Riftbound es el juego de cartas oficial de League of Legends desarrollado por Riot Games. El set Foundations introduce a los campeones más icónicos: Jinx, Vi, Lux, Garen y más. Mecánicas de combate únicas derivadas del videojuego.",
     category: "booster-box",
     game: "riftbound",
     images: [

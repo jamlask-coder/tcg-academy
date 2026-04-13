@@ -47,21 +47,8 @@ const SOCIAL_LINKS = [
   { label: "X", href: "#", Icon: IconX },
 ];
 
-const GAMES: [string, string][] = [
-  ["Magic", "/magic"],
-  ["Pokémon", "/pokemon"],
-  ["One Piece", "/one-piece"],
-  ["Riftbound", "/riftbound"],
-  ["Topps", "/topps"],
-  ["Lorcana", "/lorcana"],
-  ["Dragon Ball", "/dragon-ball"],
-  ["Yu-Gi-Oh!", "/yugioh"],
-  ["Naruto", "/naruto"],
-];
-
 const LINKS: [string, string][] = [
   ["Nuestras tiendas", "/tiendas"],
-  ["Eventos", "/eventos"],
   ["Contacto", "/contacto"],
   ["Profesionales B2B", "/mayoristas"],
   ["Abre tu tienda TCG", "/mayoristas/franquicias"],
@@ -98,24 +85,9 @@ export function Footer() {
   return (
     <footer className="bg-gradient-to-b from-[#0f172a] to-[#1e293b] text-white">
       <Container className="py-8">
-        {/* Games row */}
-        <div className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-white/8 pb-6">
-          {GAMES.map(([label, href], i) => (
-            <span key={href} className="flex items-center gap-2">
-              {i > 0 && <span className="text-xs text-white/20">·</span>}
-              <Link
-                href={href}
-                className="text-xs text-slate-400 transition-colors hover:text-white"
-              >
-                {label}
-              </Link>
-            </span>
-          ))}
-        </div>
-
-        {/* Brand row — full width */}
-        <div className="mb-6">
-          {/* Col 1: Brand + social + payment */}
+        {/* Main grid: Brand | Tienda | Legal */}
+        <div className="mb-6 grid gap-8 sm:grid-cols-3">
+          {/* Brand */}
           <div>
             <Link href="/" className="mb-4 inline-flex items-center gap-2">
               <span className="text-xl font-black tracking-tight text-white">TCG <span className="text-amber-400">Academy</span></span>
@@ -151,10 +123,8 @@ export function Footer() {
               ))}
             </div>
           </div>
-        </div>
 
-        {/* Tienda + Legal — always side by side */}
-        <div className="mb-6 grid grid-cols-2 gap-8">
+          {/* Tienda */}
           <div>
             <h3 className="mb-3 text-[10px] font-bold tracking-widest text-white/40 uppercase">
               Tienda
@@ -168,6 +138,7 @@ export function Footer() {
             </ul>
           </div>
 
+          {/* Legal */}
           <div>
             <h3 className="mb-3 text-[10px] font-bold tracking-widest text-white/40 uppercase">
               Legal

@@ -7,7 +7,6 @@ import {
 } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
 import { useDiscounts, type ProductDiscount } from "@/context/DiscountContext";
-import { MOCK_ADMIN_COUPONS } from "@/data/mockData";
 import { Tag, Zap, Save, X, ChevronDown, Plus, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 
 export default function AdminDescuentosPage() {
@@ -92,7 +91,6 @@ export default function AdminDescuentosPage() {
   };
 
   const activeCount = Object.values(discounts).filter((d) => d.active).length;
-  const activeCouponsCount = MOCK_ADMIN_COUPONS.filter((c) => c.active).length;
 
   const activeProductDiscounts = useMemo(() => {
     return Object.values(discounts)
@@ -117,7 +115,7 @@ export default function AdminDescuentosPage() {
             Gestión de descuentos
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            {activeCount + activeCouponsCount} activos · {activeCount} en productos · {activeCouponsCount} cupones
+            {activeCount} descuento{activeCount !== 1 ? "s" : ""} activo{activeCount !== 1 ? "s" : ""} en productos
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -140,7 +138,7 @@ export default function AdminDescuentosPage() {
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <div className="flex items-center gap-2">
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-black text-white">
-              {activeCount + activeCouponsCount}
+              {activeCount}
             </span>
             <h2 className="font-bold text-gray-900">Descuentos activos ahora</h2>
           </div>
@@ -155,7 +153,7 @@ export default function AdminDescuentosPage() {
           </button>
         </div>
 
-        {activeProductDiscounts.length === 0 && activeCouponsCount === 0 ? (
+        {activeProductDiscounts.length === 0 ? (
           <p className="px-5 py-8 text-center text-sm text-gray-400">
             No hay descuentos activos en este momento
           </p>
@@ -166,7 +164,7 @@ export default function AdminDescuentosPage() {
               <div key={d.productId} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-sm font-semibold text-gray-900">{d.productName}</p>
-                  <p className="text-xs capitalize text-gray-400">{d.game}{d.endsAt ? ` · Caduca ${d.endsAt}` : ""}</p>
+                  <p className="text-xs capitalize text-gray-400">{d.game}{d.endsAt ? ` · Finaliza ${d.endsAt}` : ""}</p>
                 </div>
                 <span className="rounded-full bg-red-100 px-2.5 py-1 text-sm font-black text-red-600">
                   -{d.pct}%
@@ -208,30 +206,7 @@ export default function AdminDescuentosPage() {
               </div>
             ))}
 
-            {/* Active coupons */}
-            {MOCK_ADMIN_COUPONS.filter((c) => c.active).map((c) => (
-              <div key={c.code} className="flex flex-wrap items-center gap-3 bg-amber-50/60 px-5 py-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900">
-                    Cupón <span className="font-mono text-amber-700">{c.code}</span>
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    {c.discountType === "percent" ? `-${c.value}%` : `-${c.value}€`} · Caduca {c.endsAt}
-                  </p>
-                </div>
-                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-sm font-black text-amber-700">
-                  {c.discountType === "percent" ? `-${c.value}%` : `-${c.value}€`}
-                </span>
-                <span className="text-xs text-gray-400">Cupón</span>
-                <button
-                  aria-label={`Ir a gestión del cupón ${c.code}`}
-                  onClick={() => window.location.assign("/admin/cupones")}
-                  className="text-xs font-semibold text-amber-600 underline hover:no-underline"
-                >
-                  Gestionar →
-                </button>
-              </div>
-            ))}
+
           </div>
         )}
       </div>
@@ -242,7 +217,7 @@ export default function AdminDescuentosPage() {
           <Zap size={18} className="text-yellow-500" /> Descuento masivo
         </h2>
         <p className="mb-5 text-sm text-gray-500">
-          Aplica un descuento a un juego o categoria entera de golpe
+          Aplica un descuento a un juego o categoría entera de golpe
         </p>
         <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="relative">
@@ -273,7 +248,7 @@ export default function AdminDescuentosPage() {
               }
               className={`w-full ${selectCls}`}
             >
-              <option value="">Todas las categorias</option>
+              <option value="">Todas las categorías</option>
               {allCats.map((c) => (
                 <option key={c} value={c}>
                   {CATEGORY_LABELS[c] ?? c}
@@ -297,13 +272,15 @@ export default function AdminDescuentosPage() {
             <span className="text-sm font-bold text-gray-500">%</span>
           </div>
           <div>
+            <label className="mb-1 block text-xs font-semibold text-gray-500">
+              Finalización del descuento
+            </label>
             <input
               type="date"
               value={bulk.endsAt}
               onChange={(e) =>
                 setBulk((b) => ({ ...b, endsAt: e.target.value }))
               }
-              placeholder="Caduca (opcional)"
               className={`w-full ${inputCls}`}
             />
           </div>
@@ -406,7 +383,7 @@ export default function AdminDescuentosPage() {
                   Precio final
                 </th>
                 <th className="px-3 py-2.5 text-center font-semibold text-gray-600">
-                  Caduca
+                  Finalización
                 </th>
                 <th className="px-4 py-2.5 text-center font-semibold text-gray-600">
                   Activo
@@ -509,8 +486,10 @@ export default function AdminDescuentosPage() {
             automáticamente.
           </p>
           <p>
-            <strong>Caduca:</strong> Si se establece una fecha, el descuento se
-            desactiva automáticamente cuando pase.
+            <strong>Finalización del descuento:</strong> Fecha en la que el
+            descuento dejará de aplicarse. Al llegar esa fecha, el descuento se
+            desactiva automáticamente. Si no se indica fecha, el descuento
+            permanece activo indefinidamente.
           </p>
           <p>
             <strong>Descuento masivo:</strong> Aplica el mismo % a un juego o
