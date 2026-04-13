@@ -248,7 +248,7 @@ export default function AdminDashboard() {
                     {lowStockCount} productos sin stock
                   </p>
                   <Link
-                    href="/admin/productos"
+                    href="/admin/preciosystock"
                     className="text-xs text-amber-600 hover:underline"
                   >
                     Revisar →
@@ -276,19 +276,19 @@ export default function AdminDashboard() {
               </div>
             )}
             {ALL_ORDERS.filter((o) => o.status === "pedido").length > 0 && (
-              <div className="flex items-start gap-3 rounded-xl bg-blue-50 p-3">
+              <div className="flex items-start gap-3 rounded-xl bg-red-50 p-3">
                 <ShoppingBag
                   size={15}
-                  className="mt-0.5 flex-shrink-0 text-blue-600"
+                  className="mt-0.5 flex-shrink-0 text-red-500"
                 />
                 <div>
-                  <p className="text-sm font-semibold text-blue-700">
+                  <p className="text-sm font-semibold text-red-600">
                     {ALL_ORDERS.filter((o) => o.status === "pedido").length}{" "}
                     pedidos pendientes
                   </p>
                   <Link
                     href="/admin/pedidos"
-                    className="text-xs text-blue-600 hover:underline"
+                    className="text-xs text-red-500 hover:underline"
                   >
                     Gestionar →
                   </Link>

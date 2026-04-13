@@ -178,7 +178,10 @@ export function generateInvoiceHTML(data: InvoiceData): string {
     @page { size: A4; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #1a1a2e; background: white; }
-    .invoice-wrap { max-width: 760px; margin: 0 auto; padding: 14mm 16mm; }
+    .invoice-wrap { max-width: 760px; margin: 0 auto; padding: 14mm 16mm; position: relative; }
+
+    /* ── Watermark ── */
+    .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80%; opacity: 0.04; pointer-events: none; z-index: 0; }
 
     /* ── Header table ── */
     .header-table { width: 100%; border-collapse: collapse; border-bottom: 3px solid #2563eb; padding-bottom: 16px; margin-bottom: 22px; }
@@ -186,10 +189,11 @@ export function generateInvoiceHTML(data: InvoiceData): string {
     .header-right { vertical-align: top; width: 45%; padding-left: 20px; border-left: 1px solid #e2e8f0; }
 
     /* Issuer */
-    .issuer-wrap { display: flex; align-items: flex-start; gap: 11px; }
-    .brand-logo { width: 46px; height: 46px; object-fit: contain; flex-shrink: 0; }
-    .brand-name { font-size: 16pt; font-weight: 900; color: #2563eb; letter-spacing: -0.5px; line-height: 1; }
-    .brand-name span { color: #f59e0b; }
+    .issuer-wrap { display: flex; align-items: flex-start; gap: 14px; }
+    .brand-logo { width: 60px; height: 60px; object-fit: contain; flex-shrink: 0; }
+    .brand-name { font-size: 18pt; font-weight: 900; letter-spacing: -0.5px; line-height: 1; color: #111827; }
+    .brand-name .tcg { color: #111827; }
+    .brand-name .academy { color: #f59e0b; }
     .brand-sub { font-size: 6.5pt; color: #b0b7c3; text-transform: uppercase; letter-spacing: 2px; margin: 3px 0 6px; }
     .issuer-data { font-size: 8pt; color: #4b5563; line-height: 1.65; }
     .issuer-data strong { color: #111827; }
@@ -247,14 +251,17 @@ export function generateInvoiceHTML(data: InvoiceData): string {
 <body>
 <div class="invoice-wrap">
 
+  <!-- ── WATERMARK ── -->
+  <img class="watermark" src="/images/logo-tcg-shield.png" alt="" />
+
   <!-- ── HEADER: Logo+Emisor LEFT | Nº factura + Cliente RIGHT ── -->
   <table class="header-table">
     <tr>
       <td class="header-left">
         <div class="issuer-wrap">
-          <img class="brand-logo" src="/images/logo-tcg-shield.svg" alt="TCG Academy" />
+          <img class="brand-logo" src="/images/logo-tcg-shield.png" alt="TCG Academy" />
           <div>
-            <div class="brand-name">TCG <span>Academy</span></div>
+            <div class="brand-name"><span class="tcg">TCG</span> <span class="academy">Academy</span></div>
             <div class="brand-sub">Tienda especialista en TCG</div>
             <div class="issuer-data">
               <strong>${issuerName}</strong><br>

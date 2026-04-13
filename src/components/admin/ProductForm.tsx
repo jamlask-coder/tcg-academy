@@ -379,7 +379,7 @@ export function ProductForm({
                     }
                   : {
                       label: "Volver al catálogo",
-                      href: "/admin/productos",
+                      href: "/admin/preciosystock",
                       variant: "ghost" as const,
                     },
               ].filter(Boolean)
@@ -419,7 +419,7 @@ export function ProductForm({
 
       <div className="mb-6 flex items-center gap-3">
         <Link
-          href="/admin/productos"
+          href="/admin/preciosystock"
           className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg p-2 transition hover:bg-gray-100"
         >
           <ArrowLeft size={18} />
@@ -746,7 +746,7 @@ export function ProductForm({
             {/* Actions */}
             <div className="flex flex-wrap gap-3 pb-6">
               <Link
-                href="/admin/productos"
+                href="/admin/preciosystock"
                 className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl border-2 border-gray-200 px-5 py-3 text-center text-sm font-bold text-gray-700 transition hover:bg-gray-50 sm:flex-none"
               >
                 Cancelar

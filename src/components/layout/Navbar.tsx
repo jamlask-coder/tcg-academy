@@ -152,6 +152,9 @@ export function Navbar() {
   const [activeItem, setActiveItem] = useState<string | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lockedRef = useRef(false);
+  const navRef = useRef<HTMLDivElement>(null);
+  const logoRefsMap = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [activeLogoLeft, setActiveLogoLeft] = useState<number | null>(null);
 
   const cancelClose = useCallback(() => {
     if (closeTimerRef.current) {
@@ -170,6 +173,14 @@ export function Navbar() {
       if (lockedRef.current) return;
       cancelClose();
       setActiveItem(key);
+      // Calculate left offset of the logo relative to the viewport
+      const logoEl = logoRefsMap.current.get(key);
+      if (logoEl) {
+        const rect = logoEl.getBoundingClientRect();
+        setActiveLogoLeft(rect.left);
+      } else {
+        setActiveLogoLeft(null);
+      }
     },
     [cancelClose],
   );
@@ -198,7 +209,7 @@ export function Navbar() {
       : null;
 
   return (
-    <div className="z-40 hidden lg:block" onMouseLeave={handleNavMouseLeave}>
+    <div ref={navRef} className="z-40 hidden lg:block" onMouseLeave={handleNavMouseLeave}>
       <nav
         className="relative overflow-hidden border-b border-white/10"
         style={{ background: "#1f2937", minHeight: NAV_HEIGHT }}
@@ -231,6 +242,7 @@ export function Navbar() {
                   return (
                     <div
                       key={slug}
+                      ref={(el) => { if (el) logoRefsMap.current.set(slug, el); }}
                       className="group/logo flex items-stretch"
                       onMouseEnter={() => openItem(slug)}
                     >
@@ -363,7 +375,7 @@ export function Navbar() {
       <div className="absolute right-0 left-0">
         <AnimatePresence>
           {activeGameData && (
-            <MegaMenu game={activeGameData} onClose={closeNow} />
+            <MegaMenu game={activeGameData} onClose={closeNow} leftOffset={activeLogoLeft ?? undefined} />
           )}
           {activeItem === TIENDAS_KEY && (
             <TiendasMenu key="tiendas" onClose={closeNow} />

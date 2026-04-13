@@ -62,7 +62,7 @@ const ADMIN_NAV_ITEMS = [
   },
   { href: "/admin/precios", label: "Precios", icon: Euro, primary: true },
   { href: "/admin/pedidos", label: "Pedidos", icon: Package, primary: true },
-  { href: "/admin/productos", label: "Catálogo", icon: Grid },
+  { href: "/admin/preciosystock", label: "Precios y Stock", icon: Grid },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
   { href: "/admin/cupones", label: "Cupones", icon: Gift },
   { href: "/admin/fiscal", label: "Fiscal", icon: Receipt },

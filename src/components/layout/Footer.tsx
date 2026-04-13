@@ -30,13 +30,13 @@ function IconX() {
 
 
 
-// ─── GLS logo ─────────────────────────────────────────────────────────────────
+// ─── GLS logo (official colors: dark blue bg + yellow text) ──────────────────
 
 function IconGLS() {
   return (
-    <svg viewBox="0 0 44 18" className="h-4" aria-label="GLS">
-      <rect x="0" y="0" width="44" height="18" rx="3" fill="rgba(255,255,255,0.15)" />
-      <text x="6" y="13" fontFamily="Arial" fontWeight="900" fontSize="12" fill="#ffffff">GLS</text>
+    <svg viewBox="0 0 60 24" className="h-5" aria-label="GLS" role="img">
+      <rect width="60" height="24" rx="4" fill="#003366" />
+      <text x="30" y="17" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontWeight="900" fontSize="15" fill="#FFD500" letterSpacing="1">GLS</text>
     </svg>
   );
 }
@@ -85,8 +85,8 @@ export function Footer() {
   return (
     <footer className="bg-gradient-to-b from-[#0f172a] to-[#1e293b] text-white">
       <Container className="py-8">
-        {/* Main grid: Brand | Tienda | Legal */}
-        <div className="mb-6 grid gap-8 sm:grid-cols-3">
+        {/* Main grid: Brand | Tienda | Legal | Shield */}
+        <div className="mb-6 grid gap-12 sm:grid-cols-[2fr_1fr_1fr_auto]">
           {/* Brand */}
           <div>
             <Link href="/" className="mb-4 inline-flex items-center gap-2">
@@ -151,17 +151,25 @@ export function Footer() {
               ))}
             </ul>
           </div>
+
+          {/* Shield */}
+          <div className="flex items-start justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/logo-tcg-shield.png"
+              alt="TCG Academy"
+              width={280}
+              height={274}
+              className="opacity-70 transition-opacity hover:opacity-100"
+            />
+          </div>
         </div>
 
         {/* Bottom bar */}
-        <div className="flex flex-col items-center justify-between gap-2 border-t border-white/8 pt-4 sm:flex-row">
+        <div className="border-t border-white/8 pt-4 text-center">
           <p className="text-xs text-slate-500">
             © 2026 TCG Academy. Todos los derechos reservados.
           </p>
-          <div className="flex items-center gap-2">
-            <IconGLS />
-            <span className="text-xs text-white">Envío con GLS</span>
-          </div>
         </div>
       </Container>
     </footer>

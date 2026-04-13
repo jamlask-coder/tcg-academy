@@ -9,7 +9,10 @@ import {
   ArrowUpDown,
   Plus,
 } from "lucide-react";
+// ChevronDown, ChevronUp used by SortIcon
 import { loadInvoices, createInvoice } from "@/services/invoiceService";
+import { printInvoiceWithCSV } from "@/utils/invoiceGenerator";
+import type { InvoiceData } from "@/utils/invoiceGenerator";
 import type { InvoiceLineItem } from "@/types/fiscal";
 import {
   generateCSVForAdvisor,
@@ -201,7 +204,6 @@ export default function FacturasPage() {
   >("all");
   const [sortKey, setSortKey] = useState<SortKey>("invoiceDate");
   const [sortAsc, setSortAsc] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let list = invoices.filter(
@@ -260,6 +262,41 @@ export default function FacturasPage() {
     URL.revokeObjectURL(url);
   }
 
+  function downloadPDF(inv: InvoiceRecord) {
+    const recipient = inv.recipient as { name?: string; taxId?: string; address?: { street?: string; postalCode?: string; city?: string; province?: string; country?: string }; email?: string; phone?: string; isEU?: boolean };
+    const addr = recipient.address;
+    const issuer = inv.issuer as { name?: string; taxId?: string; address?: { street?: string; postalCode?: string; city?: string; province?: string; country?: string }; email?: string; phone?: string };
+    const issuerAddr = issuer.address;
+    const data: InvoiceData = {
+      invoiceNumber: inv.invoiceNumber,
+      date: new Date(inv.invoiceDate).toISOString(),
+      paymentMethod: inv.paymentMethod,
+      verifactuHash: inv.verifactuHash ?? undefined,
+      verifactuQR: inv.verifactuQR ?? undefined,
+      verifactuStatus: inv.verifactuStatus ?? undefined,
+      issuerName: issuer.name ?? "TCG Academy S.L.",
+      issuerCIF: issuer.taxId ?? "B12345678",
+      issuerAddress: issuerAddr?.street ?? "Calle Ejemplo 1, Local 4",
+      issuerCity: issuerAddr ? `${issuerAddr.postalCode ?? ""} ${issuerAddr.city ?? ""}`.trim() : "28001 Madrid, España",
+      issuerPhone: issuer.phone ?? "+34 91 000 00 00",
+      issuerEmail: issuer.email ?? "facturacion@tcgacademy.es",
+      clientName: recipient.name ?? "—",
+      clientCIF: recipient.taxId,
+      clientAddress: addr?.street,
+      clientCity: addr ? `${addr.postalCode ?? ""} ${addr.city ?? ""}`.trim() : undefined,
+      clientProvince: addr?.province,
+      clientCountry: addr?.country ?? "España",
+      intracomunitario: !!recipient.isEU,
+      items: inv.items.map((item) => ({
+        name: item.description,
+        quantity: item.quantity,
+        unitPriceWithVAT: item.totalLine / item.quantity,
+        vatRate: item.vatRate,
+      })),
+    };
+    printInvoiceWithCSV(data);
+  }
+
   function exportSingle(inv: InvoiceRecord) {
     const csv = generateCSVForAdvisor([inv], {
       period: null,
@@ -291,13 +328,19 @@ export default function FacturasPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/admin/fiscal/nueva-factura"
-            className="flex h-9 items-center gap-2 rounded-lg bg-green-600 px-4 text-sm font-semibold text-white transition hover:bg-green-700"
+            className="flex h-9 items-center gap-2 rounded-lg bg-green-600 px-4 text-sm font-semibold !text-white transition hover:bg-green-700"
           >
             <Plus size={15} /> Emitir factura manual
           </Link>
+          <Link
+            href="/admin/fiscal/presupuesto"
+            className="flex h-9 items-center gap-2 rounded-lg bg-amber-500 px-4 text-sm font-semibold !text-white transition hover:bg-amber-600"
+          >
+            <Plus size={15} /> Emitir presupuesto
+          </Link>
           <button
             onClick={exportAll}
-            className="flex h-9 items-center gap-2 rounded-lg bg-[#2563eb] px-4 text-sm font-semibold text-white transition hover:bg-[#1d4ed8]"
+            className="flex h-9 items-center gap-2 rounded-lg bg-[#2563eb] px-4 text-sm font-semibold !text-white transition hover:bg-[#1d4ed8]"
           >
             <Download size={15} /> Exportar CSV
           </button>
@@ -423,9 +466,6 @@ export default function FacturasPage() {
                   <th className="px-4 py-3 text-center font-semibold">
                     VeriFactu
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold">
-                    Acciones
-                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -434,126 +474,44 @@ export default function FacturasPage() {
                     name?: string;
                     taxId?: string;
                   };
-                  const isExpanded = expandedId === inv.invoiceId;
                   return (
-                    <>
-                      <tr
-                        key={inv.invoiceId}
-                        className="transition hover:bg-gray-50"
-                      >
-                        <td
-                          className="cursor-pointer px-4 py-3 font-mono text-xs font-bold text-[#2563eb]"
-                          onClick={() =>
-                            setExpandedId(isExpanded ? null : inv.invoiceId)
-                          }
-                        >
-                          {inv.invoiceNumber}
-                          {isExpanded ? (
-                            <ChevronUp size={12} className="ml-1 inline" />
-                          ) : (
-                            <ChevronDown size={12} className="ml-1 inline" />
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {formatDate(inv.invoiceDate)}
-                        </td>
-                        <td className="px-4 py-3 text-gray-800">
-                          {recipient.name ?? "—"}
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs text-gray-500">
-                          {recipient.taxId ?? "—"}
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-800">
-                          {inv.totals.totalTaxableBase.toFixed(2)} €
-                        </td>
-                        <td className="px-4 py-3 text-right text-red-600">
-                          {inv.totals.totalVAT.toFixed(2)} €
-                        </td>
-                        <td className="px-4 py-3 text-right font-bold text-gray-900">
-                          {inv.totals.totalInvoice.toFixed(2)} €
-                        </td>
-                        <td className="px-4 py-3 text-center text-xs text-gray-600 capitalize">
-                          {inv.invoiceType}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {statusBadge(inv.status)}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {verifactuBadge(inv.verifactuStatus)}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => {
-                                /* PDF view – not yet implemented */
-                              }}
-                              className="rounded border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
-                            >
-                              PDF
-                            </button>
-                            <button
-                              onClick={() => exportSingle(inv)}
-                              className="rounded border border-[#2563eb]/20 px-2 py-1 text-xs font-semibold text-[#2563eb] hover:bg-blue-50"
-                            >
-                              CSV
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      {isExpanded && (
-                        <tr
-                          key={`${inv.invoiceId}-detail`}
-                          className="bg-gray-50"
-                        >
-                          <td colSpan={11} className="px-6 py-4">
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                              <div>
-                                <p className="mb-2 text-xs font-bold tracking-wide text-gray-500 uppercase">
-                                  Líneas de factura
-                                </p>
-                                {inv.items.map((item) => (
-                                  <div
-                                    key={item.lineNumber}
-                                    className="flex justify-between py-0.5 text-xs text-gray-700"
-                                  >
-                                    <span>
-                                      {item.quantity}× {item.description}
-                                    </span>
-                                    <span className="font-semibold">
-                                      {item.totalLine.toFixed(2)} €
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                              <div>
-                                <p className="mb-2 text-xs font-bold tracking-wide text-gray-500 uppercase">
-                                  Desglose fiscal
-                                </p>
-                                {inv.taxBreakdown.map((b) => (
-                                  <div
-                                    key={b.vatRate}
-                                    className="flex justify-between py-0.5 text-xs text-gray-700"
-                                  >
-                                    <span>
-                                      IVA {b.vatRate}% — Base:{" "}
-                                      {b.taxableBase.toFixed(2)} €
-                                    </span>
-                                    <span className="font-semibold">
-                                      Cuota: {b.vatAmount.toFixed(2)} €
-                                    </span>
-                                  </div>
-                                ))}
-                                {inv.verifactuQR && (
-                                  <p className="mt-2 text-xs break-all text-gray-400">
-                                    QR: {inv.verifactuQR.slice(0, 80)}…
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </>
+                    <tr
+                      key={inv.invoiceId}
+                      className="cursor-pointer transition hover:bg-blue-50"
+                      onClick={() => downloadPDF(inv)}
+                      title="Haz clic para descargar PDF"
+                    >
+                      <td className="px-4 py-3 font-mono text-xs font-bold text-[#2563eb]">
+                        {inv.invoiceNumber}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {formatDate(inv.invoiceDate)}
+                      </td>
+                      <td className="px-4 py-3 text-gray-800">
+                        {recipient.name ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                        {recipient.taxId ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-800">
+                        {inv.totals.totalTaxableBase.toFixed(2)} €
+                      </td>
+                      <td className="px-4 py-3 text-right text-red-600">
+                        {inv.totals.totalVAT.toFixed(2)} €
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-900">
+                        {inv.totals.totalInvoice.toFixed(2)} €
+                      </td>
+                      <td className="px-4 py-3 text-center text-xs text-gray-600 capitalize">
+                        {inv.invoiceType}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {statusBadge(inv.status)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {verifactuBadge(inv.verifactuStatus)}
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>

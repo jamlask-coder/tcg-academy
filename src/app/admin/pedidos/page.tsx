@@ -246,7 +246,7 @@ function RoleBadge({ role }: { role: "cliente" | "mayorista" | "tienda" }) {
   const cfg = ROLE_CFG[role];
   return (
     <span
-      className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
+      className="ml-1.5 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
       style={{ color: cfg.color, backgroundColor: cfg.bg }}
     >
       {cfg.label}
@@ -501,37 +501,25 @@ function OrderPanel({
   return (
     <div className="border-t-2 border-[#2563eb]/10 bg-white">
       {/* Tab bar */}
-      <div className="flex overflow-x-auto border-b border-gray-100 px-4">
+      <div className="flex overflow-x-auto border-b border-gray-100 px-3">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id as typeof tab)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-3 text-xs font-semibold whitespace-nowrap transition ${tab === id ? "border-[#2563eb] text-[#2563eb]" : "border-transparent text-gray-500 hover:text-gray-700"} ${id === "incidencia" ? "text-orange-700" : ""}`}
+            className={`flex items-center gap-1 border-b-2 px-2.5 py-2 text-xs font-semibold whitespace-nowrap transition ${tab === id ? "border-[#2563eb] text-[#2563eb]" : "border-transparent text-gray-500 hover:text-gray-700"} ${id === "incidencia" ? "text-orange-700" : ""}`}
           >
-            <Icon size={13} /> {label}
+            <Icon size={12} /> {label}
             {id === "incidencia" && order.incident?.status === "abierta" && (
               <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
             )}
           </button>
         ))}
-        <div className="ml-auto flex items-center gap-2 py-2 pl-4">
+        <div className="ml-auto flex items-center gap-1.5 py-1.5 pl-3">
           <button
             onClick={() => printInvoicePDF(order)}
             className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-[#2563eb]"
           >
             <Printer size={13} /> Factura
-          </button>
-          <button
-            onClick={() => printAlbaran(order)}
-            className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-[#2563eb]"
-          >
-            <Printer size={13} /> Albarán
-          </button>
-          <button
-            onClick={() => onSendEmail(order)}
-            className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-[#2563eb]"
-          >
-            <Mail size={13} /> Email
           </button>
           <button
             onClick={() => onSendMessage(order)}
@@ -542,22 +530,22 @@ function OrderPanel({
         </div>
       </div>
 
-      <div className="p-5">
+      <div className="p-3">
         {/* ── Tab: Detalle ── */}
         {tab === "detalle" && (
-          <div className="space-y-4">
+          <div className="space-y-2">
             {/* Items */}
             <div>
-              <p className="mb-2 text-xs font-bold tracking-wider text-gray-400 uppercase">
+              <p className="mb-1 text-xs font-bold tracking-wider text-gray-400 uppercase">
                 Productos
               </p>
-              <div className="space-y-2">
+              <div className="space-y-0">
                 {order.items.map((item, i) => (
                   <div
                     key={i}
-                    className="flex items-center gap-3 border-b border-gray-50 py-2 last:border-0"
+                    className="flex items-center gap-2 border-b border-gray-50 py-1.5 last:border-0"
                   >
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-base">
+                    <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-gray-100 text-sm">
                       {item.game === "magic"
                         ? "🧙"
                         : item.game === "pokemon"
@@ -567,16 +555,14 @@ function OrderPanel({
                             : "🃏"}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-gray-800">
+                      <p className="truncate text-xs font-medium text-gray-800">
                         {item.name}
                       </p>
-                      <div className="mt-0.5 flex items-center gap-2">
-                        <p className="text-xs text-gray-400">
-                          {item.qty}× · {item.price.toFixed(2)}€/ud
-                        </p>
-                      </div>
+                      <p className="text-[10px] text-gray-400">
+                        {item.qty}× · {item.price.toFixed(2)}€/ud
+                      </p>
                     </div>
-                    <span className="flex-shrink-0 text-sm font-bold text-gray-900">
+                    <span className="flex-shrink-0 text-xs font-bold text-gray-900">
                       {(item.price * item.qty).toFixed(2)}€
                     </span>
                   </div>
@@ -584,85 +570,27 @@ function OrderPanel({
               </div>
             </div>
 
-            {/* Meta */}
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1 rounded-xl bg-gray-50 p-3 text-xs">
-                <p className="mb-1.5 font-bold text-gray-600">
-                  Información del cliente
-                </p>
-                <p>
-                  <span className="text-gray-400">Nombre:</span>{" "}
-                  <Link
-                    href={`/admin/usuarios/${order.userId}`}
-                    className="font-medium text-[#2563eb] hover:underline"
-                  >
-                    {order.userName}
-                  </Link>
-                </p>
-                <p>
-                  <span className="text-gray-400">Email:</span>{" "}
-                  <span className="font-mono">{order.userEmail}</span>
-                </p>
-                <p>
-                  <span className="text-gray-400">Tipo:</span>{" "}
-                  <RoleBadge role={order.userRole} />
-                </p>
+            {/* Meta + Totals */}
+            <div className="grid gap-1.5 sm:grid-cols-3">
+              <div className="rounded-lg bg-gray-50 px-2.5 py-1.5 text-xs leading-snug">
+                <p className="mb-0.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase">Cliente</p>
+                <p><Link href={`/admin/usuarios/${order.userId}`} className="font-medium text-[#2563eb] hover:underline">{order.userName}</Link></p>
+                <p className="truncate font-mono text-[10px] text-gray-500">{order.userEmail}</p>
+                <p className="mt-0.5"><RoleBadge role={order.userRole} /></p>
               </div>
-              <div className="space-y-1 rounded-xl bg-gray-50 p-3 text-xs">
-                <p className="mb-1.5 font-bold text-gray-600">Pago y envío</p>
-                <p>
-                  <span className="text-gray-400">Método:</span>{" "}
-                  <span className="font-medium">{order.paymentMethod}</span>
-                </p>
-                <p>
-                  <span className="text-gray-400">Dirección:</span>{" "}
-                  <span className="font-medium">{order.address}</span>
-                </p>
+              <div className="rounded-lg bg-gray-50 px-2.5 py-1.5 text-xs leading-snug">
+                <p className="mb-0.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase">Pago y envío</p>
+                <p className="font-medium">{order.paymentMethod}</p>
+                <p className="truncate text-[10px] text-gray-500">{order.address}</p>
                 {order.trackingNumber && (
-                  <p>
-                    <span className="text-gray-400">Tracking:</span>{" "}
-                    <span className="font-mono text-purple-600">
-                      {order.trackingNumber}
-                    </span>
-                  </p>
+                  <p className="mt-0.5 font-mono text-[10px] text-purple-600">{order.trackingNumber}</p>
                 )}
               </div>
-            </div>
-
-            {/* Totals */}
-            <div className="rounded-xl bg-gray-50 p-3 text-xs">
-              <div className="flex justify-between py-1">
-                <span className="text-gray-500">Subtotal</span>
-                <span className="font-medium">
-                  {order.subtotal.toFixed(2)}€
-                </span>
-              </div>
-              {order.couponCode && order.couponDiscount && (
-                <div className="flex justify-between py-1 text-green-700">
-                  <span>
-                    Cupón{" "}
-                    <span className="rounded bg-green-100 px-1 font-mono font-bold">
-                      {order.couponCode}
-                    </span>
-                  </span>
-                  <span className="font-medium">
-                    -{order.couponDiscount.toFixed(2)}€
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between py-1">
-                <span className="text-gray-500">Envío</span>
-                <span className="font-medium">
-                  {order.shipping === 0
-                    ? "Gratuito"
-                    : order.shipping.toFixed(2) + "€"}
-                </span>
-              </div>
-              <div className="mt-1 flex justify-between border-t border-gray-200 py-1 text-sm font-bold">
-                <span>Total</span>
-                <span className="text-[#2563eb]">
-                  {order.total.toFixed(2)}€
-                </span>
+              <div className="rounded-lg bg-gray-50 px-2.5 py-1.5 text-xs leading-snug">
+                <p className="mb-0.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase">Totales</p>
+                <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="font-medium">{order.subtotal.toFixed(2)}€</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Envío</span><span className="font-medium">{order.shipping === 0 ? "Gratis" : order.shipping.toFixed(2) + "€"}</span></div>
+                <div className="mt-0.5 flex justify-between border-t border-gray-200 pt-0.5 font-bold"><span>Total</span><span className="text-[#2563eb]">{order.total.toFixed(2)}€</span></div>
               </div>
             </div>
           </div>
@@ -670,7 +598,7 @@ function OrderPanel({
 
         {/* ── Tab: Envío ── */}
         {tab === "envio" && (
-          <div className="space-y-5">
+          <div className="space-y-3">
             {/* Terminal state banner */}
             {(order.adminStatus === "cancelado" ||
               order.adminStatus === "devolucion") && (
@@ -696,7 +624,7 @@ function OrderPanel({
             )}
             {/* Timeline */}
             <div>
-              <p className="mb-3 text-xs font-bold tracking-wider text-gray-400 uppercase">
+              <p className="mb-2 text-xs font-bold tracking-wider text-gray-400 uppercase">
                 Estado del pedido
               </p>
               <div className="flex items-start gap-0">
@@ -753,10 +681,10 @@ function OrderPanel({
             </div>
 
             {/* Action based on status */}
-            <div className="rounded-xl border border-gray-200 p-4">
+            <div className="rounded-lg border border-gray-200 p-3">
               {order.adminStatus === "pendiente_envio" &&
                 !order.trackingNumber && (
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <Package
                       size={16}
                       className="flex-shrink-0 text-orange-500"
@@ -927,9 +855,9 @@ function OrderPanel({
 
         {/* ── Tab: Incidencia ── */}
         {tab === "incidencia" && order.incident && (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-orange-200 bg-orange-50 p-4">
-              <div className="mb-2 flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+              <div className="mb-1 flex items-center justify-between">
                 <span className="text-sm font-bold text-orange-800">
                   {INCIDENT_TYPES[order.incident.type] ?? order.incident.type}
                 </span>
@@ -952,7 +880,7 @@ function OrderPanel({
             </div>
 
             {/* Message thread */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               <p className="text-xs font-bold tracking-wider text-gray-400 uppercase">
                 Historial de mensajes
               </p>
@@ -986,8 +914,8 @@ function OrderPanel({
                   value={incidentReply}
                   onChange={(e) => setIncidentReply(e.target.value)}
                   placeholder="Escribe una respuesta al cliente..."
-                  rows={3}
-                  className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none"
+                  rows={2}
+                  className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none"
                 />
                 <div className="flex gap-2">
                   <button
@@ -1005,7 +933,7 @@ function OrderPanel({
 
         {/* ── Tab: Notas ── */}
         {tab === "notas" && (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <p className="text-xs text-gray-400">
               Notas internas — solo visibles para el admin. No las ve el
               cliente.
@@ -1014,8 +942,8 @@ function OrderPanel({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Añade notas sobre este pedido..."
-              rows={5}
-              className="w-full resize-none rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:border-[#2563eb] focus:outline-none"
+              rows={3}
+              className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none"
             />
             <button
               onClick={() => onSaveNotes(order.id, notes)}
@@ -1028,17 +956,17 @@ function OrderPanel({
 
         {/* ── Tab: Historial ── */}
         {tab === "historial" && (
-          <div className="space-y-3">
-            <p className="mb-3 text-xs font-bold tracking-wider text-gray-400 uppercase">
+          <div className="space-y-2">
+            <p className="mb-1 text-xs font-bold tracking-wider text-gray-400 uppercase">
               Log de cambios de estado
             </p>
-            <div className="space-y-2">
+            <div className="space-y-0">
               {[...order.statusHistory].reverse().map((entry, i) => {
                 const cfg = STATUS_CFG[entry.status];
                 return (
                   <div
                     key={i}
-                    className="flex items-start gap-3 border-b border-gray-50 py-2 last:border-0"
+                    className="flex items-start gap-2 border-b border-gray-50 py-1.5 last:border-0"
                   >
                     <div
                       className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full"
@@ -1607,13 +1535,13 @@ export default function AdminPedidosPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50 text-xs tracking-wider text-gray-500 uppercase">
-                <th className="px-4 py-3 text-left font-semibold">
+              <tr className="border-b border-gray-100 bg-gray-50 text-[11px] tracking-widest text-gray-500 uppercase">
+                <th className="px-4 py-3 text-left font-bold">
                   <button
                     className="flex items-center gap-1 hover:text-gray-700"
                     onClick={() => toggleSort("date")}
                   >
-                    Pedido{" "}
+                    PEDIDO{" "}
                     <SortIcon
                       field="date"
                       sortField={sortField}
@@ -1621,18 +1549,18 @@ export default function AdminPedidosPage() {
                     />
                   </button>
                 </th>
-                <th className="hidden px-3 py-3 text-left font-semibold md:table-cell">
-                  Cliente
+                <th className="hidden px-3 py-3 text-left font-bold md:table-cell">
+                  CLIENTE
                 </th>
-                <th className="hidden px-3 py-3 text-left font-semibold sm:table-cell">
-                  Fecha
+                <th className="hidden px-3 py-3 text-left font-bold sm:table-cell">
+                  FECHA
                 </th>
-                <th className="px-3 py-3 text-right font-semibold">
+                <th className="px-3 py-3 text-right font-bold">
                   <button
                     className="ml-auto flex items-center gap-1 hover:text-gray-700"
                     onClick={() => toggleSort("total")}
                   >
-                    Total{" "}
+                    TOTAL{" "}
                     <SortIcon
                       field="total"
                       sortField={sortField}
@@ -1640,12 +1568,12 @@ export default function AdminPedidosPage() {
                     />
                   </button>
                 </th>
-                <th className="px-3 py-3 text-center font-semibold">
+                <th className="px-3 py-3 text-center font-bold">
                   <button
                     className="mx-auto flex items-center gap-1 hover:text-gray-700"
                     onClick={() => toggleSort("status")}
                   >
-                    Estado{" "}
+                    ESTADO{" "}
                     <SortIcon
                       field="status"
                       sortField={sortField}
@@ -1668,11 +1596,11 @@ export default function AdminPedidosPage() {
                       className={`cursor-pointer transition ${roleCfg.rowBg} ${roleCfg.borderClass} hover:brightness-95 ${isOpen ? "ring-1 ring-blue-200 ring-inset" : ""} ${urgent ? "border-l-[3px] border-l-red-500" : ""}`}
                       onClick={() => setExpanded(isOpen ? null : order.id)}
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-sm">
                         <Link
                           href={`/admin/pedidos/${order.id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="font-mono text-xs font-bold text-[#2563eb] hover:underline"
+                          className="font-mono font-bold text-[#2563eb] hover:underline"
                         >
                           {order.id}
                         </Link>
@@ -1687,27 +1615,22 @@ export default function AdminPedidosPage() {
                               <AlertTriangle size={8} /> Incidencia
                             </span>
                           )}
-                          {order.couponCode && (
-                            <span className="rounded-full bg-green-50 px-1.5 py-0.5 text-[9px] font-bold text-green-700">
-                              Cupón {order.couponCode}
-                            </span>
-                          )}
                         </div>
                       </td>
-                      <td className="hidden px-3 py-3 md:table-cell">
+                      <td className="hidden px-3 py-3 text-sm md:table-cell">
                         <Link
                           href={`/admin/usuarios/${order.userId}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-sm font-medium text-[#2563eb] hover:underline"
+                          className="font-medium text-[#2563eb] hover:underline"
                         >
                           {order.userName}
                         </Link>
                         <RoleBadge role={order.userRole} />
                       </td>
-                      <td className="hidden px-3 py-3 text-xs whitespace-nowrap text-gray-500 sm:table-cell">
+                      <td className="hidden px-3 py-3 text-sm whitespace-nowrap text-gray-500 sm:table-cell">
                         {fmtDate(order.date)}
                       </td>
-                      <td className="px-3 py-3 text-right font-bold whitespace-nowrap text-gray-900">
+                      <td className="px-3 py-3 text-right text-sm font-bold whitespace-nowrap text-gray-900">
                         {order.total.toFixed(2)}€
                       </td>
                       <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>

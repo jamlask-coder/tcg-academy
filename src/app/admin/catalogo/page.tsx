@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function CatalogoRedirect() {
-  redirect("/admin/productos");
+  redirect("/admin/preciosystock");
 }

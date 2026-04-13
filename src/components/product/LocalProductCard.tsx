@@ -2,6 +2,7 @@
 import { memo, useState, useEffect } from "react";
 import Link from "next/link";
 import { ShoppingCart, Heart, Check } from "lucide-react";
+import { getStockInfo } from "@/utils/stockStatus";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -156,11 +157,15 @@ function LocalProductCardInner({ product }: Props) {
       {/* ── ESQUINA SUPERIOR DERECHA: bandera de idioma + estado stock ── */}
       <div className="absolute top-2 right-2 z-10 flex flex-col items-end gap-1">
         {product.language && <LanguageFlag language={product.language} size="md" />}
-        {isOutOfStock && (
-          <span className="rounded-full bg-gray-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
-            AGOTADO
-          </span>
-        )}
+        {(() => {
+          const si = getStockInfo(product.inStock ? product.stock : 0);
+          if (si.level === "unlimited" || si.level === "available") return null;
+          return (
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${si.level === "out" ? "bg-gray-500 text-white" : si.level === "last" ? "bg-red-500 text-white" : "bg-amber-500 text-white"}`}>
+              {si.level === "out" ? "AGOTADO" : si.label.toUpperCase()}
+            </span>
+          );
+        })()}
       </div>
 
       {/* ── FRANJA INFERIOR: Añadir al carrito (desktop hover) ── */}

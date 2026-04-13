@@ -49,30 +49,22 @@ const NAV_ITEMS: NavItem[] = [
     icon: LayoutDashboard,
     exact: true,
   },
-  { href: "/admin/pedidos", label: "Gestión de pedidos", icon: Package },
+  { href: "/admin/pedidos", label: "Pedidos", icon: Package },
   {
     href: "/admin/productos/nuevo",
     label: "Añadir producto",
     icon: PackagePlus,
   },
-  { href: "/admin/productos", label: "Precios", icon: Tag, excludePathPrefixes: ["/admin/productos/nuevo"] },
+  { href: "/admin/preciosystock", label: "Precios y Stock", icon: Tag },
   { href: "/admin/usuarios", label: "Usuarios registrados", icon: Users },
   { href: "/admin/solicitudes", label: "Solicitudes B2B", icon: Inbox },
-  { href: "/admin/categorias", label: "Categorías", icon: Layers },
-  { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart2 },
-  {
-    href: "/admin/fiscal",
-    label: "Facturas",
-    icon: Receipt,
-    sub: [
-      { href: "/admin/fiscal/facturas", label: "Todas las facturas", icon: Receipt },
-      { href: "/admin/fiscal/nueva-factura", label: "Emitir factura manual", icon: FilePlus },
-    ],
-  },
+  { href: "/admin/fiscal/facturas", label: "Facturas", icon: Receipt },
   { href: "/admin/cupones", label: "Cupones", icon: Ticket },
+  { href: "/admin/categorias", label: "Categorías", icon: Layers },
   { href: "/admin/bonos", label: "Sistema de puntos", icon: Star },
   { href: "/admin/mensajes", label: "Mensajes", icon: MessageSquare },
   { href: "/admin/emails", label: "Emails automáticos", icon: Mail },
+  { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart2 },
   { href: "/admin/herramientas", label: "Herramientas", icon: Wrench },
   { href: "/cuenta/datos", label: "Mis datos", icon: UserCircle },
 ];
@@ -140,7 +132,7 @@ function NavLink({
           </span>
         )}
         {href === "/admin/solicitudes" && badges.newSolicitudes > 0 && (
-          <span className="ml-auto flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold leading-none text-white">
+          <span className="ml-auto flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold leading-none text-white">
             {badges.newSolicitudes}
           </span>
         )}
@@ -196,7 +188,7 @@ function SidebarContent({
               {user.name} {user.lastName}
             </p>
           </div>
-          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-[#2563eb] uppercase">
+          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-white uppercase">
             Admin
           </span>
         </div>
@@ -364,7 +356,7 @@ export default function AdminLayout({
         </div>
 
         {/* Content */}
-        <main className="min-w-0">
+        <main className="min-w-0 [&_a]:text-black [&_a]:no-underline [&_a:hover]:text-[#2563eb]">
           <div className="hidden lg:block">
             <Breadcrumb pathname={pathname} />
           </div>

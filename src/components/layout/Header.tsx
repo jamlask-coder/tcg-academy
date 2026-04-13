@@ -687,8 +687,8 @@ export function Header() {
             <>
               {([
                 { count: pendingOrders, href: "/admin/pedidos", Icon: Package, label: "pedidos pendientes", color: "bg-red-500" },
-                { count: pendingNotifs, href: "/admin/notificaciones", Icon: Bell, label: "incidencias nuevas", color: "bg-amber-500" },
-                { count: pendingSolicitudes, href: "/admin/solicitudes", Icon: Inbox, label: "solicitudes nuevas", color: "bg-blue-500" },
+                { count: pendingNotifs, href: "/admin/notificaciones", Icon: Bell, label: "incidencias nuevas", color: "bg-red-500" },
+                { count: pendingSolicitudes, href: "/admin/solicitudes", Icon: Inbox, label: "solicitudes nuevas", color: "bg-red-500" },
               ] as const).filter(({ count }) => count > 0).map(({ count, href, Icon, label, color }) => (
                 <Link
                   key={href}

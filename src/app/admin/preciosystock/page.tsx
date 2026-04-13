@@ -8,6 +8,7 @@ import {
 } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
 import { useDiscounts } from "@/context/DiscountContext";
+import { getStockInfo } from "@/utils/stockStatus";
 import {
   Search,
   Save,
@@ -50,7 +51,7 @@ type PriceRow = {
   costPrice: number;
 };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 
 export default function AdminProductosPage() {
   const { priceOverrides, setPriceOverride, saveToStorage } = useDiscounts();
@@ -84,6 +85,7 @@ export default function AdminProductosPage() {
       return new Set();
     }
   });
+  const [stockEdits, setStockEdits] = useState<Record<number, string>>({});
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickForm, setQuickForm] = useState<QuickForm>(EMPTY_FORM);
@@ -216,28 +218,58 @@ export default function AdminProductosPage() {
     }));
   };
 
+  const handleStockChange = (productId: number, val: string) => {
+    setStockEdits((prev) => ({ ...prev, [productId]: val }));
+  };
+
+  const getStock = (p: LocalProduct): string => {
+    if (stockEdits[p.id] !== undefined) return stockEdits[p.id];
+    return p.stock !== undefined ? String(p.stock) : "";
+  };
+
   const handleSaveAll = () => {
     for (const [id, changes] of Object.entries(edits)) {
       setPriceOverride(Number(id), changes);
     }
     saveToStorage();
+    // Save stock edits to products in localStorage
+    if (Object.keys(stockEdits).length > 0) {
+      const stored = JSON.parse(localStorage.getItem("tcgacademy_new_products") ?? "[]") as LocalProduct[];
+      const stockOverrides = JSON.parse(localStorage.getItem("tcgacademy_stock_overrides") ?? "{}") as Record<string, number | null>;
+      for (const [id, val] of Object.entries(stockEdits)) {
+        const numId = Number(id);
+        const stockVal = val.trim() === "" ? null : parseInt(val);
+        // Update in new products if exists there
+        const idx = stored.findIndex((sp: LocalProduct) => sp.id === numId);
+        if (idx >= 0) {
+          stored[idx].stock = stockVal ?? undefined;
+          stored[idx].inStock = stockVal === null || stockVal > 0;
+        }
+        // Always save as override for static products
+        stockOverrides[id] = stockVal;
+      }
+      localStorage.setItem("tcgacademy_new_products", JSON.stringify(stored));
+      localStorage.setItem("tcgacademy_stock_overrides", JSON.stringify(stockOverrides));
+      window.dispatchEvent(new Event("tcga:products:updated"));
+      setStockEdits({});
+    }
     setEdits({});
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
 
   const inputCls =
-    "w-24 h-8 px-2 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:border-[#2563eb] transition";
+    "w-[70px] h-7 px-1.5 border border-gray-200 rounded-md text-xs text-right focus:outline-none focus:border-[#2563eb] transition";
 
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Gestión de precios
+            Precios y Stock
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            {filtered.length} productos · Edición inline
+            {filtered.length} productos
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -274,7 +306,7 @@ export default function AdminProductosPage() {
           </button>
           <button
             onClick={handleSaveAll}
-            disabled={Object.keys(edits).length === 0}
+            disabled={Object.keys(edits).length === 0 && Object.keys(stockEdits).length === 0}
             className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-40"
           >
             <Save size={16} /> Guardar cambios
@@ -602,6 +634,9 @@ export default function AdminProductosPage() {
                 <th className="px-3 py-3 text-right font-semibold whitespace-nowrap text-gray-600">
                   P. Adquisición
                 </th>
+                <th className="px-3 py-3 text-center font-semibold whitespace-nowrap text-gray-600">
+                  Stock
+                </th>
                 <th className="hidden px-4 py-3 text-center font-semibold text-gray-600 sm:table-cell">
                   Acciones
                 </th>
@@ -638,14 +673,17 @@ export default function AdminProductosPage() {
                             {GAME_CONFIG[p.game]?.emoji ?? "🃏"}
                           </div>
                         )}
-                        <span className="line-clamp-1 max-w-[280px] font-medium text-gray-800">
+                        <Link
+                          href={`/producto?id=${p.id}`}
+                          className="line-clamp-1 max-w-[280px] font-medium text-gray-800 hover:text-[#2563eb] hover:underline"
+                        >
                           {p.name}
-                        </span>
+                        </Link>
                       </div>
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <span className="text-xs font-semibold text-gray-500 capitalize">
-                        {p.game}
+                      <span className="text-xs font-semibold text-gray-500">
+                        {GAME_CONFIG[p.game]?.name ?? p.game}
                       </span>
                     </td>
                     <td className="px-3 py-3 text-right">
@@ -708,6 +746,25 @@ export default function AdminProductosPage() {
                         />
                         <span className="ml-0.5 text-xs text-gray-400">€</span>
                       </div>
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      {(() => {
+                        const val = getStock(p);
+                        const numVal = val.trim() === "" ? undefined : parseInt(val);
+                        const si = getStockInfo(numVal);
+                        const borderCls = si.level === "out" ? "border-red-400 bg-red-50 text-red-600" : si.level === "last" ? "border-red-300 bg-red-50 text-red-600" : si.level === "low" ? "border-amber-300 bg-amber-50 text-amber-700" : "border-gray-200";
+                        return (
+                          <input
+                            type="number"
+                            min="0"
+                            value={val}
+                            placeholder="∞"
+                            title={si.label}
+                            onChange={(e) => handleStockChange(p.id, e.target.value)}
+                            className={`${inputCls} w-16 text-center focus:border-orange-500 ${borderCls}`}
+                          />
+                        );
+                      })()}
                     </td>
                     <td className="hidden px-4 py-3 sm:table-cell">
                       <div className="flex items-center justify-center gap-1">

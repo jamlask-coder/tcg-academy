@@ -37,7 +37,7 @@ function GridContent({ products, color, game, category }: Props) {
   // Card grids: more columns (narrower cards); normal grids: fewer wider cards
   const gridCols = isCardGrid
     ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
-    : "grid-cols-2 sm:grid-cols-3 xl:grid-cols-4";
+    : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
   const params = useSearchParams();
   const [page, setPage] = useState(1);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -196,7 +196,7 @@ export function CategoryFilteredGrid(props: Props) {
   return (
     <Suspense
       fallback={
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}

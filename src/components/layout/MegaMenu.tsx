@@ -3,14 +3,14 @@ import { motion } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import type { MegaMenuGame } from "@/data/megaMenuData";
-import { Container } from "@/components/ui/Container";
 
 interface Props {
   game: MegaMenuGame;
   onClose: () => void;
+  leftOffset?: number;
 }
 
-export function MegaMenu({ game, onClose }: Props) {
+export function MegaMenu({ game, onClose, leftOffset }: Props) {
   const [displayedGame, setDisplayedGame] = useState(game);
   const [contentVisible, setContentVisible] = useState(true);
   const prevSlugRef = useRef(game.slug);
@@ -37,18 +37,55 @@ export function MegaMenu({ game, onClose }: Props) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15, ease: "easeOut" }}
-      className="border-t-2 bg-white shadow-xl"
-      style={{ borderTopColor: color }}
+      className="inline-flex border-t-2 bg-white shadow-xl"
+      style={{
+        borderTopColor: color,
+        marginLeft: leftOffset ?? 0,
+        borderRadius: "0 0 12px 12px",
+      }}
     >
-      <Container
-        className="py-5"
+      <div
+        className="relative py-5 px-6"
         style={{
           opacity: contentVisible ? 1 : 0,
           transition: "opacity 0.12s ease-in-out",
         }}
       >
-        {/* Fixed-width columns + logo on the right */}
-        <div className="flex items-start gap-5">
+        {/* Background shield — behind content, centered, subtle game color */}
+        <style>{`
+          @keyframes megaLogoFloat {
+            0%,100% { transform: translate(-50%, -50%) translateY(0px) translateZ(0); }
+            45%     { transform: translate(-50%, -50%) translateY(-8px) translateZ(0); }
+            75%     { transform: translate(-50%, -50%) translateY(5px) translateZ(0); }
+          }
+        `}</style>
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            height: "90%",
+            aspectRatio: "1",
+            backgroundColor: color,
+            opacity: 0.18,
+            WebkitMaskImage: "url(/images/logo-tcg-shield.png)",
+            WebkitMaskSize: "contain",
+            WebkitMaskRepeat: "no-repeat",
+            WebkitMaskPosition: "center",
+            maskImage: "url(/images/logo-tcg-shield.png)",
+            maskSize: "contain",
+            maskRepeat: "no-repeat",
+            maskPosition: "center",
+            animation: "megaLogoFloat 6s ease-in-out infinite",
+            willChange: "transform",
+            pointerEvents: "none",
+            zIndex: 0,
+          }}
+        />
+
+        {/* Columns — above the background */}
+        <div className="relative z-10 flex items-start gap-5">
           {columns.map((col) => (
             <div key={col.title} style={{ width: 200, flexShrink: 0 }}>
               <h3
@@ -72,34 +109,8 @@ export function MegaMenu({ game, onClose }: Props) {
               </ul>
             </div>
           ))}
-
-          {/* TCG Academy logo — far right, large, animated, game-color glow */}
-          <div
-            className="ml-auto flex flex-shrink-0 items-center justify-center"
-            style={{ minWidth: 180 }}
-          >
-            <style>{`
-              @keyframes megaLogoFloat {
-                0%,100% { transform: translateY(0px) rotate(0deg); }
-                45%     { transform: translateY(-10px) rotate(1.5deg); }
-                75%     { transform: translateY(6px) rotate(-1deg); }
-              }
-            `}</style>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/logo-tcg-shield.png"
-              alt="TCG Academy"
-              style={{
-                height: 130,
-                width: "auto",
-                opacity: 0.32,
-                filter: `invert(1) drop-shadow(0 0 14px ${color}) drop-shadow(0 0 4px ${color}88)`,
-                animation: "megaLogoFloat 6s ease-in-out infinite",
-              }}
-            />
-          </div>
         </div>
-      </Container>
+      </div>
     </motion.div>
   );
 }

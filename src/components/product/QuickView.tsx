@@ -7,6 +7,7 @@ import { usePrice } from "@/hooks/usePrice";
 import { GAME_CONFIG } from "@/data/products";
 import type { LocalProduct } from "@/data/products";
 import { isLocalProduct } from "@/lib/productStore";
+import { getStockInfo } from "@/utils/stockStatus";
 
 interface Props {
   product: LocalProduct;
@@ -136,18 +137,15 @@ export function QuickView({ product, onClose }: Props) {
             )}
 
             {/* Stock */}
-            <div
-              className={`flex items-center gap-2 text-sm font-semibold ${
-                product.inStock ? "text-green-600" : "text-red-500"
-              }`}
-            >
-              <div
-                className={`h-2 w-2 rounded-full ${
-                  product.inStock ? "bg-green-500" : "bg-red-400"
-                }`}
-              />
-              {product.inStock ? "En stock" : "Sin stock"}
-            </div>
+            {(() => {
+              const si = getStockInfo(product.inStock ? product.stock : 0);
+              return (
+                <div className={`flex items-center gap-2 text-sm font-semibold ${si.color}`}>
+                  <div className={`h-2 w-2 rounded-full ${si.dotColor}`} />
+                  {si.label}
+                </div>
+              );
+            })()}
 
             {/* Actions */}
             <div className="flex flex-col gap-2">

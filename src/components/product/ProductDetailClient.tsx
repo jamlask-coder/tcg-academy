@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { addToRecentlyViewed } from "@/lib/recentlyViewed";
+import { getStockInfo } from "@/utils/stockStatus";
 import { RecentlyViewedSection } from "@/components/product/RecentlyViewedSection";
 import {
   isNewProduct,
@@ -308,6 +309,9 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
     number | undefined
   >(product.comparePrice);
   const [inlineStock, setInlineStock] = useState(product.inStock);
+  const [inlineStockQty, setInlineStockQty] = useState<string>(
+    product.stock !== undefined ? String(product.stock) : "",
+  );
   const [descExpanded, setDescExpanded] = useState(false);
   const [descOverflows, setDescOverflows] = useState(false);
   const descRef = useRef<HTMLDivElement>(null);
@@ -369,16 +373,22 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
       costPrice: inlineCostPrice,
       comparePrice: inlineComparePrice,
       inStock: inlineStock,
+      stock: inlineStockQty.trim() === "" ? undefined : parseInt(inlineStockQty),
       images: inlineImages,
     };
     localStorage.setItem(
       "tcgacademy_product_overrides",
       JSON.stringify(overrides),
     );
+    // Also save stock override
+    const stockOverrides = JSON.parse(localStorage.getItem("tcgacademy_stock_overrides") ?? "{}");
+    stockOverrides[product.id] = inlineStockQty.trim() === "" ? null : parseInt(inlineStockQty);
+    localStorage.setItem("tcgacademy_stock_overrides", JSON.stringify(stockOverrides));
+    window.dispatchEvent(new Event("tcga:products:updated"));
     setSavedToast(true);
     setTimeout(() => setSavedToast(false), 2500);
     setEditMode(false);
-  }, [product.id, inlineTitle, inlineDesc, inlineGame, inlineCategory, inlineLanguage, inlinePrice, inlineWholesalePrice, inlineStorePrice, inlineCostPrice, inlineComparePrice, inlineStock, inlineImages]);
+  }, [product.id, inlineTitle, inlineDesc, inlineGame, inlineCategory, inlineLanguage, inlinePrice, inlineWholesalePrice, inlineStorePrice, inlineCostPrice, inlineComparePrice, inlineStock, inlineStockQty, inlineImages]);
 
   const handleDelete = useCallback(() => {
     const deleted = JSON.parse(
@@ -680,7 +690,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                   className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-sm font-semibold"
                   style={{ borderColor: color, color }}
                 >
-                  <LanguageFlag language={product.language} showLabel size="md" />
+                  <LanguageFlag language={product.language} showLabel size="sm" />
                 </span>
               </div>
               {langVariants.length > 0 && (
@@ -694,7 +704,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                         className="inline-flex items-center gap-1 font-semibold hover:underline"
                         style={{ color }}
                       >
-                        <LanguageFlag language={v.language} showLabel size="md" />
+                        <LanguageFlag language={v.language} showLabel size="sm" />
                       </Link>
                     </span>
                   ))}
@@ -722,14 +732,16 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
 
           {/* 4. Stock */}
           <div className="flex items-center gap-3">
-            <div
-              className={`inline-flex items-center gap-2 text-sm font-semibold ${inlineStock ? "text-green-600" : "text-red-500"}`}
-            >
-              <div
-                className={`h-2 w-2 rounded-full ${inlineStock ? "bg-green-500" : "bg-red-400"}`}
-              />
-              {inlineStock ? "En stock — Listo para enviar" : "Sin stock"}
-            </div>
+            {(() => {
+              const stockNum = inlineStockQty.trim() === "" ? undefined : parseInt(inlineStockQty);
+              const si = getStockInfo(inlineStock ? stockNum : 0);
+              return (
+                <div className={`inline-flex items-center gap-2 text-sm font-semibold ${si.color}`}>
+                  <div className={`h-2 w-2 rounded-full ${si.dotColor}`} />
+                  {si.label}
+                </div>
+              );
+            })()}
           </div>
 
           {/* 5. Description */}
@@ -894,15 +906,35 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           <div className="flex items-center justify-between border-b border-gray-100 py-2">
             <span className="text-sm text-gray-500">Estado</span>
             {editMode ? (
-              <button
-                type="button"
-                onClick={() => setInlineStock(!inlineStock)}
-                className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold transition ${inlineStock ? "border-green-300 bg-green-50 text-green-700" : "border-red-300 bg-red-50 text-red-600"}`}
-              >
-                {inlineStock ? "En stock" : "Agotado"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setInlineStock(!inlineStock)}
+                  className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold transition ${inlineStock ? "border-green-300 bg-green-50 text-green-700" : "border-red-300 bg-red-50 text-red-600"}`}
+                >
+                  {inlineStock ? "En stock" : "Agotado"}
+                </button>
+              </div>
             ) : (
               <span className="text-sm font-medium">{inlineStock ? "✅ En stock" : "❌ Agotado"}</span>
+            )}
+          </div>
+          {/* Stock qty */}
+          <div className="flex items-center justify-between border-b border-gray-100 py-2">
+            <span className="text-sm text-gray-500">Unidades</span>
+            {editMode ? (
+              <input
+                type="number"
+                min="0"
+                value={inlineStockQty}
+                placeholder="Ilimitado"
+                onChange={(e) => setInlineStockQty(e.target.value)}
+                className="h-8 w-24 rounded-lg border border-gray-200 px-2 text-right text-sm focus:border-[#2563eb] focus:outline-none"
+              />
+            ) : (
+              <span className="text-sm font-medium">
+                {inlineStockQty.trim() === "" ? "Ilimitado" : inlineStockQty}
+              </span>
             )}
           </div>
           {/* Referencia */}
@@ -925,7 +957,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                 ))}
               </select>
             ) : inlineLanguage ? (
-              <LanguageFlag language={inlineLanguage} showLabel size="md" />
+              <LanguageFlag language={inlineLanguage} showLabel size="sm" />
             ) : (
               <span className="text-sm text-gray-400">—</span>
             )}
@@ -939,7 +971,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           <h2 className="mb-6 text-xl font-bold text-gray-900">
             También te puede interesar
           </h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {related.map((p) => (
               <LocalProductCard key={p.id} product={p} />
             ))}

@@ -14,6 +14,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { type LocalProduct } from "@/data/products";
+import { Package as PackageIcon } from "lucide-react";
+import { STOCK_THRESHOLDS } from "@/utils/stockStatus";
 import { getMergedProducts } from "@/lib/productStore";
 import { MOCK_USERS, ALL_ORDERS } from "@/data/mockData";
 import type { User } from "@/types/user";
@@ -424,6 +426,70 @@ export default function AdminHerramientasPage() {
         <p className="mt-2 text-center text-xs text-gray-400">
           Estado simulado para demo · Última comprobación:{" "}
           {new Date().toLocaleTimeString("es")}
+        </p>
+      </div>
+
+      {/* Stock criteria */}
+      <div className="mb-8">
+        <h2 className="mb-4 flex items-center gap-2 font-bold text-gray-900">
+          <PackageIcon size={18} className="text-[#2563eb]" /> Criterios de Stock
+        </h2>
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+          <div className="divide-y divide-gray-100">
+            <div className="flex items-center justify-between px-5 py-3.5">
+              <div className="flex items-center gap-3">
+                <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Stock disponible</p>
+                  <p className="text-xs text-gray-500">{STOCK_THRESHOLDS.available} o más unidades</p>
+                </div>
+              </div>
+              <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-600">En stock</span>
+            </div>
+            <div className="flex items-center justify-between px-5 py-3.5">
+              <div className="flex items-center gap-3">
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Pocas unidades</p>
+                  <p className="text-xs text-gray-500">Entre {STOCK_THRESHOLDS.lastUnits + 1} y {STOCK_THRESHOLDS.lowStock} unidades</p>
+                </div>
+              </div>
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-600">Pocas unidades</span>
+            </div>
+            <div className="flex items-center justify-between px-5 py-3.5">
+              <div className="flex items-center gap-3">
+                <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">¡Últimas unidades!</p>
+                  <p className="text-xs text-gray-500">{STOCK_THRESHOLDS.lastUnits} o menos unidades</p>
+                </div>
+              </div>
+              <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-600">¡Últimas unidades!</span>
+            </div>
+            <div className="flex items-center justify-between px-5 py-3.5">
+              <div className="flex items-center gap-3">
+                <span className="h-2.5 w-2.5 rounded-full bg-gray-400" />
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Agotado</p>
+                  <p className="text-xs text-gray-500">0 unidades — no se puede comprar</p>
+                </div>
+              </div>
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-500">Agotado</span>
+            </div>
+            <div className="flex items-center justify-between px-5 py-3.5 bg-gray-50">
+              <div className="flex items-center gap-3">
+                <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Sin stock definido</p>
+                  <p className="text-xs text-gray-500">No se ha indicado cantidad — se asume stock ilimitado</p>
+                </div>
+              </div>
+              <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-bold text-green-600">En stock</span>
+            </div>
+          </div>
+        </div>
+        <p className="mt-2 text-center text-xs text-gray-400">
+          Estos criterios se aplican automáticamente en la ficha de producto visible al cliente
         </p>
       </div>
 
