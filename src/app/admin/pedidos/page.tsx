@@ -46,27 +46,27 @@ const STATUS_CFG: Record<
 > = {
   pendiente_envio: {
     label: "Pendiente de envío",
-    color: "#c2410c",
-    bg: "#fff7ed",
-    border: "#fed7aa",
+    color: "#a16207",
+    bg: "#fef9c3",
+    border: "#fde047",
   },
   enviado: {
     label: "Enviado",
-    color: "#7c3aed",
-    bg: "#f5f3ff",
-    border: "#ddd6fe",
+    color: "#15803d",
+    bg: "#dcfce7",
+    border: "#86efac",
   },
   finalizado: {
     label: "Entregado",
-    color: "#16a34a",
+    color: "#166534",
     bg: "#f0fdf4",
     border: "#bbf7d0",
   },
   incidencia: {
     label: "Incidencia",
-    color: "#dc2626",
-    bg: "#fff1f2",
-    border: "#fecdd3",
+    color: "#c2410c",
+    bg: "#fff7ed",
+    border: "#fed7aa",
   },
   cancelado: {
     label: "Cancelado",
@@ -91,14 +91,14 @@ const ROLE_CFG = {
     borderClass: "",
   },
   mayorista: {
-    label: "Mayoristas",
+    label: "Mayorista",
     color: "#1d4ed8",
     bg: "#dbeafe",
     rowBg: "bg-blue-100",
     borderClass: "border-l-4 border-l-blue-400",
   },
   tienda: {
-    label: "Tiendas TCG",
+    label: "Tienda",
     color: "#15803d",
     bg: "#dcfce7",
     rowBg: "bg-green-100",
@@ -504,11 +504,11 @@ function OrderPanel({
           <button
             key={id}
             onClick={() => setTab(id as typeof tab)}
-            className={`flex items-center gap-1.5 border-b-2 px-3 py-3 text-xs font-semibold whitespace-nowrap transition ${tab === id ? "border-[#2563eb] text-[#2563eb]" : "border-transparent text-gray-500 hover:text-gray-700"} ${id === "incidencia" ? "text-red-600" : ""}`}
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-3 text-xs font-semibold whitespace-nowrap transition ${tab === id ? "border-[#2563eb] text-[#2563eb]" : "border-transparent text-gray-500 hover:text-gray-700"} ${id === "incidencia" ? "text-orange-700" : ""}`}
           >
             <Icon size={13} /> {label}
             {id === "incidencia" && order.incident?.status === "abierta" && (
-              <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+              <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
             )}
           </button>
         ))}
@@ -872,18 +872,18 @@ function OrderPanel({
               )}
 
               {order.adminStatus === "incidencia" && (
-                <div className="flex items-center gap-3 rounded-xl bg-red-50 p-3">
+                <div className="flex items-center gap-3 rounded-xl bg-orange-50 p-3">
                   <AlertTriangle
                     size={16}
-                    className="flex-shrink-0 text-red-500"
+                    className="flex-shrink-0 text-orange-600"
                   />
                   <div>
-                    <p className="text-sm font-semibold text-red-700">
+                    <p className="text-sm font-semibold text-orange-800">
                       Hay una incidencia abierta
                     </p>
                     <button
                       onClick={() => setTab("incidencia")}
-                      className="text-xs text-red-500 hover:underline"
+                      className="text-xs text-orange-600 hover:underline"
                     >
                       Ver incidencia →
                     </button>
@@ -932,13 +932,13 @@ function OrderPanel({
         {/* ── Tab: Incidencia ── */}
         {tab === "incidencia" && order.incident && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+            <div className="rounded-xl border border-orange-200 bg-orange-50 p-4">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-bold text-red-700">
+                <span className="text-sm font-bold text-orange-800">
                   {INCIDENT_TYPES[order.incident.type] ?? order.incident.type}
                 </span>
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${order.incident.status === "resuelta" ? "bg-green-100 text-green-700" : order.incident.status === "en_revision" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-600"}`}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${order.incident.status === "resuelta" ? "bg-green-100 text-green-700" : order.incident.status === "en_revision" ? "bg-orange-100 text-orange-700" : "bg-orange-100 text-orange-800"}`}
                 >
                   {order.incident.status === "abierta"
                     ? "Abierta"
@@ -1475,24 +1475,31 @@ export default function AdminPedidosPage() {
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {[
           {
+            label: "Urgentes (+48h)",
+            value: counts.urgentes,
+            color: "#dc2626",
+            bg: "#fff1f2",
+            filter: null,
+          },
+          {
             label: "Pendientes",
             value: counts.pendientes,
-            color: "#c2410c",
-            bg: "#fff7ed",
+            color: "#a16207",
+            bg: "#fef9c3",
             filter: "pendiente_envio" as const,
           },
           {
             label: "Enviados",
             value: counts.enviados,
-            color: "#7c3aed",
-            bg: "#f5f3ff",
+            color: "#15803d",
+            bg: "#dcfce7",
             filter: "enviado" as const,
           },
           {
             label: "Incidencias",
             value: counts.incidencias,
-            color: "#dc2626",
-            bg: "#fff1f2",
+            color: "#c2410c",
+            bg: "#fff7ed",
             filter: "incidencia" as const,
           },
           {
@@ -1508,13 +1515,6 @@ export default function AdminPedidosPage() {
             color: "#6d28d9",
             bg: "#ede9fe",
             filter: "devolucion" as const,
-          },
-          {
-            label: "Urgentes (+48h)",
-            value: counts.urgentes,
-            color: "#92400e",
-            bg: "#fef3c7",
-            filter: null,
           },
         ].map(({ label, value, color, bg, filter }) => (
           <button
@@ -1570,12 +1570,21 @@ export default function AdminPedidosPage() {
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value as typeof roleFilter)}
-          className="h-9 rounded-xl border border-gray-200 bg-white px-3 text-sm focus:border-[#2563eb] focus:outline-none"
+          className="h-9 rounded-xl border px-3 text-sm font-semibold focus:outline-none transition"
+          style={
+            roleFilter && ROLE_CFG[roleFilter as "cliente" | "mayorista" | "tienda"]
+              ? {
+                  color: ROLE_CFG[roleFilter as "cliente" | "mayorista" | "tienda"].color,
+                  backgroundColor: ROLE_CFG[roleFilter as "cliente" | "mayorista" | "tienda"].bg,
+                  borderColor: ROLE_CFG[roleFilter as "cliente" | "mayorista" | "tienda"].color + "55",
+                }
+              : { backgroundColor: "white", borderColor: "#e5e7eb", color: "#374151" }
+          }
         >
           <option value="">Todos los tipos</option>
           <option value="cliente">Cliente</option>
           <option value="mayorista">Mayorista</option>
-          <option value="tienda">Tienda TCG</option>
+          <option value="tienda">Tienda</option>
         </select>
         {(search || statusFilter || roleFilter || urgentOnly) && (
           <button
@@ -1658,7 +1667,7 @@ export default function AdminPedidosPage() {
                   <>
                     <tr
                       key={order.id}
-                      className={`cursor-pointer transition ${roleCfg.rowBg} ${roleCfg.borderClass} hover:brightness-95 ${isOpen ? "ring-1 ring-blue-200 ring-inset" : ""} ${urgent ? "border-l-[6px] border-l-amber-400" : ""}`}
+                      className={`cursor-pointer transition ${roleCfg.rowBg} ${roleCfg.borderClass} hover:brightness-95 ${isOpen ? "ring-1 ring-blue-200 ring-inset" : ""} ${urgent ? "border-l-[6px] border-l-red-500" : ""}`}
                       onClick={() => setExpanded(isOpen ? null : order.id)}
                     >
                       <td className="px-4 py-3">
@@ -1667,7 +1676,7 @@ export default function AdminPedidosPage() {
                         </div>
                         <div className="mt-0.5 flex flex-wrap items-center gap-1">
                           {urgent && (
-                            <span className="flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">
+                            <span className="flex items-center gap-0.5 rounded-full bg-red-50 px-1.5 py-0.5 text-[9px] font-bold text-red-600">
                               <Clock size={8} /> +48h sin procesar
                             </span>
                           )}

@@ -1,7 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Download,
+  Upload,
   Database,
   Users,
   ShoppingBag,
@@ -9,10 +10,14 @@ import {
   CheckCircle,
   AlertCircle,
   RefreshCw,
+  CheckCircle2,
 } from "lucide-react";
 import { type LocalProduct } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
 import { MOCK_USERS, ALL_ORDERS } from "@/data/mockData";
+import type { User } from "@/types/user";
+
+// ─── CSV export helpers ───────────────────────────────────────────────────────
 
 function downloadCSV(filename: string, rows: string[][], headers: string[]) {
   const escape = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
@@ -121,6 +126,63 @@ function exportOrders() {
   );
 }
 
+// ─── User JSON export / import helpers ───────────────────────────────────────
+
+type RegisteredEntry = { password: string; user: User };
+
+function loadRegistered(): Record<string, RegisteredEntry> {
+  try {
+    return JSON.parse(localStorage.getItem("tcgacademy_registered") ?? "{}") as Record<string, RegisteredEntry>;
+  } catch { return {}; }
+}
+
+function exportUsersJSON() {
+  const data = loadRegistered();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tcgacademy-users-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportUsersCSV() {
+  const data = loadRegistered();
+  const rows = Object.values(data).map(({ user }) =>
+    [user.id, user.name, user.lastName, user.email, user.role, user.phone ?? "", user.createdAt?.slice(0, 10) ?? ""]
+      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+      .join(","),
+  );
+  const csv = ["ID,Nombre,Apellidos,Email,Rol,Telefono,Registro", ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tcgacademy-users-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importUsersJSON(file: File, onDone: (count: number) => void) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const imported = JSON.parse(e.target?.result as string) as Record<string, RegisteredEntry>;
+      const current = loadRegistered();
+      let count = 0;
+      for (const [email, entry] of Object.entries(imported)) {
+        if (!current[email]) { current[email] = entry; count++; }
+      }
+      localStorage.setItem("tcgacademy_registered", JSON.stringify(current));
+      onDone(count);
+    } catch { onDone(-1); }
+  };
+  reader.readAsText(file);
+}
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const SYSTEM_CHECKS = [
   { label: "Base de datos", status: "ok" as const },
   { label: "WooCommerce API", status: "ok" as const },
@@ -133,6 +195,8 @@ const SYSTEM_CHECKS = [
 export default function AdminHerramientasPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [allProducts, setAllProducts] = useState<LocalProduct[]>(() =>
     getMergedProducts(),
   );
@@ -242,6 +306,77 @@ export default function AdminHerramientasPage() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* User DB — JSON export / import */}
+      <div className="mb-8">
+        <h2 className="mb-4 font-bold text-gray-900">Base de datos de usuarios</h2>
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+          <div className="divide-y divide-gray-100">
+            <div className="flex items-center justify-between px-5 py-4">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Exportar JSON</p>
+                <p className="text-xs text-gray-500">Usuarios registrados en la sesión actual</p>
+              </div>
+              <button
+                onClick={() => { exportUsersJSON(); showToast("Usuarios exportados como JSON"); }}
+                className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              >
+                <Download size={14} className="text-[#2563eb]" /> Exportar JSON
+              </button>
+            </div>
+            <div className="flex items-center justify-between px-5 py-4">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Exportar CSV</p>
+                <p className="text-xs text-gray-500">Usuarios registrados en formato hoja de cálculo</p>
+              </div>
+              <button
+                onClick={() => { exportUsersCSV(); showToast("Usuarios exportados como CSV"); }}
+                className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+              >
+                <Download size={14} className="text-green-600" /> Exportar CSV
+              </button>
+            </div>
+            <div className="flex items-center justify-between px-5 py-4">
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Importar JSON</p>
+                <p className="text-xs text-gray-500">Añade usuarios desde un archivo JSON exportado previamente</p>
+              </div>
+              <div className="flex items-center gap-3">
+                {importMsg && (
+                  <span className="flex items-center gap-1 text-sm font-semibold text-green-600">
+                    <CheckCircle2 size={14} /> {importMsg}
+                  </span>
+                )}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                >
+                  <Upload size={14} className="text-amber-600" /> Importar JSON
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            importUsersJSON(file, (count) => {
+              if (count >= 0) {
+                setImportMsg(`${count} usuario(s) importados`);
+              } else {
+                setImportMsg("Error al importar el archivo");
+              }
+              setTimeout(() => setImportMsg(null), 4000);
+            });
+            e.target.value = "";
+          }}
+        />
       </div>
 
       {/* System status */}

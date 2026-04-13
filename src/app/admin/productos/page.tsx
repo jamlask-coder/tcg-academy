@@ -21,6 +21,7 @@ import {
   Trash2,
   Download,
   ChevronUp,
+  Tag,
 } from "lucide-react";
 import Link from "next/link";
 import { calcVAT, IVA_GENERAL } from "@/hooks/usePrice";
@@ -413,6 +414,12 @@ export default function AdminProductosPage() {
               ✓ Guardado
             </span>
           )}
+          <Link
+            href="/admin/descuentos"
+            className="flex min-h-[44px] items-center gap-2 rounded-xl border border-[#2563eb]/20 px-4 py-2.5 text-sm font-bold text-[#2563eb] transition hover:bg-blue-50"
+          >
+            <Tag size={15} /> Descuentos
+          </Link>
           <button
             onClick={exportCSV}
             className="flex min-h-[44px] items-center gap-2 rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-200"

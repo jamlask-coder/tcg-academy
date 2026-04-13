@@ -6,8 +6,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   LayoutDashboard,
-  Package,
-  Tag,
   ShoppingBag,
   Users,
   LogOut,
@@ -59,18 +57,10 @@ const NAV_ITEMS: NavItem[] = [
     label: "Añadir producto",
     icon: PackagePlus,
   },
-  {
-    href: "/admin/precios",
-    label: "Precios",
-    icon: BadgeDollarSign,
-    sub: [
-      { href: "/admin/productos", label: "Gestión de precios", icon: Package, excludePathPrefixes: ["/admin/productos/nuevo"] },
-      { href: "/admin/descuentos", label: "Descuentos", icon: Tag },
-    ],
-  },
+  { href: "/admin/productos", label: "Precios", icon: BadgeDollarSign, excludePathPrefixes: ["/admin/productos/nuevo"] },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
-  { href: "/admin/categorias", label: "Subcategorías", icon: Layers },
   { href: "/admin/solicitudes", label: "Solicitudes B2B", icon: Inbox },
+  { href: "/admin/categorias", label: "Categorías", icon: Layers },
   { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart2 },
   {
     href: "/admin/fiscal",

@@ -123,9 +123,9 @@ export default function HomePage() {
 
               {/* Desktop subtitle */}
               <p className="mb-10 hidden max-w-xl text-lg leading-relaxed text-blue-200/80 md:block md:text-xl">
-                Pokémon, Magic, One Piece, Riftbound y más.
+                Empezamos con una tienda. Hoy somos cuatro, y no paramos.
                 <br />
-                Envío en menos de 24 horas. 4 tiendas físicas.
+                En plena expansión por toda España.
               </p>
 
               {/* Mobile: stores grid + B2B pill */}
