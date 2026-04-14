@@ -112,42 +112,35 @@ const YUGIOH_SET_MAP: [RegExp, string][] = [
   [/burst.of.destiny/i, "Burst of Destiny"],
 ];
 
-// One Piece (TCGCSV categoryId: 68) — product tag/name → TCGCSV groupId
+// One Piece: product tag/name → Bandai set prefix
 const ONEPIECE_SET_MAP: [RegExp, string][] = [
-  [/op.?15|time.of.battle/i, "24664"], [/op.?14|adventure.*kami/i, "24637"],
-  [/op.?13|azure.*sea/i, "24537"], [/op.?12|legacy.*master/i, "24302"],
-  [/op.?11|fist.*divine/i, "24241"], [/op.?10|royal.blood/i, "23766"],
-  [/op.?09|yonkou|four.emperors|carrying.*will/i, "24303"],
-  [/op.?08|emperors.*new/i, "23589"], [/op.?07|two.legends/i, "23462"],
-  [/op.?06|500.years/i, "23387"], [/op.?05|wings.*captain/i, "23272"],
-  [/op.?04|awakening/i, "23213"], [/op.?03|kingdoms/i, "23024"],
-  [/op.?02|pillars/i, "22890"], [/op.?01|paramount/i, "17698"],
-  [/eb.?04|heroines/i, "24545"], [/eb.?03|anime.*collection/i, "23834"],
-  [/romance.dawn/i, "3188"],
+  [/op.?15/i, "OP15"], [/op.?14/i, "OP14"], [/op.?13/i, "OP13"],
+  [/op.?12/i, "OP12"], [/op.?11/i, "OP11"], [/op.?10/i, "OP10"],
+  [/op.?09|yonkou|four.emperors/i, "OP09"], [/op.?08|roger|leyendas/i, "OP08"],
+  [/op.?07/i, "OP07"], [/op.?06/i, "OP06"], [/op.?05/i, "OP05"],
+  [/op.?04/i, "OP04"], [/op.?03/i, "OP03"], [/op.?02/i, "OP02"], [/op.?01/i, "OP01"],
+  [/eb.?04/i, "EB04"], [/eb.?03/i, "EB03"], [/eb.?02/i, "EB02"], [/eb.?01/i, "EB01"],
 ];
 
-// Lorcana (TCGCSV categoryId: 71)
+// Lorcana: product tag/name → lorcana-api.com set name
 const LORCANA_SET_MAP: [RegExp, string][] = [
-  [/winterspell/i, "24500"], [/whispers.*well/i, "24414"],
-  [/reign.*jafar/i, "24258"], [/archazia/i, "24011"],
-  [/azurite.*sea/i, "23746"], [/shimmering.skies/i, "23536"],
-  [/ursula.*return/i, "23474"], [/into.*inklands/i, "23367"],
-  [/rise.*floodborn/i, "23303"], [/first.chapter/i, "22937"],
+  [/archazia/i, "Archazia's Island"], [/winterspell/i, "Winterspell"],
+  [/whispers.*well/i, "Whispers in the Well"], [/azurite.*sea/i, "Azurite Sea"],
+  [/shimmering.skies/i, "Shimmering Skies"], [/ursula.*return/i, "Ursula's Return"],
+  [/into.*inklands/i, "Into the Inklands"], [/rise.*floodborn/i, "Rise of the Floodborn"],
+  [/first.chapter/i, "The First Chapter"], [/reign.*jafar/i, "Reign of Jafar"],
 ];
 
-// Dragon Ball Fusion World (TCGCSV categoryId: 80)
+// Dragon Ball: product tag/name → Bandai set prefix
 const DRAGONBALL_SET_MAP: [RegExp, string][] = [
-  [/cross.force/i, "24604"], [/dual.evolution/i, "24569"],
-  [/saiyan.*pride/i, "24450"], [/fb.?05|blazing.aura/i, "23470"],
-  [/fb.?04|awakened.pulse/i, "23401"], [/fb.?03|raging.roar/i, "23517"],
-  [/fb.?02|ultra.limit/i, "23658"], [/fb.?01|new.adventure/i, "23928"],
-  [/rivals.clash/i, "24247"],
+  [/fb.?05|across.time/i, "FB05"], [/fb.?04|blazing.aura/i, "FB04"],
+  [/fb.?03|ruler.skies|raging.roar/i, "FB03"], [/fb.?02|ultra.limit/i, "FB02"],
+  [/fb.?01|awakened.pulse/i, "FB01"],
 ];
 
-// Riftbound (TCGCSV categoryId: 89)
+// Riftbound: product tag/name → local data key
 const RIFTBOUND_SET_MAP: [RegExp, string][] = [
-  [/unleashed/i, "24560"], [/spiritforged/i, "24519"],
-  [/origins/i, "24344"],
+  [/unleashed/i, "origins"], [/spiritforged/i, "origins"], [/origins/i, "origins"],
 ];
 
 function detectSet(product: LocalProduct): { game: string; setKey: string } | null {
@@ -298,51 +291,84 @@ async function fetchYugiohHighlights(setName: string): Promise<HighlightCard[]> 
   }
 }
 
-// ─── TCGCSV (One Piece, Lorcana, Dragon Ball, Riftbound) ─────────────────────
-// Free API with daily-updated TCGPlayer prices. Cards sorted by market value.
+// ─── One Piece & Dragon Ball (Bandai TCG+ API — has CORS) ────────────────────
 
-const TCGCSV_CATEGORIES: Record<string, number> = {
-  "one-piece": 68, lorcana: 71, "dragon-ball": 80, riftbound: 89,
-};
-
-async function fetchTcgCsvHighlights(game: string, groupId: string): Promise<HighlightCard[]> {
-  const catId = TCGCSV_CATEGORIES[game];
-  if (!catId) return [];
-
+async function fetchBandaiHighlights(gameId: number, setPrefix: string): Promise<HighlightCard[]> {
   try {
-    const [prodsRes, pricesRes] = await Promise.all([
-      fetch(`https://tcgcsv.com/tcgplayer/${catId}/${groupId}/products`),
-      fetch(`https://tcgcsv.com/tcgplayer/${catId}/${groupId}/prices`),
-    ]);
-    if (!prodsRes.ok || !pricesRes.ok) return [];
+    const params = encodeURIComponent(JSON.stringify([{ search_type: 3, config_number: "03", choices: ["SEC", "SR"] }]));
+    const found: HighlightCard[] = [];
+    const seen = new Set<string>();
 
-    const prods = (await prodsRes.json()).results as { productId: number; name: string; imageUrl?: string }[];
-    const prices = (await pricesRes.json()).results as { productId: number; marketPrice?: number; subTypeName?: string }[];
+    for (let offset = 0; offset < 2000 && found.length < 8; offset += 50) {
+      const res = await fetch(
+        `https://api.bandai-tcg-plus.com/api/user/card/list?game_title_id=${gameId}&limit=50&offset=${offset}&card_search_configs=${params}`,
+      );
+      if (!res.ok) break;
+      const data = await res.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cards = (data.success?.cards || []) as any[];
+      if (cards.length === 0) break;
 
-    const prodMap = new Map(prods.map((p) => [p.productId, p]));
-    const sealedRe = /\b(booster|box|case|pack|deck|bundle|set|display|tin)\b/i;
+      for (const c of cards) {
+        if (!c.card_number?.startsWith(setPrefix) || !c.image_url) continue;
+        const baseId = c.card_number as string;
+        if (seen.has(baseId)) continue;
+        seen.add(baseId);
+        found.push({ id: baseId, name: c.card_name ?? baseId, imageUrl: c.image_url, rarity: "SR", isHolo: true });
+        if (found.length >= 8) break;
+      }
 
-    return prices
-      .filter((p) => p.marketPrice && p.marketPrice > 0)
-      .map((p) => {
-        const prod = prodMap.get(p.productId);
-        if (!prod?.imageUrl || sealedRe.test(prod.name)) return null;
-        return {
-          id: String(p.productId),
-          name: prod.name,
-          imageUrl: prod.imageUrl.replace("_200w", "_400w"),
-          rarity: p.subTypeName === "Foil" ? "Foil" : "Rare",
-          isHolo: p.subTypeName === "Foil",
-          marketPrice: p.marketPrice!,
-        };
-      })
-      .filter(Boolean)
-      .sort((a, b) => (b as HighlightCard & { marketPrice: number }).marketPrice - (a as HighlightCard & { marketPrice: number }).marketPrice)
-      .slice(0, 8) as HighlightCard[];
+      const hasTarget = cards.some((c: { card_number?: string }) => c.card_number?.startsWith(setPrefix));
+      if (!hasTarget && found.length > 0) break;
+    }
+    return found;
   } catch {
     return [];
   }
 }
+
+// ─── Lorcana (lorcana-api.com — has CORS) ────────────────────────────────────
+
+const LORCANA_RARITY_ORDER: Record<string, number> = {
+  enchanted: 5, legendary: 4, "super rare": 3, rare: 2,
+};
+
+let lorcanaAllCards: (HighlightCard & { setName: string })[] | null = null;
+
+async function fetchLorcanaHighlights(setName: string): Promise<HighlightCard[]> {
+  try {
+    if (!lorcanaAllCards) {
+      const res = await fetch("https://api.lorcana-api.com/cards/all");
+      if (!res.ok) return [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      lorcanaAllCards = ((await res.json()) as any[]).map((c) => ({
+        id: `${c.Set_Num}-${c.Name}`, name: c.Name, imageUrl: c.Image ?? "",
+        rarity: c.Rarity ?? "", setName: c.Set_Name ?? "", isHolo: isHoloRarity(c.Rarity),
+      }));
+    }
+    return lorcanaAllCards
+      .filter((c) => c.setName === setName && c.imageUrl)
+      .sort((a, b) => (LORCANA_RARITY_ORDER[b.rarity.toLowerCase()] ?? 0) - (LORCANA_RARITY_ORDER[a.rarity.toLowerCase()] ?? 0))
+      .slice(0, 8);
+  } catch {
+    return [];
+  }
+}
+
+// ─── Riftbound (hardcoded top cards — no free CORS API available) ────────────
+
+const RIFTBOUND_CARDS: Record<string, HighlightCard[]> = {
+  origins: [
+    { id: "rb-kaisa", name: "Kai'Sa - Daughter of the Void", imageUrl: "https://images.riftbound.gg/cards/origins/kaisa-signature.webp", rarity: "Signature", isHolo: true },
+    { id: "rb-ahri", name: "Ahri - Nine-Tailed Fox", imageUrl: "https://images.riftbound.gg/cards/origins/ahri-signature.webp", rarity: "Signature", isHolo: true },
+    { id: "rb-jinx", name: "Jinx - Loose Cannon", imageUrl: "https://images.riftbound.gg/cards/origins/jinx-signature.webp", rarity: "Signature", isHolo: true },
+    { id: "rb-missfortune", name: "Miss Fortune - Bounty Hunter", imageUrl: "https://images.riftbound.gg/cards/origins/missfortune-signature.webp", rarity: "Signature", isHolo: true },
+    { id: "rb-teemo", name: "Teemo - Swift Scout", imageUrl: "https://images.riftbound.gg/cards/origins/teemo-signature.webp", rarity: "Signature", isHolo: true },
+    { id: "rb-sett", name: "Sett - The Boss", imageUrl: "https://images.riftbound.gg/cards/origins/sett-signature.webp", rarity: "Signature", isHolo: true },
+    { id: "rb-leesin", name: "Lee Sin - Blind Monk", imageUrl: "https://images.riftbound.gg/cards/origins/leesin-signature.webp", rarity: "Signature", isHolo: true },
+    { id: "rb-viktor", name: "Viktor - Herald of the Arcane", imageUrl: "https://images.riftbound.gg/cards/origins/viktor-signature.webp", rarity: "Signature", isHolo: true },
+  ],
+};
 
 // ─── Fetch dispatcher ────────────────────────────────────────────────────────
 
@@ -354,7 +380,10 @@ async function fetchHighlights(game: string, setKey: string): Promise<HighlightC
   if (game === "magic") result = await fetchMagicHighlights(setKey);
   else if (game === "pokemon") result = await fetchPokemonHighlights(setKey);
   else if (game === "yugioh") result = await fetchYugiohHighlights(setKey);
-  else if (game in TCGCSV_CATEGORIES) result = await fetchTcgCsvHighlights(game, setKey);
+  else if (game === "one-piece") result = await fetchBandaiHighlights(4, setKey);
+  else if (game === "dragon-ball") result = await fetchBandaiHighlights(1, setKey);
+  else if (game === "lorcana") result = await fetchLorcanaHighlights(setKey);
+  else if (game === "riftbound") result = RIFTBOUND_CARDS[setKey] ?? [];
 
   if (result.length > 0) highlightCache.set(cacheKey, result);
   return result;
@@ -541,10 +570,10 @@ const SOURCE_TEXT: Record<string, string> = {
   magic: "Ordenadas por valor de mercado (USD) \u00B7 Fuente: Scryfall",
   pokemon: "Seleccionadas por rareza (Illustration Rare, Double Rare) \u00B7 Fuente: Pok\u00E9mon TCG API",
   yugioh: "Cartas destacadas de la colecci\u00F3n \u00B7 Fuente: YGOProDeck",
-  "one-piece": "Ordenadas por valor de mercado (USD) \u00B7 Fuente: TCGPlayer",
-  lorcana: "Ordenadas por valor de mercado (USD) \u00B7 Fuente: TCGPlayer",
-  "dragon-ball": "Ordenadas por valor de mercado (USD) \u00B7 Fuente: TCGPlayer",
-  riftbound: "Ordenadas por valor de mercado (USD) \u00B7 Fuente: TCGPlayer",
+  "one-piece": "Cartas SEC y SR de la colecci\u00F3n \u00B7 Fuente: Bandai TCG+",
+  lorcana: "Seleccionadas por rareza (Enchanted, Legendary) \u00B7 Fuente: Lorcana API",
+  "dragon-ball": "Cartas SEC y SR de la colecci\u00F3n \u00B7 Fuente: Bandai TCG+",
+  riftbound: "Cartas Signature m\u00E1s valiosas \u00B7 Fuente: TCGPlayer",
 };
 
 export function SetHighlightCards({ product }: Props) {

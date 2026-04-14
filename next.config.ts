@@ -21,6 +21,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "files.bandai-tcg-plus.com" },
       { protocol: "https", hostname: "lorcana-api.com" },
       { protocol: "https", hostname: "tcgplayer-cdn.tcgplayer.com" },
+      { protocol: "https", hostname: "images.riftbound.gg" },
     ],
   },
 };
