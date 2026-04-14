@@ -285,29 +285,48 @@ async function fetchYugiohHighlights(setName: string): Promise<HighlightCard[]> 
   }
 }
 
-// ─── One Piece (Bandai TCG+ API) ─────────────────────────────────────────────
+// ─── Bandai TCG+ helper (One Piece & Dragon Ball) ───────────────────────────
 
-async function fetchOnePieceHighlights(setPrefix: string): Promise<HighlightCard[]> {
+async function fetchBandaiHighlights(gameId: number, setPrefix: string): Promise<HighlightCard[]> {
   try {
-    // Bandai TCG+ API: game_title_id=4 is One Piece
-    const res = await fetch(
-      `https://api.bandai-tcg-plus.com/api/user/card/list?game_title_id=4&limit=50&offset=0`,
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (data.success?.cards || [])
+    // Bandai sorts newest first. Paginate to find cards from the target set.
+    // SEC/SR rarity filter: config_number 03 for both One Piece (gameId=4) and Dragon Ball (gameId=1)
+    const params = encodeURIComponent(JSON.stringify([{ search_type: 3, config_number: "03", choices: ["SEC", "SR"] }]));
+    const found: HighlightCard[] = [];
+    const seen = new Set<string>();
+
+    for (let offset = 0; offset < 2000 && found.length < 8; offset += 50) {
+      const res = await fetch(
+        `https://api.bandai-tcg-plus.com/api/user/card/list?game_title_id=${gameId}&limit=50&offset=${offset}&card_search_configs=${params}`,
+      );
+      if (!res.ok) break;
+      const data = await res.json();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .filter((c: any) => c.card_number?.startsWith(setPrefix) && c.image_url)
-      .slice(0, 8)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((c: any) => ({
-        id: c.card_number,
-        name: c.card_name ?? c.card_number,
-        imageUrl: c.image_url,
-        rarity: c.rarity ?? "SR",
-        isHolo: true,
-      }));
+      const cards = (data.success?.cards || []) as any[];
+      if (cards.length === 0) break;
+
+      for (const c of cards) {
+        if (!c.card_number?.startsWith(setPrefix) || !c.image_url) continue;
+        // Skip duplicate art variants (_p1, _p2, _SP, WANTED)
+        const baseId = c.card_number as string;
+        if (seen.has(baseId)) continue;
+        seen.add(baseId);
+        found.push({
+          id: baseId,
+          name: c.card_name ?? baseId,
+          imageUrl: c.image_url,
+          rarity: "SR",
+          isHolo: true,
+        });
+        if (found.length >= 8) break;
+      }
+
+      // If we've passed the target set (sets are ordered newest→oldest), stop early
+      const hasTargetSet = cards.some((c: { card_number?: string }) => c.card_number?.startsWith(setPrefix));
+      if (!hasTargetSet && found.length > 0) break;
+    }
+
+    return found;
   } catch {
     return [];
   }
@@ -351,33 +370,7 @@ async function fetchLorcanaHighlights(setName: string): Promise<HighlightCard[]>
   }
 }
 
-// ─── Dragon Ball (Bandai TCG+ API) ──────────────────────────────────────────
-
-async function fetchDragonBallHighlights(setPrefix: string): Promise<HighlightCard[]> {
-  try {
-    // Bandai TCG+ API: game_title_id=1 is Dragon Ball Super (FW)
-    const res = await fetch(
-      `https://api.bandai-tcg-plus.com/api/user/card/list?game_title_id=1&limit=50&offset=0`,
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (data.success?.cards || [])
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .filter((c: any) => c.card_number?.startsWith(setPrefix) && c.image_url)
-      .slice(0, 8)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((c: any) => ({
-        id: c.card_number,
-        name: c.card_name ?? c.card_number,
-        imageUrl: c.image_url,
-        rarity: c.rarity ?? "SR",
-        isHolo: true,
-      }));
-  } catch {
-    return [];
-  }
-}
+// One Piece & Dragon Ball use the shared Bandai helper above
 
 // ─── Fetch dispatcher ────────────────────────────────────────────────────────
 
@@ -389,9 +382,9 @@ async function fetchHighlights(game: string, setKey: string): Promise<HighlightC
   if (game === "magic") result = await fetchMagicHighlights(setKey);
   else if (game === "pokemon") result = await fetchPokemonHighlights(setKey);
   else if (game === "yugioh") result = await fetchYugiohHighlights(setKey);
-  else if (game === "one-piece") result = await fetchOnePieceHighlights(setKey);
+  else if (game === "one-piece") result = await fetchBandaiHighlights(4, setKey);
   else if (game === "lorcana") result = await fetchLorcanaHighlights(setKey);
-  else if (game === "dragon-ball") result = await fetchDragonBallHighlights(setKey);
+  else if (game === "dragon-ball") result = await fetchBandaiHighlights(1, setKey);
 
   if (result.length > 0) highlightCache.set(cacheKey, result);
   return result;
