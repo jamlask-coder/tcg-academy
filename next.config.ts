@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "svgs.scryfall.io" },
       { protocol: "https", hostname: "images.ygoprodeck.com" },
       { protocol: "https", hostname: "api.tcgdex.net" },
+      { protocol: "https", hostname: "files.bandai-tcg-plus.com" },
+      { protocol: "https", hostname: "lorcana-api.com" },
     ],
   },
 };

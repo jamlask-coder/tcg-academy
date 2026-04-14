@@ -848,7 +848,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           >
             <div
               ref={descRef}
-              className={`overflow-hidden text-sm leading-relaxed text-gray-600 transition-all ${descExpanded ? "" : "line-clamp-5"}`}
+              className={`overflow-hidden text-sm leading-relaxed text-gray-600 text-justify transition-all ${descExpanded ? "" : "line-clamp-5"}`}
             >
               {editMode ? (
                 <>
@@ -1026,11 +1026,19 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/images/payment/bizum.svg" alt="Bizum" className="h-5 rounded bg-white px-1.5 py-0.5" />
             </div>
-            <div className="mt-2.5 flex items-center gap-1.5 text-xs text-amber-700">
-              <span className="text-amber-400">★</span>
-              <span>
-                Consigue <strong>{Math.round(displayPrice * 100)}</strong> puntos con esta compra
-              </span>
+            <div className="mt-2.5 border-t border-gray-100 pt-2.5">
+              <div className="flex items-center gap-1.5 text-xs text-amber-700">
+                <span className="text-amber-400">★</span>
+                <span>
+                  Consigue <strong>{Math.round(displayPrice * 100)}</strong> puntos con esta compra
+                </span>
+              </div>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+                Acumula puntos con cada compra y canjéalos por descuentos exclusivos.
+                Crea o únete a un <Link href="/cuenta/grupo" className="font-semibold text-[#2563eb] hover:underline">grupo de amigos</Link> para
+                ganar puntos extra entre todos.{" "}
+                <Link href="/puntos" className="font-semibold text-[#2563eb] hover:underline">¿Cómo funcionan los puntos?</Link>
+              </p>
             </div>
           </div>
 
