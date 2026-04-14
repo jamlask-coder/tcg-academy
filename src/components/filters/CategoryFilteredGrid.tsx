@@ -122,6 +122,7 @@ function GridContent({ products, color, game, category }: Props) {
         minPrice={minPrice}
         maxPrice={maxPrice}
         color={color}
+        filteredCount={filtered.length}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
       />

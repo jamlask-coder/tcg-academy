@@ -9,7 +9,10 @@
       "WebFetch(domain:en.wikipedia.org)",
       "WebFetch(domain:api.scryfall.com)",
       "WebFetch(domain:db.ygoprodeck.com)",
-      "WebFetch(domain:api.pokemontcg.io)"
+      "WebFetch(domain:api.pokemontcg.io)",
+      "WebFetch(domain:www.cardmarket.com)",
+      "WebFetch(domain:en.digimoncard.com)",
+      "WebFetch(domain:www.paniniamerica.net)"
     ]
   }
 }

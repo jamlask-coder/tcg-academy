@@ -30,6 +30,7 @@ function LocalProductCardInner({ product }: Props) {
   const [added, setAdded] = useState(false);
   const [limitMsg, setLimitMsg] = useState<string | undefined>(undefined);
   const [hovered, setHovered] = useState(false);
+  const [floatAnims, setFloatAnims] = useState<{ type: "plus" | "minus"; key: number }[]>([]);
   const [inlineComparePrice, setInlineComparePrice] = useState<
     number | undefined
   >(product.comparePrice);
@@ -56,11 +57,18 @@ function LocalProductCardInner({ product }: Props) {
   const cartItem = items.find((i) => i.key === cartKey);
   const cartQty = cartItem?.quantity ?? 0;
 
+  const triggerFloat = (type: "plus" | "minus") => {
+    const key = Date.now() + Math.random();
+    setFloatAnims((prev) => [...prev, { type, key }]);
+    setTimeout(() => setFloatAnims((prev) => prev.filter((a) => a.key !== key)), 900);
+  };
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     if (isOutOfStock) return;
     const result = addItem(product.id, product.name, displayPrice, image ?? "");
     if (result.added) {
+      triggerFloat("plus");
       setAdded(true);
       setTimeout(() => setAdded(false), 2000);
     } else {
@@ -88,7 +96,7 @@ function LocalProductCardInner({ product }: Props) {
 
   // Singles/card categories get portrait TCG-card aspect ratio
   const isSingles = isCardCategory;
-  const imageAspect = isSingles ? "aspect-[5/7]" : "aspect-square";
+  const imageAspect = "aspect-square";
   const imageObjectFit = "object-contain p-2";
   // Show second image on hover if available
   const displayImage = hovered && product.images[1] ? product.images[1] : image;
@@ -171,39 +179,73 @@ function LocalProductCardInner({ product }: Props) {
       {/* ── FRANJA INFERIOR: Añadir al carrito (desktop hover) ── */}
       {!isOutOfStock && (
         <div className="absolute right-0 bottom-0 left-0 hidden translate-y-2 opacity-0 transition-all duration-200 ease-out group-hover:translate-y-0 group-hover:opacity-100 sm:block">
-          <div className="bg-gradient-to-t from-black/60 via-black/25 to-transparent px-2 pt-8 pb-2">
-            {cartQty > 0 ? (
-              <div className="flex items-center justify-center gap-0.5">
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (cartQty <= 1) removeItem(cartKey);
-                    else updateQty(cartKey, cartQty - 1);
-                  }}
-                  className="flex h-8 w-8 items-center justify-center rounded-l-lg bg-white text-gray-700 shadow-lg transition hover:bg-gray-100"
-                  aria-label="Quitar uno"
-                >
-                  −
-                </button>
-                <span className="flex h-8 min-w-[32px] items-center justify-center bg-white px-2 text-sm font-bold text-gray-900 shadow-lg">
-                  {cartQty}
-                </span>
+          <div className="relative bg-gradient-to-t from-black/60 via-black/25 to-transparent px-2 pt-8 pb-2">
+            <style>{`
+              @keyframes floatUp {
+                0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(0.5); }
+                15% { opacity: 1; transform: translateX(-50%) translateY(-18px) scale(1.3); }
+                30% { opacity: 1; transform: translateX(-50%) translateY(-14px) scale(1); }
+                45% { opacity: 1; transform: translateX(-50%) translateY(-22px) scale(1.1); }
+                100% { opacity: 0; transform: translateX(-50%) translateY(-36px) scale(0.8); }
+              }
+              @keyframes scaleIn {
+                0% { transform: scale(0.5); opacity: 0; }
+                50% { transform: scale(1.08); }
+                100% { transform: scale(1); opacity: 1; }
+              }
+            `}</style>
+            {/* +1 / -1 floats — positioned on stable container */}
+            {floatAnims.map((anim, i) => (
+              <span
+                key={anim.key}
+                className="pointer-events-none absolute left-1/2 bottom-[calc(100%-8px)] z-20 text-base font-black"
+                style={{
+                  color: anim.type === "plus" ? "#22c55e" : "#f87171",
+                  WebkitTextStroke: "0.3px rgba(150,150,150,0.35)",
+                  textShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                  animation: "floatUp 0.9s ease-out forwards",
+                  letterSpacing: "0.5px",
+                  marginLeft: i % 2 !== 0 ? "12px" : "-12px",
+                }}
+              >
+                {anim.type === "plus" ? "+1" : "−1"}
+              </span>
+            ))}
+            <div style={{ animation: cartQty === 1 && added ? "scaleIn 0.3s ease-out" : "none" }}>
+              {cartQty > 0 ? (
+                <div className="flex items-center justify-center gap-0.5">
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      triggerFloat("minus");
+                      if (cartQty <= 1) removeItem(cartKey);
+                      else updateQty(cartKey, cartQty - 1);
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-l-lg bg-white text-gray-700 shadow-lg transition-all duration-150 hover:bg-red-50 hover:text-red-500 active:scale-90"
+                    aria-label="Quitar uno"
+                  >
+                    −
+                  </button>
+                  <span className="flex h-8 min-w-[32px] items-center justify-center bg-white px-2 text-sm font-bold text-gray-900 shadow-lg">
+                    {cartQty}
+                  </span>
+                  <button
+                    onClick={(e) => { handleAddToCart(e); }}
+                    className="flex h-8 w-8 items-center justify-center rounded-r-lg bg-white text-gray-700 shadow-lg transition-all duration-150 hover:bg-green-50 hover:text-green-600 active:scale-90"
+                    aria-label="Añadir uno más"
+                  >
+                    +
+                  </button>
+                </div>
+              ) : (
                 <button
                   onClick={handleAddToCart}
-                  className="flex h-8 w-8 items-center justify-center rounded-r-lg bg-white text-gray-700 shadow-lg transition hover:bg-gray-100"
-                  aria-label="Añadir uno más"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-200 bg-gradient-to-r from-white to-amber-50 py-2 text-sm font-bold text-amber-800 shadow-[0_2px_12px_rgba(245,158,11,0.25)] transition-all duration-200 hover:from-amber-50 hover:to-amber-100 hover:shadow-[0_4px_20px_rgba(245,158,11,0.4)] hover:scale-[1.03] active:scale-[0.97]"
                 >
-                  +
+                  <ShoppingCart size={14} /> Añadir
                 </button>
-              </div>
-            ) : (
-              <button
-                onClick={handleAddToCart}
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-white py-2 text-sm font-bold text-gray-900 shadow-lg transition-all duration-200 hover:bg-amber-50 hover:text-amber-700 hover:scale-[1.02]"
-              >
-                <ShoppingCart size={14} /> Añadir
-              </button>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -211,26 +253,48 @@ function LocalProductCardInner({ product }: Props) {
       {/* ── MÓVIL: carrito (abajo a la derecha, siempre visible) ── */}
       {!isOutOfStock && (
         cartQty > 0 ? (
-          <div className="absolute right-1.5 bottom-1.5 z-10 flex items-center gap-0 rounded-full bg-white shadow-md sm:hidden">
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                if (cartQty <= 1) removeItem(cartKey);
-                else updateQty(cartKey, cartQty - 1);
-              }}
-              className="flex h-7 w-7 items-center justify-center rounded-l-full text-xs font-bold text-gray-700"
-              aria-label="Quitar uno"
-            >
-              −
-            </button>
-            <span className="min-w-[18px] text-center text-xs font-bold text-gray-900">{cartQty}</span>
-            <button
-              onClick={handleAddToCart}
-              className="flex h-7 w-7 items-center justify-center rounded-r-full text-xs font-bold text-gray-700"
-              aria-label="Añadir uno más"
-            >
-              +
-            </button>
+          <div
+            className="absolute right-1.5 bottom-1.5 z-10 sm:hidden"
+            style={{ animation: cartQty === 1 && added ? "scaleIn 0.3s ease-out" : "none" }}
+          >
+            {/* +1 / -1 floats mobile */}
+            {floatAnims.map((anim, i) => (
+              <span
+                key={anim.key}
+                className="pointer-events-none absolute left-1/2 bottom-full text-sm font-black"
+                style={{
+                  color: anim.type === "plus" ? "#22c55e" : "#f87171",
+                  WebkitTextStroke: "0.3px rgba(150,150,150,0.35)",
+                  textShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                  animation: "floatUp 0.9s ease-out forwards",
+                  marginLeft: i % 2 !== 0 ? "8px" : "-8px",
+                }}
+              >
+                {anim.type === "plus" ? "+1" : "−1"}
+              </span>
+            ))}
+            <div className="flex items-center gap-0 rounded-full bg-white shadow-md">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  triggerFloat("minus");
+                  if (cartQty <= 1) removeItem(cartKey);
+                  else updateQty(cartKey, cartQty - 1);
+                }}
+                className="flex h-7 w-7 items-center justify-center rounded-l-full text-xs font-bold text-gray-700 transition-colors active:text-red-500"
+                aria-label="Quitar uno"
+              >
+                −
+              </button>
+              <span className="min-w-[18px] text-center text-xs font-bold text-gray-900">{cartQty}</span>
+              <button
+                onClick={handleAddToCart}
+                className="flex h-7 w-7 items-center justify-center rounded-r-full text-xs font-bold text-gray-700 transition-colors active:text-green-500"
+                aria-label="Añadir uno más"
+              >
+                +
+              </button>
+            </div>
           </div>
         ) : (
           <button
@@ -249,13 +313,28 @@ function LocalProductCardInner({ product }: Props) {
     <>
       <div className="group flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl" style={{ borderColor: `${color}22` }}>
         {isCardCategory ? (
-          <HoloCard intensity="subtle">{imageBlock}</HoloCard>
+          <div className="relative">
+            <HoloCard intensity="subtle">{imageBlock}</HoloCard>
+            {/* Badges outside holo tilt */}
+            <div className="pointer-events-none absolute top-2 right-2 z-20 flex flex-col items-end gap-1">
+              {product.language && <LanguageFlag language={product.language} size="md" />}
+              {(() => {
+                const si2 = getStockInfo(product.inStock ? product.stock : 0);
+                if (si2.level === "unlimited" || si2.level === "available") return null;
+                return (
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${si2.level === "out" ? "bg-gray-500 text-white" : si2.level === "last" ? "bg-red-500 text-white" : "bg-amber-500 text-white"}`}>
+                    {si2.level === "out" ? "AGOTADO" : si2.label.toUpperCase()}
+                  </span>
+                );
+              })()}
+            </div>
+          </div>
         ) : (
           imageBlock
         )}
 
         {/* ── INFO ── */}
-        <div className="flex flex-col gap-1 px-2.5 py-2">
+        <div className="mt-auto flex flex-col gap-1 px-2.5 py-2">
           <span className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
             {CATEGORY_LABELS[product.category] ?? product.category}
           </span>

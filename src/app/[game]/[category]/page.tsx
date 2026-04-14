@@ -14,7 +14,10 @@ import type { Metadata } from "next";
 
 export function generateStaticParams() {
   const params: { game: string; category: string }[] = [];
+  const seen = new Set<string>();
   const gameKeys = Object.keys(GAME_CONFIG);
+
+  // Categories from actual products
   for (const game of gameKeys) {
     const cats = [
       ...new Set(
@@ -22,9 +25,30 @@ export function generateStaticParams() {
       ),
     ];
     for (const category of cats) {
-      params.push({ game, category });
+      const key = `${game}/${category}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        params.push({ game, category });
+      }
     }
   }
+
+  // Categories from mega menu links (may not have products yet)
+  for (const menuGame of MEGA_MENU_DATA) {
+    for (const col of menuGame.columns) {
+      for (const item of col.items) {
+        const parts = item.href.split("/").filter(Boolean);
+        if (parts.length >= 2) {
+          const key = `${parts[0]}/${parts[1]}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            params.push({ game: parts[0], category: parts[1] });
+          }
+        }
+      }
+    }
+  }
+
   return params;
 }
 
@@ -64,58 +88,6 @@ export default async function CategoryPage({
 
   return (
     <div>
-      {/* Hero */}
-      <div
-        className="relative overflow-hidden"
-        style={{ backgroundColor: bgColor }}
-      >
-        <div className="relative mx-auto max-w-[1400px] px-4 py-5 sm:px-6">
-          <nav
-            className="mb-4 flex items-center gap-2 text-sm opacity-70"
-            style={{ color }}
-          >
-            <Link href="/" className="hover:opacity-100">
-              Inicio
-            </Link>
-            <span>/</span>
-            <Link href={`/${game}`} className="hover:opacity-100">
-              {name}
-            </Link>
-            <span>/</span>
-            <span className="font-semibold">{catLabel}</span>
-          </nav>
-
-          {/* Logo + category title */}
-          <div className="flex items-center gap-4">
-            {logoSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={logoSrc}
-                alt={name}
-                width={140}
-                height={48}
-                className="h-10 w-auto max-w-[140px] object-contain md:h-12"
-                style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.18))" }}
-              />
-            ) : (
-              <div
-                className="flex h-10 items-center rounded-lg px-3 text-xs font-black text-white md:h-12"
-                style={{ backgroundColor: color }}
-              >
-                {abbrev}
-              </div>
-            )}
-            <h1 className="text-2xl font-bold md:text-4xl" style={{ color }}>
-              {catLabel}
-            </h1>
-          </div>
-
-          <p className="mt-2 text-gray-600">
-            {name} — {products.length} productos
-          </p>
-        </div>
-      </div>
-
       {/* Category nav */}
       <div className="sticky-under-nav border-b border-gray-100 bg-white">
         <div className="mx-auto max-w-[1400px] px-4 py-3 sm:px-6">

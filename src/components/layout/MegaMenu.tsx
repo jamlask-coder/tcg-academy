@@ -14,9 +14,10 @@ export function MegaMenu({ game, onClose, leftOffset }: Props) {
   const [displayedGame, setDisplayedGame] = useState(game);
   const [contentVisible, setContentVisible] = useState(true);
   const prevSlugRef = useRef(game.slug);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [measuredHeight, setMeasuredHeight] = useState<number | undefined>(undefined);
 
-  // When game prop changes (user moved to a different game), fade content out,
-  // swap data, fade back in. Container never remounts — no positional jump.
+  // When game prop changes — crossfade content, container slides via framer-motion
   useEffect(() => {
     if (game.slug === prevSlugRef.current) return;
     prevSlugRef.current = game.slug;
@@ -25,82 +26,75 @@ export function MegaMenu({ game, onClose, leftOffset }: Props) {
     const t = setTimeout(() => {
       setDisplayedGame(game);
       setContentVisible(true);
-    }, 120);
+    }, 100);
     return () => clearTimeout(t);
   }, [game]);
 
+  // Measure height from DOM after content changes
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (containerRef.current) {
+          setMeasuredHeight(containerRef.current.scrollHeight);
+        }
+      });
+    });
+  }, [displayedGame, contentVisible]);
+
   const { color, columns } = displayedGame;
+
+  // Calculate width from columns (200px per column + gaps + padding)
+  const calculatedWidth = columns.length * 200 + (columns.length - 1) * 20 + 48;
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15, ease: "easeOut" }}
-      className="inline-flex border-t-2 bg-white shadow-xl"
+      initial={{ opacity: 0, y: -8, x: leftOffset ?? 0 }}
+      animate={{
+        opacity: 1,
+        y: 0,
+        x: leftOffset ?? 0,
+      }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{
+        x: { type: "spring", stiffness: 350, damping: 30 },
+        opacity: { duration: 0.15 },
+        y: { duration: 0.2, ease: "easeOut" },
+      }}
+      className="absolute top-0 border-t-2 bg-white shadow-2xl"
       style={{
         borderTopColor: color,
-        marginLeft: leftOffset ?? 0,
         borderRadius: "0 0 12px 12px",
+        willChange: "transform",
+        transition: "border-top-color 0.2s ease",
       }}
     >
       <div
-        className="relative py-5 px-6"
+        className="overflow-hidden"
         style={{
-          opacity: contentVisible ? 1 : 0,
-          transition: "opacity 0.12s ease-in-out",
+          height: measuredHeight ? measuredHeight : "auto",
+          width: calculatedWidth,
+          transition: "height 0.25s ease-out, width 0.25s ease-out",
         }}
       >
-        {/* Background shield — behind content, centered, subtle game color */}
-        <style>{`
-          @keyframes megaLogoFloat {
-            0%,100% { transform: translate(-50%, -50%) translateY(0px) translateZ(0); }
-            45%     { transform: translate(-50%, -50%) translateY(-8px) translateZ(0); }
-            75%     { transform: translate(-50%, -50%) translateY(5px) translateZ(0); }
-          }
-        `}</style>
         <div
-          aria-hidden="true"
+          ref={containerRef}
+          className="relative py-5 px-6"
           style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            height: "90%",
-            aspectRatio: "1",
-            backgroundColor: color,
-            opacity: 0.18,
-            WebkitMaskImage: "url(/images/logo-tcg-shield.png)",
-            WebkitMaskSize: "contain",
-            WebkitMaskRepeat: "no-repeat",
-            WebkitMaskPosition: "center",
-            maskImage: "url(/images/logo-tcg-shield.png)",
-            maskSize: "contain",
-            maskRepeat: "no-repeat",
-            maskPosition: "center",
-            animation: "megaLogoFloat 6s ease-in-out infinite",
-            willChange: "transform",
-            pointerEvents: "none",
-            zIndex: 0,
+            opacity: contentVisible ? 1 : 0,
+            transition: "opacity 0.1s ease-in-out",
           }}
-        />
-
-        {/* Columns — above the background */}
+        >
+        {/* Columns */}
         <div className="relative z-10 flex items-start gap-5">
           {columns.map((col) => (
             <div key={col.title} style={{ width: 200, flexShrink: 0 }}>
-              <h3
-                className="mb-3 text-xs font-bold tracking-widest uppercase"
-                style={{ color }}
-              >
-                {col.title}
-              </h3>
-              <ul className="space-y-0.5">
+              <ul className="space-y-1.5">
                 {col.items.map((item) => (
-                  <li key={item.label}>
+                  <li key={item.href}>
                     <Link
                       href={item.href}
                       onClick={onClose}
-                      className="block rounded-md px-2 py-1 text-sm leading-snug text-gray-600 transition-colors duration-100 hover:bg-gray-100 hover:text-gray-900"
+                      className="block px-2.5 py-1.5 text-sm text-gray-700 transition-colors hover:text-[#2563eb]"
                     >
                       {item.label}
                     </Link>
@@ -109,6 +103,7 @@ export function MegaMenu({ game, onClose, leftOffset }: Props) {
               </ul>
             </div>
           ))}
+        </div>
         </div>
       </div>
     </motion.div>

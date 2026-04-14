@@ -33,11 +33,9 @@ export function RecentlyViewedSection({ excludeId }: Props) {
         Vistos recientemente
       </h2>
       {/* Mobile: horizontal scroll; desktop: grid */}
-      <div className="flex gap-4 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible sm:pb-0 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {products.map((p) => (
-          <div key={p.id} className="w-[160px] flex-shrink-0 sm:w-auto">
-            <LocalProductCard product={p} />
-          </div>
+          <LocalProductCard key={p.id} product={p} />
         ))}
       </div>
     </section>

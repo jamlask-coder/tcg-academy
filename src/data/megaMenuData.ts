@@ -95,7 +95,7 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     href: "/one-piece",
     color: "#1d4ed8",
     abbrev: "OP",
-    logoSrc: "/images/logos/onepiece.svg",
+    logoSrc: "/images/logos/onepiece.png",
     columns: [
       {
         title: "Producto Sellado",

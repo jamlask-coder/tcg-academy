@@ -23,6 +23,14 @@ export interface LocalProduct {
   // language?: string reserved for filtering — see memory/project_language_requirement.md
   tags: string[];
   vatRate?: number; // IVA en porcentaje (21 por defecto para TCG en España)
+  /** ID del sobre suelto vinculado (solo para booster-box) */
+  linkedPackId?: number;
+  /** ID de la caja vinculada (solo para sobres) */
+  linkedBoxId?: number;
+  /** Nº de sobres por caja (solo para booster-box) */
+  packsPerBox?: number;
+  /** Nº de cartas por sobre (solo para sobres) */
+  cardsPerPack?: number;
 }
 
 // ─── Game config ──────────────────────────────────────────────────────────────
@@ -123,6 +131,14 @@ export const GAME_CONFIG: Record<
       "Booster Boxes, Starter Decks y singles del juego de cartas Digimon.",
     emoji: "🦖",
   },
+  cyberpunk: {
+    name: "Cyberpunk TCG",
+    color: "#d4e500",
+    bgColor: "#fefce8",
+    description:
+      "El nuevo TCG de Cyberpunk. Booster Boxes, Starter Decks y singles.",
+    emoji: "🤖",
+  },
 };
 
 // ─── Category labels ──────────────────────────────────────────────────────────
@@ -218,6 +234,8 @@ export const PRODUCTS: LocalProduct[] = [
 
   {
     id: 10001,
+    linkedPackId: 10201,
+    packsPerBox: 36,
     name: "Bloomburrow Draft Booster Display (36 sobres)",
     slug: "magic-bloomburrow-draft-booster-display",
     price: 99.95,
@@ -262,6 +280,7 @@ export const PRODUCTS: LocalProduct[] = [
   },
   {
     id: 10003,
+    linkedPackId: 10202, packsPerBox: 36,
     name: "Duskmourn: House of Horror Draft Booster Display",
     slug: "magic-duskmourn-draft-booster-display",
     price: 99.95,
@@ -283,6 +302,7 @@ export const PRODUCTS: LocalProduct[] = [
   },
   {
     id: 10004,
+    linkedPackId: 10203, packsPerBox: 36,
     name: "Foundations Booster Display (36 sobres)",
     slug: "magic-foundations-booster-display",
     price: 94.95,
@@ -468,6 +488,8 @@ export const PRODUCTS: LocalProduct[] = [
     id: 10021,
     name: "Pokémon Prismatic Evolutions Booster Display (36 sobres)",
     slug: "pokemon-prismatic-evolutions-booster-display",
+    linkedPackId: 10027,
+    packsPerBox: 36,
     price: 134.95,
     comparePrice: 149.95,
     wholesalePrice: 110.66,
@@ -486,6 +508,8 @@ export const PRODUCTS: LocalProduct[] = [
   },
   {
     id: 10022,
+    linkedPackId: 10028,
+    packsPerBox: 36,
     name: "Pokémon Surging Sparks Booster Display (36 sobres)",
     slug: "pokemon-surging-sparks-booster-display",
     price: 119.95,
@@ -505,6 +529,7 @@ export const PRODUCTS: LocalProduct[] = [
   },
   {
     id: 10023,
+    linkedPackId: 10204, packsPerBox: 36,
     name: "Pokémon Scarlet & Violet 151 Booster Display",
     slug: "pokemon-scarlet-violet-151-booster-display",
     price: 139.95,
@@ -584,6 +609,8 @@ export const PRODUCTS: LocalProduct[] = [
     id: 10027,
     name: "Pokémon Prismatic Evolutions Booster Pack (10 cartas)",
     slug: "pokemon-prismatic-evolutions-booster-pack",
+    linkedBoxId: 10021,
+    cardsPerPack: 10,
     price: 5.99,
     wholesalePrice: 4.91,
     storePrice: 4.49,
@@ -601,6 +628,8 @@ export const PRODUCTS: LocalProduct[] = [
   },
   {
     id: 10028,
+    linkedBoxId: 10022,
+    cardsPerPack: 10,
     name: "Pokémon Surging Sparks Booster Pack (10 cartas)",
     slug: "pokemon-surging-sparks-booster-pack",
     price: 5.49,
@@ -701,6 +730,7 @@ export const PRODUCTS: LocalProduct[] = [
 
   {
     id: 10041,
+    linkedPackId: 10205, packsPerBox: 24,
     name: "One Piece Card Game OP-09 — The Four Emperors Booster Box",
     slug: "one-piece-op09-four-emperors-booster-box",
     price: 89.95,
@@ -722,6 +752,7 @@ export const PRODUCTS: LocalProduct[] = [
   },
   {
     id: 10042,
+    linkedPackId: 10206, packsPerBox: 24,
     name: "One Piece Card Game OP-08 — Two Legends Booster Box",
     slug: "one-piece-op08-two-legends-booster-box",
     price: 84.95,
@@ -842,6 +873,7 @@ export const PRODUCTS: LocalProduct[] = [
 
   {
     id: 10056,
+    linkedPackId: 10207, packsPerBox: 24,
     name: "Riftbound: Foundations Booster Box (24 sobres)",
     slug: "riftbound-foundations-booster-box",
     price: 79.95,
@@ -3665,6 +3697,134 @@ export const PRODUCTS: LocalProduct[] = [
     isFeatured: false,
     language: "ES",
     tags: ["deckbox", "pikachu", "ultra-pro"],
+  },
+
+  // ─── Sobres sueltos vinculados a cajas ──────────────────────────────────────
+  {
+    id: 10201,
+    linkedBoxId: 10001,
+    cardsPerPack: 15,
+    name: "MTG Bloomburrow Draft Booster Pack (15 cartas)",
+    slug: "magic-bloomburrow-draft-booster-pack",
+    price: 3.95,
+    wholesalePrice: 3.20,
+    storePrice: 3.50,
+    description: "Sobre individual Draft Booster de Bloomburrow. 15 cartas con al menos 1 rara o mítica garantizada. Perfecto para Draft y juego casual.",
+    category: "sobres",
+    game: "magic",
+    images: [],
+    inStock: true,
+    isNew: false,
+    language: "EN",
+    tags: ["bloomburrow", "draft", "sobre"],
+  },
+  {
+    id: 10202,
+    linkedBoxId: 10003,
+    cardsPerPack: 15,
+    name: "MTG Duskmourn Draft Booster Pack (15 cartas)",
+    slug: "magic-duskmourn-draft-booster-pack",
+    price: 3.95,
+    wholesalePrice: 3.20,
+    storePrice: 3.50,
+    description: "Sobre individual Draft Booster de Duskmourn: House of Horror. 15 cartas por sobre con temática de terror.",
+    category: "sobres",
+    game: "magic",
+    images: [],
+    inStock: true,
+    isNew: false,
+    language: "EN",
+    tags: ["duskmourn", "draft", "sobre"],
+  },
+  {
+    id: 10203,
+    linkedBoxId: 10004,
+    cardsPerPack: 15,
+    name: "MTG Foundations Draft Booster Pack (15 cartas)",
+    slug: "magic-foundations-draft-booster-pack",
+    price: 3.95,
+    wholesalePrice: 3.20,
+    storePrice: 3.50,
+    description: "Sobre individual de Foundations, el set esencial de Magic con los mejores reprints y nuevas ilustraciones. 15 cartas por sobre.",
+    category: "sobres",
+    game: "magic",
+    images: [],
+    inStock: true,
+    isNew: false,
+    language: "EN",
+    tags: ["foundations", "draft", "sobre"],
+  },
+  {
+    id: 10204,
+    linkedBoxId: 10023,
+    cardsPerPack: 10,
+    name: "Pokémon Scarlet & Violet 151 Booster Pack (10 cartas)",
+    slug: "pokemon-sv151-booster-pack",
+    price: 5.49,
+    wholesalePrice: 4.40,
+    storePrice: 4.90,
+    description: "Sobre suelto de Scarlet & Violet 151 con los 151 Pokémon originales de Kanto. 10 cartas por sobre con posibilidad de SAR de Mew ex y Alakazam ex.",
+    category: "sobres",
+    game: "pokemon",
+    images: [],
+    inStock: true,
+    isNew: false,
+    language: "EN",
+    tags: ["151", "kanto", "sobre"],
+  },
+  {
+    id: 10205,
+    linkedBoxId: 10041,
+    cardsPerPack: 12,
+    name: "One Piece OP-09 The Four Emperors Booster Pack (12 cartas)",
+    slug: "one-piece-op09-four-emperors-booster-pack",
+    price: 3.95,
+    wholesalePrice: 3.20,
+    storePrice: 3.50,
+    description: "Sobre suelto de OP-09 The Four Emperors. 12 cartas por sobre con posibilidad de obtener cartas de Shanks, Barbanegra, Big Mom y Kaidou.",
+    category: "sobres",
+    game: "one-piece",
+    images: [],
+    inStock: true,
+    isNew: false,
+    language: "EN",
+    tags: ["op-09", "four-emperors", "sobre"],
+  },
+  {
+    id: 10206,
+    linkedBoxId: 10042,
+    cardsPerPack: 12,
+    name: "One Piece OP-08 Two Legends Booster Pack (12 cartas)",
+    slug: "one-piece-op08-two-legends-booster-pack",
+    price: 3.95,
+    wholesalePrice: 3.20,
+    storePrice: 3.50,
+    description: "Sobre suelto de OP-08 Two Legends. 12 cartas por sobre con Gol D. Roger y Barbanegra en versiones exclusivas.",
+    category: "sobres",
+    game: "one-piece",
+    images: [],
+    inStock: true,
+    isNew: false,
+    language: "EN",
+    tags: ["op-08", "two-legends", "sobre"],
+  },
+  {
+    id: 10207,
+    linkedBoxId: 10056,
+    cardsPerPack: 12,
+    name: "Riftbound Foundations Booster Pack (12 cartas)",
+    slug: "riftbound-foundations-booster-pack",
+    price: 3.95,
+    wholesalePrice: 3.20,
+    storePrice: 3.50,
+    description: "Sobre suelto de Riftbound Foundations con los campeones de League of Legends. 12 cartas por sobre con mecánicas únicas de combate.",
+    category: "sobres",
+    game: "riftbound",
+    images: [],
+    inStock: true,
+    isNew: false,
+    language: "EN",
+    tags: ["foundations", "league-of-legends", "sobre"],
   },
 ];
 

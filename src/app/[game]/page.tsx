@@ -55,35 +55,6 @@ export default async function GamePage({
 
   return (
     <div>
-      {/* Hero compacto — igual que subcategorías */}
-      <div
-        className="relative overflow-hidden"
-        style={{ backgroundColor: bgColor }}
-      >
-        <div className="relative mx-auto max-w-[1400px] px-4 py-3 sm:px-6">
-          <nav
-            className="mb-2 flex items-center gap-2 text-sm opacity-70"
-            style={{ color }}
-          >
-            <Link href="/" className="hover:opacity-100">
-              Inicio
-            </Link>
-            <span>/</span>
-            <span className="font-semibold">{name}</span>
-          </nav>
-
-          <div>
-            <h1 className="text-2xl font-bold md:text-4xl" style={{ color }}>
-              {name}
-            </h1>
-          </div>
-
-          <p className="mt-1 text-gray-600">
-            {all.length} productos disponibles
-          </p>
-        </div>
-      </div>
-
       {/* Category nav */}
       {categories.length > 0 && (
         <div className="sticky-under-nav border-b border-gray-100 bg-white">

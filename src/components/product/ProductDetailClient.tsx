@@ -24,7 +24,8 @@ import {
   CARD_CATEGORIES,
   LANGUAGE_NAMES,
 } from "@/data/products";
-import { getMergedProducts } from "@/lib/productStore";
+import { getMergedProducts, getMergedById } from "@/lib/productStore";
+import { SetHighlightCards } from "@/components/product/SetHighlightCards";
 import { LanguageFlag } from "@/components/ui/LanguageFlag";
 import { DiscountBadgeEdit } from "@/components/ui/DiscountBadgeEdit";
 import { usePrice } from "@/hooks/usePrice";
@@ -461,7 +462,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
 
       <div className="mb-8 grid gap-6 md:grid-cols-[40%_1fr]">
         {/* Gallery */}
-        <div>
+        <div className="relative">
           <HoloCard
             intensity="full"
             active={isCardCategory}
@@ -469,7 +470,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           >
             <div
               ref={imgContainerRef}
-              className="group/img relative aspect-[4/5] max-h-[450px] cursor-pointer overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 select-none"
+              className={`group/img relative ${isCardCategory ? "aspect-[2/3]" : "aspect-[4/5]"} max-h-[520px] cursor-pointer overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 select-none`}
               onClick={() => displayImages[activeImg] && setLightboxOpen(true)}
             >
               {displayImages[activeImg] ? (
@@ -568,12 +569,6 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                 />
               </div>
 
-              {/* ── ESQUINA SUPERIOR DERECHA: bandera de idioma ── */}
-              {product.language && (
-                <div className="absolute top-3 right-3 z-10">
-                  <LanguageFlag language={product.language} showLabel size="md" />
-                </div>
-              )}
             </div>
           </HoloCard>
           {product.images.length > 1 && (
@@ -659,7 +654,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                   className="w-full rounded-lg border border-[#2563eb] px-2 py-0.5 text-xl font-bold focus:outline-none"
                 />
               ) : (
-                inlineTitle
+                inlineTitle.replace(/\s*\(\d+\s*(?:cartas|sobres)\)/gi, "")
               )}
             </h1>
             {isAdmin && (
@@ -685,13 +680,62 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           {/* 2. Language */}
           {product.language && (
             <div className="space-y-1">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span
                   className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-sm font-semibold"
                   style={{ borderColor: color, color }}
                 >
-                  <LanguageFlag language={product.language} showLabel size="sm" />
+                  <LanguageFlag language={product.language} showLabel size="md" />
                 </span>
+                {/* Box ↔ Pack pills */}
+                {(() => {
+                  const linkedId = product.linkedPackId ?? product.linkedBoxId;
+                  if (!linkedId) return null;
+                  const linked = getMergedById(linkedId);
+                  if (!linked) return null;
+                  const isBox = product.category === "booster-box";
+                  const linkedHref = `/${linked.game}/${linked.category}/${linked.slug}`;
+                  const boxProduct = isBox ? product : linked;
+                  const packProduct = isBox ? linked : product;
+                  const boxHref = isBox ? "#" : linkedHref;
+                  const packHref = isBox ? linkedHref : "#";
+                  const boxLabel = `📦 Caja${boxProduct.packsPerBox ? ` · ${boxProduct.packsPerBox} sobres` : ""}`;
+                  const packLabel = `🃏 Sobre${packProduct.cardsPerPack ? ` · ${packProduct.cardsPerPack} cartas` : ""}`;
+                  return (
+                    <>
+                      {isBox ? (
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-sm font-semibold text-gray-900"
+                          style={{ borderColor: color }}
+                        >
+                          {boxLabel}
+                        </span>
+                      ) : (
+                        <Link
+                          href={boxHref}
+                          className="inline-flex items-center gap-1.5 rounded-full border-2 border-gray-200 px-3 py-1 text-sm font-semibold text-gray-400 transition-colors hover:border-gray-400 hover:text-gray-700"
+                        >
+                          {boxLabel}
+                        </Link>
+                      )}
+                      {!isBox ? (
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-sm font-semibold text-gray-900"
+                          style={{ borderColor: color }}
+                        >
+                          {packLabel}
+                        </span>
+                      ) : (
+                        <Link
+                          href={packHref}
+                          className="inline-flex items-center gap-1.5 rounded-full border-2 border-gray-200 px-3 py-1 text-sm font-semibold text-gray-400 transition-colors hover:border-gray-400 hover:text-gray-700"
+                        >
+                          {packLabel}
+                        </Link>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
               {langVariants.length > 0 && (
                 <p className="text-xs text-gray-500">
@@ -704,7 +748,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                         className="inline-flex items-center gap-1 font-semibold hover:underline"
                         style={{ color }}
                       >
-                        <LanguageFlag language={v.language} showLabel size="sm" />
+                        <LanguageFlag language={v.language} showLabel size="md" />
                       </Link>
                     </span>
                   ))}
@@ -774,6 +818,11 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
               </button>
             )}
           </div>
+
+          {/* Set highlight cards — inline below description */}
+          {(product.category === "booster-box" || product.category === "sobres") && (
+            <SetHighlightCards product={product} />
+          )}
 
           {/* 6. Qty + Add to cart */}
           <div className="flex flex-col gap-2">
@@ -957,13 +1006,94 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                 ))}
               </select>
             ) : inlineLanguage ? (
-              <LanguageFlag language={inlineLanguage} showLabel size="sm" />
+              <LanguageFlag language={inlineLanguage} showLabel size="md" />
             ) : (
               <span className="text-sm text-gray-400">—</span>
             )}
           </div>
         </div>
       </div>
+
+      {/* Box ↔ Pack link */}
+      {(() => {
+        const linkedId = product.linkedPackId ?? product.linkedBoxId;
+        if (!linkedId) return null;
+        const linked = getMergedById(linkedId);
+        if (!linked) return null;
+        const isBox = !!product.linkedPackId;
+        const linkedImage = linked.images[0];
+        const gameConfig = GAME_CONFIG[linked.game];
+        const linkedHref = linked.slug.includes("-")
+          ? `/${linked.game}/${linked.category}/${linked.slug}`
+          : `/producto?id=${linked.id}`;
+        return (
+          <section className="mb-8">
+            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+              <div className="flex flex-col sm:flex-row">
+                {/* Image */}
+                <Link href={linkedHref} className="flex-shrink-0 bg-gray-50 p-4 sm:w-36">
+                  {linkedImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={linkedImage} alt={linked.name} className="mx-auto h-28 w-auto object-contain" />
+                  ) : (
+                    <div className="flex h-28 items-center justify-center text-4xl">
+                      {gameConfig?.emoji ?? "🃏"}
+                    </div>
+                  )}
+                </Link>
+                {/* Info */}
+                <div className="flex flex-1 flex-col justify-center p-5">
+                  <p className="mb-1 text-[10px] font-bold tracking-widest text-gray-400 uppercase">
+                    {isBox ? "También disponible como sobre suelto" : "Compra la caja completa y ahorra"}
+                  </p>
+                  <Link href={linkedHref} className="mb-2 text-base font-bold text-gray-900 hover:text-[#2563eb]">
+                    {linked.name}
+                  </Link>
+                  <div className="mb-3 flex flex-wrap items-center gap-3">
+                    <span className="text-lg font-bold" style={{ color: gameConfig?.color ?? "#2563eb" }}>
+                      {linked.price.toFixed(2)}€
+                    </span>
+                    <span className="text-xs text-gray-400">IVA incl.</span>
+                    {isBox && product.packsPerBox && (
+                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-600">
+                        Precio por sobre: {(product.price / product.packsPerBox).toFixed(2)}€
+                      </span>
+                    )}
+                    {!isBox && linked.packsPerBox && (
+                      <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-bold text-green-600">
+                        {linked.packsPerBox} sobres · Ahorras {((product.price * linked.packsPerBox) - linked.price).toFixed(2)}€
+                      </span>
+                    )}
+                  </div>
+                  {/* Pack/box info badges */}
+                  <div className="flex flex-wrap gap-2">
+                    {product.packsPerBox && (
+                      <span className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+                        📦 {product.packsPerBox} sobres por caja
+                      </span>
+                    )}
+                    {product.cardsPerPack && (
+                      <span className="rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700">
+                        🃏 {product.cardsPerPack} cartas por sobre
+                      </span>
+                    )}
+                    {linked.packsPerBox && !isBox && (
+                      <span className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+                        📦 {linked.packsPerBox} sobres en la caja
+                      </span>
+                    )}
+                    {linked.cardsPerPack && isBox && (
+                      <span className="rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700">
+                        🃏 {linked.cardsPerPack} cartas por sobre
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Cross-sell */}
       {related.length > 0 && (

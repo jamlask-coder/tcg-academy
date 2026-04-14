@@ -40,6 +40,9 @@ const EMPTY_FORM = {
   tags: "",
   stock: "",
   maxPerUser: "",
+  linkedProductId: "",
+  packsPerBox: "",
+  cardsPerPack: "",
 };
 type QuickForm = typeof EMPTY_FORM;
 
@@ -95,20 +98,36 @@ export default function AdminProductosPage() {
     setQuickForm((f) => ({ ...f, [field]: val }));
 
   const saveQuickProduct = (andAnother: boolean) => {
+    // Validate: booster-box requires packsPerBox
+    if (quickForm.category === "booster-box" && !quickForm.packsPerBox) {
+      alert("Debes indicar el número de sobres por caja");
+      return;
+    }
     const price = parseFloat(quickForm.price) || 0;
+    // Auto-append "(Caja de X sobres)" for booster boxes if not already in name
+    let productName = quickForm.name.trim();
+    if (quickForm.category === "booster-box" && quickForm.packsPerBox && !productName.toLowerCase().includes("sobres")) {
+      productName += ` (Caja de ${quickForm.packsPerBox} sobres)`;
+    }
     const newProduct = {
       id: Date.now(),
-      name: quickForm.name.trim(),
+      name: productName,
       game: quickForm.game,
       category: quickForm.category,
       price,
-      wholesalePrice: parseFloat(quickForm.wholesalePrice) || price * 0.8,
-      storePrice: parseFloat(quickForm.storePrice) || price * 0.9,
+      wholesalePrice: parseFloat(quickForm.wholesalePrice) || price,
+      storePrice: parseFloat(quickForm.storePrice) || price,
       description: quickForm.description.trim(),
       language: quickForm.language,
       inStock: quickForm.inStock,
       stock: quickForm.stock ? parseInt(quickForm.stock) : undefined,
       maxPerUser: quickForm.maxPerUser ? parseInt(quickForm.maxPerUser) : undefined,
+      ...(quickForm.category === "booster-box" && quickForm.linkedProductId
+        ? { linkedPackId: parseInt(quickForm.linkedProductId), packsPerBox: quickForm.packsPerBox ? parseInt(quickForm.packsPerBox) : undefined }
+        : {}),
+      ...(quickForm.category === "sobres" && quickForm.linkedProductId
+        ? { linkedBoxId: parseInt(quickForm.linkedProductId), cardsPerPack: quickForm.cardsPerPack ? parseInt(quickForm.cardsPerPack) : undefined }
+        : {}),
       isNew: quickForm.isNew,
       tags: quickForm.tags
         .split(",")
@@ -390,7 +409,7 @@ export default function AdminProductosPage() {
                 min="0"
                 value={quickForm.wholesalePrice}
                 onChange={(e) => qf("wholesalePrice", e.target.value)}
-                placeholder="Auto (80% PVP)"
+                placeholder="Mismo que PVP"
                 className="h-10 w-full rounded-xl border-2 border-gray-200 bg-white px-3 text-sm focus:border-green-500 focus:outline-none"
               />
             </div>
@@ -404,7 +423,7 @@ export default function AdminProductosPage() {
                 min="0"
                 value={quickForm.storePrice}
                 onChange={(e) => qf("storePrice", e.target.value)}
-                placeholder="Auto (90% PVP)"
+                placeholder="Mismo que PVP"
                 className="h-10 w-full rounded-xl border-2 border-gray-200 bg-white px-3 text-sm focus:border-green-500 focus:outline-none"
               />
             </div>
@@ -487,6 +506,44 @@ export default function AdminProductosPage() {
               />
               <p className="mt-1 text-[11px] text-gray-400">Dejar vacío = sin límite por usuario</p>
             </div>
+            {/* Extra fields for booster-box / sobres */}
+            {(quickForm.category === "booster-box" || quickForm.category === "sobres") && (
+              <>
+                <div className="sm:col-span-2 rounded-xl border border-blue-100 bg-blue-50 p-3">
+                  <p className="mb-2 text-xs font-bold text-blue-700">
+                    {quickForm.category === "booster-box" ? "📦 Datos de caja de sobres" : "🃏 Datos del sobre"}
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-gray-600">
+                        {quickForm.category === "booster-box" ? "ID del sobre vinculado" : "ID de la caja vinculada"}
+                      </label>
+                      <input
+                        type="number"
+                        value={quickForm.linkedProductId}
+                        onChange={(e) => qf("linkedProductId", e.target.value)}
+                        placeholder="ID del producto"
+                        className="h-10 w-full rounded-xl border-2 border-blue-200 bg-white px-3 text-sm focus:border-blue-500 focus:outline-none"
+                      />
+                      <p className="mt-1 text-[11px] text-gray-400">Dejar vacío si aún no existe</p>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold text-gray-600">
+                        {quickForm.category === "booster-box" ? "Nº de sobres por caja *" : "Nº de cartas por sobre"}
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={quickForm.category === "booster-box" ? quickForm.packsPerBox : quickForm.cardsPerPack}
+                        onChange={(e) => qf(quickForm.category === "booster-box" ? "packsPerBox" : "cardsPerPack", e.target.value)}
+                        placeholder={quickForm.category === "booster-box" ? "Ej: 36" : "Ej: 10"}
+                        className="h-10 w-full rounded-xl border-2 border-blue-200 bg-white px-3 text-sm focus:border-blue-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
             <div className="flex items-center gap-4">
               <label className="flex cursor-pointer items-center gap-2 text-sm select-none">
                 <input

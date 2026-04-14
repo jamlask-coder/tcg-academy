@@ -83,8 +83,17 @@ function FooterLink({
 
 export function Footer() {
   return (
-    <footer className="bg-gradient-to-b from-[#0f172a] to-[#1e293b] text-white">
-      <Container className="py-8">
+    <footer className="relative text-white" style={{ background: "#050810" }}>
+      {/* 4-corner gradient overlay */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{
+        background: `
+          radial-gradient(ellipse at top left, #0a0f1a 0%, transparent 60%),
+          radial-gradient(ellipse at top right, #1e3a8a 0%, transparent 50%),
+          radial-gradient(ellipse at bottom left, #050810 0%, transparent 60%),
+          radial-gradient(ellipse at bottom right, #0c1a3a 0%, transparent 50%)
+        `,
+      }} />
+      <Container className="relative z-10 py-8">
         {/* Main grid: Brand | Tienda | Legal | Shield */}
         <div className="mb-6 grid gap-12 sm:grid-cols-[2fr_1fr_1fr_auto]">
           {/* Brand */}
@@ -92,34 +101,35 @@ export function Footer() {
             <Link href="/" className="mb-4 inline-flex items-center gap-2">
               <span className="text-xl font-black tracking-tight text-white">TCG <span className="text-amber-400">Academy</span></span>
             </Link>
-            <p className="mb-4 text-xs text-slate-500">
-              4 tiendas físicas · Envío en 24h con GLS
-            </p>
-            {/* Social icons */}
-            <div className="mb-4 flex gap-1.5">
-              {SOCIAL_LINKS.map(({ label, href, Icon }) => (
-                <Link
-                  key={label}
-                  href={href}
-                  aria-label={label}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/8 text-slate-400 transition-colors hover:bg-white/16 hover:text-white"
-                >
-                  <Icon />
-                </Link>
-              ))}
-            </div>
-            {/* Payment logos */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Store socials */}
+            <div className="mt-4 space-y-2.5">
               {[
-                { src: "/images/payment/visa.svg", alt: "Visa", w: 42, h: 14, bg: "bg-white" },
-                { src: "/images/payment/mastercard.svg", alt: "Mastercard", w: 38, h: 24, bg: "bg-white" },
-                { src: "/images/payment/paypal.svg", alt: "PayPal", w: 60, h: 16, bg: "bg-white" },
-                { src: "/images/payment/bizum.svg", alt: "Bizum", w: 52, h: 16, bg: "bg-white" },
-                { src: "/images/payment/sepa.svg", alt: "Transferencia SEPA", w: 52, h: 18, bg: "bg-white" },
-              ].map(({ src, alt, w, h, bg }) => (
-                <span key={alt} className={`flex h-8 items-center justify-center rounded-md border border-white/10 px-2 ${bg}`}>
-                  <Image src={src} alt={alt} width={w} height={h} className="object-contain" />
-                </span>
+                { store: "Calpe", ig: "tcgacademy_calpe", tt: "tcgacademy_calpe" },
+                { store: "Madrid", ig: "tcgacademy_madrid", tt: null },
+                { store: "Barcelona", ig: "tcgacademy_barcelona", tt: null },
+                { store: "Béjar", ig: "tcgacademy_bejar", tt: null },
+              ].map(({ store, ig, tt }) => (
+                <div key={store} className="flex items-center gap-2.5">
+                  <span className="w-20 text-xs font-semibold text-slate-400">{store}</span>
+                  <a
+                    href={`https://instagram.com/${ig}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 rounded-lg bg-white/6 px-2.5 py-1.5 text-xs text-slate-400 transition-colors hover:bg-white/12 hover:text-pink-400"
+                  >
+                    <IconInstagram /> {ig}
+                  </a>
+                  {tt && (
+                    <a
+                      href={`https://tiktok.com/@${tt}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 rounded-lg bg-white/6 px-2.5 py-1.5 text-xs text-slate-400 transition-colors hover:bg-white/12 hover:text-white"
+                    >
+                      <IconTikTok /> TikTok
+                    </a>
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -152,16 +162,29 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Shield */}
-          <div className="flex items-start justify-center">
+          {/* Shield + Payment */}
+          <div className="flex flex-col items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/logo-tcg-shield.png"
               alt="TCG Academy"
-              width={280}
-              height={274}
-              className="opacity-70 transition-opacity hover:opacity-100"
+              width={220}
+              height={215}
+              className="mb-4 opacity-70 transition-opacity hover:opacity-100"
             />
+            <div className="flex flex-wrap items-center justify-center gap-1.5">
+              {[
+                { src: "/images/payment/visa.svg", alt: "Visa", w: 36, h: 12, bg: "bg-white" },
+                { src: "/images/payment/mastercard.svg", alt: "Mastercard", w: 32, h: 20, bg: "bg-white" },
+                { src: "/images/payment/paypal.svg", alt: "PayPal", w: 50, h: 14, bg: "bg-white" },
+                { src: "/images/payment/bizum.svg", alt: "Bizum", w: 44, h: 14, bg: "bg-white" },
+                { src: "/images/payment/sepa.svg", alt: "SEPA", w: 44, h: 16, bg: "bg-white" },
+              ].map(({ src, alt, w, h, bg }) => (
+                <span key={alt} className={`flex h-7 items-center justify-center rounded-md border border-white/10 px-1.5 ${bg}`}>
+                  <Image src={src} alt={alt} width={w} height={h} className="object-contain" />
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 

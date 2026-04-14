@@ -124,17 +124,13 @@ export const productSchema = z
     inStock: z.boolean(),
     isNew: z.boolean(),
   })
-  .refine((d) => d.wholesalePrice < d.price, {
-    message: "Mayorista debe ser menor que PV Público",
+  .refine((d) => d.wholesalePrice <= d.price, {
+    message: "Mayorista no puede superar el PV Público",
     path: ["wholesalePrice"],
   })
-  .refine((d) => d.storePrice < d.wholesalePrice, {
-    message: "Tienda debe ser menor que Mayorista",
+  .refine((d) => d.storePrice <= d.price, {
+    message: "Tienda no puede superar el PV Público",
     path: ["storePrice"],
-  })
-  .refine((d) => !d.costPrice || d.costPrice < d.storePrice, {
-    message: "Precio Adquisición debe ser menor que PV Tiendas",
-    path: ["costPrice"],
   });
 
 export type ProductFormValues = z.infer<typeof productSchema>;

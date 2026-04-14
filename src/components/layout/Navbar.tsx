@@ -14,19 +14,24 @@ import { Container } from "@/components/ui/Container";
 // ─── Cardmarket sprite sheet ───────────────────────────────────────────────────
 const CM_SPRITE = "/images/ssGamesBig.png";
 const SPRITE_SHEET_H = 140; // original sprite sheet height in px
-const TARGET_H = 36;        // display height for normal logos
-const TARGET_W = 100;       // normalized visual width for all logos
+const TARGET_H = 44;        // display height for normal logos
+const TARGET_W = 115;       // normalized visual width for all logos
 
 // Per-logo target overrides [maxW, maxH] — increase both to scale the logo up
 const CM_SPRITE_TARGET: Record<string, [number, number]> = {
-  pokemon: [112, 42],
-  magic: [108, 38],
-  "one-piece": [103, 39],
+  pokemon: [128, 46],
+  magic: [122, 44],
+  "one-piece": [118, 45],
 };
 
 // Per-slug width/height overrides for image-based logos (not sprites)
 const LOGO_SIZE_OVERRIDE: Record<string, { w: number; h: string }> = {
   topps: { w: 72, h: "h-7" },
+};
+
+// Logos that use a white version for the dark navbar
+const WHITE_LOGO_OVERRIDE: Record<string, string> = {
+  "one-piece": "/images/logos/onepiece-white.png",
 };
 
 // [origW, origX, vOffset, filter?]
@@ -36,13 +41,12 @@ const CM_SPRITES: Record<string, [number, number, number, string?]> = {
   yugioh: [392, 696, 0],
   pokemon: [273, 1228, 0],
   "dragon-ball": [382, 3288, 0],
-  "one-piece": [482, 4642, 0, "brightness(0) invert(1) drop-shadow(0 0 4px rgba(0,0,0,0.9)) drop-shadow(0 0 8px rgba(0,0,0,0.7))"],
   lorcana: [310, 5124, 0],
   riftbound: [319, 5976, 0, "brightness(0) invert(1) drop-shadow(0 0 4px rgba(0,0,0,0.9)) drop-shadow(0 0 8px rgba(0,0,0,0.7))"],
 };
 
 // NAV_HEIGHT: total navbar height in px — drives the center line position
-const NAV_HEIGHT = 56;
+const NAV_HEIGHT = 58;
 // CENTER_LINE_Y: where the center of logo names sits (50% of nav)
 const CENTER_LINE_Y = NAV_HEIGHT / 2;
 
@@ -73,7 +77,7 @@ function CmSpriteLogo({ slug, label }: { slug: string; label: string }) {
         flexShrink: 0,
         transition: "transform 0.2s",
       }}
-      className="group-hover/logo:scale-105"
+      className="transition-transform duration-300 group-hover/logo:scale-110"
     >
       <span
         style={{
@@ -124,16 +128,16 @@ function GameLogo({
 
   const sizeOverride = LOGO_SIZE_OVERRIDE[slug];
   const w = sizeOverride?.w ?? TARGET_W;
-  const hClass = sizeOverride?.h ?? "h-9";
+  const hClass = sizeOverride?.h ?? "h-11";
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={src}
+      src={WHITE_LOGO_OVERRIDE[slug] ?? src}
       alt={label}
       width={110}
       height={28}
-      className={`relative z-10 ${hClass} object-contain transition-transform duration-200 group-hover/logo:scale-105`}
+      className={`relative z-10 ${hClass} object-contain transition-transform duration-300 group-hover/logo:scale-110`}
       style={{ width: w, maxWidth: w }}
       onError={() => setErrored(true)}
     />
@@ -165,7 +169,7 @@ export function Navbar() {
 
   const scheduleClose = useCallback(() => {
     cancelClose();
-    closeTimerRef.current = setTimeout(() => setActiveItem(null), 300);
+    closeTimerRef.current = setTimeout(() => setActiveItem(null), 150);
   }, [cancelClose]);
 
   const openItem = useCallback(
@@ -239,21 +243,54 @@ export function Navbar() {
                   const active =
                     pathname === href || pathname.startsWith(href + "/");
                   const open = activeItem === slug;
+                  const isHoveredGame = activeItem === slug;
+                  const anotherGameHovered = activeItem !== null && activeItem !== slug && activeItem !== TIENDAS_KEY && activeItem !== MAYORISTAS_KEY && activeItem !== OTROS_KEY;
+                  const isCurrentPage = active;
                   return (
                     <div
                       key={slug}
                       ref={(el) => { if (el) logoRefsMap.current.set(slug, el); }}
                       className="group/logo flex items-stretch"
                       onMouseEnter={() => openItem(slug)}
+                      style={(() => {
+                        const anyGameInNavHovered = activeItem !== null && activeItem !== TIENDAS_KEY && activeItem !== MAYORISTAS_KEY && activeItem !== OTROS_KEY;
+                        const onAGamePage = NAVBAR_GAMES.some(g => pathname === `/${g.slug}` || pathname.startsWith(`/${g.slug}/`));
+
+                        // Hover takes priority
+                        if (anyGameInNavHovered) {
+                          return {
+                            transform: isHoveredGame ? "scale(1.18)" : "scale(0.88)",
+                            opacity: isHoveredGame ? 1 : 0.45,
+                            transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease",
+                            zIndex: isHoveredGame ? 5 : 1,
+                          };
+                        }
+                        // On a game page: current big, rest dimmed
+                        if (onAGamePage) {
+                          return {
+                            transform: active ? "scale(1.18)" : "scale(0.92)",
+                            opacity: active ? 1 : 0.4,
+                            transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease",
+                            zIndex: active ? 5 : 1,
+                          };
+                        }
+                        // Default: all normal
+                        return {
+                          transform: "scale(1)",
+                          opacity: 1,
+                          transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease",
+                          zIndex: 1,
+                        };
+                      })()}
                     >
                       <Link
                         href={href}
                         onClick={handleLinkClick}
-                        className="relative z-10 flex items-center justify-center px-3 transition-all duration-200"
+                        className="relative z-10 flex items-center justify-center px-3"
                         style={{
                           background:
                             active || open
-                              ? `radial-gradient(circle 42px at center, ${color}CC 0%, ${color}55 55%, transparent 100%)`
+                              ? `radial-gradient(ellipse 60px 40px at center, ${color}DD 0%, ${color}44 60%, transparent 100%)`
                               : "transparent",
                         }}
                         title={label}

@@ -94,6 +94,7 @@ export default function HomePage() {
 
               {/* Mobile: stores grid + B2B pill */}
               <div className="mb-10 md:hidden">
+                <p className="mb-3 text-sm font-bold tracking-widest text-white uppercase">Nuestras tiendas</p>
                 <div className="mb-3 grid grid-cols-2 gap-2">
                   {[
                     { city: "Madrid", href: "/tiendas/madrid" },
@@ -166,7 +167,8 @@ export default function HomePage() {
                 justifyContent: "flex-start",
               }}
             >
-              {/* Stores timeline — shifted down so Madrid starts where Barcelona was */}
+              <p className="mb-4 text-sm font-bold tracking-widest text-white uppercase">Nuestras tiendas</p>
+              {/* Stores timeline */}
               <div className="relative pl-10" style={{ paddingTop: 0 }}>
                 {/* vertical glowing line */}
                 <div

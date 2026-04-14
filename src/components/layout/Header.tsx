@@ -563,7 +563,7 @@ export function Header() {
   return (
     <>
     <header
-      className="border-b border-white/10"
+      className="sticky top-0 z-50 border-b border-white/10"
       style={{
         background:
           "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #2563eb 100%)",
@@ -571,7 +571,7 @@ export function Header() {
     >
       {/* Topbar — desktop */}
       <div
-        className="hidden py-1.5 text-xs text-white lg:block"
+        className="hidden py-2.5 text-xs text-white lg:block"
         style={{
           background:
             "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #2563eb 100%)",
@@ -613,7 +613,7 @@ export function Header() {
       <MobileTrustBar />
 
       {/* ── Main bar: logo LEFT · search FILL · icons RIGHT ──── */}
-      <Container className="flex h-16 items-center justify-center gap-3">
+      <Container className="flex h-20 items-center justify-center gap-3">
         {/* Logo — izquierda, alineado con Pokémon en la navbar */}
         <Link href="/" className="flex shrink-0 items-center gap-2.5">
           <span className="text-xl font-black tracking-tight text-white lg:text-2xl">
@@ -863,6 +863,7 @@ export function Header() {
                     ["Yu-Gi-Oh!", "/yugioh", "#dc2626", "yugioh.png"],
                     ["Naruto", "/naruto", "#ea580c", "naruto.svg"],
                     ["Digimon TCG", "/digimon", "#2563eb", "digimon.svg"],
+                    ["Cyberpunk TCG", "/cyberpunk", "#d4e500", "cyberpunk.png"],
                     ["Topps", "/topps", "#1d4ed8", "topps.svg"],
                     ["Panini", "/panini", "#16a34a", "panini.png"],
                   ] as [string, string, string, string][]

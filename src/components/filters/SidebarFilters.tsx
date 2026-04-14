@@ -10,6 +10,7 @@ interface Props {
   minPrice: number;
   maxPrice: number;
   color: string;
+  filteredCount?: number;
   // Mobile: controlled externally via MobileFilterButton
   mobileOpen?: boolean;
   onMobileClose?: () => void;
@@ -96,11 +97,13 @@ function FilterContent({
   minPrice,
   maxPrice,
   color,
+  filteredCount,
 }: {
   availableLanguages: string[];
   minPrice: number;
   maxPrice: number;
   color: string;
+  filteredCount?: number;
 }) {
   const {
     langs,
@@ -150,7 +153,14 @@ function FilterContent({
     <div className="flex flex-col gap-1">
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-sm font-bold text-gray-800">Filtros</span>
+        <span className="flex items-center gap-2 text-sm font-bold text-gray-800">
+          Filtros
+          {filteredCount !== undefined && (
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500">
+              {filteredCount}
+            </span>
+          )}
+        </span>
         {activeCount > 0 && (
           <button
             onClick={clearAll}
@@ -367,19 +377,21 @@ export function SidebarFilters({
   minPrice,
   maxPrice,
   color,
+  filteredCount,
   mobileOpen = false,
   onMobileClose,
 }: Props) {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="sticky top-[calc(var(--header-h)+4.5rem)] hidden max-h-[calc(100vh-var(--header-h)-6rem)] w-[240px] flex-shrink-0 self-start overflow-y-auto lg:block">
+      <aside className="sticky top-[calc(var(--header-h)+5rem)] hidden max-h-[calc(100vh-var(--header-h)-6rem)] w-[240px] flex-shrink-0 self-start overflow-y-auto lg:block">
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <FilterContent
             availableLanguages={availableLanguages}
             minPrice={minPrice}
             maxPrice={maxPrice}
             color={color}
+            filteredCount={filteredCount}
           />
         </div>
       </aside>

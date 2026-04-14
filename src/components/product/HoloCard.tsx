@@ -1,14 +1,18 @@
 "use client";
-import { useRef, useCallback, type ReactNode } from "react";
+import { useRef, useCallback, useState, type ReactNode, Children, isValidElement, cloneElement } from "react";
 
 interface Props {
   children?: ReactNode;
   intensity?: "subtle" | "full";
   className?: string;
-  /** Set false to render a plain wrapper with no effect */
   active?: boolean;
 }
 
+/**
+ * Wraps an image block and adds a holographic tilt + shine effect.
+ * The holo shimmer is injected as a pseudo-layer clipped to the actual
+ * <img> element inside children, so it never bleeds into white space.
+ */
 export function HoloCard({
   children,
   intensity = "subtle",
@@ -16,145 +20,92 @@ export function HoloCard({
   active = true,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const [vars, setVars] = useState({ mx: 50, my: 50, angle: 135, opacity: 0, rx: 0, ry: 0 });
   const maxTilt = intensity === "full" ? 10 : 5;
 
-  const applyVars = useCallback(
-    (
-      rx: number,
-      ry: number,
-      mx: number,
-      my: number,
-      angle: number,
-      opacity: number,
-    ) => {
-      const card = cardRef.current;
-      if (!card) return;
-      card.style.setProperty("--rx", `${rx}deg`);
-      card.style.setProperty("--ry", `${ry}deg`);
-      card.style.setProperty("--mx", `${mx}%`);
-      card.style.setProperty("--my", `${my}%`);
-      card.style.setProperty("--angle", `${angle}deg`);
-      card.style.setProperty("--opacity", String(opacity));
-    },
-    [],
-  );
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const el = containerRef.current;
-      const card = cardRef.current;
-      if (!el || !card) return;
-      card.style.transition = "transform 0.08s ease-out";
-      const rect = el.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width;
-      const y = (e.clientY - rect.top) / rect.height;
-      const rx = (x - 0.5) * maxTilt * 2;
-      const ry = (y - 0.5) * -maxTilt * 2;
-      const angle = Math.atan2(y - 0.5, x - 0.5) * (180 / Math.PI) + 135;
-      applyVars(rx, ry, x * 100, y * 100, angle, 1);
-    },
-    [maxTilt, applyVars],
-  );
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    setVars({
+      mx: x * 100, my: y * 100,
+      angle: Math.atan2(y - 0.5, x - 0.5) * (180 / Math.PI) + 135,
+      opacity: 1,
+      rx: (x - 0.5) * maxTilt * 2,
+      ry: (y - 0.5) * -maxTilt * 2,
+    });
+  }, [maxTilt]);
 
   const handleMouseLeave = useCallback(() => {
-    const card = cardRef.current;
-    if (card) card.style.transition = "transform 0.5s ease-out";
-    applyVars(0, 0, 50, 50, 135, 0);
-  }, [applyVars]);
+    setVars({ mx: 50, my: 50, angle: 135, opacity: 0, rx: 0, ry: 0 });
+  }, []);
 
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent<HTMLDivElement>) => {
-      const el = containerRef.current;
-      const card = cardRef.current;
-      if (!el || !card || !e.touches[0]) return;
-      card.style.transition = "transform 0.08s ease-out";
-      const rect = el.getBoundingClientRect();
-      const x = (e.touches[0].clientX - rect.left) / rect.width;
-      const y = (e.touches[0].clientY - rect.top) / rect.height;
-      const rx = (x - 0.5) * maxTilt * 2;
-      const ry = (y - 0.5) * -maxTilt * 2;
-      const angle = Math.atan2(y - 0.5, x - 0.5) * (180 / Math.PI) + 135;
-      applyVars(rx, ry, x * 100, y * 100, angle, 1);
-    },
-    [maxTilt, applyVars],
-  );
+  if (!active) return <div className={className}>{children}</div>;
 
-  const handleTouchEnd = useCallback(() => {
-    const card = cardRef.current;
-    if (card) card.style.transition = "transform 0.5s ease-out";
-    applyVars(0, 0, 50, 50, 135, 0);
-  }, [applyVars]);
+  // Find the <img> inside children and wrap it with holo overlay
+  function wrapChildren(node: ReactNode): ReactNode {
+    return Children.map(node, (child) => {
+      if (!isValidElement(child)) return child;
 
-  if (!active) {
-    return <div className={className}>{children}</div>;
+      // If it's an img, wrap it in a relative container with the holo overlay clipped to it
+      if (child.type === "img") {
+        return (
+          <span className="relative inline-block">
+            {child}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0"
+              style={{
+                borderRadius: "6px",
+                background: `linear-gradient(${vars.angle}deg,
+                  rgba(255,50,50,0.2) 0%, rgba(255,200,50,0.2) 20%,
+                  rgba(50,255,50,0.2) 40%, rgba(50,200,255,0.2) 60%,
+                  rgba(150,50,255,0.2) 80%, rgba(255,50,100,0.2) 100%)`,
+                mixBlendMode: "color-dodge",
+                opacity: vars.opacity,
+                transition: "opacity 0.3s",
+              }}
+            />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0"
+              style={{
+                borderRadius: "6px",
+                background: `radial-gradient(circle at ${vars.mx}% ${vars.my}%, rgba(255,255,255,0.5) 0%, transparent 50%)`,
+                mixBlendMode: "overlay",
+                opacity: vars.opacity,
+                transition: "opacity 0.3s",
+              }}
+            />
+          </span>
+        );
+      }
+
+      // Recurse into children
+      if (child.props && typeof child.props === "object" && "children" in child.props) {
+        return cloneElement(child, {}, wrapChildren((child.props as { children?: ReactNode }).children));
+      }
+
+      return child;
+    });
   }
 
   return (
-    /* Outer container holds perspective — does NOT rotate */
     <div
       ref={containerRef}
-      className={`holo-container ${className}`}
+      className={className}
       style={{ perspective: "800px" }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
     >
-      {/* Inner card — rotates in 3D */}
-      <div
-        ref={cardRef}
-        className="holo-card relative"
-        style={
-          {
-            "--rx": "0deg",
-            "--ry": "0deg",
-            "--mx": "50%",
-            "--my": "50%",
-            "--angle": "135deg",
-            "--opacity": "0",
-            transform: "rotateY(var(--rx)) rotateX(var(--ry))",
-            transformStyle: "preserve-3d",
-            transition: "transform 0.5s ease-out",
-            willChange: "transform",
-          } as React.CSSProperties
-        }
-      >
-        {children}
-
-        {/* Rainbow holo gradient — moves with mouse angle */}
-        <div
-          aria-hidden="true"
-          style={{
-            position: "absolute",
-            inset: 0,
-            borderRadius: "inherit",
-            background:
-              "linear-gradient(var(--angle), transparent 0%, rgba(255,0,0,0.12) 20%, rgba(255,255,0,0.12) 40%, rgba(0,255,0,0.12) 60%, rgba(0,0,255,0.12) 80%, transparent 100%)",
-            mixBlendMode: "color-dodge",
-            opacity: "var(--opacity)" as unknown as number,
-            transition: "opacity 0.3s ease-out",
-            pointerEvents: "none",
-            zIndex: 3,
-          }}
-        />
-
-        {/* Radial spotlight — follows cursor */}
-        <div
-          aria-hidden="true"
-          style={{
-            position: "absolute",
-            inset: 0,
-            borderRadius: "inherit",
-            background:
-              "radial-gradient(circle at var(--mx) var(--my), rgba(255,255,255,0.35) 0%, transparent 60%)",
-            mixBlendMode: "soft-light",
-            opacity: "var(--opacity)" as unknown as number,
-            transition: "opacity 0.3s ease-out",
-            pointerEvents: "none",
-            zIndex: 4,
-          }}
-        />
+      <div style={{
+        transform: `rotateY(${vars.rx}deg) rotateX(${vars.ry}deg)`,
+        transformStyle: "preserve-3d",
+        transition: vars.opacity ? "transform 0.08s ease-out" : "transform 0.5s ease-out",
+      }}>
+        {wrapChildren(children)}
       </div>
     </div>
   );
