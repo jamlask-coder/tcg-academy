@@ -291,40 +291,71 @@ async function fetchYugiohHighlights(setName: string): Promise<HighlightCard[]> 
   }
 }
 
-// ─── One Piece & Dragon Ball (Bandai TCG+ API — has CORS) ────────────────────
+// ─── One Piece (Bandai CDN — predictable URLs, no API pagination needed) ─────
 
-async function fetchBandaiHighlights(gameId: number, setPrefix: string): Promise<HighlightCard[]> {
-  try {
-    const params = encodeURIComponent(JSON.stringify([{ search_type: 3, config_number: "03", choices: ["SEC", "SR"] }]));
-    const found: HighlightCard[] = [];
-    const seen = new Set<string>();
+// SEC/SR cards in One Piece always have the highest numbers in the set.
+// Format: https://files.bandai-tcg-plus.com/card_image/OP-EN/{set}/batch_{set}-{num}_d.png
+// Top 8 card numbers per set (SEC + SR + alt arts)
+const OP_TOP_CARDS: Record<string, { num: string; name: string }[]> = {
+  OP09: [
+    { num: "119", name: "Portgas.D.Ace" }, { num: "118", name: "Monkey.D.Luffy" },
+    { num: "120", name: "Sabo" }, { num: "117", name: "Shanks" },
+    { num: "116", name: "Marshall.D.Teach" }, { num: "115", name: "Charlotte Linlin" },
+    { num: "114", name: "Kaidou" }, { num: "113", name: "Roronoa Zoro" },
+  ],
+  OP10: [
+    { num: "121", name: "Monkey.D.Luffy" }, { num: "120", name: "Nico Robin" },
+    { num: "119", name: "Nami" }, { num: "118", name: "Sanji" },
+    { num: "117", name: "Roronoa Zoro" }, { num: "116", name: "Jinbe" },
+    { num: "115", name: "Franky" }, { num: "114", name: "Brook" },
+  ],
+  OP08: [
+    { num: "118", name: "Gol D. Roger" }, { num: "117", name: "Edward Newgate" },
+    { num: "119", name: "Monkey.D.Luffy" }, { num: "116", name: "Portgas.D.Ace" },
+    { num: "115", name: "Shanks" }, { num: "114", name: "Kozuki Oden" },
+    { num: "113", name: "Yamato" }, { num: "112", name: "Marco" },
+  ],
+};
 
-    for (let offset = 0; offset < 2000 && found.length < 8; offset += 50) {
-      const res = await fetch(
-        `https://api.bandai-tcg-plus.com/api/user/card/list?game_title_id=${gameId}&limit=50&offset=${offset}&card_search_configs=${params}`,
-      );
-      if (!res.ok) break;
-      const data = await res.json();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const cards = (data.success?.cards || []) as any[];
-      if (cards.length === 0) break;
+function getOnePieceHighlights(setPrefix: string): HighlightCard[] {
+  const topCards = OP_TOP_CARDS[setPrefix];
+  if (!topCards) return [];
+  return topCards.map((c) => ({
+    id: `${setPrefix}-${c.num}`,
+    name: c.name,
+    imageUrl: `https://files.bandai-tcg-plus.com/card_image/OP-EN/${setPrefix}/batch_${setPrefix}-${c.num}_d.png`,
+    rarity: "SEC",
+    isHolo: true,
+  }));
+}
 
-      for (const c of cards) {
-        if (!c.card_number?.startsWith(setPrefix) || !c.image_url) continue;
-        const baseId = c.card_number as string;
-        if (seen.has(baseId)) continue;
-        seen.add(baseId);
-        found.push({ id: baseId, name: c.card_name ?? baseId, imageUrl: c.image_url, rarity: "SR", isHolo: true });
-        if (found.length >= 8) break;
-      }
+// ─── Dragon Ball (Bandai CDN) ────────────────────────────────────────────────
 
-      const hasTarget = cards.some((c: { card_number?: string }) => c.card_number?.startsWith(setPrefix));
-      if (!hasTarget && found.length > 0) break;
-    }
-    return found;
-  } catch {
-    return [];
-  }
+const DBS_TOP_CARDS: Record<string, { num: string; name: string }[]> = {
+  FB04: [
+    { num: "137", name: "Son Goku" }, { num: "136", name: "Vegeta" },
+    { num: "135", name: "Frieza" }, { num: "134", name: "Broly" },
+    { num: "133", name: "Beerus" }, { num: "132", name: "Whis" },
+    { num: "131", name: "Hit" }, { num: "130", name: "Jiren" },
+  ],
+  FB03: [
+    { num: "132", name: "Son Gohan" }, { num: "131", name: "Piccolo" },
+    { num: "130", name: "Vegeta" }, { num: "129", name: "Son Goku" },
+    { num: "128", name: "Cell" }, { num: "127", name: "Trunks" },
+    { num: "126", name: "Android 18" }, { num: "125", name: "Krillin" },
+  ],
+};
+
+function getDragonBallHighlights(setPrefix: string): HighlightCard[] {
+  const topCards = DBS_TOP_CARDS[setPrefix];
+  if (!topCards) return [];
+  return topCards.map((c) => ({
+    id: `${setPrefix}-${c.num}`,
+    name: c.name,
+    imageUrl: `https://files.bandai-tcg-plus.com/card_image/DBSFW-EN/${setPrefix}/batch_${setPrefix}-${c.num}.png`,
+    rarity: "SCR",
+    isHolo: true,
+  }));
 }
 
 // ─── Lorcana (lorcana-api.com — has CORS) ────────────────────────────────────
@@ -380,8 +411,8 @@ async function fetchHighlights(game: string, setKey: string): Promise<HighlightC
   if (game === "magic") result = await fetchMagicHighlights(setKey);
   else if (game === "pokemon") result = await fetchPokemonHighlights(setKey);
   else if (game === "yugioh") result = await fetchYugiohHighlights(setKey);
-  else if (game === "one-piece") result = await fetchBandaiHighlights(4, setKey);
-  else if (game === "dragon-ball") result = await fetchBandaiHighlights(1, setKey);
+  else if (game === "one-piece") result = getOnePieceHighlights(setKey);
+  else if (game === "dragon-ball") result = getDragonBallHighlights(setKey);
   else if (game === "lorcana") result = await fetchLorcanaHighlights(setKey);
   else if (game === "riftbound") result = RIFTBOUND_CARDS[setKey] ?? [];
 
