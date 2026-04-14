@@ -1,10 +1,12 @@
 "use client";
 import { memo, useState, useEffect } from "react";
 import Link from "next/link";
-import { ShoppingCart, Heart, Check } from "lucide-react";
+import { ShoppingCart, Heart, Check, Trash2, Bell } from "lucide-react";
 import { getStockInfo } from "@/utils/stockStatus";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
+import { useFavorites } from "@/context/FavoritesContext";
+import { subscribeRestock, isSubscribed } from "@/services/restockService";
 import {
   GAME_CONFIG,
   CATEGORY_LABELS,
@@ -24,7 +26,8 @@ interface Props {
 
 function LocalProductCardInner({ product }: Props) {
   const { addItem, items, updateQty, removeItem } = useCart();
-  const { user, toggleFavorite, isFavorite } = useAuth();
+  const { user } = useAuth();
+  const { toggle: toggleFavorite, isFavorite } = useFavorites();
   const isAdmin = user?.role === "admin";
 
   const [added, setAdded] = useState(false);
@@ -51,6 +54,9 @@ function LocalProductCardInner({ product }: Props) {
     effectiveComparePrice !== undefined && effectiveComparePrice > displayPrice;
 
   const favorited = isFavorite(product.id);
+  const [restockSub, setRestockSub] = useState(() =>
+    user?.email ? isSubscribed(product.id, user.email) : false,
+  );
 
   const isOutOfStock = !product.inStock || (typeof product.stock === "number" && product.stock === 0);
   const cartKey = `item_${product.id}`;
@@ -222,9 +228,9 @@ function LocalProductCardInner({ product }: Props) {
                       else updateQty(cartKey, cartQty - 1);
                     }}
                     className="flex h-8 w-8 items-center justify-center rounded-l-lg bg-white text-gray-700 shadow-lg transition-all duration-150 hover:bg-red-50 hover:text-red-500 active:scale-90"
-                    aria-label="Quitar uno"
+                    aria-label={cartQty <= 1 ? "Eliminar del carrito" : "Quitar uno"}
                   >
-                    −
+                    {cartQty <= 1 ? <Trash2 size={13} /> : "−"}
                   </button>
                   <span className="flex h-8 min-w-[32px] items-center justify-center bg-white px-2 text-sm font-bold text-gray-900 shadow-lg">
                     {cartQty}
@@ -246,6 +252,32 @@ function LocalProductCardInner({ product }: Props) {
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Restock alert (desktop hover) ── */}
+      {isOutOfStock && (
+        <div className="absolute right-0 bottom-0 left-0 hidden translate-y-2 opacity-0 transition-all duration-200 ease-out group-hover:translate-y-0 group-hover:opacity-100 sm:block">
+          <div className="bg-gradient-to-t from-black/60 via-black/25 to-transparent px-2 pt-8 pb-2">
+            {restockSub ? (
+              <div className="flex items-center justify-center gap-1.5 rounded-lg bg-green-50 py-2 text-xs font-bold text-green-600">
+                <Check size={13} /> Te avisaremos
+              </div>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  const email = user?.email ?? prompt("Tu email para avisarte:");
+                  if (!email) return;
+                  subscribeRestock(product.id, product.name, email, email.split("@")[0]);
+                  setRestockSub(true);
+                }}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100"
+              >
+                <Bell size={12} /> Avisar cuando haya stock
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -282,9 +314,9 @@ function LocalProductCardInner({ product }: Props) {
                   else updateQty(cartKey, cartQty - 1);
                 }}
                 className="flex h-7 w-7 items-center justify-center rounded-l-full text-xs font-bold text-gray-700 transition-colors active:text-red-500"
-                aria-label="Quitar uno"
+                aria-label={cartQty <= 1 ? "Eliminar del carrito" : "Quitar uno"}
               >
-                −
+                {cartQty <= 1 ? <Trash2 size={11} /> : "−"}
               </button>
               <span className="min-w-[18px] text-center text-xs font-bold text-gray-900">{cartQty}</span>
               <button

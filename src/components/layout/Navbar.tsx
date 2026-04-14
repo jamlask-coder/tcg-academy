@@ -181,7 +181,7 @@ export function Navbar() {
       const logoEl = logoRefsMap.current.get(key);
       if (logoEl) {
         const rect = logoEl.getBoundingClientRect();
-        setActiveLogoLeft(rect.left);
+        setActiveLogoLeft(rect.left + rect.width / 2);
       } else {
         setActiveLogoLeft(null);
       }
@@ -412,7 +412,7 @@ export function Navbar() {
       <div className="absolute right-0 left-0">
         <AnimatePresence>
           {activeGameData && (
-            <MegaMenu game={activeGameData} onClose={closeNow} leftOffset={activeLogoLeft ?? undefined} />
+            <MegaMenu game={activeGameData} onClose={closeNow} logoCenterX={activeLogoLeft ?? undefined} />
           )}
           {activeItem === TIENDAS_KEY && (
             <TiendasMenu key="tiendas" onClose={closeNow} />

@@ -631,4 +631,31 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
 </body>
 </html>`,
   },
+  {
+    id: "restock_disponible",
+    name: "Producto disponible (restock)",
+    subject: "¡{{producto}} ya está disponible! — TCG Academy",
+    description: "Se envía automáticamente cuando un producto vuelve a tener stock y el usuario pidió ser avisado.",
+    variables: ["nombre", "producto", "producto_url", "producto_imagen"],
+    html: wrapEmail(`
+      <div class="hero">
+        <h1>¡Ya está disponible! 🎉</h1>
+        <p>El producto que esperabas ha vuelto</p>
+      </div>
+      <div class="content">
+        <p>Hola {{nombre}},</p>
+        <p>Te escribimos porque nos pediste que te avisáramos cuando <strong>{{producto}}</strong> volviera a estar disponible. ¡Buenas noticias: ya puedes conseguirlo!</p>
+        <div class="info-box" style="text-align:center">
+          <img src="{{producto_imagen}}" alt="{{producto}}" style="max-height:180px;margin:0 auto 16px;display:block;border-radius:12px" />
+          <strong style="font-size:16px">{{producto}}</strong><br/>
+          <span style="color:#16a34a;font-weight:700">✅ En stock ahora</span>
+        </div>
+        <p style="text-align:center; margin: 28px 0;">
+          <a href="{{producto_url}}" class="btn">Ver producto y comprar</a>
+        </p>
+        <p style="color:#6b7280;font-size:13px">Las unidades son limitadas y no podemos garantizar disponibilidad por mucho tiempo. Si lo quieres, te recomendamos no esperar.</p>
+        <p>¡Buenas partidas! 🎴<br/><strong>El equipo de TCG Academy</strong></p>
+      </div>
+    `),
+  },
 ];

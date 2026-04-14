@@ -163,7 +163,7 @@ export function loadSentEmails(): SentEmailLog[] {
   }
 }
 
-function logSentEmail(entry: SentEmailLog): void {
+export function logSentEmail(entry: SentEmailLog): void {
   const all = loadSentEmails();
   all.unshift(entry);
   localStorage.setItem(SENT_EMAILS_KEY, JSON.stringify(all.slice(0, MAX_LOG)));

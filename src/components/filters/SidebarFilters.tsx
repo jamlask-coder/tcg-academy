@@ -384,7 +384,7 @@ export function SidebarFilters({
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="sticky top-[calc(var(--header-h)+5rem)] hidden max-h-[calc(100vh-var(--header-h)-6rem)] w-[240px] flex-shrink-0 self-start overflow-y-auto lg:block">
+      <aside className="sticky top-[calc(var(--header-h)+var(--cat-bar-h)+0.75rem)] hidden max-h-[calc(100vh-var(--header-h)-var(--cat-bar-h)-1.5rem)] w-[240px] flex-shrink-0 self-start overflow-y-auto lg:block">
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <FilterContent
             availableLanguages={availableLanguages}

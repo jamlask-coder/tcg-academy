@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
+import { useFavorites } from "@/context/FavoritesContext";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { GAME_CONFIG } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
@@ -455,6 +456,7 @@ function HeaderInlineAuth() {
 export function Header() {
   const { count } = useCart();
   const { user, logout } = useAuth();
+  const { count: favCount } = useFavorites();
   const { unreadCount } = useNotifications();
   const router = useRouter();
 
@@ -713,25 +715,14 @@ export function Header() {
             >
               <Bell size={18} className="text-white" />
               {mounted && unreadCount > 0 && (
-                <span className="absolute top-1 right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] leading-none font-bold text-white">
+                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
             </Link>
           )}
 
-          {/* Favorites (not for admin) */}
-          {user?.role !== "admin" && (
-            <Link
-              href="/cuenta/favoritos"
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
-              aria-label="Favoritos"
-            >
-              <Heart size={20} className="text-white" />
-            </Link>
-          )}
-
-          {/* User icon → /admin (admin) | /cuenta (user) | /login (guest) */}
+          {/* 1. User icon */}
           <Link
             href={user ? (user.role === "admin" ? "/admin" : "/cuenta") : "/login"}
             className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
@@ -740,7 +731,23 @@ export function Header() {
             <User size={20} className="text-white" />
           </Link>
 
-          {/* Cart (not for admin) */}
+          {/* 2. Favorites */}
+          {user?.role !== "admin" && (
+            <Link
+              href="/cuenta/favoritos"
+              className="relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
+              aria-label="Favoritos"
+            >
+              <Heart size={20} className="text-white" fill={favCount > 0 ? "white" : "none"} />
+              {favCount > 0 && (
+                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                  {favCount}
+                </span>
+              )}
+            </Link>
+          )}
+
+          {/* 3. Cart */}
           {user?.role !== "admin" && (
             <Link
               href="/carrito"
@@ -749,7 +756,7 @@ export function Header() {
             >
               <ShoppingCart size={20} className="text-white" />
               {mounted && count > 0 && (
-                <span className="absolute top-1 right-1 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-0.5 text-[10px] leading-none font-bold text-white">
+                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
                   {count > 99 ? "99+" : count}
                 </span>
               )}
@@ -1108,9 +1115,16 @@ export function Header() {
         ) : (
           <Link
             href="/cuenta/favoritos"
-            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${pathname === "/cuenta/favoritos" ? "text-[#2563eb]" : "text-gray-500"}`}
+            className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${pathname === "/cuenta/favoritos" ? "text-[#2563eb]" : "text-gray-500"}`}
           >
-            <Heart size={22} />
+            <span className="relative">
+              <Heart size={22} fill={favCount > 0 ? "currentColor" : "none"} />
+              {favCount > 0 && (
+                <span className="absolute -top-1 -right-2 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                  {favCount}
+                </span>
+              )}
+            </span>
             <span>Favoritos</span>
           </Link>
         )}

@@ -142,6 +142,7 @@
    ────────────────────────────────────────────────────────────────────────── */
 :root {
   --header-h: 168px; /* mobile: trust bar + main bar */
+  --cat-bar-h: 56px; /* category tags sticky bar height */
 }
 @media (min-width: 1024px) {
   :root {

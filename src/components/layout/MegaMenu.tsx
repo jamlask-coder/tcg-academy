@@ -1,23 +1,44 @@
 "use client";
 import { motion } from "framer-motion";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import type { MegaMenuGame } from "@/data/megaMenuData";
 
 interface Props {
   game: MegaMenuGame;
   onClose: () => void;
-  leftOffset?: number;
+  logoCenterX?: number;
 }
 
-export function MegaMenu({ game, onClose, leftOffset }: Props) {
+function clampX(centerX: number, width: number): number {
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1440;
+  return Math.max(8, Math.min(centerX - width / 2, vw - width - 8));
+}
+
+const TRANSITION_MS = 350;
+const TRANSITION = `${TRANSITION_MS}ms ease`;
+
+export function MegaMenu({ game, onClose, logoCenterX }: Props) {
   const [displayedGame, setDisplayedGame] = useState(game);
   const [contentVisible, setContentVisible] = useState(true);
   const prevSlugRef = useRef(game.slug);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [measuredHeight, setMeasuredHeight] = useState<number | undefined>(undefined);
+  const [layout, setLayout] = useState<{ left: number; width: number; height: number } | null>(null);
+  const hasRendered = useRef(false);
 
-  // When game prop changes — crossfade content, container slides via framer-motion
+  const logoCenterRef = useRef(logoCenterX);
+  logoCenterRef.current = logoCenterX;
+
+  const measure = useCallback(() => {
+    if (!containerRef.current) return;
+    const h = containerRef.current.scrollHeight;
+    const w = containerRef.current.scrollWidth;
+    const cx = logoCenterRef.current;
+    const left = cx != null ? clampX(cx, w) : 0;
+    setLayout({ left, width: w, height: h });
+  }, []);
+
+  // When game prop changes — crossfade content
   useEffect(() => {
     if (game.slug === prevSlugRef.current) return;
     prevSlugRef.current = game.slug;
@@ -26,75 +47,67 @@ export function MegaMenu({ game, onClose, leftOffset }: Props) {
     const t = setTimeout(() => {
       setDisplayedGame(game);
       setContentVisible(true);
-    }, 100);
+    }, 150);
     return () => clearTimeout(t);
   }, [game]);
 
-  // Measure height from DOM after content changes
+  // Measure after new content is visible
   useEffect(() => {
+    if (!contentVisible) return;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (containerRef.current) {
-          setMeasuredHeight(containerRef.current.scrollHeight);
-        }
+        measure();
+        if (!hasRendered.current) hasRendered.current = true;
       });
     });
-  }, [displayedGame, contentVisible]);
+  }, [displayedGame, contentVisible, measure]);
 
   const { color, columns } = displayedGame;
 
-  // Calculate width from columns (200px per column + gaps + padding)
-  const calculatedWidth = columns.length * 200 + (columns.length - 1) * 20 + 48;
+  // No CSS transition on first render (appear in place), then animate everything uniformly
+  const cssTransition = hasRendered.current
+    ? `left ${TRANSITION}, width ${TRANSITION}, height ${TRANSITION}, border-top-color ${TRANSITION}`
+    : `border-top-color ${TRANSITION}`;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -8, x: leftOffset ?? 0 }}
-      animate={{
-        opacity: 1,
-        y: 0,
-        x: leftOffset ?? 0,
-      }}
-      exit={{ opacity: 0, y: -8 }}
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -6 }}
       transition={{
-        x: { type: "spring", stiffness: 350, damping: 30 },
-        opacity: { duration: 0.15 },
-        y: { duration: 0.2, ease: "easeOut" },
+        opacity: { duration: 0.3, ease: "easeOut" },
+        y: { duration: 0.35, ease: "easeOut" },
       }}
       className="absolute top-0 border-t-2 bg-white shadow-2xl"
       style={{
+        left: layout?.left ?? 0,
+        width: layout?.width ?? "auto",
+        height: layout?.height ?? "auto",
         borderTopColor: color,
         borderRadius: "0 0 12px 12px",
-        willChange: "transform",
-        transition: "border-top-color 0.2s ease",
+        transition: cssTransition,
+        overflow: "hidden",
       }}
     >
       <div
-        className="overflow-hidden"
+        ref={containerRef}
+        className="relative py-5 px-6"
         style={{
-          height: measuredHeight ? measuredHeight : "auto",
-          width: calculatedWidth,
-          transition: "height 0.25s ease-out, width 0.25s ease-out",
+          width: "fit-content",
+          opacity: contentVisible ? 1 : 0,
+          transition: `opacity 0.25s ease`,
         }}
       >
-        <div
-          ref={containerRef}
-          className="relative py-5 px-6"
-          style={{
-            opacity: contentVisible ? 1 : 0,
-            transition: "opacity 0.1s ease-in-out",
-          }}
-        >
-        {/* Columns */}
         <div className="relative z-10 flex items-start gap-5">
           {columns.map((col) => (
-            <div key={col.title} style={{ width: 200, flexShrink: 0 }}>
+            <div key={col.title} style={{ flexShrink: 0 }}>
               <ul className="space-y-1.5">
                 {col.items.map((item) => (
                   <li key={item.href}>
                     <Link
                       href={item.href}
                       onClick={onClose}
-                      className="block px-2.5 py-1.5 text-sm text-gray-700 transition-colors hover:text-[#2563eb]"
+                      className="block px-2.5 py-1.5 text-sm text-gray-700 transition-colors hover:text-[#2563eb] whitespace-nowrap"
                     >
                       {item.label}
                     </Link>
@@ -103,7 +116,6 @@ export function MegaMenu({ game, onClose, leftOffset }: Props) {
               </ul>
             </div>
           ))}
-        </div>
         </div>
       </div>
     </motion.div>

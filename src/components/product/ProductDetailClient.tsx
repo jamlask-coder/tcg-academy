@@ -6,13 +6,17 @@ import {
   ChevronLeft,
   Plus,
   Minus,
+  Trash2,
   Clock,
   Check,
+  Bell,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
+import { useFavorites } from "@/context/FavoritesContext";
 import { useAuth } from "@/context/AuthContext";
+import { subscribeRestock, isSubscribed, triggerRestockEmails, getSubsForProduct } from "@/services/restockService";
 import { addToRecentlyViewed } from "@/lib/recentlyViewed";
 import { getStockInfo } from "@/utils/stockStatus";
 import { RecentlyViewedSection } from "@/components/product/RecentlyViewedSection";
@@ -240,6 +244,7 @@ function PriceDisplay({
         <span className="text-2xl font-bold" style={{ color }}>
           {displayPrice.toFixed(2)}€
         </span>
+        <span className="mb-0.5 text-xs text-gray-400">IVA incl.</span>
         {effectiveHasDiscount && (
           <>
             <span className="mb-0.5 text-base text-gray-400 line-through">
@@ -254,7 +259,6 @@ function PriceDisplay({
           </>
         )}
       </div>
-      <span className="text-xs text-gray-400">IVA incl.</span>
       {/* Reference prices for privileged roles */}
       {(retailPrice !== undefined || wholesaleRef !== undefined) && (
         <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-400">
@@ -271,23 +275,32 @@ function PriceDisplay({
 }
 
 export function ProductDetailClient({ product, config, catLabel }: Props) {
-  const { addItem } = useCart();
-  const { user, toggleFavorite, isFavorite } = useAuth();
+  const { addItem, items, removeItem, updateQty } = useCart();
+  const { user } = useAuth();
+  const { toggle: toggleFavorite, isFavorite } = useFavorites();
   const { name, color, bgColor: _bgColor2 } = config;
   const router = useRouter();
 
-  const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const [limitMsg, setLimitMsg] = useState<string | undefined>(undefined);
+  const [floatAnims, setFloatAnims] = useState<{ type: "plus" | "minus"; key: number }[]>([]);
+  const [heartAnimKey, setHeartAnimKey] = useState(0);
+  const [restockSubscribed, setRestockSubscribed] = useState(() =>
+    user?.email ? isSubscribed(product.id, user.email) : false,
+  );
+
+  const cartKey = `item_${product.id}`;
+  const cartItem = items.find((i) => i.key === cartKey);
+  const cartQty = cartItem?.quantity ?? 0;
+
+  const triggerFloat = (type: "plus" | "minus") => {
+    const key = Date.now() + Math.random();
+    setFloatAnims((prev) => [...prev, { type, key }]);
+    setTimeout(() => setFloatAnims((prev) => prev.filter((a) => a.key !== key)), 900);
+  };
   const [activeImg, setActiveImg] = useState(0);
 
-  // Compute qty max from stock and maxPerUser limits
-  const qtyMax = (() => {
-    const limits: number[] = [];
-    if (typeof product.maxPerUser === "number") limits.push(product.maxPerUser);
-    if (typeof product.stock === "number") limits.push(product.stock);
-    return limits.length > 0 ? Math.min(...limits) : undefined;
-  })();
+  const isOutOfStock = !product.inStock || (typeof product.stock === "number" && product.stock === 0);
 
   // Track recently viewed
   useEffect(() => {
@@ -297,6 +310,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
   // Admin inline edits — local session overrides only (no backend)
   const [inlineTitle, setInlineTitle] = useState(product.name);
   const [inlineDesc, setInlineDesc] = useState(product.description || "");
+  const [generatingDesc, setGeneratingDesc] = useState(false);
 
   const [inlinePrice, setInlinePrice] = useState(product.price);
   const [inlineWholesalePrice, setInlineWholesalePrice] = useState(
@@ -324,7 +338,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
   const [savedToast, setSavedToast] = useState(false);
   const [editMode, setEditMode] = useState(false);
 
-  // Detect if description actually overflows line-clamp-3
+  // Detect if description overflows line-clamp-5
   useEffect(() => {
     if (!descRef.current || descExpanded) return;
     const el = descRef.current;
@@ -342,12 +356,12 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
 
   const handleAddToCart = () => {
     if (!product.inStock) return;
+    triggerFloat("plus");
     const result = addItem(
       product.id,
       product.name,
       displayPrice,
       product.images[0] ?? "",
-      qty,
     );
     if (result.added) {
       setAdded(true);
@@ -357,6 +371,59 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
       setTimeout(() => setLimitMsg(undefined), 3000);
     }
   };
+
+  const handleGenerateDesc = useCallback(async () => {
+    setGeneratingDesc(true);
+    try {
+      const name = inlineTitle;
+      const game = inlineGame;
+      const cat = inlineCategory;
+      const tags = product.tags;
+
+      // Build a rich description based on product metadata
+      const lines: string[] = [];
+      const gameName = GAME_CONFIG[game]?.name ?? game;
+
+      if (cat === "booster-box") {
+        const packs = product.packsPerBox;
+        const cards = product.cardsPerPack;
+        lines.push(`${name} — caja de sobres oficial de ${gameName}.`);
+        if (packs) lines.push(`Contiene ${packs} sobres${cards ? ` de ${cards} cartas cada uno` : ""}.`);
+        lines.push(`Producto sellado de fábrica. Cada sobre incluye cartas de distintas rarezas, con posibilidad de encontrar cartas holográficas, ultra raras y cartas especiales de alto valor para coleccionistas.`);
+      } else if (cat === "sobres") {
+        const cards = product.cardsPerPack;
+        lines.push(`${name} — sobre individual oficial de ${gameName}.`);
+        if (cards) lines.push(`Cada sobre contiene ${cards} cartas aleatorias.`);
+        lines.push(`Incluye cartas de distintas rarezas. Posibilidad de obtener cartas holográficas, raras y cartas especiales de colección.`);
+      } else if (cat === "etb") {
+        lines.push(`${name} — Elite Trainer Box oficial de ${gameName}.`);
+        lines.push(`Incluye sobres, energías, dados, fundas protectoras y caja de almacenamiento premium. Ideal para jugadores y coleccionistas.`);
+      } else if (cat === "starter") {
+        lines.push(`${name} — mazo de inicio oficial de ${gameName}.`);
+        lines.push(`Mazo preconstruido listo para jugar. Incluye cartas exclusivas y todo lo necesario para empezar a competir.`);
+      } else if (cat === "commander") {
+        lines.push(`${name} — mazo Commander oficial de ${gameName}.`);
+        lines.push(`Mazo de 100 cartas preconstruido para el formato Commander. Incluye cartas exclusivas y nuevas mecánicas.`);
+      } else if (cat === "singles" || cat === "gradeadas") {
+        lines.push(`${name} — carta individual de ${gameName}.`);
+        lines.push(`Carta en perfecto estado, ideal para completar tu colección o mejorar tu mazo competitivo.`);
+      } else {
+        lines.push(`${name} — producto oficial de ${gameName}.`);
+        lines.push(`Producto original sellado de fábrica.`);
+      }
+
+      // Add tag-based info
+      if (tags.some(t => /collector|premium|foil/i.test(t))) {
+        lines.push(`Edición premium con acabados especiales y cartas de alta calidad.`);
+      }
+
+      lines.push(`Envío rápido y embalaje protegido para garantizar que tu producto llega en perfectas condiciones.`);
+
+      setInlineDesc(lines.join(" "));
+    } finally {
+      setGeneratingDesc(false);
+    }
+  }, [inlineTitle, inlineGame, inlineCategory, product.tags, product.packsPerBox, product.cardsPerPack]);
 
   const handleSave = useCallback(() => {
     const overrides = JSON.parse(
@@ -386,6 +453,17 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
     stockOverrides[product.id] = inlineStockQty.trim() === "" ? null : parseInt(inlineStockQty);
     localStorage.setItem("tcgacademy_stock_overrides", JSON.stringify(stockOverrides));
     window.dispatchEvent(new Event("tcga:products:updated"));
+
+    // Trigger restock emails if product went from out-of-stock to in-stock
+    const wasOutOfStock = !product.inStock || (typeof product.stock === "number" && product.stock === 0);
+    const nowInStock = inlineStock && (inlineStockQty.trim() === "" || parseInt(inlineStockQty) > 0);
+    if (wasOutOfStock && nowInStock && getSubsForProduct(product.id).length > 0) {
+      const url = `https://tcgacademy.es/producto?id=${product.id}`;
+      const img = product.images[0] ?? "";
+      const { sent } = triggerRestockEmails(product.id, inlineTitle, url, img);
+      if (sent > 0) alert(`Restock: ${sent} email(s) de aviso enviados.`);
+    }
+
     setSavedToast(true);
     setTimeout(() => setSavedToast(false), 2500);
     setEditMode(false);
@@ -409,7 +487,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
   const related = getRelated(product);
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6">
+    <div className="mx-auto max-w-[1100px] px-4 py-4 sm:px-6 lg:px-12">
       {/* Confirm delete modal */}
       <ConfirmationModal
         isOpen={deleteConfirmOpen}
@@ -460,7 +538,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
         </span>
       </nav>
 
-      <div className="mb-8 grid gap-6 md:grid-cols-[40%_1fr]">
+      <div className="mb-8 grid gap-6 md:grid-cols-[45%_1fr]">
         {/* Gallery */}
         <div className="relative">
           <HoloCard
@@ -470,7 +548,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           >
             <div
               ref={imgContainerRef}
-              className={`group/img relative ${isCardCategory ? "aspect-[2/3]" : "aspect-[4/5]"} max-h-[520px] cursor-pointer overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 select-none`}
+              className={`group/img relative ${isCardCategory ? "aspect-[2/3]" : ""} max-h-[600px] cursor-pointer overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 select-none`}
               onClick={() => displayImages[activeImg] && setLightboxOpen(true)}
             >
               {displayImages[activeImg] ? (
@@ -488,7 +566,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                   <img
                     src={displayImages[activeImg]!}
                     alt={inlineTitle}
-                    className="pointer-events-none h-full w-full object-contain p-4 transition-transform duration-300 group-hover/img:scale-[1.03]"
+                    className={`pointer-events-none h-full w-full object-contain transition-transform duration-300 group-hover/img:scale-[1.03] ${isCardCategory ? "p-4" : "p-2"}`}
                   />
                   {/* Ampliar button — aparece al hacer hover */}
                   <button
@@ -594,6 +672,11 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
               ))}
             </div>
           )}
+
+          {/* Best cards from this set — below image */}
+          {(product.category === "booster-box" || product.category === "sobres") && (
+            <SetHighlightCards product={product} />
+          )}
         </div>
 
         {/* Lightbox */}
@@ -634,18 +717,14 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
 
         {/* Buy box */}
         <div className="flex flex-col gap-3">
-          {/* Back link */}
-          <Link
-            href={`/${product.game}/${product.category}`}
-            className="inline-flex items-center gap-1 text-xs font-bold tracking-wider uppercase hover:underline"
-            style={{ color }}
-          >
-            <ChevronLeft size={14} /> {catLabel}
-          </Link>
-
           {/* 1. Title + admin buttons */}
           <div className="flex items-start justify-between gap-3">
-            <h1 className="flex-1 text-xl leading-tight font-bold text-gray-900 md:text-2xl">
+            <h1 className="flex flex-1 items-center gap-2.5 text-xl leading-tight font-bold text-gray-900 md:text-2xl">
+              {product.language && !editMode && (
+                <span className="flex-shrink-0">
+                  <LanguageFlag language={product.language} size="md" />
+                </span>
+              )}
               {editMode ? (
                 <input
                   type="text"
@@ -654,7 +733,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                   className="w-full rounded-lg border border-[#2563eb] px-2 py-0.5 text-xl font-bold focus:outline-none"
                 />
               ) : (
-                inlineTitle.replace(/\s*\(\d+\s*(?:cartas|sobres)\)/gi, "")
+                <span>{inlineTitle.replace(/\s*\(\d+\s*(?:cartas|sobres)\)/gi, "")}</span>
               )}
             </h1>
             {isAdmin && (
@@ -677,85 +756,59 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
             )}
           </div>
 
-          {/* 2. Language */}
-          {product.language && (
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-sm font-semibold"
-                  style={{ borderColor: color, color }}
-                >
-                  <LanguageFlag language={product.language} showLabel size="md" />
-                </span>
-                {/* Box ↔ Pack pills */}
-                {(() => {
-                  const linkedId = product.linkedPackId ?? product.linkedBoxId;
-                  if (!linkedId) return null;
-                  const linked = getMergedById(linkedId);
-                  if (!linked) return null;
-                  const isBox = product.category === "booster-box";
-                  const linkedHref = `/${linked.game}/${linked.category}/${linked.slug}`;
-                  const boxProduct = isBox ? product : linked;
-                  const packProduct = isBox ? linked : product;
-                  const boxHref = isBox ? "#" : linkedHref;
-                  const packHref = isBox ? linkedHref : "#";
-                  const boxLabel = `📦 Caja${boxProduct.packsPerBox ? ` · ${boxProduct.packsPerBox} sobres` : ""}`;
-                  const packLabel = `🃏 Sobre${packProduct.cardsPerPack ? ` · ${packProduct.cardsPerPack} cartas` : ""}`;
-                  return (
-                    <>
-                      {isBox ? (
-                        <span
-                          className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-sm font-semibold text-gray-900"
-                          style={{ borderColor: color }}
-                        >
-                          {boxLabel}
-                        </span>
-                      ) : (
-                        <Link
-                          href={boxHref}
-                          className="inline-flex items-center gap-1.5 rounded-full border-2 border-gray-200 px-3 py-1 text-sm font-semibold text-gray-400 transition-colors hover:border-gray-400 hover:text-gray-700"
-                        >
-                          {boxLabel}
+          {/* 2. Box/Pack pills + language variants */}
+          {(() => {
+            const linkedId = product.linkedPackId ?? product.linkedBoxId;
+            const linked = linkedId ? getMergedById(linkedId) : null;
+            const showPills = linked != null;
+            const showVariants = langVariants.length > 0;
+            if (!showPills && !showVariants) return null;
+            return (
+              <div className="space-y-1">
+                {showPills && linked && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(() => {
+                      const isBox = product.category === "booster-box";
+                      const linkedHref = `/${linked.game}/${linked.category}/${linked.slug}`;
+                      const boxProduct = isBox ? product : linked;
+                      const packProduct = isBox ? linked : product;
+                      const boxHref = isBox ? "#" : linkedHref;
+                      const packHref = isBox ? linkedHref : "#";
+                      const boxLabel = `📦 Caja${boxProduct.packsPerBox ? ` · ${boxProduct.packsPerBox} sobres` : ""}`;
+                      const packLabel = `🃏 Sobre${packProduct.cardsPerPack ? ` · ${packProduct.cardsPerPack} cartas` : ""}`;
+                      return (
+                        <>
+                          {isBox ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-sm font-semibold text-gray-900" style={{ borderColor: color }}>{boxLabel}</span>
+                          ) : (
+                            <Link href={boxHref} className="inline-flex items-center gap-1.5 rounded-full border-2 border-gray-200 px-3 py-1 text-sm font-semibold text-gray-400 transition-colors hover:border-gray-400 hover:text-gray-700">{boxLabel}</Link>
+                          )}
+                          {!isBox ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-sm font-semibold text-gray-900" style={{ borderColor: color }}>{packLabel}</span>
+                          ) : (
+                            <Link href={packHref} className="inline-flex items-center gap-1.5 rounded-full border-2 border-gray-200 px-3 py-1 text-sm font-semibold text-gray-400 transition-colors hover:border-gray-400 hover:text-gray-700">{packLabel}</Link>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+                {showVariants && (
+                  <p className="text-xs text-gray-500">
+                    También disponible en:{" "}
+                    {langVariants.map((v, i) => (
+                      <span key={v.id}>
+                        {i > 0 && ", "}
+                        <Link href={`/${v.game}/${v.category}/${v.slug}`} className="inline-flex items-center gap-1 font-semibold hover:underline" style={{ color }}>
+                          <LanguageFlag language={v.language} showLabel size="md" />
                         </Link>
-                      )}
-                      {!isBox ? (
-                        <span
-                          className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-sm font-semibold text-gray-900"
-                          style={{ borderColor: color }}
-                        >
-                          {packLabel}
-                        </span>
-                      ) : (
-                        <Link
-                          href={packHref}
-                          className="inline-flex items-center gap-1.5 rounded-full border-2 border-gray-200 px-3 py-1 text-sm font-semibold text-gray-400 transition-colors hover:border-gray-400 hover:text-gray-700"
-                        >
-                          {packLabel}
-                        </Link>
-                      )}
-                    </>
-                  );
-                })()}
+                      </span>
+                    ))}
+                  </p>
+                )}
               </div>
-              {langVariants.length > 0 && (
-                <p className="text-xs text-gray-500">
-                  También disponible en:{" "}
-                  {langVariants.map((v, i) => (
-                    <span key={v.id}>
-                      {i > 0 && ", "}
-                      <Link
-                        href={`/${v.game}/${v.category}/${v.slug}`}
-                        className="inline-flex items-center gap-1 font-semibold hover:underline"
-                        style={{ color }}
-                      >
-                        <LanguageFlag language={v.language} showLabel size="md" />
-                      </Link>
-                    </span>
-                  ))}
-                </p>
-              )}
-            </div>
-          )}
+            );
+          })()}
 
           {/* 3. Price */}
           <PriceDisplay
@@ -795,15 +848,25 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           >
             <div
               ref={descRef}
-              className={`overflow-hidden text-sm leading-relaxed text-gray-600 transition-all ${descExpanded ? "" : "line-clamp-3"}`}
+              className={`overflow-hidden text-sm leading-relaxed text-gray-600 transition-all ${descExpanded ? "" : "line-clamp-5"}`}
             >
               {editMode ? (
-                <textarea
-                  value={inlineDesc}
-                  onChange={(e) => setInlineDesc(e.target.value)}
-                  rows={3}
-                  className="w-full resize-none rounded-lg border border-[#2563eb] px-2 py-1 text-sm leading-relaxed text-gray-600 focus:outline-none"
-                />
+                <>
+                  <textarea
+                    value={inlineDesc}
+                    onChange={(e) => setInlineDesc(e.target.value)}
+                    rows={3}
+                    className="w-full resize-none rounded-lg border border-[#2563eb] px-2 py-1 text-sm leading-relaxed text-gray-600 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGenerateDesc}
+                    disabled={generatingDesc}
+                    className="mt-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    {generatingDesc ? "Generando..." : "Generar descripción"}
+                  </button>
+                </>
               ) : (
                 inlineDesc
               )}
@@ -819,84 +882,159 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
             )}
           </div>
 
-          {/* Set highlight cards — inline below description */}
-          {(product.category === "booster-box" || product.category === "sobres") && (
-            <SetHighlightCards product={product} />
-          )}
-
-          {/* 6. Qty + Add to cart */}
+          {/* 6. Add to cart + favorite */}
           <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center overflow-hidden rounded-xl border-2 border-gray-200">
-              <button
-                onClick={() => setQty(Math.max(1, qty - 1))}
-                className="flex h-12 w-10 items-center justify-center transition hover:bg-gray-50"
-                aria-label="Reducir cantidad"
-              >
-                <Minus size={16} />
-              </button>
-              <span className="w-12 text-center text-lg font-bold">{qty}</span>
-              <button
-                onClick={() => setQty(qtyMax !== undefined ? Math.min(qtyMax, qty + 1) : qty + 1)}
-                disabled={qtyMax !== undefined && qty >= qtyMax}
-                className="flex h-12 w-10 items-center justify-center transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Aumentar cantidad"
-              >
-                <Plus size={16} />
-              </button>
-            </div>
-            <button
-              onClick={handleAddToCart}
-              disabled={!product.inStock || added}
-              className={`flex h-12 flex-1 items-center justify-center gap-2 rounded-xl font-bold transition-all ${
-                !product.inStock
-                  ? "cursor-not-allowed bg-gray-100 text-gray-400"
-                  : added
-                    ? "bg-green-500 text-white"
-                    : "bg-[#2563eb] text-white hover:bg-[#1d4ed8] active:scale-[0.98]"
-              }`}
-            >
-              <ShoppingCart size={18} />
-              {!product.inStock
-                ? "Sin stock"
-                : added
-                  ? "¡Añadido al carrito!"
-                  : "Añadir al carrito"}
-            </button>
-            {user && user.role !== "admin" && (
-              <button
-                onClick={() => toggleFavorite(product.id)}
-                aria-label={
-                  isFavorite(product.id)
-                    ? "Quitar de favoritos"
-                    : "Añadir a favoritos"
+            <div className="relative flex items-center gap-0">
+              {/* Float animations */}
+              <style>{`
+                @keyframes detailFloatUp {
+                  0% { opacity: 1; transform: translateY(0) scale(0.8); }
+                  15% { opacity: 1; transform: translateY(-14px) scale(1.2); }
+                  100% { opacity: 0; transform: translateY(-32px) scale(0.9); }
                 }
-                className={`flex h-12 w-12 items-center justify-center rounded-xl border-2 transition ${
-                  isFavorite(product.id)
-                    ? "border-red-400 bg-red-50"
-                    : "border-gray-200 hover:border-red-300"
+                @keyframes detailScaleIn {
+                  0% { transform: scale(0.5); opacity: 0; }
+                  50% { transform: scale(1.08); }
+                  100% { transform: scale(1); opacity: 1; }
+                }
+                @keyframes heartPop {
+                  0% { transform: scale(1); }
+                  30% { transform: scale(1.35); }
+                  60% { transform: scale(0.9); }
+                  100% { transform: scale(1); }
+                }
+              `}</style>
+              {floatAnims.map((anim, i) => (
+                <span
+                  key={anim.key}
+                  className="pointer-events-none absolute left-[60px] bottom-full z-20 text-base font-black"
+                  style={{
+                    color: anim.type === "plus" ? "#22c55e" : "#f87171",
+                    WebkitTextStroke: "0.3px rgba(150,150,150,0.35)",
+                    textShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                    animation: "detailFloatUp 0.9s ease-out forwards",
+                    marginLeft: i % 2 !== 0 ? "12px" : "-12px",
+                  }}
+                >
+                  {anim.type === "plus" ? "+1" : "\u22121"}
+                </span>
+              ))}
+
+              {/* Cart button */}
+              <div style={{ animation: cartQty === 1 && added ? "detailScaleIn 0.3s ease-out" : "none" }}>
+                {isOutOfStock ? (
+                  restockSubscribed ? (
+                    <button
+                      disabled
+                      className="flex items-center justify-center gap-2 rounded-l-xl bg-green-50 px-8 py-2.5 text-sm font-bold text-green-600"
+                    >
+                      <Check size={15} /> Te avisaremos
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        const email = user?.email ?? prompt("Tu email para avisarte:");
+                        if (!email) return;
+                        const name = user?.name ?? email.split("@")[0];
+                        subscribeRestock(product.id, product.name, email, name);
+                        setRestockSubscribed(true);
+                      }}
+                      className="flex items-center justify-center gap-2 rounded-l-xl bg-amber-50 border border-amber-200 px-8 py-2.5 text-sm font-bold text-amber-700 transition hover:bg-amber-100 active:scale-[0.97]"
+                    >
+                      <Bell size={15} /> Avisarme cuando haya stock
+                    </button>
+                  )
+                ) : cartQty > 0 ? (
+                  <div className="flex items-center gap-0">
+                    <button
+                      onClick={() => {
+                        triggerFloat("minus");
+                        if (cartQty <= 1) removeItem(cartKey);
+                        else updateQty(cartKey, cartQty - 1);
+                      }}
+                      className="flex h-10 w-10 items-center justify-center rounded-l-xl bg-white text-gray-700 shadow-lg transition-all duration-150 hover:bg-red-50 hover:text-red-500 active:scale-90"
+                      aria-label={cartQty <= 1 ? "Eliminar del carrito" : "Quitar uno"}
+                    >
+                      {cartQty <= 1 ? <Trash2 size={14} /> : <Minus size={15} />}
+                    </button>
+                    <span className="flex h-10 min-w-[36px] items-center justify-center bg-white px-2 text-sm font-bold text-gray-900 shadow-lg">
+                      {cartQty}
+                    </span>
+                    <button
+                      onClick={handleAddToCart}
+                      className="flex h-10 w-10 items-center justify-center rounded-r-xl bg-white text-gray-700 shadow-lg transition-all duration-150 hover:bg-green-50 hover:text-green-600 active:scale-90"
+                      aria-label="Añadir uno más"
+                    >
+                      <Plus size={15} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleAddToCart}
+                    className="flex items-center justify-center gap-2 rounded-l-xl bg-[#2563eb] px-10 py-2.5 text-sm font-bold text-white shadow-lg transition-all duration-200 hover:bg-[#1d4ed8] hover:shadow-xl active:scale-[0.97]"
+                  >
+                    <ShoppingCart size={15} /> Añadir al carrito
+                  </button>
+                )}
+              </div>
+
+              {/* Favorite — attached to the right of the cart button */}
+              <button
+                onClick={() => {
+                  setHeartAnimKey((k) => k + 1);
+                  toggleFavorite(product.id);
+                }}
+                aria-label={isFavorite(product.id) ? "Quitar de favoritos" : "Añadir a favoritos"}
+                className={`flex h-10 items-center justify-center rounded-r-xl border-l px-3 transition-all duration-300 ${
+                  isOutOfStock
+                    ? "bg-gray-50 text-gray-400 border-gray-200"
+                    : cartQty > 0
+                      ? "bg-white text-gray-400 border-gray-200 shadow-lg hover:text-red-400 hover:bg-red-50"
+                      : "bg-[#1d4ed8] text-white/70 border-white/20 hover:text-white hover:bg-[#1a3fc7]"
                 }`}
               >
                 <Heart
-                  size={18}
-                  className={
-                    isFavorite(product.id)
-                      ? "fill-red-500 text-red-500"
-                      : "text-gray-500"
-                  }
+                  key={heartAnimKey}
+                  size={15}
+                  fill={isFavorite(product.id) ? (cartQty > 0 ? "#ef4444" : "white") : "none"}
+                  color={isFavorite(product.id) ? (cartQty > 0 ? "#ef4444" : "white") : "currentColor"}
+                  style={{ animation: heartAnimKey > 0 ? "heartPop 0.4s ease-out" : "none" }}
                 />
               </button>
+            </div>
+            {typeof product.maxPerUser === "number" && (
+              <p className="text-xs text-gray-500">Máx. {product.maxPerUser} uds/persona</p>
+            )}
+            {limitMsg && (
+              <p className="text-xs font-semibold text-red-500">{limitMsg}</p>
             )}
           </div>
-          {typeof product.maxPerUser === "number" && (
-            <p className="text-xs text-gray-500">Máx. {product.maxPerUser} uds/persona</p>
-          )}
-          {limitMsg && (
-            <p className="text-xs font-semibold text-red-500">{limitMsg}</p>
-          )}
+
+          {/* 7. Payment + points */}
+          <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-green-500"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+              <span>Pago 100% seguro</span>
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/payment/visa.svg" alt="Visa" className="h-5 rounded bg-white px-1.5 py-0.5" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/payment/mastercard.svg" alt="Mastercard" className="h-5 rounded bg-white px-1 py-0.5" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/payment/paypal.svg" alt="PayPal" className="h-5 rounded bg-white px-1.5 py-0.5" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/payment/bizum.svg" alt="Bizum" className="h-5 rounded bg-white px-1.5 py-0.5" />
+            </div>
+            <div className="mt-2.5 flex items-center gap-1.5 text-xs text-amber-700">
+              <span className="text-amber-400">★</span>
+              <span>
+                Consigue <strong>{Math.round(displayPrice * 100)}</strong> puntos con esta compra
+              </span>
+            </div>
           </div>
 
-          {/* 7. Shipping info */}
+          {/* 8. Shipping info */}
           <div className="flex items-center gap-2.5 rounded-xl bg-gray-50 p-3 text-sm">
             <Clock size={16} className="flex-shrink-0 text-[#2563eb]" />
             <span className="text-gray-600">
@@ -908,109 +1046,6 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
 
           {/* Share */}
           <ShareButtons url={productUrl} title={inlineTitle} />
-        </div>
-      </div>
-
-      {/* Specs table */}
-      <div className="mb-12 overflow-hidden rounded-2xl border border-gray-200">
-        <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
-          <h2 className="font-bold text-gray-900">Ficha técnica</h2>
-        </div>
-        <div className="grid gap-0 p-6 sm:grid-cols-2">
-          {/* Juego */}
-          <div className="flex items-center justify-between border-b border-gray-100 py-2">
-            <span className="text-sm text-gray-500">Juego</span>
-            {editMode ? (
-              <select
-                value={inlineGame}
-                onChange={(e) => setInlineGame(e.target.value)}
-                className="rounded border border-[#2563eb] px-1.5 py-0.5 text-sm focus:outline-none"
-              >
-                {Object.entries(GAME_CONFIG).map(([key, g]) => (
-                  <option key={key} value={key}>{g.name}</option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-sm font-medium">{GAME_CONFIG[inlineGame]?.name ?? inlineGame}</span>
-            )}
-          </div>
-          {/* Categoría */}
-          <div className="flex items-center justify-between border-b border-gray-100 py-2">
-            <span className="text-sm text-gray-500">Categoría</span>
-            {editMode ? (
-              <select
-                value={inlineCategory}
-                onChange={(e) => setInlineCategory(e.target.value)}
-                className="rounded border border-[#2563eb] px-1.5 py-0.5 text-sm focus:outline-none"
-              >
-                {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-sm font-medium">{CATEGORY_LABELS[inlineCategory] ?? inlineCategory}</span>
-            )}
-          </div>
-          {/* Estado */}
-          <div className="flex items-center justify-between border-b border-gray-100 py-2">
-            <span className="text-sm text-gray-500">Estado</span>
-            {editMode ? (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setInlineStock(!inlineStock)}
-                  className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold transition ${inlineStock ? "border-green-300 bg-green-50 text-green-700" : "border-red-300 bg-red-50 text-red-600"}`}
-                >
-                  {inlineStock ? "En stock" : "Agotado"}
-                </button>
-              </div>
-            ) : (
-              <span className="text-sm font-medium">{inlineStock ? "✅ En stock" : "❌ Agotado"}</span>
-            )}
-          </div>
-          {/* Stock qty */}
-          <div className="flex items-center justify-between border-b border-gray-100 py-2">
-            <span className="text-sm text-gray-500">Unidades</span>
-            {editMode ? (
-              <input
-                type="number"
-                min="0"
-                value={inlineStockQty}
-                placeholder="Ilimitado"
-                onChange={(e) => setInlineStockQty(e.target.value)}
-                className="h-8 w-24 rounded-lg border border-gray-200 px-2 text-right text-sm focus:border-[#2563eb] focus:outline-none"
-              />
-            ) : (
-              <span className="text-sm font-medium">
-                {inlineStockQty.trim() === "" ? "Ilimitado" : inlineStockQty}
-              </span>
-            )}
-          </div>
-          {/* Referencia */}
-          <div className="flex items-center justify-between border-b border-gray-100 py-2">
-            <span className="text-sm text-gray-500">Referencia</span>
-            <span className="text-sm font-medium">TCG-{product.id}</span>
-          </div>
-          {/* Idioma */}
-          <div className="flex items-center justify-between border-b border-gray-100 py-2">
-            <span className="text-sm text-gray-500">Idioma</span>
-            {editMode ? (
-              <select
-                value={inlineLanguage}
-                onChange={(e) => setInlineLanguage(e.target.value)}
-                className="rounded border border-[#2563eb] px-1.5 py-0.5 text-sm focus:outline-none"
-              >
-                <option value="">— Sin idioma —</option>
-                {Object.entries(LANGUAGE_NAMES).map(([code, label]) => (
-                  <option key={code} value={code}>{label}</option>
-                ))}
-              </select>
-            ) : inlineLanguage ? (
-              <LanguageFlag language={inlineLanguage} showLabel size="md" />
-            ) : (
-              <span className="text-sm text-gray-400">—</span>
-            )}
-          </div>
         </div>
       </div>
 

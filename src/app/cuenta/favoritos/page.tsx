@@ -2,37 +2,32 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Heart, ShoppingBag } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { useFavorites } from "@/context/FavoritesContext";
 import { getMergedProducts } from "@/lib/productStore";
 import { LocalProductCard } from "@/components/product/LocalProductCard";
 import type { LocalProduct } from "@/data/products";
 
 export default function FavoritosPage() {
-  const { user } = useAuth();
-  const [favorites, setFavorites] = useState<LocalProduct[]>([]);
+  const { favorites } = useFavorites();
+  const [products, setProducts] = useState<LocalProduct[]>([]);
 
   useEffect(() => {
-    if (!user) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFavorites([]);
-      return;
-    }
     const all = getMergedProducts();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFavorites(all.filter((p) => user.favorites.includes(p.id)));
-  }, [user, user?.favorites]);
+    setProducts(all.filter((p) => favorites.includes(p.id)));
+  }, [favorites]);
 
   return (
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Mis favoritos</h1>
         <p className="mt-1 text-sm text-gray-500">
-          {favorites.length} producto{favorites.length !== 1 ? "s" : ""}{" "}
+          {products.length} producto{products.length !== 1 ? "s" : ""}{" "}
           guardados
         </p>
       </div>
 
-      {favorites.length === 0 ? (
+      {products.length === 0 ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-16 text-center">
           <Heart size={48} className="mx-auto mb-4 text-gray-200" />
           <p className="mb-2 font-bold text-gray-700">
@@ -50,7 +45,7 @@ export default function FavoritosPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {favorites.map((p) => (
+          {products.map((p) => (
             <LocalProductCard key={p.id} product={p} />
           ))}
         </div>
