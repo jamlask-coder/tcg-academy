@@ -66,6 +66,9 @@ const MAGIC_SET_MAP: [RegExp, string][] = [
   [/aetherdrift/i, "dft"],
   [/tarkir.*dragonstorm/i, "tds"],
   [/final.*fantasy/i, "ffc"],
+  [/tortugas.*ninja|teenage.*mutant/i, "pip"],
+  [/spider.man/i, "spd"],
+  [/innistrad.*remastered/i, "inr"],
 ];
 
 // Pokemon: product tag/name → pokemontcg.io set ID (EN names + JP set names)
@@ -155,7 +158,8 @@ const DRAGONBALL_SET_MAP: [RegExp, string][] = [
 
 // Riftbound: product tag/name → local data key
 const RIFTBOUND_SET_MAP: [RegExp, string][] = [
-  [/unleashed/i, "origins"], [/spiritforged/i, "origins"], [/origins/i, "origins"],
+  [/spiritforged/i, "spiritforged"],
+  [/demacia/i, "origins"], [/unleashed/i, "origins"], [/origins/i, "origins"],
 ];
 
 // Map product language to Scryfall lang codes
@@ -230,7 +234,7 @@ async function fetchMagicHighlights(setCode: string, lang: string): Promise<High
     return (data.data || [])
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .filter((c: any) => c.image_uris || c.card_faces?.[0]?.image_uris)
-      .slice(0, 8)
+      .slice(0, 20)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((c: any) => {
         const imgs = c.image_uris ?? c.card_faces?.[0]?.image_uris ?? {};
@@ -378,7 +382,7 @@ async function fetchYugiohHighlights(setName: string, lang: string): Promise<Hig
       parseFloat(b.card_prices?.[0]?.cardmarket_price ?? "0") - parseFloat(a.card_prices?.[0]?.cardmarket_price ?? "0"),
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return sorted.slice(0, 8).map((c: any) => {
+    return sorted.slice(0, 20).map((c: any) => {
       const img = c.card_images?.[0];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const setInfo = (c.card_sets as any[] | undefined)?.find(
@@ -422,6 +426,24 @@ const OP_TOP_CARDS: Record<string, { num: string; name: string }[]> = {
     { num: "115", name: "Shanks" }, { num: "114", name: "Kozuki Oden" },
     { num: "113", name: "Yamato" }, { num: "112", name: "Marco" },
   ],
+  OP07: [
+    { num: "119", name: "Portgas.D.Ace" }, { num: "118", name: "Monkey.D.Luffy" },
+    { num: "109", name: "Monkey.D.Luffy" }, { num: "117", name: "Boa Hancock" },
+    { num: "116", name: "Trafalgar Law" }, { num: "115", name: "Sanji" },
+    { num: "114", name: "Jewelry Bonney" }, { num: "113", name: "Roronoa Zoro" },
+  ],
+  OP06: [
+    { num: "118", name: "Roronoa Zoro" }, { num: "119", name: "Sanji" },
+    { num: "117", name: "Monkey.D.Luffy" }, { num: "116", name: "O-Nami" },
+    { num: "115", name: "Yamato" }, { num: "114", name: "Boa Hancock" },
+    { num: "113", name: "Vinsmoke Reiju" }, { num: "101", name: "O-Nami" },
+  ],
+  OP04: [
+    { num: "119", name: "Donquixote Rosinante" }, { num: "118", name: "Sabo" },
+    { num: "100", name: "Capone Gang Bege" }, { num: "117", name: "Monkey.D.Luffy" },
+    { num: "116", name: "Ms. All Sunday" }, { num: "115", name: "Hody Jones" },
+    { num: "114", name: "Rebecca" }, { num: "064", name: "Ms. All Sunday" },
+  ],
 };
 
 // ─── Dragon Ball (Bandai CDN) ────────────────────────────────────────────────
@@ -438,6 +460,24 @@ const DBS_TOP_CARDS: Record<string, { num: string; name: string }[]> = {
     { num: "130", name: "Vegeta" }, { num: "129", name: "Son Goku" },
     { num: "128", name: "Cell" }, { num: "127", name: "Trunks" },
     { num: "126", name: "Android 18" }, { num: "125", name: "Krillin" },
+  ],
+  FB05: [
+    { num: "139", name: "Son Goku" }, { num: "138", name: "Vegeta" },
+    { num: "137", name: "Future Trunks" }, { num: "136", name: "Goku Black" },
+    { num: "135", name: "Zamasu" }, { num: "134", name: "Hit" },
+    { num: "133", name: "Beerus" }, { num: "132", name: "Champa" },
+  ],
+  FB02: [
+    { num: "134", name: "Son Goku" }, { num: "133", name: "Vegeta" },
+    { num: "132", name: "Frieza" }, { num: "131", name: "Son Gohan" },
+    { num: "130", name: "Piccolo" }, { num: "129", name: "Android 17" },
+    { num: "128", name: "Android 18" }, { num: "127", name: "Krillin" },
+  ],
+  FB01: [
+    { num: "140", name: "Son Goku" }, { num: "139", name: "Vegeta" },
+    { num: "138", name: "Frieza" }, { num: "137", name: "Broly" },
+    { num: "136", name: "Cell" }, { num: "135", name: "Beerus" },
+    { num: "134", name: "Whis" }, { num: "133", name: "Son Gohan" },
   ],
 };
 
@@ -485,7 +525,7 @@ async function fetchLorcanaHighlights(setName: string): Promise<HighlightCard[]>
     return lorcanaAllCards
       .filter((c) => c.setName === setName && c.imageUrl)
       .sort((a, b) => (LORCANA_RARITY_ORDER[b.rarity.toLowerCase()] ?? 0) - (LORCANA_RARITY_ORDER[a.rarity.toLowerCase()] ?? 0))
-      .slice(0, 8);
+      .slice(0, 20);
   } catch {
     return [];
   }
@@ -495,15 +535,51 @@ async function fetchLorcanaHighlights(setName: string): Promise<HighlightCard[]>
 
 // Riftbound top cards by market value (source: PriceCharting.com) — images stored locally
 const RIFTBOUND_CARDS: Record<string, HighlightCard[]> = {
+  // Top 20 Spiritforged cards by market value (source: PriceCharting.com, verified images)
+  spiritforged: [
+    { id: "sfd-227s", name: "Ahri - Inquisitive [Signature] #227", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/izjjj54spmuge6jv/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "sfd-225s", name: "Irelia - Fervent [Signature] #225", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/zk26vnro6d5ygcla/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "sfd-223s", name: "Vayne - Hunter [Signature] #223", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/fnw4mqnxgb42gyrj/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "sfd-239s", name: "Soraka - Wanderer [Signature] #239", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/zbakh522k5t6to4y/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "sfd-224s", name: "Aphelios - Exalted [Signature] #224", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/q7xgcfs42j25kiw2/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "sfd-232s", name: "Sett - Brawler [Signature] #232", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/2nt6vk5nw234qyuk/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "sfd-230s", name: "Teemo - Strategist [Signature] #230", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/s5h3gfj2gxhbsnex/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "sfd-233s", name: "Yone - Blademaster [Signature] #233", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/6xfxbygmuertdi4d/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "sfd-235s", name: "Yasuo - Windrider [Signature] #235", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/737j762jbd6kt4ho/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "sfd-228s", name: "Bard - Mercurial [Signature] #228", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/pavno6wkz5xt5k5d/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "sfd-236s", name: "Darius - Executioner [Signature] #236", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/4q3m4srax2ycaoeq/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "sfd-227", name: "Ahri - Inquisitive #227", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/c3u4djyv2coz637o/1600.jpg", rarity: "Overnumber", isHolo: true },
+    { id: "sfd-237s", name: "Karma - Channeler [Signature] #237", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/7sf6m2kg5p33nwvs/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "sfd-225", name: "Irelia - Fervent #225", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/fhnxmgv3t4daejf5/1600.jpg", rarity: "Overnumber", isHolo: true },
+    { id: "sfd-246", name: "Irelia - Blade Dancer #246", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/dn3nrkpc7wdggjq7/1600.jpg", rarity: "Overnumber", isHolo: true },
+    { id: "sfd-234", name: "Seal of Discord #234", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/56wcgcrt2j3krfvb/1600.jpg", rarity: "Overnumber", isHolo: true },
+    { id: "sfd-238", name: "Seal of Unity #238", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/zcqg4uqxoikfajf5/1600.jpg", rarity: "Overnumber", isHolo: true },
+    { id: "sfd-223", name: "Vayne - Hunter #223", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/3wyeoag5wjefmdte/1600.jpg", rarity: "Overnumber", isHolo: true },
+    { id: "sfd-248", name: "Ezreal - Prodigal Explorer #248", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/2gunqpdk2uujyqio/1600.jpg", rarity: "Overnumber", isHolo: true },
+    { id: "sfd-251", name: "Fiora - Grand Duelist #251", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/saztcdfpg7bklup6/1600.jpg", rarity: "Overnumber", isHolo: true },
+  ],
+  // Top 20 Origins cards by market value (source: PriceCharting.com, verified images)
   origins: [
-    { id: "rb-kaisa-sig", name: "Kai'Sa, Daughter of the Void (Signature)", imageUrl: "/images/products/store/riftbound-kaisa-sig.jpg", rarity: "Signature", isHolo: true },
-    { id: "rb-jinx-sig", name: "Jinx, Loose Cannon (Signature)", imageUrl: "/images/products/store/riftbound-jinx-sig.jpg", rarity: "Signature", isHolo: true },
-    { id: "rb-ahri-sig", name: "Ahri, Nine-Tailed Fox (Signature)", imageUrl: "/images/products/store/riftbound-ahri-sig.jpg", rarity: "Signature", isHolo: true },
-    { id: "rb-mf-sig", name: "Miss Fortune, Bounty Hunter (Signature)", imageUrl: "/images/products/store/riftbound-missfortune-sig.jpg", rarity: "Signature", isHolo: true },
-    { id: "rb-leesin-sig", name: "Lee Sin, Blind Monk (Signature)", imageUrl: "/images/products/store/riftbound-leesin-sig.jpg", rarity: "Signature", isHolo: true },
-    { id: "rb-kaisa", name: "Kai'Sa, Daughter of the Void", imageUrl: "/images/products/store/riftbound-kaisa.jpg", rarity: "Rare", isHolo: true },
-    { id: "rb-ahri", name: "Ahri, Nine-Tailed Fox", imageUrl: "/images/products/store/riftbound-ahri.jpg", rarity: "Rare", isHolo: true },
-    { id: "rb-teemo-sig", name: "Teemo, Swift Scout (Signature)", imageUrl: "/images/products/store/riftbound-teemo-sig.jpg", rarity: "Signature", isHolo: true },
+    { id: "ori-299s", name: "Kai'Sa - Daughter of the Void [Signature] #299", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/7j4ccdi2rtczspyi/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "ori-303s", name: "Ahri - Nine-Tailed Fox [Signature] #303", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/s5zm7jpcy3hg7eve/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "ori-309s", name: "Miss Fortune - Bounty Hunter [Signature] #309", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/wycromqsq6d4zyne/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "ori-307s", name: "Teemo - Swift Scout [Signature] #307", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/d3hx3furli2sanfq/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "ori-301s", name: "Jinx - Loose Cannon [Signature] #301", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/ywquskhlc4nf4beq/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "ori-308s", name: "Viktor - Herald of the Arcane [Signature] #308", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/c4jin4k2udu2m7nh/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "ori-304s", name: "Lee Sin - Blind Monk [Signature] #304", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/6374u4sn6bzqa4o2/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "ori-305s", name: "Yasuo - Unforgiven [Signature] #305", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/q24mbltxy64cwtno/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "ori-310s", name: "Sett - The Boss [Signature] #310", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/i5v53afmenuj4xla/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "ori-306s", name: "Leona - Radiant Dawn [Signature] #306", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/ssmi47g2xznaqmho/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "ori-300s", name: "Volibear - Relentless Storm [Signature] #300", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/aqhwe2rwdo6xo77v/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "ori-302s", name: "Darius - Hand of Noxus [Signature] #302", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/wfyqcdwjhwywvvdb/1600.jpg", rarity: "Signature", isHolo: true },
+    { id: "ori-303", name: "Ahri - Nine-Tailed Fox #303", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/n6l6rxc3hutsylki/1600.jpg", rarity: "Overnumber", isHolo: true },
+    { id: "ori-299", name: "Kai'Sa - Daughter of the Void #299", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/5dkyhq4bbjbqcxzp/1600.jpg", rarity: "Overnumber", isHolo: true },
+    { id: "ori-309", name: "Miss Fortune - Bounty Hunter #309", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/uor4xz2uhir6vauh/1600.jpg", rarity: "Overnumber", isHolo: true },
+    { id: "ori-66p", name: "Ahri - Alluring [Launch Promo] #66", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/jpzm4vsafei3szxx/1600.jpg", rarity: "Promo", isHolo: true },
+    { id: "ori-308", name: "Viktor - Herald of the Arcane #308", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/x4226lu3kq7rq3yb/1600.jpg", rarity: "Overnumber", isHolo: true },
+    { id: "ori-301", name: "Jinx - Loose Cannon #301", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/lma73y7hnczuko7z/1600.jpg", rarity: "Overnumber", isHolo: true },
+    { id: "ori-306", name: "Leona - Radiant Dawn #306", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/bspgbfq5v6jeo5xu/1600.jpg", rarity: "Overnumber", isHolo: true },
+    { id: "ori-307", name: "Teemo - Swift Scout #307", imageUrl: "https://storage.googleapis.com/images.pricecharting.com/c7gatr22jatsldcf/1600.jpg", rarity: "Overnumber", isHolo: true },
   ],
 };
 
@@ -700,125 +776,85 @@ function CardLightbox({
 // ─── Collection grid modal ──────────────────────────────────────────────────
 
 function CollectionGridModal({ cards, onClose }: { cards: HighlightCard[]; onClose: () => void }) {
-  const [expanded, setExpanded] = useState<number | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set());
 
-  // Scroll to card when closing expanded view
-  const closeExpanded = useCallback(() => {
-    const idx = expanded;
-    setExpanded(null);
-    if (idx !== null) {
-      requestAnimationFrame(() => {
-        cardRefs.current.get(idx)?.scrollIntoView({ block: "center", behavior: "smooth" });
-      });
-    }
-  }, [expanded]);
+  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (expanded !== null) closeExpanded();
-        else onClose();
-      }
+      if (e.key === "Escape" && lightboxIndex === null) onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [expanded, closeExpanded, onClose]);
+  }, [lightboxIndex, onClose]);
 
-  const expandedCard = expanded !== null ? cards[expanded] : null;
+  // Cards with valid images for lightbox navigation
+  const validCards = cards.filter((c) => !brokenIds.has(c.id));
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/90 backdrop-blur-sm">
-      {/* Header */}
-      <div className="sticky top-0 z-10 border-b border-white/10 bg-black/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <h2 className="text-base font-bold text-white">Colección completa ({cards.length} cartas)</h2>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/25"
-            aria-label="Cerrar"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      </div>
+    <>
+      {/* Lightbox — rendered as sibling (outside scroll container) to avoid z-index/overflow issues */}
+      {lightboxIndex !== null && validCards.length > 0 && (
+        <CardLightbox
+          cards={validCards}
+          index={lightboxIndex}
+          onClose={closeLightbox}
+          onNavigate={setLightboxIndex}
+        />
+      )}
 
-      {/* Grid */}
-      <div ref={scrollRef} className="mx-auto max-w-5xl px-4 py-6">
-        <div className="grid grid-cols-6 gap-2.5">
-          {cards.map((card, i) => (
+      <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/90 backdrop-blur-sm">
+        {/* Header */}
+        <div className="sticky top-0 z-10 border-b border-white/10 bg-black/80 backdrop-blur-md">
+          <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+            <h2 className="text-base font-bold text-white">Colección completa ({cards.length} cartas)</h2>
             <button
-              key={card.id}
-              ref={(el) => { if (el) cardRefs.current.set(i, el); }}
-              type="button"
-              onClick={() => setExpanded(i)}
-              className="group relative cursor-pointer focus:outline-none"
-              title={card.name}
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/25"
+              aria-label="Cerrar"
             >
-              <div className="overflow-hidden rounded-lg transition-all duration-200 group-hover:scale-105 group-hover:shadow-xl group-hover:ring-2 group-hover:ring-white/30">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={card.imageUrl}
-                  alt={card.name}
-                  loading="lazy"
-                  className="aspect-[2/3] w-full rounded-lg bg-gray-800 object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.15"; }}
-                />
-              </div>
-              <p className="mt-1 truncate text-center text-[9px] text-white/50">{card.name}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Expanded card overlay */}
-      {expandedCard && (
-        <div
-          className="fixed inset-0 z-20 flex items-center justify-center bg-black/70"
-          onClick={closeExpanded}
-        >
-          <div className="relative max-h-[85vh] max-w-[400px]" onClick={(e) => e.stopPropagation()}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={expandedCard.imageUrl}
-              alt={expandedCard.name}
-              className="h-auto max-h-[80vh] w-auto rounded-2xl shadow-2xl"
-            />
-            <div className="absolute -bottom-10 left-0 right-0 text-center">
-              <p className="text-sm font-bold text-white">{expandedCard.name}</p>
-              <p className="mt-0.5 text-xs text-white/50">#{(expanded ?? 0) + 1} / {cards.length}</p>
-            </div>
-            {/* Nav arrows */}
-            {expanded !== null && expanded > 0 && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setExpanded(expanded - 1); }}
-                className="absolute top-1/2 -left-12 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/25"
-                aria-label="Anterior"
-              >
-                <ChevronLeft size={18} />
-              </button>
-            )}
-            {expanded !== null && expanded < cards.length - 1 && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setExpanded(expanded + 1); }}
-                className="absolute top-1/2 -right-12 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/25"
-                aria-label="Siguiente"
-              >
-                <ChevronRight size={18} />
-              </button>
-            )}
-            <button
-              onClick={closeExpanded}
-              className="absolute -top-3 -right-3 flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-white transition hover:bg-white/40"
-              aria-label="Volver a la colección"
-            >
-              <X size={14} />
+              <X size={16} />
             </button>
           </div>
         </div>
-      )}
-    </div>
+
+        {/* Grid */}
+        <div className="mx-auto max-w-5xl px-4 py-6">
+          <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-6">
+            {cards.map((card, i) => {
+              const isBroken = brokenIds.has(card.id);
+              return (
+                <button
+                  key={`${card.id}-${i}`}
+                  type="button"
+                  onClick={() => {
+                    if (isBroken) return;
+                    // Find the index in validCards (which excludes broken images)
+                    const validIdx = validCards.findIndex((c) => c.id === card.id);
+                    if (validIdx !== -1) setLightboxIndex(validIdx);
+                  }}
+                  className={`relative focus:outline-none active:scale-95 ${isBroken ? "cursor-default opacity-20" : "cursor-pointer"}`}
+                  title={card.name}
+                >
+                  <div className="overflow-hidden rounded-lg transition-shadow duration-200 hover:shadow-xl hover:ring-2 hover:ring-white/30">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={card.imageUrl}
+                      alt={card.name}
+                      loading="lazy"
+                      className="aspect-[2/3] w-full rounded-lg bg-gray-800 object-cover"
+                      onError={() => setBrokenIds((prev) => { const next = new Set(prev); next.add(card.id); return next; })}
+                    />
+                  </div>
+                  <p className="mt-1 truncate text-center text-[9px] text-white/50">{card.name}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -830,13 +866,13 @@ interface Props {
 
 // Source text per game
 const SOURCE_TEXT: Record<string, string> = {
-  magic: "Ordenadas por valor de mercado (USD) \u00B7 Fuente: Scryfall",
+  magic: "Ordenadas por valor de mercado \u00B7 Fuente: Scryfall",
   pokemon: "Ordenadas por valor de mercado \u00B7 Fuente: PriceCharting",
   yugioh: "Ordenadas por valor de mercado \u00B7 Fuente: PriceCharting",
   "one-piece": "Cartas SEC y SR m\u00E1s cotizadas \u00B7 Fuente: Bandai TCG+",
   lorcana: "Ordenadas por rareza y valor \u00B7 Fuente: Lorcana API",
   "dragon-ball": "Cartas SCR y SR m\u00E1s cotizadas \u00B7 Fuente: Bandai TCG+",
-  riftbound: "Cartas Signature m\u00E1s valiosas",
+  riftbound: "Cartas Signature m\u00E1s valiosas \u00B7 Fuente: PriceCharting",
 };
 
 export function SetHighlightCards({ product }: Props) {
@@ -851,12 +887,14 @@ export function SetHighlightCards({ product }: Props) {
   const [collection, setCollection] = useState<HighlightCard[]>([]);
   const [colGridOpen, setColGridOpen] = useState(false);
   const [colCardIdx, setColCardIdx] = useState<number | null>(null);
+  const [colLightboxIndex, setColLightboxIndex] = useState<number | null>(null);
 
   const markBroken = useCallback((id: string) => {
     setBrokenIds((prev) => { const next = new Set(prev); next.add(id); return next; });
   }, []);
 
   const closeLightbox = useCallback(() => setLightboxIndex(null), []);
+  const closeColLightbox = useCallback(() => setColLightboxIndex(null), []);
 
   useEffect(() => {
     const detected = detectSet(product);
@@ -918,6 +956,14 @@ export function SetHighlightCards({ product }: Props) {
           onNavigate={setLightboxIndex}
         />
       )}
+      {colLightboxIndex !== null && collection.length > 0 && (
+        <CardLightbox
+          cards={collection}
+          index={colLightboxIndex}
+          onClose={closeColLightbox}
+          onNavigate={setColLightboxIndex}
+        />
+      )}
 
       <div className="mt-6">
         {/* Cartas más cotizadas — 6 columns */}
@@ -965,19 +1011,18 @@ export function SetHighlightCards({ product }: Props) {
         {/* La Colección — 6 cards with scroll + link to full grid */}
         {collection.length > 0 && (() => {
           const PER = 6;
-          const pos = colCardIdx !== null ? 0 : 0;
           return (
             <div className="mt-5">
               <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-xl font-bold text-gray-900">La Colección</h3>
-                  <button
-                    onClick={() => setColGridOpen(true)}
-                    className="text-xs font-semibold text-[#2563eb] transition hover:underline"
-                  >
-                    Ver colección completa ({collection.length})
-                  </button>
-                </div>
+                <button
+                  onClick={() => setColGridOpen(true)}
+                  className="group/col flex items-center gap-2 text-left"
+                >
+                  <h3 className="text-xl font-bold text-gray-900 transition group-hover/col:text-[#2563eb]">
+                    Ver la colección completa de {product.name.replace(/^\[DEMO\]\s*/i, "").replace(/\s*\(\d+\s*(?:cartas|sobres)\)/gi, "")} ({collection.length})
+                  </h3>
+                  <ChevronRight size={18} className="flex-shrink-0 text-gray-400 transition group-hover/col:text-[#2563eb]" />
+                </button>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setColCardIdx((p) => Math.max(0, (p ?? 0) - PER))}
@@ -998,11 +1043,11 @@ export function SetHighlightCards({ product }: Props) {
                 </div>
               </div>
               <div className="grid grid-cols-6 gap-2">
-                {collection.slice(colCardIdx ?? 0, (colCardIdx ?? 0) + PER).map((card) => (
+                {collection.slice(colCardIdx ?? 0, (colCardIdx ?? 0) + PER).map((card, i) => (
                   <button
                     key={card.id}
                     type="button"
-                    onClick={() => setColGridOpen(true)}
+                    onClick={() => setColLightboxIndex((colCardIdx ?? 0) + i)}
                     className="relative cursor-pointer focus:outline-none"
                     title={card.name}
                   >

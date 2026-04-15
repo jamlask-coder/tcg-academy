@@ -204,7 +204,7 @@ export interface IncidentReplyEmailData {
 }
 
 export async function sendIncidentReplyEmail(
-  data: IncidentReplyEmailData,
+  _data: IncidentReplyEmailData,
 ): Promise<void> {
   // ── PRODUCTION ──────────────────────────────────────────────────────────
   // const emailjs = await import("@emailjs/browser");

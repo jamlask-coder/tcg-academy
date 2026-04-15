@@ -24,10 +24,10 @@ import {
   type LocalProduct,
   GAME_CONFIG,
   CARD_CATEGORIES,
+  LANGUAGE_NAMES,
 } from "@/data/products";
 import { getMergedProducts, getMergedById } from "@/lib/productStore";
 import { SetHighlightCards } from "@/components/product/SetHighlightCards";
-import { CompleteYourOrder } from "@/components/product/CompleteYourOrder";
 import { LanguageFlag } from "@/components/ui/LanguageFlag";
 import { DiscountBadgeEdit } from "@/components/ui/DiscountBadgeEdit";
 import { usePrice } from "@/hooks/usePrice";
@@ -53,6 +53,9 @@ interface Props {
 }
 
 // Find same product in other languages (same game + category + slug base)
+// Sorted: in-stock first, then by priority (ES > EN > JP > KO > rest)
+const LANG_PRIORITY: Record<string, number> = { ES: 0, EN: 1, JP: 2, KO: 3, FR: 4, DE: 5, IT: 6, PT: 7 };
+
 function getLangVariants(product: LocalProduct) {
   if (!product.language) return [];
   const base = product.slug.replace(/-(?:es|en|jp|fr|de|it|ko|pt)$/i, "");
@@ -65,7 +68,12 @@ function getLangVariants(product: LocalProduct) {
         p.language !== product.language &&
         p.slug.replace(/-(?:es|en|jp|fr|de|it|ko|pt)$/i, "") === base,
     )
-    .slice(0, 4);
+    .sort((a, b) => {
+      // In-stock first, then by language priority
+      if (a.inStock !== b.inStock) return a.inStock ? -1 : 1;
+      return (LANG_PRIORITY[a.language] ?? 99) - (LANG_PRIORITY[b.language] ?? 99);
+    })
+    .slice(0, 6);
 }
 
 // Find related products from same game
@@ -74,7 +82,6 @@ function getRelated(product: LocalProduct) {
     .filter(
       (p) => p.game === product.game && p.id !== product.id && p.inStock,
     )
-    .sort(() => 0)
     .slice(0, 4);
 }
 
@@ -162,7 +169,7 @@ function PriceDisplay({
   const {
     displayPrice,
     comparePrice: origComparePrice,
-    hasDiscount: _origHasDiscount,
+    hasDiscount: _hasDiscount,
     discountPct: origDiscountPct,
     etiquetaRol,
     retailPrice,
@@ -257,24 +264,7 @@ function PriceDisplay({
           </>
         )}
       </div>
-      {/* Savings badge: box vs buying packs individually */}
-      {product.linkedPackId && product.packsPerBox && (() => {
-        const pack = getMergedById(product.linkedPackId);
-        if (!pack) return null;
-        const packsTotalPrice = pack.price * product.packsPerBox;
-        const savings = packsTotalPrice - displayPrice;
-        if (savings <= 0) return null;
-        const pct = Math.round((savings / packsTotalPrice) * 100);
-        return (
-          <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-green-100 bg-green-50 px-3 py-1.5">
-            <span className="text-lg font-bold text-green-600">-{pct}%</span>
-            <div className="flex flex-col text-xs leading-tight">
-              <span className="font-semibold text-green-700">Ahorras {savings.toFixed(2)}€</span>
-              <span className="text-green-600/70">vs comprar {product.packsPerBox} sobres sueltos ({packsTotalPrice.toFixed(2)}€)</span>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Savings badge moved to box/pack pills row */}
       {/* Reference prices for privileged roles */}
       {(retailPrice !== undefined || wholesaleRef !== undefined) && (
         <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-400">
@@ -294,8 +284,9 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
   const { addItem, items, removeItem, updateQty } = useCart();
   const { user } = useAuth();
   const { toggle: toggleFavorite, isFavorite } = useFavorites();
-  const { name, color, bgColor: _bgColor2 } = config;
+  const { name, color } = config;
   const router = useRouter();
+  const langVariants = getLangVariants(product);
 
   const [added, setAdded] = useState(false);
   const [limitMsg, setLimitMsg] = useState<string | undefined>(undefined);
@@ -304,6 +295,10 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
   const [restockSubscribed, setRestockSubscribed] = useState(() =>
     user?.email ? isSubscribed(product.id, user.email) : false,
   );
+  const [variantRestockIds, setVariantRestockIds] = useState<Set<number>>(() => {
+    if (!user?.email) return new Set();
+    return new Set(langVariants.filter((v) => !v.inStock && isSubscribed(v.id, user.email)).map((v) => v.id));
+  });
 
   const cartKey = `item_${product.id}`;
   const cartItem = items.find((i) => i.key === cartKey);
@@ -354,7 +349,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
   const [savedToast, setSavedToast] = useState(false);
   const [editMode, setEditMode] = useState(false);
 
-  // Detect if description overflows line-clamp-5
+  // Detect if description overflows line-clamp-3
   useEffect(() => {
     if (!descRef.current || descExpanded) return;
     const el = descRef.current;
@@ -513,11 +508,10 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
     typeof window !== "undefined"
       ? window.location.href
       : `https://tcgacademy.es/${product.game}/${product.category}/${product.slug}`;
-  const langVariants = getLangVariants(product);
   const related = getRelated(product);
 
   return (
-    <div className="mx-auto max-w-[1280px] px-4 py-4 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-[1280px] px-5 py-4 sm:px-8 lg:px-10">
       {/* Confirm delete modal */}
       <ConfirmationModal
         isOpen={deleteConfirmOpen}
@@ -568,7 +562,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
         </span>
       </nav>
 
-      <div className="mb-8 grid gap-6 md:grid-cols-[45%_1fr]">
+      <div className="mb-4 grid gap-6 md:grid-cols-[45%_1fr]">
         {/* Gallery */}
         <div className="relative">
           <HoloCard
@@ -578,7 +572,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           >
             <div
               ref={imgContainerRef}
-              className={`group/img relative ${isCardCategory ? "aspect-[2/3]" : ""} max-h-[600px] cursor-pointer overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 select-none`}
+              className={`group/img relative ${isCardCategory ? "aspect-[2/3] overflow-hidden" : "flex items-center justify-center"} max-h-[510px] cursor-pointer rounded-2xl border border-gray-100 bg-gray-50 select-none`}
               onClick={() => displayImages[activeImg] && setLightboxOpen(true)}
             >
               {displayImages[activeImg] ? (
@@ -596,7 +590,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                   <img
                     src={displayImages[activeImg]!}
                     alt={inlineTitle}
-                    className={`pointer-events-none h-full w-full object-contain transition-transform duration-300 group-hover/img:scale-[1.03] ${isCardCategory ? "p-4" : "p-2"}`}
+                    className={`pointer-events-none w-full object-contain transition-transform duration-300 group-hover/img:scale-[1.03] ${isCardCategory ? "h-full p-4" : "max-h-[500px] p-2"}`}
                     onError={(e) => { (e.target as HTMLImageElement).src = "/images/placeholder-product.svg"; }}
                   />
                   {/* Ampliar button — aparece al hacer hover */}
@@ -753,15 +747,10 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
         )}
 
         {/* Buy box */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2.5">
           {/* 1. Title + admin buttons */}
           <div className="flex items-start justify-between gap-3">
             <h1 className="flex flex-1 items-center gap-2.5 text-xl leading-tight font-bold text-gray-900 md:text-2xl">
-              {product.language && !editMode && (
-                <span className="flex-shrink-0">
-                  <LanguageFlag language={product.language} size="md" />
-                </span>
-              )}
               {editMode ? (
                 <input
                   type="text"
@@ -793,59 +782,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
             )}
           </div>
 
-          {/* 2. Box/Pack pills + language variants */}
-          {(() => {
-            const linkedId = product.linkedPackId ?? product.linkedBoxId;
-            const linked = linkedId ? getMergedById(linkedId) : null;
-            const showPills = linked != null;
-            const showVariants = langVariants.length > 0;
-            if (!showPills && !showVariants) return null;
-            return (
-              <div className="space-y-1">
-                {showPills && linked && (
-                  <div className="flex flex-wrap items-center gap-2">
-                    {(() => {
-                      const isBox = product.category === "booster-box";
-                      const linkedHref = `/${linked.game}/${linked.category}/${linked.slug}`;
-                      const boxProduct = isBox ? product : linked;
-                      const packProduct = isBox ? linked : product;
-                      const boxHref = isBox ? "#" : linkedHref;
-                      const packHref = isBox ? linkedHref : "#";
-                      const boxLabel = `📦 Caja${boxProduct.packsPerBox ? ` · ${boxProduct.packsPerBox} sobres` : ""}`;
-                      const packLabel = `🃏 Sobre${packProduct.cardsPerPack ? ` · ${packProduct.cardsPerPack} cartas` : ""}`;
-                      return (
-                        <>
-                          {isBox ? (
-                            <span className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-sm font-semibold text-gray-900" style={{ borderColor: color }}>{boxLabel}</span>
-                          ) : (
-                            <Link href={boxHref} className="inline-flex items-center gap-1.5 rounded-full border-2 border-gray-200 px-3 py-1 text-sm font-semibold text-gray-400 transition-colors hover:border-gray-400 hover:text-gray-700">{boxLabel}</Link>
-                          )}
-                          {!isBox ? (
-                            <span className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-sm font-semibold text-gray-900" style={{ borderColor: color }}>{packLabel}</span>
-                          ) : (
-                            <Link href={packHref} className="inline-flex items-center gap-1.5 rounded-full border-2 border-gray-200 px-3 py-1 text-sm font-semibold text-gray-400 transition-colors hover:border-gray-400 hover:text-gray-700">{packLabel}</Link>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-                {showVariants && (
-                  <p className="text-xs text-gray-500">
-                    También disponible en:{" "}
-                    {langVariants.map((v, i) => (
-                      <span key={v.id}>
-                        {i > 0 && ", "}
-                        <Link href={`/${v.game}/${v.category}/${v.slug}`} className="inline-flex items-center gap-1 font-semibold hover:underline" style={{ color }}>
-                          <LanguageFlag language={v.language} showLabel size="md" />
-                        </Link>
-                      </span>
-                    ))}
-                  </p>
-                )}
-              </div>
-            );
-          })()}
+          {/* 2. (moved below stock) */}
 
           {/* 3. Price */}
           <PriceDisplay
@@ -871,12 +808,139 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
               const si = getStockInfo(inlineStock ? stockNum : 0);
               return (
                 <div className={`inline-flex items-center gap-2 text-sm font-semibold ${si.color}`}>
-                  <div className={`h-2 w-2 rounded-full ${si.dotColor}`} />
+                  <span className="relative flex h-2 w-2">
+                    {si.pulse && (
+                      <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${si.dotColor}`} />
+                    )}
+                    <span className={`relative inline-flex h-2 w-2 rounded-full ${si.dotColor}`} />
+                  </span>
                   {si.label}
                 </div>
               );
             })()}
           </div>
+
+          {/* 4b. Language flags + Box/Pack pills */}
+          {(() => {
+            const linkedId = product.linkedPackId ?? product.linkedBoxId;
+            const linked = linkedId ? getMergedById(linkedId) : null;
+            const hasFlags = !!product.language && !editMode;
+            const hasPills = linked != null;
+            const hasVariants = langVariants.length > 0;
+            if (!hasFlags && !hasPills) return null;
+
+            const pillBase = "inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-xs font-semibold sm:py-1";
+            const pillActive = `${pillBase} border-gray-900 text-gray-900`;
+            const pillInactive = `${pillBase} border-gray-200 text-gray-400 transition-colors hover:border-gray-400 hover:text-gray-700`;
+
+            return (
+              <div className="flex flex-col gap-2">
+                {/* Row 1: language flags */}
+                {hasFlags && (
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    {/* Current product flag — black border */}
+                    <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-gray-900 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-900 sm:py-1">
+                      <LanguageFlag language={product.language} size="md" bare />
+                      <span>{LANGUAGE_NAMES[product.language.toUpperCase()] ?? product.language}</span>
+                    </span>
+                    {/* Variant flags — gray border */}
+                    {hasVariants && langVariants.map((v) => {
+                      const vOut = !v.inStock;
+                      const vSubscribed = variantRestockIds.has(v.id);
+
+                      if (vOut) {
+                        return (
+                          <button
+                            key={v.id}
+                            type="button"
+                            onClick={() => {
+                              if (vSubscribed) return;
+                              const email = user?.email ?? prompt("Tu email para avisarte:");
+                              if (!email) return;
+                              const name = user?.name ?? email.split("@")[0];
+                              subscribeRestock(v.id, v.name, email, name);
+                              setVariantRestockIds((prev) => { const next = new Set(prev); next.add(v.id); return next; });
+                            }}
+                            className={`inline-flex items-center gap-1.5 rounded-full border-2 px-2.5 py-1.5 text-xs font-semibold transition sm:py-1 ${
+                              vSubscribed
+                                ? "border-amber-300 bg-amber-50 text-amber-700"
+                                : "border-gray-200 bg-gray-50 text-gray-400 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-600"
+                            }`}
+                          >
+                            <LanguageFlag language={v.language} size="md" bare />
+                            {vSubscribed ? (
+                              <>
+                                <span>Te avisaremos</span>
+                                <Bell size={11} className="fill-amber-500 text-amber-500" />
+                              </>
+                            ) : (
+                              <>
+                                <span>Agotado</span>
+                                <Bell size={11} className="text-gray-300" />
+                              </>
+                            )}
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <Link
+                          key={v.id}
+                          href={`/${v.game}/${v.category}/${v.slug}`}
+                          className="inline-flex items-center gap-1.5 rounded-full border-2 border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-500 transition hover:border-gray-400 hover:text-gray-700 sm:py-1"
+                        >
+                          <LanguageFlag language={v.language} size="md" bare />
+                          <span>{LANGUAGE_NAMES[v.language?.toUpperCase()] ?? v.language}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+                {/* Row 2: Box/Pack pills */}
+                {hasPills && linked && (
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    {(() => {
+                      const isBox = product.category === "booster-box";
+                      const linkedHref = `/${linked.game}/${linked.category}/${linked.slug}`;
+                      const boxProduct = isBox ? product : linked;
+                      const packProduct = isBox ? linked : product;
+                      const boxHref = isBox ? "#" : linkedHref;
+                      const packHref = isBox ? linkedHref : "#";
+                      const boxLabel = `📦 Caja${boxProduct.packsPerBox ? ` · ${boxProduct.packsPerBox} sobres` : ""}`;
+                      const packLabel = `🃏 Sobre${packProduct.cardsPerPack ? ` · ${packProduct.cardsPerPack} cartas` : ""}`;
+                      // Savings: only when viewing a box with linked pack
+                      const savingsEl = isBox && product.packsPerBox ? (() => {
+                        const packPrice = linked.price * product.packsPerBox;
+                        const saved = packPrice - product.price;
+                        if (saved <= 0) return null;
+                        const pct = Math.round((saved / packPrice) * 100);
+                        return (
+                          <span className="text-xs font-semibold text-green-600">
+                            Ahorras {saved.toFixed(2)}€ ({pct}%)
+                          </span>
+                        );
+                      })() : null;
+                      return (
+                        <>
+                          {isBox ? (
+                            <span className={pillActive}>{boxLabel}</span>
+                          ) : (
+                            <Link href={boxHref} className={pillInactive}>{boxLabel}</Link>
+                          )}
+                          {!isBox ? (
+                            <span className={pillActive}>{packLabel}</span>
+                          ) : (
+                            <Link href={packHref} className={pillInactive}>{packLabel}</Link>
+                          )}
+                          {savingsEl}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* 5. Description */}
           <div
@@ -885,7 +949,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           >
             <div
               ref={descRef}
-              className={`overflow-hidden text-sm leading-relaxed text-gray-600 text-justify transition-all ${descExpanded ? "" : "line-clamp-5"}`}
+              className={`overflow-hidden text-sm leading-relaxed text-gray-600 text-justify transition-all ${descExpanded ? "" : "line-clamp-3"}`}
             >
               {editMode ? (
                 <>
@@ -920,7 +984,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           </div>
 
           {/* 6. Add to cart + favorite */}
-          <div className="flex flex-col gap-2">
+          <div className="mt-1 flex flex-col gap-2">
             <div className="relative flex items-center gap-2">
               {/* Float animations */}
               <style>{`
@@ -941,29 +1005,15 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                   100% { transform: scale(1); }
                 }
               `}</style>
-              {floatAnims.map((anim, i) => (
-                <span
-                  key={anim.key}
-                  className="pointer-events-none absolute left-[60px] bottom-full z-20 text-base font-black"
-                  style={{
-                    color: anim.type === "plus" ? "#22c55e" : "#f87171",
-                    WebkitTextStroke: "0.3px rgba(150,150,150,0.35)",
-                    textShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                    animation: "detailFloatUp 0.9s ease-out forwards",
-                    marginLeft: i % 2 !== 0 ? "12px" : "-12px",
-                  }}
-                >
-                  {anim.type === "plus" ? "+1" : "\u22121"}
-                </span>
-              ))}
+              {/* Float animations are rendered inside the counter below */}
 
-              {/* Cart button — fixed width so it doesn't shrink when counter appears */}
-              <div className="min-w-[200px]" style={{ animation: cartQty === 1 && added ? "detailScaleIn 0.3s ease-out" : "none" }}>
+              {/* Cart button — flex-1 on mobile, fixed min on desktop */}
+              <div className="min-w-0 flex-1 sm:min-w-[240px] sm:flex-none" style={{ animation: cartQty === 1 && added ? "detailScaleIn 0.3s ease-out" : "none" }}>
                 {isOutOfStock ? (
                   restockSubscribed ? (
                     <button
                       disabled
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-50 py-2.5 text-sm font-bold text-green-600"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-50 py-3 text-sm font-bold text-green-600"
                     >
                       <Check size={15} /> Te avisaremos
                     </button>
@@ -976,26 +1026,42 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                         subscribeRestock(product.id, product.name, email, name);
                         setRestockSubscribed(true);
                       }}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-50 border border-amber-200 py-2.5 text-sm font-bold text-amber-700 transition hover:bg-amber-100 active:scale-[0.97]"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-50 border border-amber-200 py-3 text-sm font-bold text-amber-700 transition hover:bg-amber-100 active:scale-[0.97]"
                     >
                       <Bell size={15} /> Avisarme cuando haya stock
                     </button>
                   )
                 ) : cartQty > 0 ? (
-                  <div className="flex w-full items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg">
+                  <div className="relative flex w-full items-center justify-center overflow-visible rounded-xl border-2 border-[#2563eb]/30 bg-white shadow-sm">
                     <button
                       onClick={() => {
                         triggerFloat("minus");
                         if (cartQty <= 1) removeItem(cartKey);
                         else updateQty(cartKey, cartQty - 1);
                       }}
-                      className="flex h-10 flex-1 items-center justify-center text-gray-700 transition-all duration-150 hover:bg-red-50 hover:text-red-500 active:scale-90"
+                      className="flex h-10 flex-1 items-center justify-center rounded-l-xl text-gray-700 transition-all duration-150 hover:bg-red-50 hover:text-red-500 active:scale-90"
                       aria-label={cartQty <= 1 ? "Eliminar del carrito" : "Quitar uno"}
                     >
                       {cartQty <= 1 ? <Trash2 size={14} /> : <Minus size={15} />}
                     </button>
-                    <span className="flex h-10 min-w-[48px] items-center justify-center border-x border-gray-100 px-3 text-sm font-bold text-gray-900">
+                    <span className="relative flex h-10 min-w-[48px] items-center justify-center border-x border-gray-100 px-3 text-sm font-bold text-gray-900">
                       {cartQty}
+                      {/* Float animations — between qty and + button */}
+                      {floatAnims.map((anim, i) => (
+                        <span
+                          key={anim.key}
+                          className="pointer-events-none absolute right-0 bottom-full z-20 text-base font-black"
+                          style={{
+                            color: anim.type === "plus" ? "#22c55e" : "#f87171",
+                            WebkitTextStroke: "0.3px rgba(150,150,150,0.35)",
+                            textShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                            animation: "detailFloatUp 0.9s ease-out forwards",
+                            marginRight: i % 2 !== 0 ? "-8px" : "4px",
+                          }}
+                        >
+                          {anim.type === "plus" ? "+1" : "\u22121"}
+                        </span>
+                      ))}
                     </span>
                     <button
                       onClick={handleAddToCart}
@@ -1008,7 +1074,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                 ) : (
                   <button
                     onClick={handleAddToCart}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] py-2.5 text-sm font-bold text-white shadow-lg transition-all duration-200 hover:bg-[#1d4ed8] hover:shadow-xl active:scale-[0.97]"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] py-3 text-sm font-bold text-white shadow-lg transition-all duration-200 hover:bg-[#1d4ed8] hover:shadow-xl active:scale-[0.97]"
                   >
                     <ShoppingCart size={15} /> Añadir al carrito
                   </button>
@@ -1037,11 +1103,6 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                 />
               </button>
 
-              {/* Shipping badge */}
-              <div className="flex h-10 items-center gap-1.5 rounded-xl bg-[#2563eb] px-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5a1 1 0 0 1-1 1h-2"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-                <span className="text-[11px] font-bold text-white">&lt;{SITE_CONFIG.dispatchHours}h</span>
-              </div>
             </div>
             {typeof product.maxPerUser === "number" && (
               <p className="text-xs text-gray-500">Máx. {product.maxPerUser} uds/persona</p>
@@ -1052,7 +1113,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           </div>
 
           {/* 7. Payment + Shipping + points */}
-          <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+          <div className="-mt-1.5 rounded-xl border border-gray-100 bg-gray-50 p-3">
             <div className="flex items-start gap-3">
               {/* Left: payment */}
               <div className="flex-1">
@@ -1062,15 +1123,15 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   {[
+                    { src: "/images/payment/paypal.svg", alt: "PayPal", h: "h-8" },
                     { src: "/images/payment/bizum.svg", alt: "Bizum", h: "h-8" },
                     { src: "/images/payment/visa.svg", alt: "Visa", h: "h-8" },
                     { src: "/images/payment/mastercard.svg", alt: "Mastercard", h: "h-9" },
-                    { src: "/images/payment/paypal.svg", alt: "PayPal", h: "h-8" },
                     { src: "/images/payment/google-pay.svg", alt: "Google Pay", h: "h-8" },
-                    { src: "/images/payment/apple-pay.svg", alt: "Apple Pay", h: "h-9" },
+                    { src: "/images/payment/apple-pay.svg", alt: "Apple Pay", h: "h-8" },
                   ].map(({ src, alt, h }) => (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img key={src} src={src} alt={alt} className={`${h} w-auto rounded-md border border-gray-200 bg-white p-1`} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    <img key={src} src={src} alt={alt} className={`${h} w-auto rounded-md border border-gray-200 bg-white ${alt === "Apple Pay" || alt === "Google Pay" ? "p-0.5" : "p-1"}`} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   ))}
                 </div>
               </div>
@@ -1090,12 +1151,10 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           </div>
 
           {/* Share */}
-          <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-1.5">
+          <div className="-mt-1 rounded-xl border border-gray-100 bg-gray-50 px-3 py-1.5">
             <ShareButtons url={productUrl} title={inlineTitle} />
           </div>
 
-          {/* Complete your order — in right column, fewer products */}
-          <CompleteYourOrder game={product.game} category={product.category} />
         </div>
       </div>
 
@@ -1106,86 +1165,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
 
 
 
-      {/* Box ↔ Pack link */}
-      {(() => {
-        const linkedId = product.linkedPackId ?? product.linkedBoxId;
-        if (!linkedId) return null;
-        const linked = getMergedById(linkedId);
-        if (!linked) return null;
-        const isBox = !!product.linkedPackId;
-        const linkedImage = linked.images[0];
-        const gameConfig = GAME_CONFIG[linked.game];
-        const linkedHref = linked.slug.includes("-")
-          ? `/${linked.game}/${linked.category}/${linked.slug}`
-          : `/producto?id=${linked.id}`;
-        return (
-          <section className="mb-8">
-            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-              <div className="flex flex-col sm:flex-row">
-                {/* Image */}
-                <Link href={linkedHref} className="flex-shrink-0 bg-gray-50 p-4 sm:w-36">
-                  {linkedImage ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={linkedImage} alt={linked.name} className="mx-auto h-28 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).src = "/images/placeholder-product.svg"; }} />
-                  ) : (
-                    <div className="flex h-28 items-center justify-center text-4xl">
-                      {gameConfig?.emoji ?? "🃏"}
-                    </div>
-                  )}
-                </Link>
-                {/* Info */}
-                <div className="flex flex-1 flex-col justify-center p-5">
-                  <p className="mb-1 text-[10px] font-bold tracking-widest text-gray-400 uppercase">
-                    {isBox ? "También disponible como sobre suelto" : "Compra la caja completa y ahorra"}
-                  </p>
-                  <Link href={linkedHref} className="mb-2 text-base font-bold text-gray-900 hover:text-[#2563eb]">
-                    {linked.name}
-                  </Link>
-                  <div className="mb-3 flex flex-wrap items-center gap-3">
-                    <span className="text-lg font-bold" style={{ color: gameConfig?.color ?? "#2563eb" }}>
-                      {linked.price.toFixed(2)}€
-                    </span>
-                    <span className="text-xs text-gray-400">IVA incl.</span>
-                    {isBox && product.packsPerBox && (
-                      <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-600">
-                        Precio por sobre: {(product.price / product.packsPerBox).toFixed(2)}€
-                      </span>
-                    )}
-                    {!isBox && linked.packsPerBox && (
-                      <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-bold text-green-600">
-                        {linked.packsPerBox} sobres · Ahorras {((product.price * linked.packsPerBox) - linked.price).toFixed(2)}€
-                      </span>
-                    )}
-                  </div>
-                  {/* Pack/box info badges */}
-                  <div className="flex flex-wrap gap-2">
-                    {product.packsPerBox && (
-                      <span className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
-                        📦 {product.packsPerBox} sobres por caja
-                      </span>
-                    )}
-                    {product.cardsPerPack && (
-                      <span className="rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700">
-                        🃏 {product.cardsPerPack} cartas por sobre
-                      </span>
-                    )}
-                    {linked.packsPerBox && !isBox && (
-                      <span className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
-                        📦 {linked.packsPerBox} sobres en la caja
-                      </span>
-                    )}
-                    {linked.cardsPerPack && isBox && (
-                      <span className="rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700">
-                        🃏 {linked.cardsPerPack} cartas por sobre
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        );
-      })()}
+      {/* Box ↔ Pack link removed — info already shown in buy box pills */}
 
       {/* Cross-sell */}
       {related.length > 0 && (

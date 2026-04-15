@@ -658,4 +658,36 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       </div>
     `),
   },
+  {
+    id: "restock_suscripcion",
+    name: "Confirmación de alerta de restock",
+    subject: "🔔 Alerta activada — {{producto}} — TCG Academy",
+    description: "Se envía cuando un usuario se suscribe para recibir aviso de restock de un producto agotado.",
+    variables: ["nombre", "producto", "producto_url", "producto_imagen", "idioma"],
+    html: wrapEmail(`
+      <div class="hero">
+        <h1>🔔 Alerta activada</h1>
+        <p>Te avisaremos en cuanto llegue</p>
+      </div>
+      <div class="content">
+        <p>Hola {{nombre}},</p>
+        <p>Hemos registrado tu alerta para <strong>{{producto}}</strong>. En cuanto volvamos a recibir unidades te enviaremos un email para que puedas conseguirlo antes que nadie.</p>
+        <div class="info-box" style="text-align:center">
+          <img src="{{producto_imagen}}" alt="{{producto}}" style="max-height:160px;margin:0 auto 16px;display:block;border-radius:12px" />
+          <strong style="font-size:16px">{{producto}}</strong><br/>
+          <span style="font-size:13px;color:#6b7280">Idioma: {{idioma}}</span><br/>
+          <span style="color:#d97706;font-weight:700;font-size:14px;margin-top:8px;display:inline-block">🔔 Alerta activa — te avisaremos</span>
+        </div>
+        <div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:16px;padding:20px;text-align:center;margin:24px 0">
+          <p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#92400e">¿Sabías que…?</p>
+          <p style="margin:0;font-size:13px;color:#78350f">Los productos agotados suelen volver en cantidades muy limitadas. Al activar esta alerta tendrás ventaja para hacerte con él antes de que se agote de nuevo.</p>
+        </div>
+        <p style="text-align:center; margin: 24px 0;">
+          <a href="{{producto_url}}" class="btn-secondary">Ver producto</a>
+        </p>
+        <p style="color:#6b7280;font-size:13px">Mientras tanto, puedes explorar el mismo producto en otros idiomas que sí tenemos disponibles. A veces la versión japonesa o coreana esconde las mismas cartas a un precio diferente.</p>
+        <p>¡Buenas partidas! 🎴<br/><strong>El equipo de TCG Academy</strong></p>
+      </div>
+    `),
+  },
 ];

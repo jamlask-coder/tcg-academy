@@ -19,6 +19,10 @@ interface LanguageFlagProps {
   showLabel?: boolean;
   /** Flag size: "sm" (default, for cards/filters) | "md" (for product page) */
   size?: "sm" | "md";
+  /** Highlight with a border ring — used to mark the current product's language */
+  highlighted?: boolean;
+  /** Render only the flag icon without the pill container */
+  bare?: boolean;
   className?: string;
 }
 
@@ -30,25 +34,34 @@ export function LanguageFlag({
   language,
   showLabel = false,
   size = "sm",
+  highlighted = false,
+  bare = false,
   className = "",
 }: LanguageFlagProps) {
   const country = LANG_TO_COUNTRY[language.toUpperCase()];
   if (!country) return null;
 
   const fullName = LANGUAGE_NAMES[language.toUpperCase()] ?? language;
-  const flagW = size === "md" ? 32 : 20;
-  const flagH = size === "md" ? 24 : 15;
+  const flagW = size === "md" ? 24 : 20;
+  const flagH = size === "md" ? 18 : 15;
   const labelCls = size === "md" ? "text-xs font-semibold text-gray-700" : "text-[10px] font-bold text-gray-700";
+  const highlightCls = highlighted ? "ring-2 ring-gray-900 ring-offset-1" : "";
+
+  const flagEl = (
+    <span
+      className={`fi fi-${country} flex-shrink-0`}
+      style={{ width: flagW, height: flagH, display: "inline-block", borderRadius: 2 }}
+    />
+  );
+
+  if (bare) return flagEl;
 
   return (
     <div
       title={fullName}
-      className={`inline-flex items-center gap-1.5 rounded bg-white/80 px-1.5 py-0.5 leading-none shadow-sm backdrop-blur-sm select-none ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded bg-white/80 px-1.5 py-0.5 leading-none shadow-sm backdrop-blur-sm select-none ${highlightCls} ${className}`}
     >
-      <span
-        className={`fi fi-${country}`}
-        style={{ width: flagW, height: flagH, display: "inline-block", borderRadius: 2 }}
-      />
+      {flagEl}
       {showLabel && (
         <span className={`ml-0.5 ${labelCls}`}>
           {fullName}

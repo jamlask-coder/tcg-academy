@@ -141,7 +141,12 @@ export function QuickView({ product, onClose }: Props) {
               const si = getStockInfo(product.inStock ? product.stock : 0);
               return (
                 <div className={`flex items-center gap-2 text-sm font-semibold ${si.color}`}>
-                  <div className={`h-2 w-2 rounded-full ${si.dotColor}`} />
+                  <span className="relative flex h-2 w-2">
+                    {si.pulse && (
+                      <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${si.dotColor}`} />
+                    )}
+                    <span className={`relative inline-flex h-2 w-2 rounded-full ${si.dotColor}`} />
+                  </span>
                   {si.label}
                 </div>
               );

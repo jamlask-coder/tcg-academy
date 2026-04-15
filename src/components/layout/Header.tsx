@@ -728,7 +728,7 @@ export function Header() {
             className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
             aria-label={user?.role === "admin" ? "Panel de administración" : "Mi cuenta"}
           >
-            <User size={20} className="text-white" />
+            <User size={22} className="text-white" />
           </Link>
 
           {/* 2. Favorites */}
@@ -738,7 +738,7 @@ export function Header() {
               className="relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
               aria-label="Favoritos"
             >
-              <Heart size={20} className="text-white" fill={favCount > 0 ? "white" : "none"} />
+              <Heart size={22} className="text-white" fill={favCount > 0 ? "white" : "none"} />
               {favCount > 0 && (
                 <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
                   {favCount}
@@ -754,7 +754,7 @@ export function Header() {
               className="relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
               aria-label={mounted ? `Carrito (${count} artículos)` : "Carrito"}
             >
-              <ShoppingCart size={20} className="text-white" />
+              <ShoppingCart size={22} className="text-white" />
               {mounted && count > 0 && (
                 <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
                   {count > 99 ? "99+" : count}

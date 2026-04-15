@@ -18,6 +18,7 @@ export interface StockInfo {
   color: string;       // text color class
   bgColor: string;     // bg color class
   dotColor: string;    // dot/indicator color class
+  pulse: boolean;      // whether the dot should pulse/blink
 }
 
 export const STOCK_THRESHOLDS = {
@@ -34,6 +35,7 @@ export function getStockInfo(stock: number | undefined): StockInfo {
       color: "text-green-600",
       bgColor: "bg-green-50",
       dotColor: "bg-green-500",
+      pulse: true,
     };
   }
   if (stock === 0) {
@@ -43,6 +45,7 @@ export function getStockInfo(stock: number | undefined): StockInfo {
       color: "text-red-600",
       bgColor: "bg-red-50",
       dotColor: "bg-red-500",
+      pulse: false,
     };
   }
   if (stock <= STOCK_THRESHOLDS.lastUnits) {
@@ -52,6 +55,7 @@ export function getStockInfo(stock: number | undefined): StockInfo {
       color: "text-red-600",
       bgColor: "bg-red-50",
       dotColor: "bg-red-500",
+      pulse: true,
     };
   }
   if (stock <= STOCK_THRESHOLDS.lowStock) {
@@ -61,6 +65,7 @@ export function getStockInfo(stock: number | undefined): StockInfo {
       color: "text-amber-600",
       bgColor: "bg-amber-50",
       dotColor: "bg-amber-500",
+      pulse: true,
     };
   }
   return {
@@ -69,5 +74,6 @@ export function getStockInfo(stock: number | undefined): StockInfo {
     color: "text-green-600",
     bgColor: "bg-green-50",
     dotColor: "bg-green-500",
+    pulse: true,
   };
 }
