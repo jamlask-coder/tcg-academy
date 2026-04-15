@@ -24,6 +24,7 @@ export function MegaMenu({ game, onClose, logoCenterX }: Props) {
   const prevSlugRef = useRef(game.slug);
   const containerRef = useRef<HTMLDivElement>(null);
   const [layout, setLayout] = useState<{ left: number; width: number; height: number } | null>(null);
+  const [positioned, setPositioned] = useState(false);
   const hasRendered = useRef(false);
 
   const logoCenterRef = useRef(logoCenterX);
@@ -36,6 +37,7 @@ export function MegaMenu({ game, onClose, logoCenterX }: Props) {
     const cx = logoCenterRef.current;
     const left = cx != null ? clampX(cx, w) : 0;
     setLayout({ left, width: w, height: h });
+    setPositioned(true);
   }, []);
 
   // When game prop changes — crossfade content
@@ -51,6 +53,14 @@ export function MegaMenu({ game, onClose, logoCenterX }: Props) {
     return () => clearTimeout(t);
   }, [game]);
 
+  // Recalculate position when logoCenterX changes (hover between logos)
+  useEffect(() => {
+    if (logoCenterX == null || !containerRef.current) return;
+    const w = containerRef.current.scrollWidth;
+    const h = containerRef.current.scrollHeight;
+    setLayout({ left: clampX(logoCenterX, w), width: w, height: h });
+  }, [logoCenterX]);
+
   // Measure after new content is visible
   useEffect(() => {
     if (!contentVisible) return;
@@ -64,7 +74,7 @@ export function MegaMenu({ game, onClose, logoCenterX }: Props) {
 
   const { color, columns } = displayedGame;
 
-  // No CSS transition on first render (appear in place), then animate everything uniformly
+  // No CSS transition on first render (appear in place), then animate
   const cssTransition = hasRendered.current
     ? `left ${TRANSITION}, width ${TRANSITION}, height ${TRANSITION}, border-top-color ${TRANSITION}`
     : `border-top-color ${TRANSITION}`;
@@ -72,11 +82,11 @@ export function MegaMenu({ game, onClose, logoCenterX }: Props) {
   return (
     <motion.div
       initial={{ opacity: 0, y: -6 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{ opacity: positioned ? 1 : 0, y: positioned ? 0 : -6 }}
       exit={{ opacity: 0, y: -6 }}
       transition={{
-        opacity: { duration: 0.3, ease: "easeOut" },
-        y: { duration: 0.35, ease: "easeOut" },
+        opacity: { duration: 0.2, ease: "easeOut" },
+        y: { duration: 0.25, ease: "easeOut" },
       }}
       className="absolute top-0 border-t-2 bg-white shadow-2xl"
       style={{

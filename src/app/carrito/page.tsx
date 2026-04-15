@@ -171,7 +171,7 @@ export default function CartPage() {
                       <Minus size={12} />
                     </button>
                     <span
-                      className="w-8 text-center text-sm font-bold"
+                      className="w-12 text-center text-sm font-bold"
                       aria-label={`Cantidad: ${item.quantity}`}
                     >
                       {item.quantity}

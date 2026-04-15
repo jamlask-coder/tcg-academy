@@ -100,10 +100,8 @@ function LocalProductCardInner({ product }: Props) {
     CARD_CATEGORIES.has(product.category) &&
     (product.game === "pokemon" || product.game === "riftbound");
 
-  // Singles/card categories get portrait TCG-card aspect ratio
-  const isSingles = isCardCategory;
   const imageAspect = "aspect-square";
-  const imageObjectFit = "object-contain p-2";
+  const imageObjectFit = "object-contain px-2 pt-8 pb-0";
   // Show second image on hover if available
   const displayImage = hovered && product.images[1] ? product.images[1] : image;
 
@@ -141,8 +139,17 @@ function LocalProductCardInner({ product }: Props) {
         </div>
       )}
 
-      {/* ── ESQUINA SUPERIOR IZQUIERDA: NUEVO → descuento → corazón ── */}
+      {/* ── ESQUINA SUPERIOR IZQUIERDA: stock → NUEVO → descuento → corazón ── */}
       <div className="absolute top-2 left-2 z-10 flex flex-col items-start gap-1">
+        {(() => {
+          const si = getStockInfo(product.inStock ? product.stock : 0);
+          if (si.level === "unlimited" || si.level === "available") return null;
+          return (
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${si.level === "out" ? "bg-gray-500 text-white" : si.level === "last" ? "bg-red-500 text-white" : "bg-amber-500 text-white"}`}>
+              {si.level === "out" ? "AGOTADO" : si.label.toUpperCase()}
+            </span>
+          );
+        })()}
         {isNewProduct(product) && (
           <span className="animate-badge-pulse rounded-full bg-green-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
             NUEVO
@@ -168,18 +175,9 @@ function LocalProductCardInner({ product }: Props) {
         )}
       </div>
 
-      {/* ── ESQUINA SUPERIOR DERECHA: bandera de idioma + estado stock ── */}
+      {/* ── ESQUINA SUPERIOR DERECHA: bandera de idioma ── */}
       <div className="absolute top-2 right-2 z-10 flex flex-col items-end gap-1">
         {product.language && <LanguageFlag language={product.language} size="md" />}
-        {(() => {
-          const si = getStockInfo(product.inStock ? product.stock : 0);
-          if (si.level === "unlimited" || si.level === "available") return null;
-          return (
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${si.level === "out" ? "bg-gray-500 text-white" : si.level === "last" ? "bg-red-500 text-white" : "bg-amber-500 text-white"}`}>
-              {si.level === "out" ? "AGOTADO" : si.label.toUpperCase()}
-            </span>
-          );
-        })()}
       </div>
 
       {/* ── FRANJA INFERIOR: Añadir al carrito (desktop hover) ── */}
@@ -305,7 +303,7 @@ function LocalProductCardInner({ product }: Props) {
                 {anim.type === "plus" ? "+1" : "−1"}
               </span>
             ))}
-            <div className="flex items-center gap-0 rounded-full bg-white shadow-md">
+            <div className="flex items-center overflow-hidden rounded-full bg-white shadow-md">
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -313,15 +311,15 @@ function LocalProductCardInner({ product }: Props) {
                   if (cartQty <= 1) removeItem(cartKey);
                   else updateQty(cartKey, cartQty - 1);
                 }}
-                className="flex h-7 w-7 items-center justify-center rounded-l-full text-xs font-bold text-gray-700 transition-colors active:text-red-500"
+                className="flex h-8 w-8 items-center justify-center text-xs font-bold text-gray-700 transition-colors hover:bg-red-50 active:text-red-500"
                 aria-label={cartQty <= 1 ? "Eliminar del carrito" : "Quitar uno"}
               >
                 {cartQty <= 1 ? <Trash2 size={11} /> : "−"}
               </button>
-              <span className="min-w-[18px] text-center text-xs font-bold text-gray-900">{cartQty}</span>
+              <span className="flex h-8 w-10 items-center justify-center border-x border-gray-100 text-xs font-bold text-gray-900">{cartQty}</span>
               <button
                 onClick={handleAddToCart}
-                className="flex h-7 w-7 items-center justify-center rounded-r-full text-xs font-bold text-gray-700 transition-colors active:text-green-500"
+                className="flex h-8 w-8 items-center justify-center text-xs font-bold text-gray-700 transition-colors hover:bg-green-50 active:text-green-500"
                 aria-label="Añadir uno más"
               >
                 +
@@ -347,19 +345,22 @@ function LocalProductCardInner({ product }: Props) {
         {isCardCategory ? (
           <div className="relative">
             <HoloCard intensity="subtle">{imageBlock}</HoloCard>
-            {/* Badges outside holo tilt */}
+            {/* Badge idioma — derecha */}
             <div className="pointer-events-none absolute top-2 right-2 z-20 flex flex-col items-end gap-1">
               {product.language && <LanguageFlag language={product.language} size="md" />}
-              {(() => {
-                const si2 = getStockInfo(product.inStock ? product.stock : 0);
-                if (si2.level === "unlimited" || si2.level === "available") return null;
-                return (
+            </div>
+            {/* Badge stock — izquierda */}
+            {(() => {
+              const si2 = getStockInfo(product.inStock ? product.stock : 0);
+              if (si2.level === "unlimited" || si2.level === "available") return null;
+              return (
+                <div className="pointer-events-none absolute top-2 left-2 z-20">
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${si2.level === "out" ? "bg-gray-500 text-white" : si2.level === "last" ? "bg-red-500 text-white" : "bg-amber-500 text-white"}`}>
                     {si2.level === "out" ? "AGOTADO" : si2.label.toUpperCase()}
                   </span>
-                );
-              })()}
-            </div>
+                </div>
+              );
+            })()}
           </div>
         ) : (
           imageBlock

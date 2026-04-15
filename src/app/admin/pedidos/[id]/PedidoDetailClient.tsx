@@ -572,7 +572,7 @@ export default function PedidoDetailClient() {
                   <div key={item.id} className="flex items-center gap-4 rounded-xl bg-gray-50 p-3">
                     {image ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={image} alt={item.name} className="h-14 w-14 flex-shrink-0 rounded-lg bg-white object-cover" />
+                      <img src={image} alt={item.name} className="h-14 w-14 flex-shrink-0 rounded-lg bg-white object-cover" onError={(e) => { (e.target as HTMLImageElement).src = "/images/placeholder-product.svg"; }} />
                     ) : (
                       <div
                         className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-lg text-xl"

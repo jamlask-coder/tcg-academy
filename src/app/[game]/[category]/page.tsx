@@ -4,6 +4,7 @@ import {
   GAME_CONFIG,
   CATEGORY_LABELS,
   PRODUCTS,
+  ACCESSORY_CATEGORIES,
   getProductsByGameAndCategory,
   getAllCategories,
 } from "@/data/products";
@@ -17,18 +18,27 @@ export function generateStaticParams() {
   const seen = new Set<string>();
   const gameKeys = Object.keys(GAME_CONFIG);
 
-  // Categories from actual products
+  // Categories from actual products (including virtual "accesorios")
   for (const game of gameKeys) {
     const cats = [
       ...new Set(
         PRODUCTS.filter((p) => p.game === game).map((p) => p.category),
       ),
     ];
+    let hasAccessory = false;
     for (const category of cats) {
+      if (ACCESSORY_CATEGORIES.has(category)) { hasAccessory = true; continue; }
       const key = `${game}/${category}`;
       if (!seen.has(key)) {
         seen.add(key);
         params.push({ game, category });
+      }
+    }
+    if (hasAccessory) {
+      const key = `${game}/accesorios`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        params.push({ game, category: "accesorios" });
       }
     }
   }

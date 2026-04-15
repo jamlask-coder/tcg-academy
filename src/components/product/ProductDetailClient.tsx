@@ -7,7 +7,6 @@ import {
   Plus,
   Minus,
   Trash2,
-  Clock,
   Check,
   Bell,
 } from "lucide-react";
@@ -24,12 +23,11 @@ import {
   isNewProduct,
   type LocalProduct,
   GAME_CONFIG,
-  CATEGORY_LABELS,
   CARD_CATEGORIES,
-  LANGUAGE_NAMES,
 } from "@/data/products";
 import { getMergedProducts, getMergedById } from "@/lib/productStore";
 import { SetHighlightCards } from "@/components/product/SetHighlightCards";
+import { CompleteYourOrder } from "@/components/product/CompleteYourOrder";
 import { LanguageFlag } from "@/components/ui/LanguageFlag";
 import { DiscountBadgeEdit } from "@/components/ui/DiscountBadgeEdit";
 import { usePrice } from "@/hooks/usePrice";
@@ -259,6 +257,24 @@ function PriceDisplay({
           </>
         )}
       </div>
+      {/* Savings badge: box vs buying packs individually */}
+      {product.linkedPackId && product.packsPerBox && (() => {
+        const pack = getMergedById(product.linkedPackId);
+        if (!pack) return null;
+        const packsTotalPrice = pack.price * product.packsPerBox;
+        const savings = packsTotalPrice - displayPrice;
+        if (savings <= 0) return null;
+        const pct = Math.round((savings / packsTotalPrice) * 100);
+        return (
+          <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-green-100 bg-green-50 px-3 py-1.5">
+            <span className="text-lg font-bold text-green-600">-{pct}%</span>
+            <div className="flex flex-col text-xs leading-tight">
+              <span className="font-semibold text-green-700">Ahorras {savings.toFixed(2)}€</span>
+              <span className="text-green-600/70">vs comprar {product.packsPerBox} sobres sueltos ({packsTotalPrice.toFixed(2)}€)</span>
+            </div>
+          </div>
+        );
+      })()}
       {/* Reference prices for privileged roles */}
       {(retailPrice !== undefined || wholesaleRef !== undefined) && (
         <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-400">
@@ -349,6 +365,20 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
   const isCardCategory = CARD_CATEGORIES.has(product.category);
 
   const { displayPrice } = usePrice(product);
+
+  // Admin: drag to reorder thumbnails
+  const dragIdx = useRef<number | null>(null);
+  const handleDragStart = (i: number) => { dragIdx.current = i; };
+  const handleDrop = (targetIdx: number) => {
+    const from = dragIdx.current;
+    if (from === null || from === targetIdx) return;
+    const imgs = [...inlineImages];
+    const [moved] = imgs.splice(from, 1);
+    imgs.splice(targetIdx, 0, moved);
+    setInlineImages(imgs);
+    setActiveImg(targetIdx);
+    dragIdx.current = null;
+  };
 
   // Lightbox
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -487,7 +517,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
   const related = getRelated(product);
 
   return (
-    <div className="mx-auto max-w-[1100px] px-4 py-4 sm:px-6 lg:px-12">
+    <div className="mx-auto max-w-[1280px] px-4 py-4 sm:px-6 lg:px-8">
       {/* Confirm delete modal */}
       <ConfirmationModal
         isOpen={deleteConfirmOpen}
@@ -533,7 +563,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           {catLabel}
         </Link>
         <span>/</span>
-        <span className="max-w-[200px] truncate font-medium text-gray-800">
+        <span className="font-medium text-gray-800">
           {product.name}
         </span>
       </nav>
@@ -544,7 +574,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           <HoloCard
             intensity="full"
             active={isCardCategory}
-            className="mb-3 rounded-2xl"
+            className="mb-1.5 rounded-2xl"
           >
             <div
               ref={imgContainerRef}
@@ -567,6 +597,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                     src={displayImages[activeImg]!}
                     alt={inlineTitle}
                     className={`pointer-events-none h-full w-full object-contain transition-transform duration-300 group-hover/img:scale-[1.03] ${isCardCategory ? "p-4" : "p-2"}`}
+                    onError={(e) => { (e.target as HTMLImageElement).src = "/images/placeholder-product.svg"; }}
                   />
                   {/* Ampliar button — aparece al hacer hover */}
                   <button
@@ -643,40 +674,45 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                   displayPrice={inlinePrice}
                   comparePrice={inlineComparePrice}
                   onSave={setInlineComparePrice}
-                  badgeClassName="bg-red-500 text-white text-xs font-bold px-2.5 py-0.5 rounded-full shadow-sm"
+                  badgeClassName="bg-red-500 text-white text-sm font-bold px-3 py-1 rounded-full shadow-md"
                 />
               </div>
 
             </div>
           </HoloCard>
-          {product.images.length > 1 && (
+          {inlineImages.length > 1 && (
             <div className="flex gap-2 overflow-x-auto">
-              {product.images.map((img, i) => (
+              {inlineImages.map((img, i) => (
                 <button
-                  key={i}
+                  key={`${img}-${i}`}
                   onClick={() => setActiveImg(i)}
+                  draggable={isAdmin}
+                  onDragStart={isAdmin ? () => handleDragStart(i) : undefined}
+                  onDragOver={isAdmin ? (e) => e.preventDefault() : undefined}
+                  onDrop={isAdmin ? () => handleDrop(i) : undefined}
                   className={`relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border-2 transition ${
                     i === activeImg
                       ? "border-[#2563eb]"
                       : "border-gray-200 hover:border-gray-300"
-                  }`}
+                  } ${isAdmin ? "cursor-grab active:cursor-grabbing" : ""}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={img}
                     alt={`${product.name} ${i + 1}`}
                     loading="lazy"
-                    className="h-full w-full object-cover"
+                    className="pointer-events-none h-full w-full object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).src = "/images/placeholder-product.svg"; }}
                   />
+                  {isAdmin && (
+                    <span className="absolute bottom-0.5 left-0.5 rounded bg-black/60 px-1 text-[9px] font-bold text-white">{i + 1}</span>
+                  )}
                 </button>
               ))}
             </div>
           )}
 
-          {/* Best cards from this set — below image */}
-          {(product.category === "booster-box" || product.category === "sobres") && (
-            <SetHighlightCards product={product} />
-          )}
+
         </div>
 
         {/* Lightbox */}
@@ -691,6 +727,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
               alt={inlineTitle}
               className="max-h-[90vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl"
               onClick={(e) => e.stopPropagation()}
+              onError={(e) => { (e.target as HTMLImageElement).src = "/images/placeholder-product.svg"; }}
             />
             <button
               onClick={() => setLightboxOpen(false)}
@@ -716,7 +753,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
         )}
 
         {/* Buy box */}
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           {/* 1. Title + admin buttons */}
           <div className="flex items-start justify-between gap-3">
             <h1 className="flex flex-1 items-center gap-2.5 text-xl leading-tight font-bold text-gray-900 md:text-2xl">
@@ -884,7 +921,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
 
           {/* 6. Add to cart + favorite */}
           <div className="flex flex-col gap-2">
-            <div className="relative flex items-center gap-0">
+            <div className="relative flex items-center gap-2">
               {/* Float animations */}
               <style>{`
                 @keyframes detailFloatUp {
@@ -920,13 +957,13 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                 </span>
               ))}
 
-              {/* Cart button */}
-              <div style={{ animation: cartQty === 1 && added ? "detailScaleIn 0.3s ease-out" : "none" }}>
+              {/* Cart button — fixed width so it doesn't shrink when counter appears */}
+              <div className="min-w-[200px]" style={{ animation: cartQty === 1 && added ? "detailScaleIn 0.3s ease-out" : "none" }}>
                 {isOutOfStock ? (
                   restockSubscribed ? (
                     <button
                       disabled
-                      className="flex items-center justify-center gap-2 rounded-l-xl bg-green-50 px-8 py-2.5 text-sm font-bold text-green-600"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-green-50 py-2.5 text-sm font-bold text-green-600"
                     >
                       <Check size={15} /> Te avisaremos
                     </button>
@@ -939,30 +976,30 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                         subscribeRestock(product.id, product.name, email, name);
                         setRestockSubscribed(true);
                       }}
-                      className="flex items-center justify-center gap-2 rounded-l-xl bg-amber-50 border border-amber-200 px-8 py-2.5 text-sm font-bold text-amber-700 transition hover:bg-amber-100 active:scale-[0.97]"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-50 border border-amber-200 py-2.5 text-sm font-bold text-amber-700 transition hover:bg-amber-100 active:scale-[0.97]"
                     >
                       <Bell size={15} /> Avisarme cuando haya stock
                     </button>
                   )
                 ) : cartQty > 0 ? (
-                  <div className="flex items-center gap-0">
+                  <div className="flex w-full items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg">
                     <button
                       onClick={() => {
                         triggerFloat("minus");
                         if (cartQty <= 1) removeItem(cartKey);
                         else updateQty(cartKey, cartQty - 1);
                       }}
-                      className="flex h-10 w-10 items-center justify-center rounded-l-xl bg-white text-gray-700 shadow-lg transition-all duration-150 hover:bg-red-50 hover:text-red-500 active:scale-90"
+                      className="flex h-10 flex-1 items-center justify-center text-gray-700 transition-all duration-150 hover:bg-red-50 hover:text-red-500 active:scale-90"
                       aria-label={cartQty <= 1 ? "Eliminar del carrito" : "Quitar uno"}
                     >
                       {cartQty <= 1 ? <Trash2 size={14} /> : <Minus size={15} />}
                     </button>
-                    <span className="flex h-10 min-w-[36px] items-center justify-center bg-white px-2 text-sm font-bold text-gray-900 shadow-lg">
+                    <span className="flex h-10 min-w-[48px] items-center justify-center border-x border-gray-100 px-3 text-sm font-bold text-gray-900">
                       {cartQty}
                     </span>
                     <button
                       onClick={handleAddToCart}
-                      className="flex h-10 w-10 items-center justify-center rounded-r-xl bg-white text-gray-700 shadow-lg transition-all duration-150 hover:bg-green-50 hover:text-green-600 active:scale-90"
+                      className="flex h-10 flex-1 items-center justify-center text-gray-700 transition-all duration-150 hover:bg-green-50 hover:text-green-600 active:scale-90"
                       aria-label="Añadir uno más"
                     >
                       <Plus size={15} />
@@ -971,36 +1008,40 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                 ) : (
                   <button
                     onClick={handleAddToCart}
-                    className="flex items-center justify-center gap-2 rounded-l-xl bg-[#2563eb] px-10 py-2.5 text-sm font-bold text-white shadow-lg transition-all duration-200 hover:bg-[#1d4ed8] hover:shadow-xl active:scale-[0.97]"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] py-2.5 text-sm font-bold text-white shadow-lg transition-all duration-200 hover:bg-[#1d4ed8] hover:shadow-xl active:scale-[0.97]"
                   >
                     <ShoppingCart size={15} /> Añadir al carrito
                   </button>
                 )}
               </div>
 
-              {/* Favorite — attached to the right of the cart button */}
+              {/* Favorite — circular button */}
               <button
                 onClick={() => {
                   setHeartAnimKey((k) => k + 1);
                   toggleFavorite(product.id);
                 }}
                 aria-label={isFavorite(product.id) ? "Quitar de favoritos" : "Añadir a favoritos"}
-                className={`flex h-10 items-center justify-center rounded-r-xl border-l px-3 transition-all duration-300 ${
-                  isOutOfStock
-                    ? "bg-gray-50 text-gray-400 border-gray-200"
-                    : cartQty > 0
-                      ? "bg-white text-gray-400 border-gray-200 shadow-lg hover:text-red-400 hover:bg-red-50"
-                      : "bg-[#1d4ed8] text-white/70 border-white/20 hover:text-white hover:bg-[#1a3fc7]"
+                className={`flex h-10 w-10 items-center justify-center rounded-full transition-all duration-300 ${
+                  isFavorite(product.id)
+                    ? "bg-red-50 text-red-500 shadow-md"
+                    : "bg-gray-100 text-gray-400 hover:text-red-400 hover:bg-red-50"
                 }`}
               >
                 <Heart
                   key={heartAnimKey}
-                  size={15}
-                  fill={isFavorite(product.id) ? (cartQty > 0 ? "#ef4444" : "white") : "none"}
-                  color={isFavorite(product.id) ? (cartQty > 0 ? "#ef4444" : "white") : "currentColor"}
+                  size={16}
+                  fill={isFavorite(product.id) ? "#ef4444" : "none"}
+                  color={isFavorite(product.id) ? "#ef4444" : "currentColor"}
                   style={{ animation: heartAnimKey > 0 ? "heartPop 0.4s ease-out" : "none" }}
                 />
               </button>
+
+              {/* Shipping badge */}
+              <div className="flex h-10 items-center gap-1.5 rounded-xl bg-[#2563eb] px-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-white"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5a1 1 0 0 1-1 1h-2"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                <span className="text-[11px] font-bold text-white">&lt;{SITE_CONFIG.dispatchHours}h</span>
+              </div>
             </div>
             {typeof product.maxPerUser === "number" && (
               <p className="text-xs text-gray-500">Máx. {product.maxPerUser} uds/persona</p>
@@ -1010,52 +1051,60 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
             )}
           </div>
 
-          {/* 7. Payment + points */}
+          {/* 7. Payment + Shipping + points */}
           <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-green-500"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
-              <span>Pago 100% seguro</span>
+            <div className="flex items-start gap-3">
+              {/* Left: payment */}
+              <div className="flex-1">
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-green-500"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                  <span>Pago 100% seguro</span>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {[
+                    { src: "/images/payment/bizum.svg", alt: "Bizum", h: "h-8" },
+                    { src: "/images/payment/visa.svg", alt: "Visa", h: "h-8" },
+                    { src: "/images/payment/mastercard.svg", alt: "Mastercard", h: "h-9" },
+                    { src: "/images/payment/paypal.svg", alt: "PayPal", h: "h-8" },
+                    { src: "/images/payment/google-pay.svg", alt: "Google Pay", h: "h-8" },
+                    { src: "/images/payment/apple-pay.svg", alt: "Apple Pay", h: "h-9" },
+                  ].map(({ src, alt, h }) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={src} src={src} alt={alt} className={`${h} w-auto rounded-md border border-gray-200 bg-white p-1`} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="mt-2 flex items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/payment/visa.svg" alt="Visa" className="h-5 rounded bg-white px-1.5 py-0.5" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/payment/mastercard.svg" alt="Mastercard" className="h-5 rounded bg-white px-1 py-0.5" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/payment/paypal.svg" alt="PayPal" className="h-5 rounded bg-white px-1.5 py-0.5" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/payment/bizum.svg" alt="Bizum" className="h-5 rounded bg-white px-1.5 py-0.5" />
-            </div>
-            <div className="mt-2.5 border-t border-gray-100 pt-2.5">
+            <div className="mt-1.5 border-t border-gray-100 pt-1.5">
               <div className="flex items-center gap-1.5 text-xs text-amber-700">
                 <span className="text-amber-400">★</span>
                 <span>
                   Consigue <strong>{Math.round(displayPrice * 100)}</strong> puntos con esta compra
                 </span>
               </div>
-              <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
-                Acumula puntos con cada compra y canjéalos por descuentos exclusivos.
-                Crea o únete a un <Link href="/cuenta/grupo" className="font-semibold text-[#2563eb] hover:underline">grupo de amigos</Link> para
-                ganar puntos extra entre todos.{" "}
-                <Link href="/puntos" className="font-semibold text-[#2563eb] hover:underline">¿Cómo funcionan los puntos?</Link>
+              <p className="mt-1 text-[11px] text-gray-400">
+                Acumula puntos y canjéalos por descuentos.{" "}
+                <Link href="/puntos" className="font-semibold text-[#2563eb] hover:underline">¿Cómo funcionan?</Link>
               </p>
             </div>
           </div>
 
-          {/* 8. Shipping info */}
-          <div className="flex items-center gap-2.5 rounded-xl bg-gray-50 p-3 text-sm">
-            <Clock size={16} className="flex-shrink-0 text-[#2563eb]" />
-            <span className="text-gray-600">
-              Enviamos en menos de {SITE_CONFIG.dispatchHours}h con{" "}
-              <strong>{SITE_CONFIG.carrier}</strong> — Envío gratis desde{" "}
-              {SITE_CONFIG.shippingThreshold}€
-            </span>
+          {/* Share */}
+          <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-1.5">
+            <ShareButtons url={productUrl} title={inlineTitle} />
           </div>
 
-          {/* Share */}
-          <ShareButtons url={productUrl} title={inlineTitle} />
+          {/* Complete your order — in right column, fewer products */}
+          <CompleteYourOrder game={product.game} category={product.category} />
         </div>
       </div>
+
+      {/* Best cards — full width */}
+      {(product.category === "booster-box" || product.category === "sobres") && (
+        <SetHighlightCards product={product} />
+      )}
+
+
 
       {/* Box ↔ Pack link */}
       {(() => {
@@ -1077,7 +1126,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                 <Link href={linkedHref} className="flex-shrink-0 bg-gray-50 p-4 sm:w-36">
                   {linkedImage ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={linkedImage} alt={linked.name} className="mx-auto h-28 w-auto object-contain" />
+                    <img src={linkedImage} alt={linked.name} className="mx-auto h-28 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).src = "/images/placeholder-product.svg"; }} />
                   ) : (
                     <div className="flex h-28 items-center justify-center text-4xl">
                       {gameConfig?.emoji ?? "🃏"}
@@ -1140,8 +1189,8 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
 
       {/* Cross-sell */}
       {related.length > 0 && (
-        <section className="mb-8">
-          <h2 className="mb-6 text-xl font-bold text-gray-900">
+        <section className="mt-10 mb-8">
+          <h2 className="mb-4 text-xl font-bold text-gray-900">
             También te puede interesar
           </h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">

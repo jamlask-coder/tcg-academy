@@ -65,7 +65,7 @@ function GridContent({ products, color, game, category }: Props) {
   }, [game, category]);
 
   const langs = params.get("lang")?.split(",").filter(Boolean) ?? [];
-  const inStock = params.get("inStock") === "1";
+  const inStock = params.get("inStock") !== "0";
   const priceMin = params.get("priceMin")
     ? Number(params.get("priceMin"))
     : null;
@@ -98,7 +98,7 @@ function GridContent({ products, color, game, category }: Props) {
 
   const activeCount =
     langs.length +
-    (inStock ? 1 : 0) +
+    (!inStock ? 1 : 0) +
     (priceMin !== null ? 1 : 0) +
     (priceMax !== null ? 1 : 0);
 

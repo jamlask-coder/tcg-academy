@@ -177,11 +177,12 @@ export function Navbar() {
       if (lockedRef.current) return;
       cancelClose();
       setActiveItem(key);
-      // Calculate left offset of the logo relative to the viewport
+      // Calculate center X of the logo relative to the navRef container
       const logoEl = logoRefsMap.current.get(key);
-      if (logoEl) {
-        const rect = logoEl.getBoundingClientRect();
-        setActiveLogoLeft(rect.left + rect.width / 2);
+      if (logoEl && navRef.current) {
+        const logoRect = logoEl.getBoundingClientRect();
+        const navRect = navRef.current.getBoundingClientRect();
+        setActiveLogoLeft(logoRect.left + logoRect.width / 2 - navRect.left);
       } else {
         setActiveLogoLeft(null);
       }
@@ -213,7 +214,7 @@ export function Navbar() {
       : null;
 
   return (
-    <div ref={navRef} className="z-40 hidden lg:block" onMouseLeave={handleNavMouseLeave}>
+    <div ref={navRef} className="relative z-40 hidden lg:block" onMouseLeave={handleNavMouseLeave}>
       <nav
         className="relative overflow-hidden border-b border-white/10"
         style={{ background: "#1f2937", minHeight: NAV_HEIGHT }}
@@ -408,8 +409,8 @@ export function Navbar() {
         </Container>
       </nav>
 
-      {/* Dropdown panels */}
-      <div className="absolute right-0 left-0">
+      {/* Dropdown panels — absolute, positioned by navRef (relative parent) */}
+      <div className="absolute right-0 left-0 z-50">
         <AnimatePresence>
           {activeGameData && (
             <MegaMenu game={activeGameData} onClose={closeNow} logoCenterX={activeLogoLeft ?? undefined} />

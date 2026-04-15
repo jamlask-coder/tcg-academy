@@ -597,11 +597,19 @@ export default function CheckoutPage() {
                         ],
                       },
                       {
-                        id: "transferencia",
-                        label: "Transferencia SEPA",
-                        sub: "Plazo adicional de 1–2 días hábiles",
+                        id: "google-pay",
+                        label: "Google Pay",
+                        sub: "Pago rápido con tu cuenta Google",
                         logos: [
-                          { src: "/images/payment/sepa.svg", alt: "SEPA Credit Transfer", w: 52, h: 18 },
+                          { src: "/images/payment/google-pay.svg", alt: "Google Pay", w: 50, h: 18 },
+                        ],
+                      },
+                      {
+                        id: "apple-pay",
+                        label: "Apple Pay",
+                        sub: "Pago rápido con tu dispositivo Apple",
+                        logos: [
+                          { src: "/images/payment/apple-pay.svg", alt: "Apple Pay", w: 50, h: 18 },
                         ],
                       },
                     ]

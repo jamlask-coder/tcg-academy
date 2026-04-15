@@ -174,13 +174,14 @@ export function Footer() {
             />
             <div className="flex flex-wrap items-center justify-center gap-1.5">
               {[
-                { src: "/images/payment/visa.svg", alt: "Visa", w: 36, h: 12, bg: "bg-white" },
-                { src: "/images/payment/mastercard.svg", alt: "Mastercard", w: 32, h: 20, bg: "bg-white" },
-                { src: "/images/payment/paypal.svg", alt: "PayPal", w: 50, h: 14, bg: "bg-white" },
-                { src: "/images/payment/bizum.svg", alt: "Bizum", w: 44, h: 14, bg: "bg-white" },
-                { src: "/images/payment/sepa.svg", alt: "SEPA", w: 44, h: 16, bg: "bg-white" },
-              ].map(({ src, alt, w, h, bg }) => (
-                <span key={alt} className={`flex h-7 items-center justify-center rounded-md border border-white/10 px-1.5 ${bg}`}>
+                { src: "/images/payment/bizum.svg", alt: "Bizum", w: 46, h: 16 },
+                { src: "/images/payment/visa.svg", alt: "Visa", w: 40, h: 14 },
+                { src: "/images/payment/mastercard.svg", alt: "Mastercard", w: 38, h: 24 },
+                { src: "/images/payment/paypal.svg", alt: "PayPal", w: 52, h: 16 },
+                { src: "/images/payment/google-pay.svg", alt: "Google Pay", w: 38, h: 16 },
+                { src: "/images/payment/apple-pay.svg", alt: "Apple Pay", w: 44, h: 18 },
+              ].map(({ src, alt, w, h }) => (
+                <span key={alt} className="flex h-8 items-center justify-center rounded-md border border-white/10 bg-white px-2">
                   <Image src={src} alt={alt} width={w} height={h} className="object-contain" />
                 </span>
               ))}

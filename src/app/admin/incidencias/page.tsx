@@ -118,7 +118,7 @@ function IncidentCard({ incident, onUpdate }: { incident: Incident; onUpdate: ()
                 {incident.photos.map((src, i) => (
                   <button key={i} onClick={() => setPhotoIndex(i)} className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt={`foto ${i + 1}`} className="h-20 w-20 rounded-xl border border-gray-200 object-cover hover:opacity-80 transition-opacity" />
+                    <img src={src} alt={`foto ${i + 1}`} className="h-20 w-20 rounded-xl border border-gray-200 object-cover hover:opacity-80 transition-opacity" onError={(e) => { (e.target as HTMLImageElement).src = "/images/placeholder-product.svg"; }} />
                   </button>
                 ))}
               </div>
@@ -137,6 +137,7 @@ function IncidentCard({ incident, onUpdate }: { incident: Incident; onUpdate: ()
                 alt="foto ampliada"
                 className="max-h-[90vh] max-w-[90vw] rounded-2xl object-contain"
                 onClick={(e) => e.stopPropagation()}
+                onError={(e) => { (e.target as HTMLImageElement).src = "/images/placeholder-product.svg"; }}
               />
             </div>
           )}

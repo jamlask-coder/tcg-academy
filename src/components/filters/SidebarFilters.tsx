@@ -22,7 +22,7 @@ function useFilters() {
   const pathname = usePathname();
 
   const langs = params.get("lang")?.split(",").filter(Boolean) ?? [];
-  const inStock = params.get("inStock") === "1";
+  const inStock = params.get("inStock") !== "0";
   const priceMin = params.get("priceMin")
     ? Number(params.get("priceMin"))
     : null;
@@ -54,7 +54,7 @@ function useFilters() {
   );
 
   const setInStock = useCallback(
-    (v: boolean) => update("inStock", v ? "1" : null),
+    (v: boolean) => update("inStock", v ? null : "0"),
     [update],
   );
 
@@ -74,7 +74,7 @@ function useFilters() {
 
   const activeCount =
     langs.length +
-    (inStock ? 1 : 0) +
+    (!inStock ? 1 : 0) +
     (priceMin !== null ? 1 : 0) +
     (priceMax !== null ? 1 : 0);
 

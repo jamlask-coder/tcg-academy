@@ -29,7 +29,7 @@ export function RecentlyViewedSection({ excludeId }: Props) {
 
   return (
     <section className="mb-12">
-      <h2 className="mb-6 text-xl font-bold text-gray-900">
+      <h2 className="mb-4 text-xl font-bold text-gray-900">
         Vistos recientemente
       </h2>
       {/* Mobile: horizontal scroll; desktop: grid */}
