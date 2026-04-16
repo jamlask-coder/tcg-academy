@@ -348,13 +348,24 @@ export default function CheckoutPage() {
           },
         };
 
-        // FIXED: Calculate per-item discount proportion for correct VAT
+        // FIXED: Distribute discount with remainder correction on last line
+        // This prevents rounding drift (0.01-0.02€) across multiple lines
         const totalProductDiscount = couponDiscount + pointsDiscount;
         const discountRatio = total > 0 ? totalProductDiscount / total : 0;
 
+        let discountDistributed = 0;
         const invoiceItems = items.map((item, idx) => {
-          // Each item gets a proportional share of the global discount
-          const itemDiscountPct = Math.min(discountRatio * 100, 100);
+          const lineGross = Math.round(item.price * item.quantity * 100) / 100;
+          let lineDiscountAmt: number;
+          if (idx === items.length - 1) {
+            // Last line absorbs remaining cents
+            lineDiscountAmt = Math.round((totalProductDiscount - discountDistributed) * 100) / 100;
+          } else {
+            lineDiscountAmt = Math.round(lineGross * discountRatio * 100) / 100;
+          }
+          discountDistributed = Math.round((discountDistributed + lineDiscountAmt) * 100) / 100;
+          const lineDiscountPct = lineGross > 0 ? Math.min((lineDiscountAmt / lineGross) * 100, 100) : 0;
+
           return buildLineItem({
             lineNumber: idx + 1,
             productId: item.key,
@@ -362,7 +373,7 @@ export default function CheckoutPage() {
             quantity: item.quantity,
             unitPriceWithVAT: item.price,
             vatRate: 21,
-            discount: itemDiscountPct,
+            discount: lineDiscountPct,
           });
         });
 

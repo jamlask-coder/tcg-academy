@@ -444,17 +444,27 @@ export async function regenerateInvoiceForOrder(
     const totalDiscount = (order.couponDiscount ?? 0) + (order.pointsDiscount ?? 0);
     const discountRatio = subtotal > 0 ? totalDiscount / subtotal : 0;
 
-    const invoiceItems = order.items.map((item, idx) =>
-      buildLineItem({
+    let discDistributed = 0;
+    const invoiceItems = order.items.map((item, idx) => {
+      const lineGross = Math.round(item.price * item.quantity * 100) / 100;
+      let lineDiscAmt: number;
+      if (idx === order.items.length - 1) {
+        lineDiscAmt = Math.round((totalDiscount - discDistributed) * 100) / 100;
+      } else {
+        lineDiscAmt = Math.round(lineGross * discountRatio * 100) / 100;
+      }
+      discDistributed = Math.round((discDistributed + lineDiscAmt) * 100) / 100;
+      const pct = lineGross > 0 ? Math.min((lineDiscAmt / lineGross) * 100, 100) : 0;
+      return buildLineItem({
         lineNumber: idx + 1,
         productId: item.key,
         description: item.name,
         quantity: item.quantity,
         unitPriceWithVAT: item.price,
         vatRate: 21,
-        discount: Math.min(discountRatio * 100, 100),
-      }),
-    );
+        discount: pct,
+      });
+    });
 
     const paymentMap: Record<string, typeof PaymentMethod[keyof typeof PaymentMethod]> = {
       tarjeta: PaymentMethod.TARJETA,
