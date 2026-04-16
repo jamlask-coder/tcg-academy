@@ -170,7 +170,7 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     href: "/dragon-ball",
     color: "#d97706",
     abbrev: "DBS",
-    logoSrc: "/images/logos/dragonball.png",
+    logoSrc: "/images/logos/dragonball-clean.png",
     columns: [
       {
         title: "Producto Sellado",

@@ -99,7 +99,7 @@ export default async function CategoryPage({
   return (
     <div>
       {/* Category nav */}
-      <div className="sticky-under-nav border-b border-gray-100 bg-white">
+      <div className="sticky-under-nav hidden border-b border-gray-100 bg-white lg:block">
         <div className="mx-auto max-w-[1400px] px-4 py-3 sm:px-6">
           <CategoryTags
             items={[
@@ -117,7 +117,7 @@ export default async function CategoryPage({
       </div>
 
       {/* Products with sidebar filters */}
-      <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 sm:py-10">
+      <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 sm:py-5">
         {products.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-gray-200 py-24 text-center">
             <p className="font-medium text-gray-400">
@@ -137,6 +137,14 @@ export default async function CategoryPage({
             color={color}
             game={game}
             category={category}
+            categoryItems={[
+              { id: "todo", label: "Todo", href: `/${game}` },
+              ...allCategories.map((cat) => ({
+                id: cat,
+                label: CATEGORY_LABELS[cat] ?? cat,
+                href: `/${game}/${cat}`,
+              })),
+            ]}
           />
         )}
       </div>

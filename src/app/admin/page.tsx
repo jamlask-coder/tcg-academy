@@ -17,6 +17,12 @@ import type { KpiMode } from "@/components/admin/SalesChart";
 import { useDiscounts } from "@/context/DiscountContext";
 import { countNewIncidents } from "@/services/incidentService";
 import {
+  getOrderMetrics,
+  getRevenueSummary,
+  getTopProducts,
+} from "@/services/analyticsService";
+import type { OrderMetrics, TopProduct } from "@/services/analyticsService";
+import {
   ALL_ORDERS,
   MOCK_USERS,
   MOCK_ADMIN_COUPONS,
@@ -74,6 +80,20 @@ export default function AdminDashboard() {
       window.removeEventListener("tcga:incidents:updated", update);
       window.removeEventListener("storage", update);
     };
+  }, []);
+
+  // ── Analytics from real order data ──
+  const [metrics, setMetrics] = useState<OrderMetrics>(() => getOrderMetrics());
+  const [totalRevFromOrders, setTotalRevFromOrders] = useState(() => getRevenueSummary().total);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>(() => getTopProducts(5));
+  useEffect(() => {
+    const refresh = () => {
+      setMetrics(getOrderMetrics());
+      setTotalRevFromOrders(getRevenueSummary().total);
+      setTopProducts(getTopProducts(5));
+    };
+    window.addEventListener("storage", refresh);
+    return () => window.removeEventListener("storage", refresh);
   }, []);
 
   const [revPeriod, setRevPeriod] = useState<"hoy"|"7d"|"30d"|"3m"|"1a"|"todo">("hoy");
@@ -303,6 +323,57 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Analytics KPIs from real order data */}
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5">
+          <p className="text-xs font-medium text-gray-500">Ingresos totales (pedidos)</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">
+            {totalRevFromOrders.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+          </p>
+          <p className="mt-1 text-xs text-gray-400">{metrics.totalOrders} pedidos</p>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5">
+          <p className="text-xs font-medium text-gray-500">Valor medio pedido</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">
+            {metrics.avgOrderValue.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+          </p>
+          <p className="mt-1 text-xs text-gray-400">{metrics.avgItemsPerOrder} items/pedido</p>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5">
+          <p className="text-xs font-medium text-gray-500">Tasa devoluciones</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{metrics.returnRate}%</p>
+          <p className="mt-1 text-xs text-gray-400">Sobre total de pedidos</p>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5">
+          <p className="text-xs font-medium text-gray-500">Tasa incidencias</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{metrics.incidentRate}%</p>
+          <p className="mt-1 text-xs text-gray-400">Sobre total de pedidos</p>
+        </div>
+      </div>
+
+      {/* Top products */}
+      {topProducts.length > 0 && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-5">
+          <h2 className="mb-4 font-bold text-gray-900">Top productos (por ingresos)</h2>
+          <div className="space-y-2">
+            {topProducts.map((p, i) => (
+              <div key={p.id} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2">
+                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb]/10 text-xs font-bold text-[#2563eb]">
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-gray-800">{p.name}</p>
+                  <p className="text-xs text-gray-400">{p.totalQty} uds vendidas</p>
+                </div>
+                <span className="flex-shrink-0 text-sm font-bold text-gray-900">
+                  {p.totalRevenue.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
     </div>
   );

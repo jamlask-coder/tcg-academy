@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { User, UserRole, RegisterData } from "@/types/user";
 import { ensureReferralCode, registerWithReferral } from "@/services/pointsService";
+import { sanitizeString } from "@/utils/sanitize";
 
 interface AuthContextValue {
   user: User | null;
@@ -17,6 +18,7 @@ interface AuthContextValue {
   login: (
     emailOrUsername: string,
     password: string,
+    rememberMe?: boolean,
   ) => Promise<{ ok: boolean; error?: string }>;
   logout: () => void;
   register: (data: RegisterData) => Promise<{ ok: boolean; error?: string }>;
@@ -34,6 +36,7 @@ const STORAGE_KEY = "tcgacademy_user";
 const REGISTERED_KEY = "tcgacademy_registered";
 const USERNAMES_KEY = "tcgacademy_usernames"; // username (lowercase) → email
 const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+const REMEMBER_ME_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 /** Normalize username: lowercase, trim */
 function normalizeUsername(u: string): string {
@@ -67,7 +70,7 @@ async function sha256hex(input: string): Promise<string> {
 }
 
 /** Hash a password for storage — used for registered (non-demo) users */
-async function hashPassword(pw: string): Promise<string> {
+export async function hashPassword(pw: string): Promise<string> {
   return sha256hex(PASSWORD_HASH_SALT + pw);
 }
 
@@ -170,11 +173,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const parsed = JSON.parse(stored) as User & {
             _loginAt?: number;
             _hash?: string;
+            _expiresIn?: number;
           };
           const loginAt = parsed._loginAt ?? 0;
+          const expiresIn = parsed._expiresIn ?? SESSION_EXPIRY_MS;
 
           // Expired session
-          if (Date.now() - loginAt >= SESSION_EXPIRY_MS) {
+          if (Date.now() - loginAt >= expiresIn) {
             localStorage.removeItem(STORAGE_KEY);
             return;
           }
@@ -205,11 +210,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     verify();
   }, []);
 
-  const persist = useCallback((u: User | null) => {
+  const persist = useCallback((u: User | null, expiresIn?: number) => {
     setUser(u);
     if (u) {
       const loginAt = Date.now();
-      const data = { ...u, _loginAt: loginAt };
+      const data = { ...u, _loginAt: loginAt, _expiresIn: expiresIn ?? SESSION_EXPIRY_MS };
       // Write immediately so auth state is available synchronously
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       // Then append integrity hash asynchronously
@@ -238,7 +243,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (
       emailOrUsername: string,
       password: string,
+      rememberMe?: boolean,
     ): Promise<{ ok: boolean; error?: string }> => {
+      const expiresIn = rememberMe ? REMEMBER_ME_MS : SESSION_EXPIRY_MS;
       // Resolve username → email if input has no @
       let resolvedEmail = emailOrUsername.trim();
       if (!resolvedEmail.includes("@")) {
@@ -255,7 +262,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Demo users — plaintext comparison (by design; no real backend)
       const demo = DEMO_USERS[key];
       if (demo && demo.password === password) {
-        persist(demo.user);
+        persist(demo.user, expiresIn);
         return { ok: true };
       }
 
@@ -275,7 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               entry.password = hashed;
               localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered));
             }
-            persist(entry.user);
+            persist(entry.user, expiresIn);
             return { ok: true };
           }
         }
@@ -315,13 +322,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const newUserId = `user-${crypto.randomUUID()}`;
         const refCode = ensureReferralCode(newUserId);
+        const sanitizedName = sanitizeString(data.name);
+        const sanitizedLastName = sanitizeString(data.lastName);
+        const sanitizedPhone = data.phone ? sanitizeString(data.phone) : "";
+        const sanitizedUsername = username ? sanitizeString(username) : undefined;
         const newUser: User = {
           id: newUserId,
           email,
-          ...(username ? { username } : {}),
-          name: data.name,
-          lastName: data.lastName,
-          phone: data.phone,
+          ...(sanitizedUsername ? { username: sanitizedUsername } : {}),
+          name: sanitizedName,
+          lastName: sanitizedLastName,
+          phone: sanitizedPhone,
           role: "cliente",
           addresses: [
             {
@@ -371,7 +382,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback(
     (updates: Partial<Pick<User, "name" | "lastName" | "phone">>) => {
       if (!user) return;
-      const updated = { ...user, ...updates };
+      const sanitizedUpdates: Partial<Pick<User, "name" | "lastName" | "phone">> = {};
+      if (updates.name !== undefined) sanitizedUpdates.name = sanitizeString(updates.name);
+      if (updates.lastName !== undefined) sanitizedUpdates.lastName = sanitizeString(updates.lastName);
+      if (updates.phone !== undefined) sanitizedUpdates.phone = sanitizeString(updates.phone);
+      const updated = { ...user, ...sanitizedUpdates };
       persist(updated);
       // Also update in registered store if applicable
       try {

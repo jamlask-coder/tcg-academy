@@ -66,8 +66,9 @@ export function CategoryTags({
   const visibleItems = hasOverflow ? items.slice(0, maxCollapsed) : items;
   const overflowItems = hasOverflow ? items.slice(maxCollapsed) : [];
 
+  // CRITICO: justify-center es OBLIGATORIO — nunca quitar
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap justify-center gap-1.5">
       {visibleItems.map((item) => (
         <TagPill
           key={item.id}

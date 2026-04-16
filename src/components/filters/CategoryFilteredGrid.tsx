@@ -12,11 +12,18 @@ import {
   MobileFilterButton,
 } from "@/components/filters/SidebarFilters";
 
+interface CategoryItem {
+  id: string;
+  label: string;
+  href: string;
+}
+
 interface Props {
   products: LocalProduct[];
   color: string;
   game: string;
   category: string;
+  categoryItems?: CategoryItem[];
 }
 
 const PAGE_SIZE = 32;
@@ -32,7 +39,7 @@ function byDateDesc(a: LocalProduct, b: LocalProduct): number {
   return getTime(b) - getTime(a);
 }
 
-function GridContent({ products, color, game, category }: Props) {
+function GridContent({ products, color, game, category, categoryItems }: Props) {
   const isCardGrid = CARD_CATEGORIES.has(category);
   // Card grids: more columns (narrower cards); normal grids: fewer wider cards
   const gridCols = isCardGrid
@@ -125,16 +132,19 @@ function GridContent({ products, color, game, category }: Props) {
         filteredCount={filtered.length}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
+        categoryItems={categoryItems}
+        activeCategory={category}
       />
 
       {/* Main content */}
       <div className="min-w-0 flex-1">
         {/* Mobile filter bar */}
-        <div className="mb-3 flex items-center justify-end lg:hidden">
+        <div className="mb-3 lg:hidden">
           <MobileFilterButton
             onClick={() => setMobileOpen(true)}
             activeCount={activeCount}
             color={color}
+            categoryLabel={categoryItems?.find((c) => c.id === category)?.label}
           />
         </div>
 

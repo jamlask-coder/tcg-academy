@@ -201,3 +201,62 @@ export function formatExpiryDate(isoDate: string): string {
     year: "numeric",
   });
 }
+
+// ── Coupon usage tracking ─────────────────────────────────────────────────────
+
+const COUPON_USAGE_KEY = "tcgacademy_coupon_usage";
+
+interface CouponUsageRecord {
+  couponCode: string;
+  userId: string;
+  orderId: string;
+  date: string;
+}
+
+function loadCouponUsage(): CouponUsageRecord[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(
+      localStorage.getItem(COUPON_USAGE_KEY) ?? "[]",
+    ) as CouponUsageRecord[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Record that a coupon was used by a user in an order.
+ * Call after order is successfully created.
+ */
+export function recordCouponUsage(
+  couponCode: string,
+  userId: string,
+  orderId: string,
+): void {
+  if (typeof window === "undefined") return;
+  const usage = loadCouponUsage();
+  usage.unshift({
+    couponCode: couponCode.toUpperCase(),
+    userId,
+    orderId,
+    date: new Date().toISOString(),
+  });
+  // Cap at 1000 records
+  if (usage.length > 1000) usage.length = 1000;
+  localStorage.setItem(COUPON_USAGE_KEY, JSON.stringify(usage));
+}
+
+/**
+ * Get usage count for a coupon, optionally filtered by user.
+ */
+export function getCouponUsageCount(
+  couponCode: string,
+  userId?: string,
+): number {
+  const upper = couponCode.toUpperCase();
+  const usage = loadCouponUsage();
+  return usage.filter(
+    (r) =>
+      r.couponCode === upper && (userId === undefined || r.userId === userId),
+  ).length;
+}

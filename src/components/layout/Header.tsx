@@ -21,6 +21,8 @@ import {
   Home,
   Gamepad2,
   Inbox,
+  ChevronRight,
+  Menu,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
@@ -30,6 +32,7 @@ import { GAME_CONFIG } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
 import { useNotifications } from "@/context/NotificationContext";
 import { useDebounce } from "@/hooks/useDebounce";
+import { MobileDrawer } from "./MobileDrawer";
 import { checkRateLimit } from "@/utils/sanitize";
 import { countPendingOrders } from "@/data/mockData";
 import { countNewIncidents } from "@/services/incidentService";
@@ -238,7 +241,7 @@ function MobileTrustBar() {
   const { icon: Icon, text } = TRUST_MESSAGES[idx];
   return (
     <div
-      className="px-4 py-1.5 text-center text-xs text-white lg:hidden"
+      className="px-4 py-1 text-center text-xs text-white lg:hidden"
       style={{
         background:
           "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #2563eb 100%)",
@@ -494,6 +497,7 @@ export function Header() {
   const [mobileQuery, setMobileQuery] = useState("");
   const debouncedMobileQuery = useDebounce(mobileQuery, 300);
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
+  const [mobileSearchVisible, setMobileSearchVisible] = useState(false);
   const mobileSearchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -615,13 +619,23 @@ export function Header() {
       <MobileTrustBar />
 
       {/* ── Main bar: logo LEFT · search FILL · icons RIGHT ──── */}
-      <Container className="flex h-20 items-center justify-center gap-3">
-        {/* Logo — izquierda, alineado con Pokémon en la navbar */}
-        <Link href="/" className="flex shrink-0 items-center gap-2.5">
-          <span className="text-xl font-black tracking-tight text-white lg:text-2xl">
-            TCG <span className="text-amber-300">Academy</span>
-          </span>
-        </Link>
+      <Container className="flex h-12 items-center justify-between gap-3 lg:h-20 lg:justify-center">
+        {/* Hamburger + Logo */}
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            className="flex items-center justify-center rounded-lg p-1 text-white transition hover:bg-white/10 lg:hidden"
+            aria-label="Abrir menú"
+          >
+            <Menu size={24} />
+          </button>
+          <Link href="/" className="flex items-center">
+            <span className="text-[1.7rem] font-black tracking-tight text-white lg:text-2xl">
+              TCG <span className="text-amber-300">Academy</span>
+            </span>
+          </Link>
+        </div>
 
         {/* Middle zone: search + auth — ancho fijo, sin separar */}
         <div className="flex items-center gap-3">
@@ -722,20 +736,23 @@ export function Header() {
             </Link>
           )}
 
-          {/* 1. User icon */}
+          {/* 1. User icon — mobile shows "Identifícate" when not logged in */}
           <Link
             href={user ? (user.role === "admin" ? "/admin" : "/cuenta") : "/login"}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
+            className="flex items-center justify-center gap-1 rounded-lg p-1 transition hover:bg-white/10 lg:min-h-[44px] lg:gap-1.5 lg:p-2"
             aria-label={user?.role === "admin" ? "Panel de administración" : "Mi cuenta"}
           >
-            <User size={22} className="text-white" />
+            {!user && <span className="text-sm font-semibold text-white lg:hidden">Identifícate</span>}
+            {user && <span className="text-sm font-semibold text-white lg:hidden">{user.name?.split(" ")[0] ?? "Mi cuenta"}</span>}
+            {mounted && <ChevronRight size={14} className="text-white/60 lg:hidden" />}
+            <User size={24} className="text-white lg:h-[22px] lg:w-[22px]" />
           </Link>
 
-          {/* 2. Favorites */}
+          {/* 2. Favorites — desktop only */}
           {user?.role !== "admin" && (
             <Link
               href="/cuenta/favoritos"
-              className="relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
+              className="relative hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10 lg:flex"
               aria-label="Favoritos"
             >
               <Heart size={22} className="text-white" fill={favCount > 0 ? "white" : "none"} />
@@ -751,12 +768,12 @@ export function Header() {
           {user?.role !== "admin" && (
             <Link
               href="/carrito"
-              className="relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10"
+              className="relative flex items-center justify-center rounded-lg p-1 transition hover:bg-white/10 lg:min-h-[44px] lg:min-w-[44px] lg:p-2"
               aria-label={mounted ? `Carrito (${count} artículos)` : "Carrito"}
             >
-              <ShoppingCart size={22} className="text-white" />
+              <ShoppingCart size={24} className="text-white lg:h-[22px] lg:w-[22px]" />
               {mounted && count > 0 && (
-                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                <span className="absolute -top-2 -right-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white lg:top-0 lg:right-0 lg:h-[18px] lg:min-w-[18px] lg:text-[10px]">
                   {count > 99 ? "99+" : count}
                 </span>
               )}
@@ -766,9 +783,9 @@ export function Header() {
         </div>
       </Container>
 
-      {/* Mobile search bar — always visible */}
+      {/* Mobile search bar — hidden by default, shown when mobileSearchVisible */}
       <div
-        className="border-t border-white/10 px-4 pt-2 pb-3 lg:hidden"
+        className="border-t border-white/10 px-4 pt-1 pb-1.5 lg:hidden"
         ref={mobileSearchRef}
       >
         <form onSubmit={handleMobileSubmit} className="relative">
@@ -781,7 +798,7 @@ export function Header() {
             }}
             onFocus={() => setMobileDropdownOpen(true)}
             placeholder="Buscar cartas, sobres..."
-            className="h-11 w-full rounded-xl border-0 bg-white/15 pr-10 pl-4 text-sm text-white placeholder:text-white/60 focus:bg-white/25 focus:outline-none"
+            className="h-9 w-full rounded-xl border-0 bg-white/15 pr-10 pl-4 text-sm text-white placeholder:text-white/60 focus:bg-white/25 focus:outline-none"
             autoComplete="off"
           />
           <button
@@ -807,227 +824,13 @@ export function Header() {
       </div>
 
       {/* Mobile full-screen drawer */}
-      <div
-        className="fixed inset-0 z-[100] lg:hidden"
-        style={{
-          pointerEvents: menuOpen ? "auto" : "none",
-        }}
-      >
-        {/* Backdrop */}
-        <div
-          className="absolute inset-0 bg-black/50 transition-opacity duration-300"
-          style={{ opacity: menuOpen ? 1 : 0 }}
-          onClick={() => setMenuOpen(false)}
-          aria-hidden="true"
-        />
-
-        {/* Drawer panel */}
-        <div
-          className="absolute top-0 left-0 flex h-full w-[85vw] max-w-[340px] flex-col bg-white shadow-2xl transition-transform duration-300 ease-out"
-          style={{ transform: menuOpen ? "translateX(0)" : "translateX(-100%)" }}
-        >
-          {/* Drawer header */}
-          <div
-            className="flex flex-shrink-0 items-center justify-between px-5 py-4"
-            style={{
-              background:
-                "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #2563eb 100%)",
-            }}
-          >
-            <Link href="/" onClick={() => setMenuOpen(false)}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/logo-tcg.png"
-                alt="TCG Academy"
-                style={{ height: 32, width: "auto" }}
-              />
-            </Link>
-            <button
-              onClick={() => setMenuOpen(false)}
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-white/80 transition hover:bg-white/10"
-              aria-label="Cerrar menú"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          {/* Scrollable content */}
-          <div className="flex-1 overflow-y-auto">
-            {/* Games section */}
-            <div className="px-4 pt-5 pb-3">
-              <p className="mb-3 text-[10px] font-bold tracking-widest text-gray-400 uppercase">
-                Juegos TCG
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {(
-                  [
-                    ["Pokémon", "/pokemon", "#f59e0b", "pokemon.svg"],
-                    ["Magic: The Gathering", "/magic", "#7c3aed", "magic.svg"],
-                    ["One Piece", "/one-piece", "#1d4ed8", "onepiece.svg"],
-                    ["Riftbound", "/riftbound", "#ea580c", "riftbound.svg"],
-                    ["Disney Lorcana", "/lorcana", "#0891b2", "lorcana.png"],
-                    ["Dragon Ball", "/dragon-ball", "#d97706", "dragonball.png"],
-                    ["Yu-Gi-Oh!", "/yugioh", "#dc2626", "yugioh.png"],
-                    ["Naruto", "/naruto", "#ea580c", "naruto.svg"],
-                    ["Digimon TCG", "/digimon", "#2563eb", "digimon.svg"],
-                    ["Cyberpunk TCG", "/cyberpunk", "#d4e500", "cyberpunk.png"],
-                    ["Topps", "/topps", "#1d4ed8", "topps.svg"],
-                    ["Panini", "/panini", "#16a34a", "panini.png"],
-                  ] as [string, string, string, string][]
-                ).map(([label, href, color, logo]) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={() => setMenuOpen(false)}
-                    className="group relative overflow-hidden rounded-xl transition-transform active:scale-95"
-                    style={{ WebkitTapHighlightColor: "transparent" }}
-                  >
-                    <div
-                      className="flex flex-col items-center justify-center gap-2 px-2 py-3"
-                      style={{
-                        background: `linear-gradient(135deg, ${color}dd 0%, ${color}99 100%)`,
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`/images/logos/${logo}`}
-                        alt={label}
-                        className="h-9 w-auto object-contain drop-shadow"
-                        style={{ maxWidth: "80%" }}
-                      />
-                      <span className="text-center text-[10px] font-bold leading-tight text-white drop-shadow">
-                        {label}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-
-            <div className="mx-4 border-t border-gray-100" />
-
-            {/* Other links */}
-            <div className="px-4 pt-3 pb-3">
-              <p className="mb-3 text-[10px] font-bold tracking-widest text-gray-400 uppercase">
-                Más
-              </p>
-              <div className="space-y-1">
-                {(
-                  [
-                    ["Tiendas", "/tiendas", "#10b981"],
-                    ["Profesionales B2B", "/mayoristas", "#2563eb"],
-                  ] as [string, string, string][]
-                ).map(([label, href, color]) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={() => setMenuOpen(false)}
-                    className="flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 transition-colors active:bg-gray-100"
-                    style={{ WebkitTapHighlightColor: "transparent" }}
-                  >
-                    <div
-                      className="h-2 w-2 flex-shrink-0 rounded-full"
-                      style={{ backgroundColor: color }}
-                      aria-hidden="true"
-                    />
-                    <span className="text-sm font-medium text-gray-800">
-                      {label}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-
-            <div className="mx-4 border-t border-gray-100" />
-
-            {/* Auth section */}
-            <div className="px-4 pt-4 pb-6">
-              {user ? (
-                <div>
-                  <div className="mb-3 flex items-center gap-3 rounded-xl bg-gray-50 px-4 py-3">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-amber-400">
-                      <span className="text-sm font-bold text-white">
-                        {user.name[0]}
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-gray-800">
-                        {user.name}
-                      </p>
-                      <p className="truncate text-xs text-gray-500">
-                        {user.email ?? ""}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Link
-                      href="/cuenta"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 transition-colors active:bg-gray-100"
-                    >
-                      <User size={16} className="text-gray-400" />
-                      <span className="text-sm font-medium text-gray-800">
-                        Mi cuenta
-                      </span>
-                    </Link>
-                    <Link
-                      href="/cuenta/pedidos"
-                      onClick={() => setMenuOpen(false)}
-                      className="flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 transition-colors active:bg-gray-100"
-                    >
-                      <Package size={16} className="text-gray-400" />
-                      <span className="text-sm font-medium text-gray-800">
-                        Mis pedidos
-                      </span>
-                    </Link>
-                    {user.role === "admin" && (
-                      <Link
-                        href="/admin"
-                        onClick={() => setMenuOpen(false)}
-                        className="flex min-h-[44px] items-center gap-3 rounded-xl px-3 py-2.5 transition-colors active:bg-amber-50"
-                      >
-                        <Settings size={16} className="text-amber-500" />
-                        <span className="text-sm font-medium text-amber-700">
-                          Panel admin
-                        </span>
-                      </Link>
-                    )}
-                    <button
-                      onClick={() => {
-                        setMenuOpen(false);
-                        logout();
-                      }}
-                      className="flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 py-2.5 transition-colors active:bg-red-50"
-                    >
-                      <LogOut size={16} className="text-red-400" />
-                      <span className="text-sm font-medium text-red-600">
-                        Cerrar sesión
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <Link
-                    href="/login"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex h-12 w-full items-center justify-center rounded-xl bg-[#2563eb] text-sm font-bold text-white transition active:bg-[#1d4ed8]"
-                  >
-                    Iniciar sesión
-                  </Link>
-                  <Link
-                    href="/registro"
-                    onClick={() => setMenuOpen(false)}
-                    className="flex h-12 w-full items-center justify-center rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-700 transition active:bg-gray-50"
-                  >
-                    Crear cuenta
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      <MobileDrawer
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        user={user}
+        logout={logout}
+        pathname={pathname}
+      />
 
       <style>{`
         @keyframes headerShake {
@@ -1113,20 +916,23 @@ export function Header() {
             <span>Admin</span>
           </Link>
         ) : (
-          <Link
-            href="/cuenta/favoritos"
-            className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${pathname === "/cuenta/favoritos" ? "text-[#2563eb]" : "text-gray-500"}`}
+          <button
+            type="button"
+            onClick={() => {
+              setMobileSearchVisible((v) => !v);
+              if (!mobileSearchVisible) {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+                setTimeout(() => {
+                  const input = mobileSearchRef.current?.querySelector("input");
+                  if (input) input.focus();
+                }, 100);
+              }
+            }}
+            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${mobileSearchVisible ? "text-[#2563eb]" : "text-gray-500"}`}
           >
-            <span className="relative">
-              <Heart size={22} fill={favCount > 0 ? "currentColor" : "none"} />
-              {favCount > 0 && (
-                <span className="absolute -top-1 -right-2 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
-                  {favCount}
-                </span>
-              )}
-            </span>
-            <span>Favoritos</span>
-          </Link>
+            <Search size={22} />
+            <span>Buscar</span>
+          </button>
         )}
         <Link
           href={user ? (user.role === "admin" ? "/admin" : "/cuenta") : "/login"}

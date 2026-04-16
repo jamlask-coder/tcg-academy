@@ -23,10 +23,10 @@ import {
   Layers,
   Ticket,
   Wrench,
-  FilePlus,
   MessageSquare,
   Mail,
   Star,
+  Settings,
 } from "lucide-react";
 
 const SOLICITUDES_KEY = "tcgacademy_solicitudes";
@@ -66,6 +66,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/emails", label: "Emails automáticos", icon: Mail },
   { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart2 },
   { href: "/admin/herramientas", label: "Herramientas", icon: Wrench },
+  { href: "/admin/ajustes", label: "Ajustes", icon: Settings },
   { href: "/cuenta/datos", label: "Mis datos", icon: UserCircle },
 ];
 

@@ -1,9 +1,16 @@
 "use client";
 import { useState, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { SlidersHorizontal, X, ChevronDown, ChevronUp } from "lucide-react";
+import Link from "next/link";
+import { SlidersHorizontal, X, ChevronDown, ChevronUp, Check } from "lucide-react";
 import { LANGUAGE_NAMES } from "@/data/products";
 import { LanguageFlag } from "@/components/ui/LanguageFlag";
+
+interface CategoryItem {
+  id: string;
+  label: string;
+  href: string;
+}
 
 interface Props {
   availableLanguages: string[];
@@ -14,6 +21,9 @@ interface Props {
   // Mobile: controlled externally via MobileFilterButton
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+  // Category items for mobile unified drawer
+  categoryItems?: CategoryItem[];
+  activeCategory?: string;
 }
 
 function useFilters() {
@@ -380,12 +390,14 @@ export function SidebarFilters({
   filteredCount,
   mobileOpen = false,
   onMobileClose,
+  categoryItems,
+  activeCategory,
 }: Props) {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="sticky top-[calc(var(--header-h)+var(--cat-bar-h)+0.75rem)] hidden max-h-[calc(100vh-var(--header-h)-var(--cat-bar-h)-1.5rem)] w-[240px] flex-shrink-0 self-start overflow-y-auto lg:block">
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+      <aside className="sticky top-[calc(var(--header-h)+var(--cat-bar-h)+0.75rem)] hidden w-[240px] flex-shrink-0 lg:block">
+        <div className="max-h-[calc(100vh-var(--header-h)-var(--cat-bar-h)-1.5rem)] overflow-y-auto rounded-2xl border border-gray-200 bg-white p-4">
           <FilterContent
             availableLanguages={availableLanguages}
             minPrice={minPrice}
@@ -396,7 +408,7 @@ export function SidebarFilters({
         </div>
       </aside>
 
-      {/* Mobile slide-in */}
+      {/* Mobile bottom sheet */}
       {mobileOpen && (
         <>
           {/* Backdrop */}
@@ -405,26 +417,85 @@ export function SidebarFilters({
             onClick={onMobileClose}
             aria-hidden="true"
           />
-          {/* Panel */}
-          <div className="fixed inset-y-0 left-0 z-50 w-72 overflow-y-auto bg-white p-5 shadow-2xl lg:hidden">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm font-bold text-gray-800">
-                <SlidersHorizontal size={15} /> Filtros
+          {/* Bottom sheet panel */}
+          <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-hidden rounded-t-3xl bg-white shadow-2xl lg:hidden">
+            {/* Handle bar */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="h-1 w-10 rounded-full bg-gray-300" />
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 pb-3">
+              <div className="flex items-center gap-2 text-base font-bold text-gray-900">
+                <SlidersHorizontal size={16} />
+                Filtros
+                {filteredCount !== undefined && (
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-500">
+                    {filteredCount}
+                  </span>
+                )}
               </div>
               <button
                 onClick={onMobileClose}
                 aria-label="Cerrar filtros"
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition hover:bg-gray-200"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
-            <FilterContent
-              availableLanguages={availableLanguages}
-              minPrice={minPrice}
-              maxPrice={maxPrice}
-              color={color}
-            />
+
+            {/* Scrollable content */}
+            <div className="overflow-y-auto px-5 pt-4 pb-6" style={{ maxHeight: "calc(85vh - 80px)" }}>
+              {/* Categories section */}
+              {categoryItems && categoryItems.length > 0 && (
+                <div className="mb-5">
+                  <p className="mb-2.5 text-xs font-bold tracking-wide text-gray-400 uppercase">Categorías</p>
+                  <div className="flex flex-wrap gap-2">
+                    {categoryItems.map((item) => {
+                      const isActive = item.id === activeCategory;
+                      return (
+                        <Link
+                          key={item.id}
+                          href={item.href}
+                          onClick={onMobileClose}
+                          className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition ${
+                            isActive
+                              ? "text-white shadow-sm"
+                              : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                          }`}
+                          style={isActive ? { backgroundColor: color } : undefined}
+                        >
+                          {isActive && <Check size={13} strokeWidth={3} />}
+                          {item.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Divider */}
+              {categoryItems && categoryItems.length > 0 && <div className="mb-4 h-px bg-gray-100" />}
+
+              {/* Filters */}
+              <FilterContent
+                availableLanguages={availableLanguages}
+                minPrice={minPrice}
+                maxPrice={maxPrice}
+                color={color}
+              />
+            </div>
+
+            {/* Sticky bottom button */}
+            <div className="border-t border-gray-100 px-5 py-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
+              <button
+                onClick={onMobileClose}
+                className="w-full rounded-xl py-3 text-sm font-bold text-white transition active:scale-[0.98]"
+                style={{ backgroundColor: color }}
+              >
+                Ver {filteredCount ?? 0} productos
+              </button>
+            </div>
           </div>
         </>
       )}
@@ -432,34 +503,33 @@ export function SidebarFilters({
   );
 }
 
-// Standalone mobile filter button to place in the category page header
+// Standalone mobile filter button
 export function MobileFilterButton({
   onClick,
   activeCount,
   color,
+  categoryLabel,
 }: {
   onClick: () => void;
   activeCount: number;
   color: string;
+  categoryLabel?: string;
 }) {
+  const totalActive = activeCount + (categoryLabel && categoryLabel !== "Todo" ? 1 : 0);
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-semibold transition lg:hidden ${
-        activeCount > 0
-          ? "border-transparent text-white"
-          : "border-gray-200 text-gray-700"
-      }`}
-      style={
-        activeCount > 0 ? { backgroundColor: color, borderColor: color } : {}
-      }
-      aria-label="Mostrar filtros"
+      className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition active:scale-[0.98] lg:hidden"
+      aria-label="Mostrar filtros y categorías"
     >
-      <SlidersHorizontal size={14} />
-      Filtros
-      {activeCount > 0 && (
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/30 text-[11px] font-bold">
-          {activeCount}
+      <SlidersHorizontal size={15} />
+      <span>Filtros{categoryLabel && categoryLabel !== "Todo" ? ` · ${categoryLabel}` : ""}</span>
+      {totalActive > 0 && (
+        <span
+          className="flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-bold text-white"
+          style={{ backgroundColor: color }}
+        >
+          {totalActive}
         </span>
       )}
     </button>

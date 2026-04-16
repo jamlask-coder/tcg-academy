@@ -73,7 +73,7 @@ export default function LoginPage() {
     }
     setError("");
     setLoading(true);
-    const { ok, error: err } = await login(email, password);
+    const { ok, error: err } = await login(email, password, remember);
     setLoading(false);
     if (ok) {
       router.push(user?.role === "admin" ? "/admin" : "/cuenta");

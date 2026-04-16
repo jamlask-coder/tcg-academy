@@ -57,7 +57,7 @@ export default async function GamePage({
     <div>
       {/* Category nav */}
       {categories.length > 0 && (
-        <div className="sticky-under-nav border-b border-gray-100 bg-white">
+        <div className="sticky-under-nav hidden border-b border-gray-100 bg-white lg:block">
           <div className="mx-auto max-w-[1400px] px-4 py-3 sm:px-6">
             <CategoryTags
               items={[
@@ -76,7 +76,7 @@ export default async function GamePage({
       )}
 
       {/* Catálogo */}
-      <section className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6 sm:py-6">
+      <section className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 sm:py-5">
         {all.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-gray-200 py-24 text-center">
             <p className="font-medium text-gray-400">Catálogo en construcción</p>
@@ -90,6 +90,14 @@ export default async function GamePage({
             color={color}
             game={game}
             category="todo"
+            categoryItems={[
+              { id: "todo", label: "Todo", href: `/${game}` },
+              ...categories.map((cat) => ({
+                id: cat,
+                label: CATEGORY_LABELS[cat] ?? cat,
+                href: `/${game}/${cat}`,
+              })),
+            ]}
           />
         )}
       </section>

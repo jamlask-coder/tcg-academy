@@ -11,7 +11,47 @@ export default function RecuperarContrasenaPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
+
+    // Generate a crypto-random reset token
+    const tokenArr = new Uint8Array(24);
+    crypto.getRandomValues(tokenArr);
+    const token = Array.from(tokenArr)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    // Store reset token with 1h expiry
+    try {
+      const tokens = JSON.parse(
+        localStorage.getItem("tcgacademy_reset_tokens") ?? "{}",
+      ) as Record<string, { token: string; expiresAt: number }>;
+      tokens[email.toLowerCase()] = {
+        token,
+        expiresAt: Date.now() + 3600000,
+      };
+      localStorage.setItem("tcgacademy_reset_tokens", JSON.stringify(tokens));
+    } catch {
+      /* ignore */
+    }
+
+    // Log "sent email" entry
+    const resetLink = `${window.location.origin}/restablecer-contrasena?token=${token}&email=${encodeURIComponent(email.toLowerCase())}`;
+    try {
+      const sentEmails = JSON.parse(
+        localStorage.getItem("tcgacademy_sent_emails") ?? "[]",
+      ) as Array<Record<string, unknown>>;
+      sentEmails.unshift({
+        date: new Date().toISOString(),
+        to: email.toLowerCase(),
+        subject: "Restablece tu contraseña",
+        body: `Enlace para restablecer tu contraseña: ${resetLink}`,
+        status: "enviado",
+      });
+      if (sentEmails.length > 100) sentEmails.length = 100;
+      localStorage.setItem("tcgacademy_sent_emails", JSON.stringify(sentEmails));
+    } catch {
+      /* ignore */
+    }
+
     setLoading(false);
     setSubmitted(true);
   };

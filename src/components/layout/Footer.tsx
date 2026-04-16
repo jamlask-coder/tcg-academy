@@ -94,8 +94,10 @@ export function Footer() {
         `,
       }} />
       <Container className="relative z-10 py-8">
+{/* Shield watermark is inside the Tienda/Legal section below */}
+
         {/* Main grid: Brand | Tienda | Legal | Shield */}
-        <div className="mb-6 grid gap-12 sm:grid-cols-[2fr_1fr_1fr_auto]">
+        <div className="mb-6 grid gap-8 sm:grid-cols-[2fr_1fr_1fr_auto] sm:gap-12">
           {/* Brand */}
           <div>
             <Link href="/" className="mb-4 inline-flex items-center gap-2">
@@ -134,36 +136,45 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Tienda */}
-          <div>
-            <h3 className="mb-3 text-[10px] font-bold tracking-widest text-white/40 uppercase">
-              Tienda
-            </h3>
-            <ul className="space-y-2">
-              {LINKS.map(([label, href]) => (
-                <FooterLink key={href} href={href}>
-                  {label}
-                </FooterLink>
-              ))}
-            </ul>
+          {/* Tienda + Legal — side by side on mobile, with shield watermark behind */}
+          <div className="relative col-span-1 grid grid-cols-2 gap-6 sm:contents">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/logo-tcg-shield.png"
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute right-0 top-0 opacity-[0.15] sm:hidden"
+              style={{ width: 180, height: "auto" }}
+            />
+            <div>
+              <h3 className="mb-3 text-[10px] font-bold tracking-widest text-white/40 uppercase">
+                Tienda
+              </h3>
+              <ul className="space-y-2">
+                {LINKS.map(([label, href]) => (
+                  <FooterLink key={href} href={href}>
+                    {label}
+                  </FooterLink>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="mb-3 text-[10px] font-bold tracking-widest text-white/40 uppercase">
+                Legal
+              </h3>
+              <ul className="space-y-2">
+                {LEGAL.map(([label, href]) => (
+                  <FooterLink key={label} href={href}>
+                    {label}
+                  </FooterLink>
+                ))}
+              </ul>
+            </div>
           </div>
 
-          {/* Legal */}
-          <div>
-            <h3 className="mb-3 text-[10px] font-bold tracking-widest text-white/40 uppercase">
-              Legal
-            </h3>
-            <ul className="space-y-2">
-              {LEGAL.map(([label, href]) => (
-                <FooterLink key={label} href={href}>
-                  {label}
-                </FooterLink>
-              ))}
-            </ul>
-          </div>
-
-          {/* Shield + Payment */}
-          <div className="flex flex-col items-center">
+          {/* Shield + Payment — desktop only (mobile uses watermark) */}
+          <div className="hidden flex-col items-center sm:flex">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/logo-tcg-shield.png"
@@ -172,20 +183,32 @@ export function Footer() {
               height={215}
               className="mb-4 opacity-70 transition-opacity hover:opacity-100"
             />
-            <div className="flex flex-wrap items-center justify-center gap-1.5">
+            <div className="flex items-center justify-center gap-3">
               {[
                 { src: "/images/payment/bizum.svg", alt: "Bizum", w: 46, h: 16 },
                 { src: "/images/payment/visa.svg", alt: "Visa", w: 40, h: 14 },
                 { src: "/images/payment/mastercard.svg", alt: "Mastercard", w: 38, h: 24 },
                 { src: "/images/payment/paypal.svg", alt: "PayPal", w: 52, h: 16 },
-                { src: "/images/payment/google-pay.svg", alt: "Google Pay", w: 38, h: 16 },
-                { src: "/images/payment/apple-pay.svg", alt: "Apple Pay", w: 44, h: 18 },
               ].map(({ src, alt, w, h }) => (
                 <span key={alt} className="flex h-8 items-center justify-center rounded-md border border-white/10 bg-white px-2">
                   <Image src={src} alt={alt} width={w} height={h} className="object-contain" />
                 </span>
               ))}
             </div>
+          </div>
+
+          {/* Payment — mobile only (below Tienda/Legal) */}
+          <div className="flex items-center justify-center gap-3 sm:hidden">
+            {[
+              { src: "/images/payment/bizum.svg", alt: "Bizum", w: 46, h: 16 },
+              { src: "/images/payment/visa.svg", alt: "Visa", w: 40, h: 14 },
+              { src: "/images/payment/mastercard.svg", alt: "Mastercard", w: 38, h: 24 },
+              { src: "/images/payment/paypal.svg", alt: "PayPal", w: 52, h: 16 },
+            ].map(({ src, alt, w, h }) => (
+              <span key={alt} className="flex h-8 items-center justify-center rounded-md border border-white/10 bg-white px-2">
+                <Image src={src} alt={alt} width={w} height={h} className="object-contain" />
+              </span>
+            ))}
           </div>
         </div>
 

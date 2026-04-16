@@ -542,17 +542,17 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
 
       {/* Breadcrumb */}
       <nav className="mb-4 flex flex-wrap items-center gap-2 text-sm text-gray-500">
-        <Link href="/" className="hover:text-[#2563eb]">
+        <Link href="/" className="text-[#2563eb] hover:text-[#1d4ed8]">
           Inicio
         </Link>
         <span>/</span>
-        <Link href={`/${product.game}`} className="hover:text-[#2563eb]">
+        <Link href={`/${product.game}`} className="text-[#2563eb] hover:text-[#1d4ed8]">
           {name}
         </Link>
         <span>/</span>
         <Link
           href={`/${product.game}/${product.category}`}
-          className="hover:text-[#2563eb]"
+          className="text-[#2563eb] hover:text-[#1d4ed8]"
         >
           {catLabel}
         </Link>
@@ -989,9 +989,9 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
               {/* Float animations */}
               <style>{`
                 @keyframes detailFloatUp {
-                  0% { opacity: 1; transform: translateY(0) scale(0.8); }
-                  15% { opacity: 1; transform: translateY(-14px) scale(1.2); }
-                  100% { opacity: 0; transform: translateY(-32px) scale(0.9); }
+                  0% { opacity: 1; transform: translateY(0) scale(1); }
+                  70% { opacity: 1; }
+                  100% { opacity: 0; transform: translateY(-32px) scale(1); }
                 }
                 @keyframes detailScaleIn {
                   0% { transform: scale(0.5); opacity: 0; }
@@ -1121,17 +1121,15 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 text-green-500"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
                   <span>Pago 100% seguro</span>
                 </div>
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <div className="mt-2 flex items-center gap-1.5">
                   {[
                     { src: "/images/payment/paypal.svg", alt: "PayPal", h: "h-8" },
                     { src: "/images/payment/bizum.svg", alt: "Bizum", h: "h-8" },
                     { src: "/images/payment/visa.svg", alt: "Visa", h: "h-8" },
                     { src: "/images/payment/mastercard.svg", alt: "Mastercard", h: "h-9" },
-                    { src: "/images/payment/google-pay.svg", alt: "Google Pay", h: "h-8" },
-                    { src: "/images/payment/apple-pay.svg", alt: "Apple Pay", h: "h-8" },
                   ].map(({ src, alt, h }) => (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img key={src} src={src} alt={alt} className={`${h} w-auto rounded-md border border-gray-200 bg-white ${alt === "Apple Pay" || alt === "Google Pay" ? "p-0.5" : "p-1"}`} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    <img key={src} src={src} alt={alt} className={`${h} w-auto rounded-md border border-gray-200 bg-white p-1`} onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   ))}
                 </div>
               </div>
@@ -1144,7 +1142,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                 </span>
               </div>
               <p className="mt-1 text-[11px] text-gray-400">
-                Acumula puntos y canjéalos por descuentos.{" "}
+                Compra y consigue puntos para ti y tus amigos.{" "}
                 <Link href="/puntos" className="font-semibold text-[#2563eb] hover:underline">¿Cómo funcionan?</Link>
               </p>
             </div>

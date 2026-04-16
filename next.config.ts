@@ -6,11 +6,8 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
-  output: "export",
+  // output: "export" removed — enables API routes, SSR, and image optimization
   images: {
-    // Static export requires unoptimized images.
-    // remotePatterns are kept here to document approved CDN origins for future SSR migration.
-    unoptimized: true,
     remotePatterns: [
       { protocol: "https", hostname: "images.pokemontcg.io" },
       { protocol: "https", hostname: "cards.scryfall.io" },
@@ -23,6 +20,33 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "tcgplayer-cdn.tcgplayer.com" },
       { protocol: "https", hostname: "images.riftbound.gg" },
     ],
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-XSS-Protection", value: "1; mode=block" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" },
+        ],
+      },
+      {
+        source: "/_next/static/(.*)",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      {
+        source: "/images/(.*)",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" },
+        ],
+      },
+    ];
   },
 };
 

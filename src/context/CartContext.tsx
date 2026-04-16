@@ -32,6 +32,8 @@ interface CartCtx {
   clearCart: () => void;
 }
 
+const MAX_QTY_PER_LINE = 99;
+
 const CartContext = createContext<CartCtx | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
@@ -68,13 +70,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     let effectiveQty = qty;
 
-    if (product?.maxPerUser !== undefined && typeof product.maxPerUser === "number") {
-      if (currentQty >= product.maxPerUser) {
-        return { added: false, reason: `Límite por persona alcanzado (máx. ${product.maxPerUser} uds)` };
-      }
-      if (currentQty + effectiveQty > product.maxPerUser) {
-        effectiveQty = product.maxPerUser - currentQty;
-      }
+    // Cap at absolute maximum per line
+    const maxPerUser = product?.maxPerUser !== undefined && typeof product.maxPerUser === "number"
+      ? Math.min(product.maxPerUser, MAX_QTY_PER_LINE)
+      : MAX_QTY_PER_LINE;
+
+    if (currentQty >= maxPerUser) {
+      return { added: false, reason: `Límite por persona alcanzado (máx. ${maxPerUser} uds)` };
+    }
+    if (currentQty + effectiveQty > maxPerUser) {
+      effectiveQty = maxPerUser - currentQty;
     }
 
     if (product?.stock !== undefined && typeof product.stock === "number") {
@@ -107,7 +112,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       removeItem(key);
       return;
     }
-    save(items.map((i) => (i.key === key ? { ...i, quantity: qty } : i)));
+    const capped = Math.min(qty, MAX_QTY_PER_LINE);
+    save(items.map((i) => (i.key === key ? { ...i, quantity: capped } : i)));
   };
 
   return (

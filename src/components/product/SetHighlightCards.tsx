@@ -691,7 +691,7 @@ function CardLightbox({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md"
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/85 backdrop-blur-md"
       onClick={onClose}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -726,7 +726,7 @@ function CardLightbox({
       )}
 
       {/* Coverflow cards */}
-      <div className="relative flex items-center justify-center" style={{ height: "70vh", width: "100%" }} onClick={(e) => e.stopPropagation()}>
+      <div className="relative flex items-center justify-center" style={{ height: "70vh", width: "100%" }}>
         {slots.map(({ offset, card: c, idx }) => {
           const s = SLOT_STYLES[offset];
           const isCenter = offset === 0;
@@ -742,7 +742,7 @@ function CardLightbox({
                 transition: "transform 0.4s ease, opacity 0.4s ease",
                 cursor: isCenter ? "default" : "pointer",
               }}
-              onClick={() => { if (!isCenter) onNavigate(idx); }}
+              onClick={(e) => { e.stopPropagation(); if (!isCenter) onNavigate(idx); }}
             >
               <div className="relative overflow-hidden rounded-2xl">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -794,16 +794,6 @@ function CollectionGridModal({ cards, onClose }: { cards: HighlightCard[]; onClo
 
   return (
     <>
-      {/* Lightbox — rendered as sibling (outside scroll container) to avoid z-index/overflow issues */}
-      {lightboxIndex !== null && validCards.length > 0 && (
-        <CardLightbox
-          cards={validCards}
-          index={lightboxIndex}
-          onClose={closeLightbox}
-          onNavigate={setLightboxIndex}
-        />
-      )}
-
       <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/90 backdrop-blur-sm">
         {/* Header */}
         <div className="sticky top-0 z-10 border-b border-white/10 bg-black/80 backdrop-blur-md">
@@ -854,6 +844,16 @@ function CollectionGridModal({ cards, onClose }: { cards: HighlightCard[]; onClo
           </div>
         </div>
       </div>
+
+      {/* Lightbox — rendered AFTER modal so it renders on top (higher z-index) */}
+      {lightboxIndex !== null && validCards.length > 0 && (
+        <CardLightbox
+          cards={validCards}
+          index={lightboxIndex}
+          onClose={closeLightbox}
+          onNavigate={setLightboxIndex}
+        />
+      )}
     </>
   );
 }
@@ -936,7 +936,7 @@ export function SetHighlightCards({ product }: Props) {
 
   if (!loading && validCards.length === 0) return null;
 
-  const CARDS_PER_VIEW = 6;
+  const CARDS_PER_VIEW = 20;
   const canScrollLeft = scrollPos > 0;
   const canScrollRight = scrollPos < validCards.length - CARDS_PER_VIEW;
 
@@ -969,13 +969,13 @@ export function SetHighlightCards({ product }: Props) {
         {/* Cartas más cotizadas — 6 columns */}
         <h3 className="mb-2 text-xl font-bold text-gray-900">Cartas más cotizadas</h3>
         {loading ? (
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="aspect-[2/3] animate-pulse rounded-lg bg-gray-100" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             {visibleCards.map((card, i) => (
               <button
                 key={card.id}
@@ -1042,7 +1042,7 @@ export function SetHighlightCards({ product }: Props) {
                   </button>
                 </div>
               </div>
-              <div className="grid grid-cols-6 gap-2">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                 {collection.slice(colCardIdx ?? 0, (colCardIdx ?? 0) + PER).map((card, i) => (
                   <button
                     key={card.id}

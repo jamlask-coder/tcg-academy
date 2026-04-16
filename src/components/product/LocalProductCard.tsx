@@ -186,11 +186,9 @@ function LocalProductCardInner({ product }: Props) {
           <div className="relative bg-gradient-to-t from-black/60 via-black/25 to-transparent px-2 pt-8 pb-2">
             <style>{`
               @keyframes floatUp {
-                0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(0.5); }
-                15% { opacity: 1; transform: translateX(-50%) translateY(-18px) scale(1.3); }
-                30% { opacity: 1; transform: translateX(-50%) translateY(-14px) scale(1); }
-                45% { opacity: 1; transform: translateX(-50%) translateY(-22px) scale(1.1); }
-                100% { opacity: 0; transform: translateX(-50%) translateY(-36px) scale(0.8); }
+                0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+                70% { opacity: 1; }
+                100% { opacity: 0; transform: translateX(-50%) translateY(-32px) scale(1); }
               }
               @keyframes scaleIn {
                 0% { transform: scale(0.5); opacity: 0; }
@@ -217,7 +215,7 @@ function LocalProductCardInner({ product }: Props) {
             ))}
             <div style={{ animation: cartQty === 1 && added ? "scaleIn 0.3s ease-out" : "none" }}>
               {cartQty > 0 ? (
-                <div className="flex items-center justify-center gap-0.5">
+                <div className="flex w-full items-center justify-center overflow-visible rounded-lg border border-white/40 bg-white shadow-lg">
                   <button
                     onClick={(e) => {
                       e.preventDefault();
@@ -225,17 +223,17 @@ function LocalProductCardInner({ product }: Props) {
                       if (cartQty <= 1) removeItem(cartKey);
                       else updateQty(cartKey, cartQty - 1);
                     }}
-                    className="flex h-8 w-8 items-center justify-center rounded-l-lg bg-white text-gray-700 shadow-lg transition-all duration-150 hover:bg-red-50 hover:text-red-500 active:scale-90"
+                    className="flex h-8 flex-1 items-center justify-center rounded-l-lg text-gray-700 transition-all duration-150 hover:bg-red-50 hover:text-red-500 active:scale-90"
                     aria-label={cartQty <= 1 ? "Eliminar del carrito" : "Quitar uno"}
                   >
                     {cartQty <= 1 ? <Trash2 size={13} /> : "−"}
                   </button>
-                  <span className="flex h-8 min-w-[32px] items-center justify-center bg-white px-2 text-sm font-bold text-gray-900 shadow-lg">
+                  <span className="flex h-8 min-w-[28px] items-center justify-center border-x border-gray-100 px-1.5 text-sm font-bold text-gray-900">
                     {cartQty}
                   </span>
                   <button
                     onClick={(e) => { handleAddToCart(e); }}
-                    className="flex h-8 w-8 items-center justify-center rounded-r-lg bg-white text-gray-700 shadow-lg transition-all duration-150 hover:bg-green-50 hover:text-green-600 active:scale-90"
+                    className="flex h-8 flex-1 items-center justify-center rounded-r-lg text-gray-700 transition-all duration-150 hover:bg-green-50 hover:text-green-600 active:scale-90"
                     aria-label="Añadir uno más"
                   >
                     +

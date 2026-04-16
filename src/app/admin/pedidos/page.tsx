@@ -36,6 +36,7 @@ import {
   printInvoiceWithCSV,
   generateInvoiceNumber,
 } from "@/utils/invoiceGenerator";
+import { logAudit } from "@/services/auditService";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 50;
@@ -1232,6 +1233,12 @@ export default function AdminPedidosPage() {
     tracking?: string,
   ) => {
     const now = new Date().toISOString();
+    const previousOrder = orders.find((o) => o.id === id);
+    const previousStatus = previousOrder?.adminStatus ?? "unknown";
+
+    // Skip if status hasn't changed
+    if (previousStatus === status) return;
+
     persistOrders(
       orders.map((o) => {
         if (o.id !== id) return o;
@@ -1253,6 +1260,83 @@ export default function AdminPedidosPage() {
         };
       }),
     );
+
+    // Audit trail — log status change
+    logAudit({
+      entityType: "order",
+      entityId: id,
+      action: "status_change",
+      field: "status",
+      oldValue: previousStatus,
+      newValue: status,
+      performedBy: "admin",
+    });
+
+    // Audit trail — log tracking number if provided
+    if (tracking) {
+      logAudit({
+        entityType: "order",
+        entityId: id,
+        action: "tracking_added",
+        field: "trackingNumber",
+        oldValue: previousOrder?.trackingNumber ?? "",
+        newValue: tracking,
+        performedBy: "admin",
+      });
+    }
+
+    // Restore stock when order is cancelled or returned
+    if (
+      (status === "cancelado" || status === "devolucion") &&
+      previousOrder
+    ) {
+      try {
+        const overrides = JSON.parse(
+          localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
+        ) as Record<string, Record<string, unknown>>;
+        for (const item of previousOrder.items) {
+          const pid = String(item.id);
+          const currentStock =
+            typeof overrides[pid]?.stock === "number"
+              ? (overrides[pid].stock as number)
+              : undefined;
+          if (currentStock !== undefined) {
+            overrides[pid] = {
+              ...overrides[pid],
+              stock: currentStock + item.qty,
+              inStock: true,
+            };
+          }
+        }
+        localStorage.setItem(
+          "tcgacademy_product_overrides",
+          JSON.stringify(overrides),
+        );
+        window.dispatchEvent(new Event("tcga:products:updated"));
+      } catch {
+        /* ignore */
+      }
+
+      // Add stock restoration note to status history
+      const restoreNote =
+        status === "cancelado"
+          ? "Stock restaurado por cancelación"
+          : "Stock restaurado por devolución";
+      persistOrders(
+        orders.map((o) => {
+          if (o.id !== id) return o;
+          // Only add note if we just changed to this status
+          const lastEntry = o.statusHistory[o.statusHistory.length - 1];
+          if (lastEntry?.status === status && !lastEntry.note) {
+            const updated = [...o.statusHistory];
+            updated[updated.length - 1] = { ...lastEntry, note: restoreNote };
+            return { ...o, statusHistory: updated };
+          }
+          return o;
+        }),
+      );
+    }
+
     const labels: Record<AdminOrderStatus, string> = {
       pendiente_envio: "Pendiente de envío",
       enviado: "Enviado",
@@ -1264,6 +1348,65 @@ export default function AdminPedidosPage() {
     showToast(
       `Pedido ${id} → ${labels[status]}${tracking ? ` · Tracking: ${tracking}` : ""}`,
     );
+
+    // Auto-notify customer on relevant status changes
+    const emailSubjects: Partial<Record<AdminOrderStatus, string>> = {
+      enviado: `Tu pedido ${id} ha sido enviado`,
+      finalizado: `Tu pedido ${id} ha sido entregado`,
+      cancelado: `Tu pedido ${id} ha sido cancelado`,
+      incidencia: `Incidencia con tu pedido ${id}`,
+    };
+    const emailBodies: Partial<Record<AdminOrderStatus, string>> = {
+      enviado: `Hola, tu pedido ${id} ha sido enviado.${tracking ? ` Número de seguimiento: ${tracking}` : ""} Gracias por confiar en TCG Academy.`,
+      finalizado: `Hola, tu pedido ${id} ha sido entregado. Esperamos que disfrutes tu compra. Gracias por confiar en TCG Academy.`,
+      cancelado: `Hola, tu pedido ${id} ha sido cancelado. Si tienes alguna duda, no dudes en contactarnos.`,
+      incidencia: `Hola, hemos registrado una incidencia en tu pedido ${id}. Nuestro equipo se pondrá en contacto contigo para resolverla.`,
+    };
+
+    const subject = emailSubjects[status];
+    if (subject) {
+      const order = orders.find((o) => o.id === id);
+      if (order) {
+        // Log email notification
+        try {
+          const sentEmails = JSON.parse(
+            localStorage.getItem("tcgacademy_sent_emails") ?? "[]",
+          ) as Array<Record<string, unknown>>;
+          sentEmails.unshift({
+            date: now,
+            to: order.userEmail,
+            subject,
+            body: emailBodies[status] ?? "",
+            status: "enviado",
+            orderId: id,
+          });
+          if (sentEmails.length > 100) sentEmails.length = 100;
+          localStorage.setItem("tcgacademy_sent_emails", JSON.stringify(sentEmails));
+        } catch {
+          /* ignore */
+        }
+
+        // Create in-app notification
+        try {
+          const notifications = JSON.parse(
+            localStorage.getItem("tcgacademy_notif_dynamic") ?? "[]",
+          ) as Array<Record<string, unknown>>;
+          notifications.unshift({
+            id: `notif-${Date.now()}-${id}`,
+            userId: order.userId,
+            title: subject,
+            body: emailBodies[status] ?? "",
+            date: now,
+            read: false,
+            orderId: id,
+          });
+          if (notifications.length > 200) notifications.length = 200;
+          localStorage.setItem("tcgacademy_notif_dynamic", JSON.stringify(notifications));
+        } catch {
+          /* ignore */
+        }
+      }
+    }
   };
 
   const handleSaveNotes = (id: string, notes: string) => {

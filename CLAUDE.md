@@ -2,11 +2,15 @@
 
 ## Architecture
 
-- **Framework**: Next.js static export (`output: 'export'`) — no API routes, no SSR
+- **Framework**: Next.js with API routes and SSR (`output: 'export'` removed)
 - **Business constants**: All in `src/config/siteConfig.ts` (`SITE_CONFIG`). Never hardcode 149, 24h, 21% VAT.
 - **Pricing**: `usePrice` hook reads role from `AuthContext` and applies VAT. Always display `IVA incl.` — never show price-without-VAT to public users.
 - **New product badge**: Use `isNewProduct(product)` from `@/data/products` (45-day window from `createdAt`). Never use `product.isNew`.
-- **Auth**: `AuthContext` — localStorage demo auth with 24h session expiry.
+- **Auth**: `AuthContext` — localStorage auth with 24h expiry (30d with "Recordarme"). Password reset functional.
+- **Security**: Input sanitization via `sanitizeString()` (XSS + SQL patterns). Server-side rate limiting in `src/utils/sanitize.ts`.
+- **Returns**: `src/services/returnService.ts` — Full RMA workflow (request → approve → ship → refund).
+- **Logging**: `src/lib/logger.ts` — Structured logging (localStorage client / stdout server).
+- **Price verification**: `src/lib/priceVerification.ts` — Server-side price + stock validation.
 - **Types**: `LocalProduct` interface in `src/data/products.ts`. Config type in `src/config/siteConfig.ts`.
 
 ## Sistema Fiscal VeriFactu
@@ -156,12 +160,33 @@ Full command:
 npm run lint:fix && npm run format && npm run typecheck && npm run build && node tests/audit/run-audit.mjs && npm run backup
 ```
 
-## Backend integration notes (for when connecting real backend)
+## Backend architecture (dual mode: local / server)
 
-- Replace `src/data/products.ts` mock data with API calls
-- Replace `src/context/AuthContext.tsx` localStorage with real session/JWT
-- Replace `src/context/CartContext.tsx` localStorage with server cart
-- All prices come from backend — `usePrice` hook needs updating
-- `src/utils/sanitize.ts` covers client-side XSS; backend must also validate
-- Remove `output: 'export'` from `next.config.ts` to enable SSR/API routes
-- Security headers will need to move from `public/_headers` to `next.config.ts` `headers()`
+The app runs in two modes controlled by `NEXT_PUBLIC_BACKEND_MODE` in `.env.local`:
+- **local** (default): All data in localStorage. No external services needed.
+- **server**: Uses real database, email, and payment services.
+
+### Infrastructure files
+- `.env.example` — All production environment variables
+- `src/lib/db.ts` — Database adapter (LocalDbAdapter / ServerDbAdapter)
+- `src/lib/email.ts` — Email adapter (LocalEmailAdapter / ResendEmailAdapter)
+- `src/lib/orderIds.ts` — Cryptographic order ID generation
+- `src/lib/validations/checkout.ts` — Zod schemas for checkout validation
+
+### API routes (src/app/api/)
+- `POST /api/orders` — Create order (server-side price verification)
+- `GET /api/orders` — List orders
+- `PATCH /api/orders/[id]` — Update status + auto-notify customer
+- `POST /api/auth` — Login, register, password reset
+- `POST /api/payments` — Create payment intent (Stripe/Redsys)
+- `POST /api/payments/webhook` — Payment provider webhooks
+- `POST /api/notifications` — Send customer notifications
+- `GET/PUT /api/admin/settings` — Admin configuration
+
+### To connect real services (server mode)
+1. Set `NEXT_PUBLIC_BACKEND_MODE=server` in `.env.local`
+2. Fill in Supabase credentials → data persists in PostgreSQL
+3. Fill in Resend API key → real emails sent
+4. Fill in Stripe keys → real payment processing
+5. Fill in VeriFactu credentials → invoices sent to AEAT
+6. Security headers already in `next.config.ts` `headers()`

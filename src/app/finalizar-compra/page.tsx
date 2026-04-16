@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { useCart } from "@/context/CartContext";
 import { getMergedById } from "@/lib/productStore";
@@ -12,6 +12,15 @@ import {
   POINTS_PER_EURO,
   POINTS_MAX_DISCOUNT_PCT,
 } from "@/services/pointsService";
+import {
+  createInvoice,
+  saveInvoice,
+  buildLineItem,
+} from "@/services/invoiceService";
+import { PaymentMethod } from "@/types/fiscal";
+import type { CustomerData } from "@/types/fiscal";
+import { recordCouponUsage, markCouponUsed } from "@/services/couponService";
+import { sanitizeString } from "@/utils/sanitize";
 import {
   Shield,
   Truck,
@@ -67,6 +76,9 @@ export default function CheckoutPage() {
   const [appliedPoints, setAppliedPoints] = useState<{ points: number; euros: number } | null>(null);
   const [showPointsPanel, setShowPointsPanel] = useState(false);
   const [userPoints, setUserPoints] = useState(0);
+  const [triedSubmitDatos, setTriedSubmitDatos] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (user?.role === "cliente") setUserPoints(loadPoints(user.id));
@@ -104,43 +116,75 @@ export default function CheckoutPage() {
   // Points are awarded on products only — shipping excluded
   const pointsBase = Math.max(0, total - couponDiscount - pointsDiscount);
 
-  const handleOrder = () => {
-    const id = `TCG-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(Date.now()).slice(-4)}`;
-    setOrderId(id);
+  const [orderError, setOrderError] = useState<string | null>(null);
 
-    const order = {
-      id,
-      date: new Date().toISOString(),
-      status: "procesando",
-      items: items.map((i) => ({
-        id: i.key,
-        name: i.name,
-        quantity: i.quantity,
-        price: i.price,
-        image: i.image,
-      })),
-      subtotal: total,
-      coupon: pending?.appliedCoupon ?? null,
-      couponDiscount,
-      points: appliedPoints,
-      pointsDiscount,
-      shipping,
-      total: finalTotal,
-      shippingAddress: {
-        nombre: form.nombre,
-        apellidos: form.apellidos,
-        email: form.email,
-        telefono: form.telefono,
-        direccion: form.direccion,
-        ciudad: form.ciudad,
-        cp: form.cp,
-        provincia: form.provincia,
-        pais: form.pais,
-      },
-      envio: form.envio,
-      tiendaRecogida: form.tiendaRecogida || null,
-      pago: form.pago,
-    };
+  const handleOrder = async () => {
+    // Idempotency guard — prevent double-click race conditions
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    setOrderError(null);
+
+    try {
+      // Validate no item exceeds 99 units
+      const overLimitItem = items.find((i) => i.quantity > 99);
+      if (overLimitItem) {
+        setOrderError(`El artículo "${overLimitItem.name}" supera el máximo de 99 unidades.`);
+        return;
+      }
+
+      // Sanitize customer-provided string fields
+      const sNombre = sanitizeString(form.nombre);
+      const sApellidos = sanitizeString(form.apellidos);
+      const sDireccion = sanitizeString(form.direccion);
+      const sCiudad = sanitizeString(form.ciudad);
+      const sProvincia = sanitizeString(form.provincia);
+      const sCp = sanitizeString(form.cp);
+      const sTelefono = sanitizeString(form.telefono);
+      const sNotas = ""; // notas field placeholder — sanitize if added later
+
+      const idArr = new Uint8Array(4);
+      crypto.getRandomValues(idArr);
+      const rand = Array.from(idArr).map(b => b.toString(36).padStart(2, '0')).join('').slice(0, 6).toUpperCase();
+      const id = `TCG-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${rand}`;
+      setOrderId(id);
+
+      // Keep email as-is (needs exact match for confirmations)
+      void sNotas; // consumed when notas field is wired up
+
+      const order = {
+        id,
+        date: new Date().toISOString(),
+        status: "procesando",
+        items: items.map((i) => ({
+          id: i.key,
+          name: i.name,
+          quantity: i.quantity,
+          price: i.price,
+          image: i.image,
+        })),
+        subtotal: total,
+        coupon: pending?.appliedCoupon ?? null,
+        couponDiscount,
+        points: appliedPoints,
+        pointsDiscount,
+        shipping,
+        total: finalTotal,
+        shippingAddress: {
+          nombre: sNombre,
+          apellidos: sApellidos,
+          email: form.email,
+          telefono: sTelefono,
+          direccion: sDireccion,
+          ciudad: sCiudad,
+          cp: sCp,
+          provincia: sProvincia,
+          pais: form.pais,
+        },
+        envio: form.envio,
+        tiendaRecogida: form.tiendaRecogida || null,
+        pago: form.pago,
+      };
 
     try {
       const existing = JSON.parse(
@@ -150,6 +194,66 @@ export default function CheckoutPage() {
       localStorage.setItem("tcgacademy_orders", JSON.stringify(existing));
       localStorage.removeItem("tcgacademy_pending_checkout");
     } catch {}
+
+    // Generate fiscal invoice (skip for pending-payment methods: tienda, transferencia)
+    if (form.pago !== "tienda" && form.pago !== "transferencia") {
+      try {
+        const paymentMethodMap: Record<string, PaymentMethod> = {
+          tarjeta: PaymentMethod.TARJETA,
+          paypal: PaymentMethod.PAYPAL,
+          bizum: PaymentMethod.BIZUM,
+          "google-pay": PaymentMethod.TARJETA,
+          "apple-pay": PaymentMethod.TARJETA,
+        };
+
+        const recipient: CustomerData = {
+          name: `${sNombre} ${sApellidos}`.trim(),
+          email: form.email,
+          phone: sTelefono,
+          countryCode: form.pais || "ES",
+          address: {
+            street: sDireccion,
+            city: sCiudad,
+            postalCode: sCp,
+            province: sProvincia,
+            country: form.pais === "ES" ? "España" : form.pais,
+            countryCode: form.pais || "ES",
+          },
+        };
+
+        const invoiceItems = items.map((item, idx) =>
+          buildLineItem({
+            lineNumber: idx + 1,
+            productId: item.key,
+            description: item.name,
+            quantity: item.quantity,
+            unitPriceWithVAT: item.price,
+            vatRate: 21,
+          }),
+        );
+
+        const invoice = await createInvoice({
+          recipient,
+          items: invoiceItems,
+          paymentMethod: paymentMethodMap[form.pago] ?? PaymentMethod.TARJETA,
+          sourceOrderId: id,
+        });
+
+        saveInvoice(invoice);
+
+        // Store invoice ID in the order
+        try {
+          const orders = JSON.parse(
+            localStorage.getItem("tcgacademy_orders") ?? "[]",
+          ) as { id: string; invoiceId?: string }[];
+          const orderIdx = orders.findIndex((o) => o.id === id);
+          if (orderIdx !== -1) {
+            orders[orderIdx].invoiceId = invoice.invoiceId;
+            localStorage.setItem("tcgacademy_orders", JSON.stringify(orders));
+          }
+        } catch { /* ignore */ }
+      } catch { /* Invoice failure must not block order creation */ }
+    }
 
     // Mark payment status for manual payment methods (transfer, in-store)
     if (form.pago === "transferencia" || form.pago === "tienda") {
@@ -187,6 +291,16 @@ export default function CheckoutPage() {
       window.dispatchEvent(new Event("tcga:products:updated"));
     } catch { /* ignore */ }
 
+    // Record coupon usage if a coupon was applied
+    if (pending?.appliedCoupon?.code && user?.id) {
+      try {
+        recordCouponUsage(pending.appliedCoupon.code, user.id, id);
+        markCouponUsed(pending.appliedCoupon.code, form.email);
+      } catch {
+        /* ignore */
+      }
+    }
+
     // Log confirmation email to customer
     try {
       const emailLog = JSON.parse(localStorage.getItem("tcgacademy_email_log") ?? "[]");
@@ -221,6 +335,10 @@ export default function CheckoutPage() {
 
     clearCart();
     setStep("confirmado");
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   };
 
   if (!count && step !== "confirmado")
@@ -332,7 +450,18 @@ export default function CheckoutPage() {
         {/* Form */}
         <div className="lg:col-span-2">
           {step === "datos" && (
-            <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-6">
+            <form
+              noValidate
+              onSubmit={(e) => {
+                e.preventDefault();
+                setTriedSubmitDatos(true);
+                const formEl = e.currentTarget;
+                if (formEl.checkValidity()) {
+                  setStep("envio");
+                }
+              }}
+              className="space-y-4 rounded-2xl border border-gray-200 bg-white p-6"
+            >
               <h2 className="mb-4 text-lg font-bold text-gray-900">
                 Datos personales
               </h2>
@@ -356,7 +485,7 @@ export default function CheckoutPage() {
                       onChange={(e) =>
                         setForm((f) => ({ ...f, [key]: e.target.value }))
                       }
-                      className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
+                      className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${triedSubmitDatos && req && !form[key].trim() ? "border-red-400" : "border-gray-200"}`}
                     />
                   </div>
                 ))}
@@ -375,7 +504,7 @@ export default function CheckoutPage() {
                     setForm((f) => ({ ...f, direccion: e.target.value }))
                   }
                   placeholder="Calle, número, piso..."
-                  className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
+                  className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${triedSubmitDatos && !form.direccion.trim() ? "border-red-400" : "border-gray-200"}`}
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
@@ -385,12 +514,14 @@ export default function CheckoutPage() {
                   </label>
                   <input
                     required
+                    pattern="[0-9]{5}"
+                    title="Código postal de 5 dígitos"
                     value={form.cp}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, cp: e.target.value }))
                     }
                     placeholder="28001"
-                    className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
+                    className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${triedSubmitDatos && (!form.cp.trim() || !/^[0-9]{5}$/.test(form.cp)) ? "border-red-400" : "border-gray-200"}`}
                   />
                 </div>
                 <div>
@@ -403,7 +534,7 @@ export default function CheckoutPage() {
                     onChange={(e) =>
                       setForm((f) => ({ ...f, ciudad: e.target.value }))
                     }
-                    className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
+                    className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${triedSubmitDatos && !form.ciudad.trim() ? "border-red-400" : "border-gray-200"}`}
                   />
                 </div>
                 <div>
@@ -420,12 +551,12 @@ export default function CheckoutPage() {
                 </div>
               </div>
               <button
-                onClick={() => setStep("envio")}
+                type="submit"
                 className="w-full rounded-xl bg-[#2563eb] py-4 font-bold text-white transition hover:bg-[#1d4ed8]"
               >
                 Continuar
               </button>
-            </div>
+            </form>
           )}
 
           {step === "envio" && (
@@ -544,10 +675,10 @@ export default function CheckoutPage() {
                       setStep("pago");
                     }
                   }}
-                  disabled={isStorePickup && !form.tiendaRecogida}
+                  disabled={(isStorePickup && !form.tiendaRecogida) || (isStorePickup && submitting)}
                   className="flex-1 rounded-xl bg-[#2563eb] py-3.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isStorePickup ? "Confirmar pedido" : "Continuar"}
+                  {isStorePickup && submitting ? "Procesando..." : isStorePickup ? "Confirmar pedido" : "Continuar"}
                 </button>
               </div>
             </div>
@@ -721,6 +852,11 @@ export default function CheckoutPage() {
                 Pago 100% seguro con cifrado SSL. Tus datos bancarios nunca se
                 almacenan en nuestros servidores.
               </div>
+              {orderError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
+                  {orderError}
+                </div>
+              )}
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setStep("envio")}
@@ -730,9 +866,10 @@ export default function CheckoutPage() {
                 </button>
                 <button
                   onClick={handleOrder}
-                  className="flex-1 rounded-xl bg-[#2563eb] py-3.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
+                  disabled={submitting}
+                  className="flex-1 rounded-xl bg-[#2563eb] py-3.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Confirmar pedido — {finalTotal.toFixed(2)}€
+                  {submitting ? "Procesando..." : `Confirmar pedido — ${finalTotal.toFixed(2)}€`}
                 </button>
               </div>
             </div>
