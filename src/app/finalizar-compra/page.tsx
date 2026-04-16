@@ -769,15 +769,9 @@ export default function CheckoutPage() {
                     total >= SITE_CONFIG.shippingThreshold ? "Gratis" : "3,99€",
                 },
                 {
-                  id: "express",
-                  label: "Envío express con GLS",
-                  sub: "Mismo día en península (pedido antes de las 12h)",
-                  price: "6,99€",
-                },
-                {
                   id: "tienda",
                   label: "Recogida en tienda",
-                  sub: "Gratis — disponible en 2h",
+                  sub: "Gratis",
                   price: "Gratis",
                 },
               ].map((opt) => (

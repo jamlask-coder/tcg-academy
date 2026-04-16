@@ -569,7 +569,7 @@ export function Header() {
   return (
     <>
     <header
-      className="sticky top-0 z-50 border-b border-white/10"
+      className="sticky top-0 z-50 overflow-visible border-b border-white/10"
       style={{
         background:
           "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #2563eb 100%)",
@@ -685,8 +685,8 @@ export function Header() {
         </div>
         {/* Fin zona central */}
 
-        {/* Iconos — siempre a la derecha */}
-        <div className="flex shrink-0 items-center gap-0.5">
+        {/* Iconos — siempre a la derecha, con margen para el badge */}
+        <div className="flex shrink-0 items-center gap-0.5 pr-2">
           {/* Admin shortcut (sm, not desktop where panel admin is in greeting menu) */}
           {user?.role === "admin" && (
             <Link
@@ -878,21 +878,7 @@ export function Header() {
           100% { transform: scale(1) rotate(0deg); opacity: 1; }
         }
         .badge-ping-wrap {
-          position: relative;
-          overflow: visible;
-        }
-        .badge-ping-wrap::before {
-          content: '';
-          position: absolute;
-          inset: -1px;
-          border-radius: 9999px;
-          background: #ef4444;
-          animation: badgePing 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
-          z-index: -1;
-        }
-        @keyframes badgePing {
-          0% { transform: scale(1); opacity: 0.6; }
-          75%, 100% { transform: scale(1.6); opacity: 0; }
+          animation: badgePulse 2.4s ease-in-out infinite;
         }
         @media (prefers-reduced-motion: reduce) {
           .trust-item::after { animation: none; }
