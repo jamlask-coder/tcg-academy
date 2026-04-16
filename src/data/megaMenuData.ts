@@ -57,7 +57,7 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     href: "/magic",
     color: "#dc2626",
     abbrev: "MTG",
-    logoSrc: "/images/logos/magic.png",
+    logoSrc: "/images/logos/magic-clean.png",
     columns: [
       {
         title: "Producto Sellado",
@@ -115,7 +115,7 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     href: "/riftbound",
     color: "#ea580c",
     abbrev: "RB",
-    logoSrc: "/images/logos/riftbound.svg",
+    logoSrc: "/images/logos/riftbound-clean.png?v=3",
     columns: [
       {
         title: "Producto Sellado",
@@ -170,7 +170,7 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     href: "/dragon-ball",
     color: "#d97706",
     abbrev: "DBS",
-    logoSrc: "/images/logos/dragonball-clean.png",
+    logoSrc: "/images/logos/dragonball-clean.png?v=2",
     columns: [
       {
         title: "Producto Sellado",

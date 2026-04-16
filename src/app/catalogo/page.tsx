@@ -10,12 +10,12 @@ import Link from "next/link";
 
 // ── Game logo mapping ─────────────────────────────────────────────────────────
 const LOGO_MAP: Record<string, string> = {
-  magic: "magic.svg",
+  magic: "magic-clean.png",
   pokemon: "pokemon.svg",
   "one-piece": "onepiece.svg",
-  riftbound: "riftbound.svg",
+  riftbound: "riftbound-clean.png?v=3",
   lorcana: "lorcana.png",
-  "dragon-ball": "dragonball.png",
+  "dragon-ball": "dragonball-clean.png?v=2",
   yugioh: "yugioh.png",
   naruto: "naruto.svg",
   digimon: "digimon.svg",

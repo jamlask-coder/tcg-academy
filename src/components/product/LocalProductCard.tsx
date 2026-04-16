@@ -278,61 +278,62 @@ function LocalProductCardInner({ product }: Props) {
         </div>
       )}
 
-      {/* ── MÓVIL: carrito (abajo a la derecha, siempre visible) ── */}
+      {/* ── MÓVIL: carrito (botón ancho debajo de la imagen, siempre visible) ── */}
       {!isOutOfStock && (
-        cartQty > 0 ? (
-          <div
-            className="absolute right-1.5 bottom-1.5 z-10 sm:hidden"
-            style={{ animation: cartQty === 1 && added ? "scaleIn 0.3s ease-out" : "none" }}
-          >
-            {/* +1 / -1 floats mobile */}
-            {floatAnims.map((anim, i) => (
-              <span
-                key={anim.key}
-                className="pointer-events-none absolute left-1/2 bottom-full text-sm font-black"
-                style={{
-                  color: anim.type === "plus" ? "#22c55e" : "#f87171",
-                  WebkitTextStroke: "0.3px rgba(150,150,150,0.35)",
-                  textShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                  animation: "floatUp 0.9s ease-out forwards",
-                  marginLeft: i % 2 !== 0 ? "8px" : "-8px",
-                }}
-              >
-                {anim.type === "plus" ? "+1" : "−1"}
-              </span>
-            ))}
-            <div className="flex items-center overflow-hidden rounded-full bg-white shadow-md">
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  triggerFloat("minus");
-                  if (cartQty <= 1) removeItem(cartKey);
-                  else updateQty(cartKey, cartQty - 1);
-                }}
-                className="flex h-8 w-8 items-center justify-center text-xs font-bold text-gray-700 transition-colors hover:bg-red-50 active:text-red-500"
-                aria-label={cartQty <= 1 ? "Eliminar del carrito" : "Quitar uno"}
-              >
-                {cartQty <= 1 ? <Trash2 size={11} /> : "−"}
-              </button>
-              <span className="flex h-8 w-10 items-center justify-center border-x border-gray-100 text-xs font-bold text-gray-900">{cartQty}</span>
-              <button
-                onClick={handleAddToCart}
-                className="flex h-8 w-8 items-center justify-center text-xs font-bold text-gray-700 transition-colors hover:bg-green-50 active:text-green-500"
-                aria-label="Añadir uno más"
-              >
-                +
-              </button>
+        <div className="absolute right-0 bottom-0 left-0 z-10 px-2 pb-0.5 sm:hidden">
+          {cartQty > 0 ? (
+            <div
+              style={{ animation: cartQty === 1 && added ? "scaleIn 0.3s ease-out" : "none" }}
+              className="relative"
+            >
+              {/* +1 / -1 floats mobile */}
+              {floatAnims.map((anim, i) => (
+                <span
+                  key={anim.key}
+                  className="pointer-events-none absolute left-1/2 bottom-full text-sm font-black"
+                  style={{
+                    color: anim.type === "plus" ? "#22c55e" : "#f87171",
+                    WebkitTextStroke: "0.3px rgba(150,150,150,0.35)",
+                    textShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                    animation: "floatUp 0.9s ease-out forwards",
+                    marginLeft: i % 2 !== 0 ? "8px" : "-8px",
+                  }}
+                >
+                  {anim.type === "plus" ? "+1" : "−1"}
+                </span>
+              ))}
+              <div className="flex items-center overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    triggerFloat("minus");
+                    if (cartQty <= 1) removeItem(cartKey);
+                    else updateQty(cartKey, cartQty - 1);
+                  }}
+                  className="flex h-7 flex-1 items-center justify-center text-[11px] font-bold text-gray-700 transition-colors hover:bg-red-50 active:text-red-500"
+                  aria-label={cartQty <= 1 ? "Eliminar del carrito" : "Quitar uno"}
+                >
+                  {cartQty <= 1 ? <Trash2 size={10} /> : "−"}
+                </button>
+                <span className="flex h-7 min-w-[26px] items-center justify-center border-x border-gray-100 text-[11px] font-bold text-gray-900">{cartQty}</span>
+                <button
+                  onClick={handleAddToCart}
+                  className="flex h-7 flex-1 items-center justify-center text-[11px] font-bold text-gray-700 transition-colors hover:bg-green-50 active:text-green-500"
+                  aria-label="Añadir uno más"
+                >
+                  +
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <button
-            onClick={handleAddToCart}
-            aria-label="Añadir al carrito"
-            className="absolute right-2 bottom-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md transition-all sm:hidden"
-          >
-            <ShoppingCart size={15} className="text-gray-700" />
-          </button>
-        )
+          ) : (
+            <button
+              onClick={handleAddToCart}
+              className="flex w-full items-center justify-center gap-1.5 rounded-md border border-amber-200 bg-gradient-to-r from-white to-amber-50 py-1.5 text-[11px] font-bold text-amber-800 shadow-[0_2px_8px_rgba(245,158,11,0.2)] transition-all duration-200 active:scale-[0.97]"
+            >
+              <ShoppingCart size={13} /> Añadir
+            </button>
+          )}
+        </div>
       )}
     </Link>
   );
@@ -365,12 +366,12 @@ function LocalProductCardInner({ product }: Props) {
         )}
 
         {/* ── INFO ── */}
-        <div className="mt-auto flex flex-col gap-1 px-2.5 py-2">
-          <span className="text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
+        <div className="mt-auto flex flex-col gap-0.5 px-2.5 pt-0.5 pb-2 sm:gap-1 sm:pt-2">
+          <span className="text-[9px] font-semibold tracking-wider text-gray-400 uppercase sm:text-[10px]">
             {CATEGORY_LABELS[product.category] ?? product.category}
           </span>
           <Link href={href}>
-            <h3 className="line-clamp-2 text-xs leading-snug font-semibold text-gray-800 transition hover:text-[#2563eb]">
+            <h3 className="line-clamp-2 text-[11px] leading-tight font-semibold text-gray-800 transition hover:text-[#2563eb] sm:text-xs sm:leading-snug">
               {product.name}
             </h3>
           </Link>

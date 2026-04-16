@@ -63,21 +63,76 @@ function buildIssuer(): CompanyData {
   };
 }
 
-// ─── Número de factura correlativo ───────────────────────────────────────────
+// ─── Número de factura correlativo (con lock anti-colisión) ─────────────────
+
+const INVOICE_LOCK_KEY = "tcgacademy_invoice_lock";
+const INVOICE_LOCK_TTL = 5000; // 5 seconds max lock
+
+/**
+ * Acquire a simple localStorage-based lock for invoice number generation.
+ * Prevents two concurrent tabs from generating the same number.
+ */
+function acquireInvoiceLock(): boolean {
+  try {
+    const raw = localStorage.getItem(INVOICE_LOCK_KEY);
+    if (raw) {
+      const ts = JSON.parse(raw) as number;
+      if (Date.now() - ts < INVOICE_LOCK_TTL) return false; // Lock held
+    }
+    localStorage.setItem(INVOICE_LOCK_KEY, JSON.stringify(Date.now()));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function releaseInvoiceLock(): void {
+  try {
+    localStorage.removeItem(INVOICE_LOCK_KEY);
+  } catch { /* non-critical */ }
+}
 
 /**
  * Genera el siguiente número de factura en formato FAC-YYYY-NNNNN.
  * Garantiza correlatividad sin saltos (requisito art. 6 RD 1619/2012).
+ *
+ * HARDENED: Uses a localStorage lock to prevent concurrent tabs from generating
+ * the same invoice number. Extracts max existing number from parsed values
+ * (not array length) to handle gaps from corrupted data.
  */
 export function generateInvoiceNumber(): string {
-  const invoices = loadInvoices();
-  const year = new Date().getFullYear();
-  const yearInvoices = invoices.filter((inv) =>
-    inv.invoiceNumber.startsWith(`${INVOICE_SERIES}-${year}-`),
-  );
+  // Try to acquire lock (retry once after 100ms if busy)
+  if (!acquireInvoiceLock()) {
+    // Brief spin — invoice generation is fast
+    const start = Date.now();
+    while (Date.now() - start < 200) { /* spin */ }
+    if (!acquireInvoiceLock()) {
+      // Force-acquire if stale (safety net)
+      localStorage.setItem(INVOICE_LOCK_KEY, JSON.stringify(Date.now()));
+    }
+  }
 
-  const nextNum = yearInvoices.length + 1;
-  return `${INVOICE_SERIES}-${year}-${String(nextNum).padStart(5, "0")}`;
+  try {
+    const invoices = loadInvoices();
+    const year = new Date().getFullYear();
+    const prefix = `${INVOICE_SERIES}-${year}-`;
+
+    // Extract the actual max number from existing invoices (not array length)
+    let maxNum = 0;
+    for (const inv of invoices) {
+      if (inv.invoiceNumber.startsWith(prefix)) {
+        const numPart = parseInt(inv.invoiceNumber.slice(prefix.length), 10);
+        if (Number.isFinite(numPart) && numPart > maxNum) {
+          maxNum = numPart;
+        }
+      }
+    }
+
+    const nextNum = maxNum + 1;
+    return `${INVOICE_SERIES}-${year}-${String(nextNum).padStart(5, "0")}`;
+  } finally {
+    releaseInvoiceLock();
+  }
 }
 
 // ─── Construcción de líneas de factura ───────────────────────────────────────
@@ -143,7 +198,7 @@ export function buildLineItem(params: {
   };
 }
 
-// ─── Totales ─────────────────────────────────────────────────────────────────
+// ─── Totales (con verificación cruzada interna) ─────────────────────────────
 
 function calculateTotals(items: InvoiceLineItem[]): InvoiceTotals {
   const totalTaxableBase = roundTo2(
@@ -154,6 +209,36 @@ function calculateTotals(items: InvoiceLineItem[]): InvoiceTotals {
     items.reduce((s, i) => s + i.surchargeAmount, 0),
   );
   const totalInvoice = roundTo2(totalTaxableBase + totalVAT + totalSurcharge);
+
+  // ── VERIFICACIÓN CRUZADA: suma de totalLine debe coincidir ──
+  const totalFromLines = roundTo2(
+    items.reduce((s, i) => s + i.totalLine, 0),
+  );
+  const diff = Math.abs(totalInvoice - totalFromLines);
+  if (diff >= 0.01) {
+    throw new Error(
+      `INTEGRIDAD FISCAL: Total calculado (${totalInvoice}) difiere de suma de líneas (${totalFromLines}) en ${diff.toFixed(2)}€. ` +
+      `Factura NO generada para evitar discrepancia fiscal.`,
+    );
+  }
+
+  // ── VERIFICACIÓN: cada línea es internamente consistente ──
+  for (const item of items) {
+    const expectedBase = roundTo2(
+      roundTo2(item.unitPrice * item.quantity) - item.discountAmount,
+    );
+    if (Math.abs(expectedBase - item.taxableBase) >= 0.01) {
+      throw new Error(
+        `INTEGRIDAD FISCAL: Línea "${item.description}" base esperada ${expectedBase} ≠ registrada ${item.taxableBase}`,
+      );
+    }
+    const expectedVAT = calculateVAT(item.taxableBase, item.vatRate);
+    if (Math.abs(expectedVAT - item.vatAmount) >= 0.01) {
+      throw new Error(
+        `INTEGRIDAD FISCAL: Línea "${item.description}" IVA esperado ${expectedVAT} ≠ registrado ${item.vatAmount}`,
+      );
+    }
+  }
 
   return {
     totalTaxableBase,
@@ -252,6 +337,14 @@ export async function createInvoice(
 
   // Genera URL del QR verificable
   invoice.verifactuQR = buildVerifactuQRUrl(invoice);
+
+  // ── VALIDACIÓN FINAL antes de devolver ──
+  const validation = validateInvoice(invoice);
+  if (!validation.valid) {
+    throw new Error(
+      `Factura ${invoiceNumber} no pasa validación fiscal: ${validation.errors.join("; ")}`,
+    );
+  }
 
   return invoice;
 }
@@ -451,10 +544,22 @@ export function loadInvoices(): InvoiceRecord[] {
   }
 }
 
-/** Guarda una nueva factura y actualiza el hash de integridad */
+/** Guarda una nueva factura, actualiza el hash de integridad, y genera asiento contable */
 export function saveInvoice(invoice: InvoiceRecord): void {
   const invoices = loadInvoices();
   persistInvoices([...invoices, invoice]);
+
+  // Generar asiento contable automáticamente (partida doble)
+  // Se ejecuta async sin bloquear — el asiento es secundario a la factura
+  void (async () => {
+    try {
+      const { createJournalFromInvoice } = await import("@/accounting/journalEngine");
+      await createJournalFromInvoice(invoice);
+    } catch {
+      // El asiento contable falla silenciosamente — la factura ya está guardada.
+      // El autopilot fiscal detectará la discrepancia en la cross-validation.
+    }
+  })();
 }
 
 /** Actualiza una factura existente */
@@ -467,9 +572,27 @@ export function updateInvoice(invoice: InvoiceRecord): void {
   );
 }
 
+/**
+ * Persist invoices to storage.
+ * HARDENED: validates write success and throws on failure.
+ * Invoices are CRITICAL fiscal data — silent failure is not acceptable.
+ */
 function persistInvoices(invoices: InvoiceRecord[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(INVOICE_STORAGE_KEY, JSON.stringify(invoices));
+  const json = JSON.stringify(invoices);
+  try {
+    localStorage.setItem(INVOICE_STORAGE_KEY, json);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unknown";
+    throw new Error(`CRITICAL: Failed to persist invoices: ${msg}. Data may be lost.`);
+  }
+
+  // Verify write integrity
+  const readBack = localStorage.getItem(INVOICE_STORAGE_KEY);
+  if (!readBack || readBack.length !== json.length) {
+    throw new Error("CRITICAL: Invoice write verification failed — data corruption possible.");
+  }
+
   // Actualiza hash de integridad del conjunto
   void updateIntegrityHash(invoices);
 }

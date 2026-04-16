@@ -66,11 +66,32 @@ const FISCAL_SECTIONS = [
     color: "#0284c7",
   },
   {
+    href: "/admin/fiscal/calendario",
+    icon: Calendar,
+    title: "Calendario Fiscal",
+    desc: "Obligaciones tributarias, plazos, instrucciones y alertas automáticas",
+    color: "#7c3aed",
+  },
+  {
+    href: "/admin/fiscal/control",
+    icon: AlertCircle,
+    title: "Piloto Automático",
+    desc: "Sistema autónomo: detecta, repara y verifica facturas sin intervención humana",
+    color: "#dc2626",
+  },
+  {
     href: "/admin/fiscal/verifactu",
     icon: ShieldCheck,
     title: "Estado VeriFactu",
     desc: "Conexión AEAT, hashes e integridad de la cadena",
     color: "#d97706",
+  },
+  {
+    href: "/admin/fiscal/presupuesto",
+    icon: Euro,
+    title: "Presupuestos",
+    desc: "Crear y gestionar presupuestos para clientes",
+    color: "#059669",
   },
   {
     href: "/admin/fiscal/documentacion",

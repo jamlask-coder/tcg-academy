@@ -32,6 +32,7 @@ import {
 const SOLICITUDES_KEY = "tcgacademy_solicitudes";
 import { countPendingOrders } from "@/data/mockData";
 import { countNewIncidents } from "@/services/incidentService";
+import { AdminFiscalGuard } from "@/components/AdminFiscalGuard";
 
 interface NavItem {
   href: string;
@@ -362,6 +363,7 @@ export default function AdminLayout({
             <Breadcrumb pathname={pathname} />
           </div>
           {children}
+          <AdminFiscalGuard />
         </main>
       </div>
     </div>

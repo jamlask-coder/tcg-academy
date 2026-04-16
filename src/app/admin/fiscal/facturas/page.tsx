@@ -8,6 +8,10 @@ import {
   ChevronUp,
   ArrowUpDown,
   Plus,
+  Printer,
+  Shield,
+  Search,
+  Filter,
 } from "lucide-react";
 // ChevronDown, ChevronUp used by SortIcon
 import { loadInvoices, createInvoice } from "@/services/invoiceService";
@@ -23,6 +27,28 @@ import type { InvoiceRecord } from "@/types/fiscal";
 import { InvoiceStatus, VerifactuStatus, InvoiceType, PaymentMethod } from "@/types/fiscal";
 import type { Quarter } from "@/types/tax";
 import { ADMIN_ORDERS, ORDER_STORAGE_KEY, type AdminOrder } from "@/data/mockData";
+import {
+  downloadLibroFacturas,
+  downloadVATDetail,
+  downloadTripleCheck,
+  downloadCuentaResultados,
+  downloadResumenClientes,
+  downloadResumenZonas,
+  downloadResumenPago,
+  downloadRectificativas,
+  downloadAnomalias,
+  downloadDLQ,
+  printBatchInvoicesPDF,
+  printAuditReportPDF,
+} from "@/lib/fiscalExports";
+import {
+  generateAgingReport,
+  exportAgingCSV,
+  generateTaxCalendar,
+  exportTaxCalendarCSV,
+  generateModelo347,
+  exportModelo347CSV,
+} from "@/accounting/advancedAccounting";
 
 function formatDate(d: Date | string): string {
   const dt = new Date(d);
@@ -297,6 +323,60 @@ export default function FacturasPage() {
     printInvoiceWithCSV(data);
   }
 
+  const [showExportPanel, setShowExportPanel] = useState(false);
+  const [clientSearch, setClientSearch] = useState("");
+  const [amountMin, setAmountMin] = useState("");
+  const [amountMax, setAmountMax] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Advanced filtered list (client search + amount range)
+  const advancedFiltered = useMemo(() => {
+    let list = filtered;
+    if (clientSearch.trim()) {
+      const term = clientSearch.toLowerCase();
+      list = list.filter((inv) => {
+        const r = inv.recipient as { name?: string; taxId?: string };
+        return (
+          (r.name ?? "").toLowerCase().includes(term) ||
+          (r.taxId ?? "").toLowerCase().includes(term)
+        );
+      });
+    }
+    if (amountMin) {
+      const min = parseFloat(amountMin);
+      if (Number.isFinite(min)) list = list.filter((inv) => inv.totals.totalInvoice >= min);
+    }
+    if (amountMax) {
+      const max = parseFloat(amountMax);
+      if (Number.isFinite(max)) list = list.filter((inv) => inv.totals.totalInvoice <= max);
+    }
+    return list;
+  }, [filtered, clientSearch, amountMin, amountMax]);
+
+  const selectedInvoices = useMemo(
+    () => advancedFiltered.filter((inv) => selectedIds.has(inv.invoiceId)),
+    [advancedFiltered, selectedIds],
+  );
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    setSelectedIds(new Set(advancedFiltered.map((inv) => inv.invoiceId)));
+  }
+
+  function selectNone() {
+    setSelectedIds(new Set());
+  }
+
+  const filterLabel = `${yearFilter}${quarterFilter !== "all" ? `_T${quarterFilter}` : ""}`;
+
   function exportSingle(inv: InvoiceRecord) {
     const csv = generateCSVForAdvisor([inv], {
       period: null,
@@ -402,14 +482,189 @@ export default function FacturasPage() {
         </select>
       </div>
 
+      {/* ── Advanced search: client + amount ── */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar por cliente o NIF..."
+            value={clientSearch}
+            onChange={(e) => setClientSearch(e.target.value)}
+            className="h-9 w-full rounded-lg border border-gray-200 pl-9 pr-3 text-sm focus:border-[#2563eb] focus:outline-none"
+          />
+        </div>
+        <input
+          type="number"
+          placeholder="Importe mín."
+          value={amountMin}
+          onChange={(e) => setAmountMin(e.target.value)}
+          className="h-9 w-28 rounded-lg border border-gray-200 px-3 text-sm focus:border-[#2563eb] focus:outline-none"
+        />
+        <input
+          type="number"
+          placeholder="Importe máx."
+          value={amountMax}
+          onChange={(e) => setAmountMax(e.target.value)}
+          className="h-9 w-28 rounded-lg border border-gray-200 px-3 text-sm focus:border-[#2563eb] focus:outline-none"
+        />
+        <button
+          onClick={() => setShowExportPanel(!showExportPanel)}
+          className="flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+        >
+          <Filter size={14} />
+          Exportar avanzado
+          <ChevronDown size={14} className={`transition ${showExportPanel ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+
+      {/* ── Export panel ── */}
+      {showExportPanel && (
+        <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50/50 p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="flex items-center gap-2 text-sm font-bold text-gray-800">
+              <Shield size={16} className="text-[#2563eb]" />
+              Herramientas de Exportación Fiscal
+            </h3>
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <button onClick={selectAll} className="text-[#2563eb] hover:underline">Seleccionar todas</button>
+              <span>·</span>
+              <button onClick={selectNone} className="text-[#2563eb] hover:underline">Ninguna</button>
+              <span className="ml-2 font-semibold text-gray-700">{selectedIds.size} seleccionadas</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {/* CSV Exports */}
+            <button
+              onClick={() => downloadLibroFacturas(advancedFiltered, filterLabel)}
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-[#2563eb] hover:bg-blue-50"
+            >
+              <Download size={14} className="flex-shrink-0 text-[#2563eb]" />
+              <div><div>Libro de Facturas</div><div className="font-normal text-gray-400">Art. 63-64 RIVA</div></div>
+            </button>
+            <button
+              onClick={() => downloadVATDetail(advancedFiltered, filterLabel)}
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-[#2563eb] hover:bg-blue-50"
+            >
+              <Download size={14} className="flex-shrink-0 text-green-600" />
+              <div><div>Desglose IVA</div><div className="font-normal text-gray-400">Línea por línea</div></div>
+            </button>
+            <button
+              onClick={() => downloadTripleCheck(advancedFiltered, filterLabel)}
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-[#2563eb] hover:bg-blue-50"
+            >
+              <Download size={14} className="flex-shrink-0 text-purple-600" />
+              <div><div>Triple Conteo</div><div className="font-normal text-gray-400">3 métodos verificación</div></div>
+            </button>
+            <button
+              onClick={() => downloadCuentaResultados(invoices, yearFilter)}
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-[#2563eb] hover:bg-blue-50"
+            >
+              <Download size={14} className="flex-shrink-0 text-amber-600" />
+              <div><div>Cuenta Resultados</div><div className="font-normal text-gray-400">Trimestral + anual</div></div>
+            </button>
+            <button
+              onClick={() => downloadResumenClientes(advancedFiltered, filterLabel)}
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-[#2563eb] hover:bg-blue-50"
+            >
+              <Download size={14} className="flex-shrink-0 text-teal-600" />
+              <div><div>Por Cliente</div><div className="font-normal text-gray-400">Facturación agrupada</div></div>
+            </button>
+            <button
+              onClick={() => downloadResumenZonas(advancedFiltered, filterLabel)}
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-[#2563eb] hover:bg-blue-50"
+            >
+              <Download size={14} className="flex-shrink-0 text-orange-600" />
+              <div><div>Por Zona/Provincia</div><div className="font-normal text-gray-400">Distribución geográfica</div></div>
+            </button>
+            <button
+              onClick={() => downloadResumenPago(advancedFiltered, filterLabel)}
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-[#2563eb] hover:bg-blue-50"
+            >
+              <Download size={14} className="flex-shrink-0 text-pink-600" />
+              <div><div>Por Forma de Pago</div><div className="font-normal text-gray-400">Tarjeta, Bizum, etc.</div></div>
+            </button>
+            <button
+              onClick={() => downloadRectificativas(advancedFiltered, filterLabel)}
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-[#2563eb] hover:bg-blue-50"
+            >
+              <Download size={14} className="flex-shrink-0 text-red-600" />
+              <div><div>Rectificativas</div><div className="font-normal text-gray-400">Devoluciones y anulaciones</div></div>
+            </button>
+
+            {/* PDF Exports */}
+            <button
+              onClick={() => printBatchInvoicesPDF(selectedIds.size > 0 ? selectedInvoices : advancedFiltered)}
+              className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-amber-400 hover:bg-amber-100"
+            >
+              <Printer size={14} className="flex-shrink-0 text-amber-600" />
+              <div><div>Imprimir PDF lote</div><div className="font-normal text-gray-400">{selectedIds.size > 0 ? `${selectedIds.size} seleccionadas` : `Todas (${advancedFiltered.length})`}</div></div>
+            </button>
+            <button
+              onClick={() => printAuditReportPDF(yearFilter)}
+              className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-green-400 hover:bg-green-100"
+            >
+              <Shield size={14} className="flex-shrink-0 text-green-600" />
+              <div><div>Auditoría completa</div><div className="font-normal text-gray-400">PDF con triple conteo</div></div>
+            </button>
+
+            {/* System exports */}
+            <button
+              onClick={downloadAnomalias}
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-[#2563eb] hover:bg-blue-50"
+            >
+              <Download size={14} className="flex-shrink-0 text-gray-500" />
+              <div><div>Anomalías</div><div className="font-normal text-gray-400">Incidencias detectadas</div></div>
+            </button>
+            <button
+              onClick={downloadDLQ}
+              className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-[#2563eb] hover:bg-blue-50"
+            >
+              <Download size={14} className="flex-shrink-0 text-gray-500" />
+              <div><div>Ops. Fallidas</div><div className="font-normal text-gray-400">Cola de reintentos</div></div>
+            </button>
+
+            {/* Advanced accounting exports */}
+            <button
+              onClick={() => { const r = generateAgingReport(advancedFiltered); const csv = exportAgingCSV(r); const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `antiguedad_saldos_${filterLabel}.csv`; a.click(); URL.revokeObjectURL(url); }}
+              className="flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50 p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-purple-400 hover:bg-purple-100"
+            >
+              <Download size={14} className="flex-shrink-0 text-purple-600" />
+              <div><div>Deudores Morosos</div><div className="font-normal text-gray-400">Aging report (art. 13.1 LIS)</div></div>
+            </button>
+            <button
+              onClick={() => { const cal = generateTaxCalendar(yearFilter); const csv = exportTaxCalendarCSV(cal); const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `calendario_fiscal_${yearFilter}.csv`; a.click(); URL.revokeObjectURL(url); }}
+              className="flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50 p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-purple-400 hover:bg-purple-100"
+            >
+              <Download size={14} className="flex-shrink-0 text-purple-600" />
+              <div><div>Calendario Fiscal</div><div className="font-normal text-gray-400">Todos los modelos + plazos</div></div>
+            </button>
+            <button
+              onClick={() => { const m = generateModelo347(invoices, yearFilter); const csv = exportModelo347CSV(m); const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `modelo347_${yearFilter}.csv`; a.click(); URL.revokeObjectURL(url); }}
+              className="flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50 p-3 text-left text-xs font-semibold text-gray-700 transition hover:border-purple-400 hover:bg-purple-100"
+            >
+              <Download size={14} className="flex-shrink-0 text-purple-600" />
+              <div><div>Modelo 347</div><div className="font-normal text-gray-400">Terceros &gt;3.005€ (art. 33 RGAT)</div></div>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-        <div className="border-b border-gray-100 px-6 py-4">
+        <div className="border-b border-gray-100 px-6 py-4 flex items-center justify-between">
           <span className="text-sm font-semibold text-gray-700">
-            {filtered.length} facturas
+            {advancedFiltered.length} facturas
+            {clientSearch || amountMin || amountMax ? <span className="ml-1 text-xs text-gray-400">(filtrado)</span> : null}
           </span>
+          {selectedIds.size > 0 && (
+            <span className="text-xs font-semibold text-[#2563eb]">
+              {selectedIds.size} seleccionadas
+            </span>
+          )}
         </div>
-        {filtered.length === 0 ? (
+        {advancedFiltered.length === 0 ? (
           <div className="px-6 py-16 text-center">
             <FileText size={40} className="mx-auto mb-3 text-gray-300" />
             <p className="font-semibold text-gray-600">No hay facturas</p>
@@ -424,6 +679,15 @@ export default function FacturasPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-xs tracking-wide text-gray-500 uppercase">
+                  <th className="w-8 px-2 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.size === advancedFiltered.length && advancedFiltered.length > 0}
+                      onChange={() => selectedIds.size === advancedFiltered.length ? selectNone() : selectAll()}
+                      className="accent-[#2563eb]"
+                      aria-label="Seleccionar todas"
+                    />
+                  </th>
                   <th
                     className="cursor-pointer px-4 py-3 text-left font-semibold"
                     onClick={() => handleSort("invoiceNumber")}
@@ -469,7 +733,7 @@ export default function FacturasPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filtered.map((inv) => {
+                {advancedFiltered.map((inv) => {
                   const recipient = inv.recipient as {
                     name?: string;
                     taxId?: string;
@@ -477,10 +741,19 @@ export default function FacturasPage() {
                   return (
                     <tr
                       key={inv.invoiceId}
-                      className="cursor-pointer transition hover:bg-blue-50"
+                      className={`cursor-pointer transition hover:bg-blue-50 ${selectedIds.has(inv.invoiceId) ? "bg-blue-50/50" : ""}`}
                       onClick={() => downloadPDF(inv)}
                       title="Haz clic para descargar PDF"
                     >
+                      <td className="w-8 px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(inv.invoiceId)}
+                          onChange={() => toggleSelect(inv.invoiceId)}
+                          className="accent-[#2563eb]"
+                          aria-label={`Seleccionar ${inv.invoiceNumber}`}
+                        />
+                      </td>
                       <td className="px-4 py-3 font-mono text-xs font-bold text-[#2563eb]">
                         {inv.invoiceNumber}
                       </td>

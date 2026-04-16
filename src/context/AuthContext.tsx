@@ -136,6 +136,34 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       createdAt: new Date().toISOString(),
     },
   },
+  "luri@tcgacademy.es": {
+    password: "test123",
+    user: {
+      id: "admin-luri",
+      email: "luri@tcgacademy.es",
+      name: "Luri",
+      lastName: "",
+      phone: "+34 666 000 001",
+      role: "admin" as const,
+      addresses: [],
+      favorites: [],
+      createdAt: new Date().toISOString(),
+    },
+  },
+  "font@tcgacademy.es": {
+    password: "test123",
+    user: {
+      id: "admin-font",
+      email: "font@tcgacademy.es",
+      name: "Font",
+      lastName: "",
+      phone: "+34 666 000 002",
+      role: "admin" as const,
+      addresses: [],
+      favorites: [],
+      createdAt: new Date().toISOString(),
+    },
+  },
   "tienda@test.com": {
     password: "test123",
     user: {

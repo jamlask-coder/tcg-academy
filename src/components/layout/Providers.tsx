@@ -6,6 +6,7 @@ import { DiscountProvider } from "@/context/DiscountContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { ScrollToTop } from "./ScrollToTop";
+import { SystemGuard } from "@/components/SystemGuard";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -16,6 +17,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <NotificationProvider>
               <ToastProvider>
               <ScrollToTop />
+              <SystemGuard />
               {children}
             </ToastProvider>
             </NotificationProvider>

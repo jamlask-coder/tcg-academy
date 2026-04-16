@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { X, User, ChevronDown } from "lucide-react";
+import { X, User, LogOut, ChevronDown } from "lucide-react";
 import { CATEGORY_LABELS, getAllCategories } from "@/data/products";
 
 interface UserData {
@@ -35,12 +35,12 @@ const DRAWER_GAMES: {
   sprite?: { origW: number; origX: number; filter?: string };
 }[] = [
   { slug: "pokemon", label: "Pokémon", bg: BG, sprite: { origW: 273, origX: 1228 } },
-  { slug: "magic", label: "Magic", bg: BG, logo: "/images/logos/magic-dark-trimmed.jpg", blend: true },
+  { slug: "magic", label: "Magic", bg: BG, logo: "/images/logos/magic-clean.png" },
   { slug: "one-piece", label: "One Piece", bg: BG, logo: "/images/logos/onepiece.png", blend: true },
-  { slug: "riftbound", label: "Riftbound", bg: BG, logo: "/images/logos/riftbound-clean.png" },
+  { slug: "riftbound", label: "Riftbound", bg: BG, logo: "/images/logos/riftbound-clean.png?v=3", blend: true },
   { slug: "yugioh", label: "Yu-Gi-Oh!", bg: BG, sprite: { origW: 392, origX: 696 } },
   { slug: "topps", label: "Topps", bg: BG, logo: "/images/logos/topps.svg" },
-  { slug: "dragon-ball", label: "Dragon Ball", bg: BG, logo: "/images/logos/dragonball-clean.png" },
+  { slug: "dragon-ball", label: "Dragon Ball", bg: BG, logo: "/images/logos/dragonball-clean.png?v=2" },
   { slug: "naruto", label: "Naruto", bg: BG, logo: "/images/logos/naruto-official.png" },
   { slug: "lorcana", label: "Lorcana", bg: BG, logo: "/images/logos/lorcana.png" },
   { slug: "digimon", label: "Digimon", bg: BG, logo: "/images/logos/digimon-official.png" },
@@ -50,6 +50,14 @@ const DRAWER_GAMES: {
 
 export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
   const [expandedGame, setExpandedGame] = useState<string | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(105);
+
+  // Measure the real header height to match exactly
+  useState(() => {
+    if (typeof document === "undefined") return;
+    const header = document.querySelector("header");
+    if (header) setHeaderHeight(header.offsetHeight);
+  });
 
   const handleClose = () => { setExpandedGame(null); onClose(); };
 
@@ -68,10 +76,10 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
         className="absolute top-0 left-0 flex h-full w-[88vw] max-w-[380px] flex-col bg-white shadow-2xl transition-transform duration-300 ease-out"
         style={{ transform: open ? "translateX(0)" : "translateX(-100%)" }}
       >
-        {/* ── HEADER AZUL ── */}
+        {/* ── HEADER AZUL — con escudo, misma altura que header principal ── */}
         <div
-          className="relative flex-shrink-0 rounded-b-xl"
-          style={{ background: "linear-gradient(135deg, #0a0f1a 0%, #1e3a8a 50%, #2563eb 100%)" }}
+          className="relative flex-shrink-0"
+          style={{ background: "linear-gradient(135deg, #0a0f1a 0%, #1e3a8a 50%, #2563eb 100%)", minHeight: headerHeight }}
         >
           <button
             onClick={handleClose}
@@ -90,20 +98,28 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
                 style={{ width: 107, height: 120, objectFit: "contain", flexShrink: 0 }}
               />
             </div>
-            <div className="flex flex-1 flex-col items-center gap-2">
+            <div className="flex flex-1 flex-col items-center gap-1.5">
               {user ? (
                 <>
-                  <p className="text-lg font-bold text-white">
+                  <p className="text-base font-bold text-white">
                     Hola, <span className="text-amber-300">{user.name.split(" ")[0]}</span>
                   </p>
                   <Link
                     href="/cuenta"
                     onClick={handleClose}
-                    className="flex items-center gap-2 rounded-full bg-white/15 px-5 py-2 text-sm font-bold text-white transition hover:bg-white/25"
+                    className="flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-1.5 text-xs font-bold text-white transition hover:bg-white/25"
                   >
-                    <User size={16} />
+                    <User size={14} />
                     {user.role === "admin" ? "Panel Admin" : "Mi cuenta"}
                   </Link>
+                  <button
+                    onClick={() => { logout(); handleClose(); }}
+                    className="flex items-center gap-1.5 rounded-full border border-white/20 px-4 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-white/10 hover:text-white active:scale-[0.97]"
+                    aria-label="Cerrar sesión"
+                  >
+                    <LogOut size={13} />
+                    Cerrar sesión
+                  </button>
                 </>
               ) : (
                 <>

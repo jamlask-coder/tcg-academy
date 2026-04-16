@@ -729,7 +729,7 @@ export function Header() {
             >
               <Bell size={18} className="text-white" />
               {mounted && unreadCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
@@ -757,7 +757,7 @@ export function Header() {
             >
               <Heart size={22} className="text-white" fill={favCount > 0 ? "white" : "none"} />
               {favCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
                   {favCount}
                 </span>
               )}
@@ -768,12 +768,12 @@ export function Header() {
           {user?.role !== "admin" && (
             <Link
               href="/carrito"
-              className="relative flex items-center justify-center rounded-lg p-1 transition hover:bg-white/10 lg:min-h-[44px] lg:min-w-[44px] lg:p-2"
+              className="relative flex items-center justify-center overflow-visible rounded-lg p-1 transition hover:bg-white/10 lg:min-h-[44px] lg:min-w-[44px] lg:p-2"
               aria-label={mounted ? `Carrito (${count} artículos)` : "Carrito"}
             >
               <ShoppingCart size={24} className="text-white lg:h-[22px] lg:w-[22px]" />
               {mounted && count > 0 && (
-                <span className="absolute -top-2 -right-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white lg:top-0 lg:right-0 lg:h-[18px] lg:min-w-[18px] lg:text-[10px]">
+                <span className="absolute -top-2 right-1 flex h-5 min-w-5 badge-ping-wrap items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white lg:-top-0.5 lg:right-0.5 lg:h-[18px] lg:min-w-[18px] lg:text-[10px]">
                   {count > 99 ? "99+" : count}
                 </span>
               )}
@@ -877,73 +877,33 @@ export function Header() {
           65%  { transform: scale(1.3) rotate(8deg); }
           100% { transform: scale(1) rotate(0deg); opacity: 1; }
         }
+        .badge-ping-wrap {
+          position: relative;
+          overflow: visible;
+        }
+        .badge-ping-wrap::before {
+          content: '';
+          position: absolute;
+          inset: -1px;
+          border-radius: 9999px;
+          background: #ef4444;
+          animation: badgePing 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+          z-index: -1;
+        }
+        @keyframes badgePing {
+          0% { transform: scale(1); opacity: 0.6; }
+          75%, 100% { transform: scale(1.6); opacity: 0; }
+        }
         @media (prefers-reduced-motion: reduce) {
           .trust-item::after { animation: none; }
           .trust-icon { animation: none; }
           [style*="mobileIconPop"] { animation: none !important; }
+          .animate-badge-blink { animation: none; }
         }
       `}</style>
     </header>
 
-    {/* ── Fixed bottom navigation — mobile only ───────────────────────────── */}
-    <nav
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white lg:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      aria-label="Navegación principal"
-    >
-      <div className="flex items-stretch">
-        <Link
-          href="/"
-          className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${pathname === "/" ? "text-[#2563eb]" : "text-gray-500"}`}
-        >
-          <Home size={22} />
-          <span>Inicio</span>
-        </Link>
-        <button
-          onClick={() => setMenuOpen(true)}
-          aria-label="Abrir menú de juegos"
-          className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${menuOpen ? "text-[#2563eb]" : "text-gray-500"}`}
-        >
-          <Gamepad2 size={22} />
-          <span>Juegos</span>
-        </button>
-        {user?.role === "admin" ? (
-          <Link
-            href="/admin"
-            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${pathname.startsWith("/admin") ? "text-[#2563eb]" : "text-gray-500"}`}
-          >
-            <LayoutDashboard size={22} />
-            <span>Admin</span>
-          </Link>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              setMobileSearchVisible((v) => !v);
-              if (!mobileSearchVisible) {
-                window.scrollTo({ top: 0, behavior: "smooth" });
-                setTimeout(() => {
-                  const input = mobileSearchRef.current?.querySelector("input");
-                  if (input) input.focus();
-                }, 100);
-              }
-            }}
-            className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${mobileSearchVisible ? "text-[#2563eb]" : "text-gray-500"}`}
-          >
-            <Search size={22} />
-            <span>Buscar</span>
-          </button>
-        )}
-        <Link
-          href={user ? (user.role === "admin" ? "/admin" : "/cuenta") : "/login"}
-          className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${pathname.startsWith("/cuenta") || pathname === "/login" || (user?.role === "admin" && pathname.startsWith("/admin")) ? "text-[#2563eb]" : "text-gray-500"}`}
-          aria-label={user?.role === "admin" ? "Panel de administración" : "Mi cuenta"}
-        >
-          <User size={22} />
-          <span>{user?.role === "admin" ? "Cuenta" : "Cuenta"}</span>
-        </Link>
-      </div>
-    </nav>
+    {/* Bottom nav removed — navigation via header + drawer */}
     </>
   );
 }

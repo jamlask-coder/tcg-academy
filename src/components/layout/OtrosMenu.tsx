@@ -9,7 +9,7 @@ const OTROS_GAMES = [
     name: "Dragon Ball",
     href: "/dragon-ball",
     color: "#d97706",
-    logo: "/images/logos/dragonball-clean.png",
+    logo: "/images/logos/dragonball-clean.png?v=2",
     logoH: 52,
     logoMaxW: 140,
   },

@@ -1,9 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
+import { serverRateLimit } from "@/utils/sanitize";
 
 // POST /api/auth — Unified auth endpoint
 // Body: { action: "login" | "register" | "reset-password" | "reset-confirm", ...data }
 export async function POST(req: NextRequest) {
   try {
+    // ── Rate limiting: 5 auth attempts per minute per IP ──
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+      ?? req.headers.get("x-real-ip")
+      ?? "unknown";
+    const rl = serverRateLimit(`auth:${ip}`, 5, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Demasiados intentos. Espera un momento." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)),
+          },
+        },
+      );
+    }
+
     const body = await req.json();
     const { action } = body;
 

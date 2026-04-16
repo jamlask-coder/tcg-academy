@@ -875,6 +875,95 @@ const SOURCE_TEXT: Record<string, string> = {
   riftbound: "Cartas Signature m\u00E1s valiosas \u00B7 Fuente: PriceCharting",
 };
 
+// ─── Auto-scrolling row with arrows ─────────────────────────────────────────
+
+function AutoScrollRow<T extends { id: string }>({
+  items,
+  renderCard,
+  onCardClick,
+  intervalMs = 5000,
+}: {
+  items: T[];
+  renderCard: (item: T, index: number) => React.ReactNode;
+  onCardClick: (index: number) => void;
+  intervalMs?: number;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [paused, setPaused] = useState(false);
+
+  // Scroll 6 cards at once
+  const scrollByCards = (direction: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const cardEl = el.querySelector("[data-card]");
+    const cardWidth = cardEl?.clientWidth ?? 120;
+    const gap = 8;
+    const step = (cardWidth + gap) * 6; // 6 cards at once
+    const maxScroll = el.scrollWidth - el.clientWidth;
+
+    const target = el.scrollLeft + step * direction;
+    if (target > maxScroll && direction > 0) {
+      el.scrollTo({ left: 0, behavior: "smooth" });
+    } else if (target < 0 && direction < 0) {
+      el.scrollTo({ left: maxScroll, behavior: "smooth" });
+    } else {
+      el.scrollBy({ left: step * direction, behavior: "smooth" });
+    }
+  };
+
+  useEffect(() => {
+    if (items.length === 0 || paused) return;
+    const timer = setInterval(() => scrollByCards(1), intervalMs);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length, paused, intervalMs]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="group/scroll relative">
+      {/* Left arrow */}
+      <button
+        onClick={() => { scrollByCards(-1); setPaused(true); setTimeout(() => setPaused(false), 8000); }}
+        className="absolute top-1/2 left-0 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white/90 text-gray-600 shadow-md backdrop-blur-sm transition hover:bg-white hover:text-[#2563eb] sm:opacity-0 sm:group-hover/scroll:opacity-100"
+        aria-label="Anteriores"
+      >
+        <ChevronLeft size={16} />
+      </button>
+      {/* Right arrow */}
+      <button
+        onClick={() => { scrollByCards(1); setPaused(true); setTimeout(() => setPaused(false), 8000); }}
+        className="absolute top-1/2 right-0 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white/90 text-gray-600 shadow-md backdrop-blur-sm transition hover:bg-white hover:text-[#2563eb] sm:opacity-0 sm:group-hover/scroll:opacity-100"
+        aria-label="Siguientes"
+      >
+        <ChevronRight size={16} />
+      </button>
+      <div
+        ref={scrollRef}
+        className="flex gap-2 overflow-x-auto scrollbar-hide scroll-smooth"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+        onTouchStart={() => setPaused(true)}
+        onTouchEnd={() => { setTimeout(() => setPaused(false), 8000); }}
+      >
+        <style>{`.scrollbar-hide::-webkit-scrollbar { display: none; }`}</style>
+        {items.map((item, i) => (
+          <button
+            key={item.id}
+            data-card
+            type="button"
+            onClick={() => onCardClick(i)}
+            className="w-[calc(100%/3-6px)] flex-shrink-0 cursor-pointer focus:outline-none sm:w-[calc(100%/6-8px)]"
+          >
+            {renderCard(item, i)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function SetHighlightCards({ product }: Props) {
   const [cards, setCards] = useState<HighlightCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -936,21 +1025,14 @@ export function SetHighlightCards({ product }: Props) {
 
   if (!loading && validCards.length === 0) return null;
 
-  const CARDS_PER_VIEW = 20;
-  const canScrollLeft = scrollPos > 0;
-  const canScrollRight = scrollPos < validCards.length - CARDS_PER_VIEW;
-
-  const scrollLeft = () => setScrollPos((p) => Math.max(0, p - CARDS_PER_VIEW));
-  const scrollRight = () => setScrollPos((p) => Math.min(validCards.length - CARDS_PER_VIEW, p + CARDS_PER_VIEW));
-
-  const visibleCards = validCards.slice(scrollPos, scrollPos + CARDS_PER_VIEW);
+  void scrollPos; // legacy — carousel handles its own scrolling
 
 
   return (
     <>
       {lightboxIndex !== null && (
         <CardLightbox
-          cards={validCards}
+          cards={validCards.slice(0, 18)}
           index={lightboxIndex}
           onClose={closeLightbox}
           onNavigate={setLightboxIndex}
@@ -958,7 +1040,7 @@ export function SetHighlightCards({ product }: Props) {
       )}
       {colLightboxIndex !== null && collection.length > 0 && (
         <CardLightbox
-          cards={collection}
+          cards={collection.slice(0, 18)}
           index={colLightboxIndex}
           onClose={closeColLightbox}
           onNavigate={setColLightboxIndex}
@@ -966,24 +1048,20 @@ export function SetHighlightCards({ product }: Props) {
       )}
 
       <div className="mt-6">
-        {/* Cartas más cotizadas — 6 columns */}
+        {/* Cartas más cotizadas — carrusel 1 fila, auto-scroll */}
         <h3 className="mb-2 text-xl font-bold text-gray-900">Cartas más cotizadas</h3>
         {loading ? (
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <div className="flex gap-2 overflow-hidden">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="aspect-[2/3] animate-pulse rounded-lg bg-gray-100" />
+              <div key={i} className="aspect-[2/3] w-[calc(100%/3-6px)] flex-shrink-0 animate-pulse rounded-lg bg-gray-100 sm:w-[calc(100%/6-8px)]" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-            {visibleCards.map((card, i) => (
-              <button
-                key={card.id}
-                type="button"
-                onClick={() => setLightboxIndex(scrollPos + i)}
-                className="group/card relative cursor-pointer focus:outline-none"
-                title={`${card.name} — ${card.rarity}`}
-              >
+          <AutoScrollRow
+            items={validCards.slice(0, 18)}
+            onCardClick={(globalIdx) => setLightboxIndex(globalIdx)}
+            renderCard={(card, i) => (
+              <div className="group/card relative">
                 <div className="relative overflow-hidden rounded-lg transition-transform duration-200 hover:scale-105 hover:shadow-lg">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -991,16 +1069,17 @@ export function SetHighlightCards({ product }: Props) {
                     alt={card.name}
                     loading="lazy"
                     className="aspect-[2/3] w-full rounded-lg bg-gray-100 object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).closest("button")!.style.display = "none"; markBroken(card.id); }}
+                    onError={(e) => { (e.target as HTMLImageElement).closest("div")!.style.display = "none"; markBroken(card.id); }}
                   />
                   {card.isHolo && <HoloShimmer />}
                   <div className="absolute inset-0 flex flex-col items-center justify-end rounded-lg bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 transition-opacity duration-200 group-hover/card:opacity-100">
                     <p className="pb-2 text-center text-[10px] font-bold leading-tight text-white sm:text-xs">{card.name}</p>
                   </div>
                 </div>
-              </button>
-            ))}
-          </div>
+              </div>
+            )}
+            intervalMs={3000}
+          />
         )}
         {detectedGame && !loading && validCards.length > 0 && (
           <p className="mt-1.5 text-[10px] leading-tight text-gray-400">
@@ -1008,65 +1087,39 @@ export function SetHighlightCards({ product }: Props) {
           </p>
         )}
 
-        {/* La Colección — 6 cards with scroll + link to full grid */}
-        {collection.length > 0 && (() => {
-          const PER = 6;
-          return (
-            <div className="mt-5">
-              <div className="mb-2 flex items-center justify-between">
-                <button
-                  onClick={() => setColGridOpen(true)}
-                  className="group/col flex items-center gap-2 text-left"
-                >
-                  <h3 className="text-xl font-bold text-gray-900 transition group-hover/col:text-[#2563eb]">
-                    Ver la colección completa de {product.name.replace(/^\[DEMO\]\s*/i, "").replace(/\s*\(\d+\s*(?:cartas|sobres)\)/gi, "")} ({collection.length})
-                  </h3>
-                  <ChevronRight size={18} className="flex-shrink-0 text-gray-400 transition group-hover/col:text-[#2563eb]" />
-                </button>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setColCardIdx((p) => Math.max(0, (p ?? 0) - PER))}
-                    disabled={(colCardIdx ?? 0) <= 0}
-                    className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 transition hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label="Anteriores"
-                  >
-                    <ChevronLeft size={13} className="text-gray-600" />
-                  </button>
-                  <button
-                    onClick={() => setColCardIdx((p) => Math.min(collection.length - PER, (p ?? 0) + PER))}
-                    disabled={(colCardIdx ?? 0) >= collection.length - PER}
-                    className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 transition hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label="Siguientes"
-                  >
-                    <ChevronRight size={13} className="text-gray-600" />
-                  </button>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                {collection.slice(colCardIdx ?? 0, (colCardIdx ?? 0) + PER).map((card, i) => (
-                  <button
-                    key={card.id}
-                    type="button"
-                    onClick={() => setColLightboxIndex((colCardIdx ?? 0) + i)}
-                    className="relative cursor-pointer focus:outline-none"
-                    title={card.name}
-                  >
-                    <div className="overflow-hidden rounded-lg transition-transform duration-200 hover:scale-105 hover:shadow-md">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={card.imageUrl}
-                        alt={card.name}
-                        loading="lazy"
-                        className="aspect-[2/3] w-full rounded-lg bg-gray-100 object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0"; }}
-                      />
-                    </div>
-                  </button>
-                ))}
-              </div>
+        {/* La Colección — carrusel 1 fila, auto-scroll + link to full grid */}
+        {collection.length > 0 && (
+          <div className="mt-5">
+            <div className="mb-2 flex items-center justify-between">
+              <button
+                onClick={() => setColGridOpen(true)}
+                className="group/col flex items-center gap-2 text-left"
+              >
+                <h3 className="text-xl font-bold text-gray-900 transition group-hover/col:text-[#2563eb]">
+                  Ver la colección completa de {product.name.replace(/^\[DEMO\]\s*/i, "").replace(/\s*\(\d+\s*(?:cartas|sobres)\)/gi, "")} ({collection.length})
+                </h3>
+                <ChevronRight size={18} className="flex-shrink-0 text-gray-400 transition group-hover/col:text-[#2563eb]" />
+              </button>
             </div>
-          );
-        })()}
+            <AutoScrollRow
+              items={collection.slice(0, 18)}
+              onCardClick={(globalIdx) => setColLightboxIndex(globalIdx)}
+              renderCard={(card) => (
+                <div className="overflow-hidden rounded-lg transition-transform duration-200 hover:scale-105 hover:shadow-md">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={card.imageUrl}
+                    alt={card.name}
+                    loading="lazy"
+                    className="aspect-[2/3] w-full rounded-lg bg-gray-100 object-cover"
+                    onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0"; }}
+                  />
+                </div>
+              )}
+              intervalMs={4000}
+            />
+          </div>
+        )}
 
         {/* Full collection grid modal */}
         {colGridOpen && collection.length > 0 && (

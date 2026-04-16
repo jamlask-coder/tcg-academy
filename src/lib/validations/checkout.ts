@@ -2,22 +2,44 @@
  * Zod validation schemas for the checkout flow.
  *
  * Used for client-side validation and ready for server-side reuse.
+ *
+ * HARDENED: max lengths, Spanish CP range, email format, name character sets.
  */
 
 import { z } from "zod";
+
+// ─── Shared refinements ─────────────────────────────────────────────────────
+
+/** Only letters, spaces, hyphens, apostrophes, and common accents */
+const NAME_REGEX = /^[\p{L}\s'\-.,]+$/u;
+
+/** Valid Spanish postal code range: 01000–52999 */
+function isValidSpanishCP(cp: string): boolean {
+  const num = parseInt(cp, 10);
+  return num >= 1000 && num <= 52999;
+}
 
 // ─── Personal data ──────────────────────────────────────────────────────────
 
 export const personalSchema = z.object({
   nombre: z
     .string()
-    .min(2, "El nombre debe tener al menos 2 caracteres"),
+    .min(2, "El nombre debe tener al menos 2 caracteres")
+    .max(80, "El nombre es demasiado largo (máx. 80)")
+    .refine((v) => NAME_REGEX.test(v.trim()), "El nombre contiene caracteres no permitidos"),
   apellidos: z
     .string()
-    .min(2, "Los apellidos deben tener al menos 2 caracteres"),
+    .min(2, "Los apellidos deben tener al menos 2 caracteres")
+    .max(120, "Los apellidos son demasiado largos (máx. 120)")
+    .refine((v) => NAME_REGEX.test(v.trim()), "Los apellidos contienen caracteres no permitidos"),
   email: z
     .string()
-    .email("Introduce un email válido"),
+    .email("Introduce un email válido")
+    .max(254, "El email es demasiado largo")
+    .refine(
+      (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v),
+      "El formato de email no es válido",
+    ),
   telefono: z
     .string()
     .regex(/^(\+34\s?)?[6-9]\d{8}$/, "Introduce un teléfono español válido")
@@ -32,15 +54,23 @@ export type PersonalData = z.infer<typeof personalSchema>;
 export const addressSchema = z.object({
   direccion: z
     .string()
-    .min(3, "La dirección debe tener al menos 3 caracteres"),
+    .min(5, "La dirección debe tener al menos 5 caracteres")
+    .max(200, "La dirección es demasiado larga (máx. 200)")
+    .refine(
+      (v) => /\d/.test(v),
+      "La dirección debe incluir un número (portal, piso, etc.)",
+    ),
   cp: z
     .string()
-    .regex(/^\d{5}$/, "El código postal debe tener 5 dígitos"),
+    .regex(/^\d{5}$/, "El código postal debe tener 5 dígitos")
+    .refine(isValidSpanishCP, "Código postal fuera de rango español (01000–52999)"),
   ciudad: z
     .string()
-    .min(2, "La ciudad debe tener al menos 2 caracteres"),
+    .min(2, "La ciudad debe tener al menos 2 caracteres")
+    .max(100, "El nombre de ciudad es demasiado largo"),
   provincia: z
     .string()
+    .max(100, "Nombre de provincia demasiado largo")
     .optional()
     .or(z.literal("")),
 });

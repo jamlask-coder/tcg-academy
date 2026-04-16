@@ -1,7 +1,13 @@
 /**
  * Input sanitisation helpers (client-side static export).
  * For a real backend, also sanitise server-side with DOMPurify or equivalent.
+ *
+ * HARDENED: length limits, null byte stripping, prototype pollution guard,
+ * Unicode normalization, control character removal.
  */
+
+/** Default max length for sanitized strings (prevents storage bloat) */
+const DEFAULT_MAX_LENGTH = 500;
 
 /**
  * Strip common SQL injection patterns (defense-in-depth).
@@ -27,29 +33,104 @@ export function stripSqlPatterns(input: string): string {
   return result;
 }
 
-/** Strip HTML tags and all known XSS vectors from a string. */
-export function sanitizeString(value: string): string {
-  const htmlCleaned = value
-    .replace(/<[^>]*>/g, "") // strip HTML tags
-    .replace(/javascript:/gi, "") // JS URI scheme
-    .replace(/vbscript:/gi, "") // VBScript URI scheme
-    .replace(/data:/gi, "") // data URI scheme
-    .replace(/on\w+\s*=/gi, "") // inline event handlers (onclick=, onerror=…)
-    .replace(/eval\s*\(/gi, "") // eval(
-    .replace(/expression\s*\(/gi, "") // CSS expression(
+/**
+ * Strip HTML tags, XSS vectors, null bytes, and control characters.
+ * Enforces a maximum length to prevent storage/memory abuse.
+ */
+export function sanitizeString(
+  value: string,
+  maxLength = DEFAULT_MAX_LENGTH,
+): string {
+  // 1. Truncate first to prevent regex DoS on huge strings
+  let s = value.slice(0, maxLength * 2);
+
+  // 2. Remove null bytes and control characters (except newline, tab)
+  s = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+
+  // 3. Normalize Unicode to prevent homoglyph attacks
+  s = s.normalize("NFC");
+
+  // 4. Strip HTML and XSS vectors
+  s = s
+    .replace(/<[^>]*>/g, "")
+    .replace(/javascript:/gi, "")
+    .replace(/vbscript:/gi, "")
+    .replace(/data:/gi, "")
+    .replace(/on\w+\s*=/gi, "")
+    .replace(/eval\s*\(/gi, "")
+    .replace(/expression\s*\(/gi, "")
     .trim();
-  return stripSqlPatterns(htmlCleaned);
+
+  // 5. Strip SQL patterns
+  s = stripSqlPatterns(s);
+
+  // 6. Final length enforcement
+  return s.slice(0, maxLength);
 }
 
-/** Sanitise all string fields in a plain object and return a cleaned copy. */
+/** Dangerous keys that must never appear in user-supplied objects */
+const FORBIDDEN_KEYS = new Set([
+  "__proto__",
+  "constructor",
+  "prototype",
+  "toString",
+  "valueOf",
+  "hasOwnProperty",
+]);
+
+/**
+ * Sanitise all string fields in a plain object and return a cleaned copy.
+ * Blocks prototype pollution by rejecting dangerous keys.
+ * Limits recursion depth to prevent stack overflow.
+ */
 export function sanitizeFormData<T extends Record<string, unknown>>(
   data: T,
+  maxDepth = 3,
 ): T {
+  if (maxDepth <= 0) return {} as T;
+
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(data)) {
-    out[k] = typeof v === "string" ? sanitizeString(v) : v;
+    // Block prototype pollution
+    if (FORBIDDEN_KEYS.has(k)) continue;
+
+    if (typeof v === "string") {
+      out[k] = sanitizeString(v);
+    } else if (
+      v !== null &&
+      typeof v === "object" &&
+      !Array.isArray(v)
+    ) {
+      out[k] = sanitizeFormData(v as Record<string, unknown>, maxDepth - 1);
+    } else {
+      out[k] = v;
+    }
   }
   return out as T;
+}
+
+/**
+ * Validate that an email is structurally sound.
+ * Not a full RFC 5322 check — catches common garbage inputs.
+ */
+export function isValidEmail(email: string): boolean {
+  if (!email || email.length > 254) return false;
+  return /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(email);
+}
+
+/**
+ * Clamp a numeric value to a safe range.
+ * Use for prices, quantities, discounts — prevents NaN/Infinity/negative.
+ */
+export function clampNumber(
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
 }
 
 /**

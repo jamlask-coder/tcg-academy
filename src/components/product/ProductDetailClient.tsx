@@ -1136,7 +1136,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
             </div>
             <div className="mt-1.5 border-t border-gray-100 pt-1.5">
               <div className="flex items-center gap-1.5 text-xs text-amber-700">
-                <span className="text-amber-400">★</span>
+                <span className="inline-block animate-star-glow text-lg leading-none text-amber-400">★</span>
                 <span>
                   Consigue <strong>{Math.round(displayPrice * 100)}</strong> puntos con esta compra
                 </span>

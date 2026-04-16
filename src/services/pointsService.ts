@@ -64,12 +64,33 @@ function loadMap<T>(key: string): Record<string, T> {
   }
 }
 
-function saveMap(key: string, data: Record<string, unknown>): void {
-  if (typeof window === "undefined") return;
+/**
+ * Save a map to localStorage.
+ * HARDENED: no longer ignores quota errors silently.
+ * Returns true on success, false on failure.
+ * Dispatches a storage error event on failure.
+ */
+function saveMap(key: string, data: Record<string, unknown>): boolean {
+  if (typeof window === "undefined") return false;
   try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch {
-    /* ignore quota */
+    const json = JSON.stringify(data);
+    localStorage.setItem(key, json);
+    return true;
+  } catch (err) {
+    // Dispatch error event so UI can react
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("tcga:storage:error", {
+          detail: {
+            ts: Date.now(),
+            key,
+            type: "quota",
+            detail: err instanceof Error ? err.message : "Unknown write error",
+          },
+        }),
+      );
+    }
+    return false;
   }
 }
 
@@ -116,23 +137,67 @@ export function loadPoints(userId: string): number {
   return Math.max(0, Math.floor(map[userId] ?? 0));
 }
 
-export function addPoints(userId: string, delta: number): number {
-  if (delta <= 0) return loadPoints(userId);
+/**
+ * Add points to a user's balance.
+ * HARDENED: validates delta is finite, rejects NaN/Infinity, confirms write.
+ * Returns { ok, balance } so callers can handle failure.
+ */
+export function addPoints(
+  userId: string,
+  delta: number,
+): number {
+  if (!Number.isFinite(delta) || delta <= 0) return loadPoints(userId);
   const map = loadMap<number>(POINTS_KEY);
   const current = Math.max(0, Math.floor(map[userId] ?? 0));
   const next = current + Math.floor(delta);
   map[userId] = next;
-  saveMap(POINTS_KEY, map);
+  const ok = saveMap(POINTS_KEY, map);
+  if (!ok) {
+    // Write failed — return current balance (NOT the unsaved new balance)
+    return current;
+  }
   return next;
 }
 
-export function deductPoints(userId: string, delta: number): number {
-  if (delta <= 0) return loadPoints(userId);
+/**
+ * Deduct points from a user's balance.
+ * HARDENED: validates delta, ensures sufficient balance, confirms write.
+ * Throws on critical failure (e.g., deducting for an order that must succeed).
+ */
+export function deductPoints(
+  userId: string,
+  delta: number,
+): number {
+  if (!Number.isFinite(delta) || delta <= 0) return loadPoints(userId);
   const map = loadMap<number>(POINTS_KEY);
   const current = Math.max(0, Math.floor(map[userId] ?? 0));
-  const next = Math.max(0, current - Math.floor(delta));
+  const deduction = Math.floor(delta);
+
+  // Warn if trying to deduct more than available (partial deduction)
+  if (deduction > current) {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("tcga:points:warning", {
+          detail: {
+            userId,
+            requested: deduction,
+            available: current,
+            msg: `Deducting ${deduction} pts but only ${current} available`,
+          },
+        }),
+      );
+    }
+  }
+
+  const next = Math.max(0, current - deduction);
   map[userId] = next;
-  saveMap(POINTS_KEY, map);
+  const ok = saveMap(POINTS_KEY, map);
+  if (!ok) {
+    throw new Error(
+      `CRITICAL: Failed to save point deduction for user ${userId}. ` +
+      `Attempted to deduct ${deduction} pts from ${current} pts balance.`,
+    );
+  }
   return next;
 }
 

@@ -20,7 +20,21 @@ import {
 import { PaymentMethod } from "@/types/fiscal";
 import type { CustomerData } from "@/types/fiscal";
 import { recordCouponUsage, markCouponUsed } from "@/services/couponService";
-import { sanitizeString } from "@/utils/sanitize";
+import { sanitizeString, isValidEmail, clampNumber } from "@/utils/sanitize";
+import {
+  acquireCheckoutLock,
+  releaseCheckoutLock,
+  checkOrderIdempotency,
+  orderFingerprint,
+} from "@/lib/checkoutGuard";
+import { safeWrite, safeRead, emergencyTrimStorage } from "@/lib/safeStorage";
+import {
+  detectImpossibleDiscount,
+  detectRapidFire,
+  detectTimeTravel,
+  detectNumericOverflow,
+} from "@/lib/anomalyDetection";
+import { enqueueDeadLetter } from "@/lib/circuitBreaker";
 import {
   Shield,
   Truck,
@@ -33,6 +47,7 @@ import {
   Trophy,
   ChevronDown,
   X,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -119,39 +134,100 @@ export default function CheckoutPage() {
   const [orderError, setOrderError] = useState<string | null>(null);
 
   const handleOrder = async () => {
-    // Idempotency guard — prevent double-click race conditions
+    // ── Guard 1: Prevent double-click ──
     if (submittingRef.current) return;
     submittingRef.current = true;
     setSubmitting(true);
     setOrderError(null);
 
+    // ── Guard 2: Anomaly detection — time travel + rapid fire ──
+    detectTimeTravel();
+    if (detectRapidFire("checkout", 5)) {
+      setOrderError("Demasiados intentos de pedido. Espera un momento.");
+      submittingRef.current = false;
+      setSubmitting(false);
+      return;
+    }
+
+    // ── Guard 3: Cross-tab lock ──
+    if (!acquireCheckoutLock()) {
+      setOrderError("Hay otro pedido en proceso en otra pestaña. Espera a que termine.");
+      submittingRef.current = false;
+      setSubmitting(false);
+      return;
+    }
+
     try {
-      // Validate no item exceeds 99 units
-      const overLimitItem = items.find((i) => i.quantity > 99);
-      if (overLimitItem) {
-        setOrderError(`El artículo "${overLimitItem.name}" supera el máximo de 99 unidades.`);
+      // ── Guard 3: Cart not empty ──
+      if (!items.length) {
+        setOrderError("Tu carrito está vacío.");
         return;
       }
 
-      // Sanitize customer-provided string fields
-      const sNombre = sanitizeString(form.nombre);
-      const sApellidos = sanitizeString(form.apellidos);
-      const sDireccion = sanitizeString(form.direccion);
-      const sCiudad = sanitizeString(form.ciudad);
-      const sProvincia = sanitizeString(form.provincia);
-      const sCp = sanitizeString(form.cp);
-      const sTelefono = sanitizeString(form.telefono);
-      const sNotas = ""; // notas field placeholder — sanitize if added later
+      // ── Guard 4: Validate quantities ──
+      const overLimitItem = items.find(
+        (i) => i.quantity > 99 || i.quantity < 1 || !Number.isFinite(i.quantity),
+      );
+      if (overLimitItem) {
+        setOrderError(`El artículo "${overLimitItem.name}" tiene una cantidad no válida.`);
+        return;
+      }
 
+      // ── Guard 5: Validate email ──
+      if (!isValidEmail(form.email)) {
+        setOrderError("El email introducido no es válido.");
+        return;
+      }
+
+      // ── Guard 6: Validate prices are sane ──
+      const badPriceItem = items.find(
+        (i) => !Number.isFinite(i.price) || i.price <= 0,
+      );
+      if (badPriceItem) {
+        setOrderError(`Precio inválido en "${badPriceItem.name}". Vuelve al carrito e inténtalo de nuevo.`);
+        return;
+      }
+
+      // ── Guard 7: Idempotency (prevent exact duplicate orders) ──
+      const fp = orderFingerprint(items, form.email, finalTotal);
+      if (!checkOrderIdempotency(fp)) {
+        setOrderError("Este pedido ya se ha creado recientemente. Comprueba \"Mis pedidos\".");
+        return;
+      }
+
+      // ── Sanitize all customer-provided strings ──
+      const sNombre = sanitizeString(form.nombre, 80);
+      const sApellidos = sanitizeString(form.apellidos, 120);
+      const sDireccion = sanitizeString(form.direccion, 200);
+      const sCiudad = sanitizeString(form.ciudad, 100);
+      const sProvincia = sanitizeString(form.provincia, 100);
+      const sCp = sanitizeString(form.cp, 5);
+      const sTelefono = sanitizeString(form.telefono, 20);
+
+      // ── Anomaly: detect impossible discounts ──
+      detectImpossibleDiscount(total, couponDiscount + pointsDiscount);
+
+      // ── Anomaly: numeric overflow on all monetary values ──
+      detectNumericOverflow("checkout.total", total);
+      detectNumericOverflow("checkout.couponDiscount", couponDiscount);
+      detectNumericOverflow("checkout.pointsDiscount", pointsDiscount);
+      detectNumericOverflow("checkout.shipping", shipping);
+
+      // ── Validate finalTotal is sane ──
+      const safeFinalTotal = clampNumber(finalTotal, 0, 99999.99, 0);
+      if (safeFinalTotal <= 0 && !appliedPoints && !pending?.appliedCoupon) {
+        setOrderError("El total del pedido no puede ser 0€ sin descuento aplicado.");
+        return;
+      }
+
+      // ── Generate order ID ──
       const idArr = new Uint8Array(4);
       crypto.getRandomValues(idArr);
       const rand = Array.from(idArr).map(b => b.toString(36).padStart(2, '0')).join('').slice(0, 6).toUpperCase();
       const id = `TCG-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${rand}`;
       setOrderId(id);
 
-      // Keep email as-is (needs exact match for confirmations)
-      void sNotas; // consumed when notas field is wired up
-
+      // ── Build order with FULL discount breakdown ──
       const order = {
         id,
         date: new Date().toISOString(),
@@ -168,8 +244,21 @@ export default function CheckoutPage() {
         couponDiscount,
         points: appliedPoints,
         pointsDiscount,
+        // FULL discount breakdown for admin reconciliation
+        discountBreakdown: {
+          couponCode: pending?.appliedCoupon?.code ?? null,
+          couponType: pending?.appliedCoupon?.discountType ?? null,
+          couponValue: pending?.appliedCoupon?.value ?? 0,
+          couponEuros: couponDiscount,
+          pointsUsed: appliedPoints?.points ?? 0,
+          pointsEuros: pointsDiscount,
+          freeShippingCoupon: hasFreeShippingCoupon,
+          totalDiscounts: couponDiscount + pointsDiscount,
+        },
         shipping,
-        total: finalTotal,
+        total: safeFinalTotal,
+        // Points awarded on discounted base (correct fiscal calculation)
+        pointsBase,
         shippingAddress: {
           nombre: sNombre,
           apellidos: sApellidos,
@@ -184,18 +273,56 @@ export default function CheckoutPage() {
         envio: form.envio,
         tiendaRecogida: form.tiendaRecogida || null,
         pago: form.pago,
+        userRole: user?.role ?? "guest",
+        userId: user?.id ?? null,
       };
 
-    try {
-      const existing = JSON.parse(
-        localStorage.getItem("tcgacademy_orders") ?? "[]",
-      );
-      existing.unshift(order);
-      localStorage.setItem("tcgacademy_orders", JSON.stringify(existing));
-      localStorage.removeItem("tcgacademy_pending_checkout");
-    } catch {}
+    // ── PHASE 1: Save order (CRITICAL — must succeed) ──
+    const orderSaved = safeWrite(
+      "tcgacademy_orders",
+      (() => {
+        const existing = safeRead<unknown[]>("tcgacademy_orders", []);
+        return [order, ...existing];
+      })(),
+    );
 
-    // Generate fiscal invoice (skip for pending-payment methods: tienda, transferencia)
+    if (!orderSaved) {
+      // Try emergency cleanup and retry once
+      emergencyTrimStorage();
+      const retryData = safeRead<unknown[]>("tcgacademy_orders", []);
+      const retrySaved = safeWrite("tcgacademy_orders", [order, ...retryData]);
+      if (!retrySaved) {
+        setOrderError("Error al guardar el pedido: almacenamiento lleno. Por favor, contacta con soporte.");
+        return;
+      }
+    }
+
+    localStorage.removeItem("tcgacademy_pending_checkout");
+
+    // ── PHASE 2: Points deduction (must happen BEFORE award) ──
+    let pointsDeducted = false;
+    if (user?.role === "cliente" && appliedPoints?.points) {
+      try {
+        deductPoints(user.id, appliedPoints.points);
+        pointsDeducted = true;
+      } catch (err) {
+        // CRITICAL: points deduction failed but order is saved.
+        // Log incident but DON'T block order — admin will reconcile.
+        const incidentLog = safeRead<unknown[]>("tcgacademy_incidents", []);
+        incidentLog.unshift({
+          ts: new Date().toISOString(),
+          type: "points_deduction_failed",
+          orderId: id,
+          userId: user.id,
+          pointsAttempted: appliedPoints.points,
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+        safeWrite("tcgacademy_incidents", incidentLog);
+      }
+    }
+
+    // ── PHASE 3: Generate fiscal invoice ──
+    // Invoice amounts reflect ACTUAL discounted prices for correct VAT
     if (form.pago !== "tienda" && form.pago !== "transferencia") {
       try {
         const paymentMethodMap: Record<string, PaymentMethod> = {
@@ -221,16 +348,23 @@ export default function CheckoutPage() {
           },
         };
 
-        const invoiceItems = items.map((item, idx) =>
-          buildLineItem({
+        // FIXED: Calculate per-item discount proportion for correct VAT
+        const totalProductDiscount = couponDiscount + pointsDiscount;
+        const discountRatio = total > 0 ? totalProductDiscount / total : 0;
+
+        const invoiceItems = items.map((item, idx) => {
+          // Each item gets a proportional share of the global discount
+          const itemDiscountPct = Math.min(discountRatio * 100, 100);
+          return buildLineItem({
             lineNumber: idx + 1,
             productId: item.key,
             description: item.name,
             quantity: item.quantity,
             unitPriceWithVAT: item.price,
             vatRate: 21,
-          }),
-        );
+            discount: itemDiscountPct,
+          });
+        });
 
         const invoice = await createInvoice({
           recipient,
@@ -240,6 +374,24 @@ export default function CheckoutPage() {
         });
 
         saveInvoice(invoice);
+        // saveInvoice also generates the journal entry (partida doble) automatically.
+
+        // Generate payment entry for immediate payment methods
+        // (tarjeta, bizum, paypal, google-pay, apple-pay → cobro inmediato)
+        const immediatePayments = ["tarjeta", "bizum", "paypal", "google-pay", "apple-pay"];
+        if (immediatePayments.includes(form.pago)) {
+          void (async () => {
+            try {
+              const { createPaymentEntry } = await import("@/accounting/journalEngine");
+              await createPaymentEntry(
+                invoice.invoiceNumber,
+                form.pago,
+                invoice.totals.totalInvoice,
+                new Date().toISOString().slice(0, 10),
+              );
+            } catch { /* payment entry is non-critical — autopilot detects gaps */ }
+          })();
+        }
 
         // Store invoice ID in the order
         try {
@@ -251,28 +403,49 @@ export default function CheckoutPage() {
             orders[orderIdx].invoiceId = invoice.invoiceId;
             localStorage.setItem("tcgacademy_orders", JSON.stringify(orders));
           }
-        } catch { /* ignore */ }
-      } catch { /* Invoice failure must not block order creation */ }
+        } catch { /* invoice link is non-critical */ }
+      } catch (invoiceErr) {
+        // Dead letter queue — invoice can be regenerated later by admin
+        enqueueDeadLetter("invoice_send", {
+          orderId: id,
+          total: safeFinalTotal,
+          email: form.email,
+          pago: form.pago,
+          itemCount: items.length,
+        }, invoiceErr instanceof Error ? invoiceErr.message : "Unknown error");
+
+        // Also log as incident
+        const incidentLog = safeRead<unknown[]>("tcgacademy_incidents", []);
+        incidentLog.unshift({
+          ts: new Date().toISOString(),
+          type: "invoice_generation_failed",
+          orderId: id,
+          error: invoiceErr instanceof Error ? invoiceErr.message : "Unknown error",
+          total: safeFinalTotal,
+        });
+        safeWrite("tcgacademy_incidents", incidentLog);
+      }
     }
 
-    // Mark payment status for manual payment methods (transfer, in-store)
+    // ── PHASE 4: Mark payment status ──
     if (form.pago === "transferencia" || form.pago === "tienda") {
       try {
         const ps = JSON.parse(localStorage.getItem("tcgacademy_payment_status") ?? "{}");
         ps[id] = "pendiente";
         localStorage.setItem("tcgacademy_payment_status", JSON.stringify(ps));
-      } catch { /* ignore */ }
+      } catch { /* non-critical */ }
     }
 
-    // Award purchase points and propagate to referral chain (cliente only)
+    // ── PHASE 5: Award purchase points (on discounted base, not full price) ──
     if (user?.role === "cliente") {
-      if (appliedPoints?.points) {
-        deductPoints(user.id, appliedPoints.points);
+      // Award on pointsBase (subtotal minus discounts, excluding shipping)
+      // This prevents earning points on free orders from stacked discounts
+      if (pointsBase > 0) {
+        awardPurchasePoints(user.id, pointsBase);
       }
-      awardPurchasePoints(user.id, pointsBase);
     }
 
-    // Decrement stock for purchased items
+    // ── PHASE 6: Decrement stock ──
     try {
       const overrides = JSON.parse(localStorage.getItem("tcgacademy_product_overrides") ?? "{}");
       for (const item of items) {
@@ -289,31 +462,28 @@ export default function CheckoutPage() {
       }
       localStorage.setItem("tcgacademy_product_overrides", JSON.stringify(overrides));
       window.dispatchEvent(new Event("tcga:products:updated"));
-    } catch { /* ignore */ }
+    } catch { /* stock update is non-critical */ }
 
-    // Record coupon usage if a coupon was applied
+    // ── PHASE 7: Record coupon usage ──
     if (pending?.appliedCoupon?.code && user?.id) {
       try {
         recordCouponUsage(pending.appliedCoupon.code, user.id, id);
         markCouponUsed(pending.appliedCoupon.code, form.email);
-      } catch {
-        /* ignore */
-      }
+      } catch { /* coupon tracking is non-critical */ }
     }
 
-    // Log confirmation email to customer
+    // ── PHASE 8: Log confirmation emails ──
     try {
-      const emailLog = JSON.parse(localStorage.getItem("tcgacademy_email_log") ?? "[]");
+      const emailLog = safeRead<unknown[]>("tcgacademy_email_log", []);
       emailLog.unshift({
         date: new Date().toISOString(),
         to: form.email,
         subject: `Confirmación de pedido ${id}`,
         status: "enviado",
         orderId: id,
-        body: `Pedido ${id} confirmado. Total: ${finalTotal.toFixed(2)}€. ${isStorePickup ? `Recogida en ${TIENDAS.find(t => t.id === form.tiendaRecogida)?.name ?? "tienda"}.` : `Envío a: ${form.direccion}, ${form.ciudad}.`}`,
+        body: `Pedido ${id} confirmado. Total: ${safeFinalTotal.toFixed(2)}€. ${isStorePickup ? `Recogida en ${TIENDAS.find(t => t.id === form.tiendaRecogida)?.name ?? "tienda"}.` : `Envío a: ${form.direccion}, ${form.ciudad}.`}`,
       });
 
-      // If store pickup, notify the store
       if (isStorePickup && form.tiendaRecogida) {
         const tienda = TIENDAS.find(t => t.id === form.tiendaRecogida);
         if (tienda) {
@@ -324,18 +494,33 @@ export default function CheckoutPage() {
             subject: `Nuevo pedido para recoger en ${tienda.name} — ${id}`,
             status: "enviado",
             orderId: id,
-            body: `Nuevo pedido ${id} para recogida en ${tienda.name}.\n\nCliente: ${form.nombre} ${form.apellidos}\nEmail: ${form.email}\nTeléfono: ${form.telefono}\n\nProductos: ${productList}\nTotal: ${finalTotal.toFixed(2)}€\nPago: En tienda al recoger.\n\nPor favor, preparad el pedido para que el cliente pueda recogerlo.`,
+            body: `Nuevo pedido ${id} para recogida en ${tienda.name}.\n\nCliente: ${form.nombre} ${form.apellidos}\nEmail: ${form.email}\nTeléfono: ${form.telefono}\n\nProductos: ${productList}\nTotal: ${safeFinalTotal.toFixed(2)}€\nPago: En tienda al recoger.\n\nPor favor, preparad el pedido para que el cliente pueda recogerlo.`,
           });
         }
       }
 
-      if (emailLog.length > 100) emailLog.length = 100;
-      localStorage.setItem("tcgacademy_email_log", JSON.stringify(emailLog));
-    } catch { /* ignore */ }
+      // Keep more email history (was 100, now 500)
+      if (emailLog.length > 500) emailLog.length = 500;
+      safeWrite("tcgacademy_email_log", emailLog);
+    } catch { /* email log is non-critical */ }
+
+    // ── Log point deduction failure for admin to see ──
+    if (user?.role === "cliente" && appliedPoints?.points && !pointsDeducted) {
+      // Order went through but points weren't deducted — flag it
+      try {
+        const existing = JSON.parse(localStorage.getItem("tcgacademy_orders") ?? "[]");
+        const orderIdx = existing.findIndex((o: { id: string }) => o.id === id);
+        if (orderIdx !== -1) {
+          existing[orderIdx].pointsDeductionFailed = true;
+          localStorage.setItem("tcgacademy_orders", JSON.stringify(existing));
+        }
+      } catch { /* non-critical */ }
+    }
 
     clearCart();
     setStep("confirmado");
     } finally {
+      releaseCheckoutLock();
       submittingRef.current = false;
       setSubmitting(false);
     }
