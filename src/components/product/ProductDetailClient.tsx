@@ -3,7 +3,6 @@ import Link from "next/link";
 import {
   ShoppingCart,
   Heart,
-  ChevronLeft,
   Plus,
   Minus,
   Trash2,
@@ -34,7 +33,6 @@ import { usePrice } from "@/hooks/usePrice";
 import { LocalProductCard } from "@/components/product/LocalProductCard";
 import { InlineEdit } from "@/components/admin/InlineEdit";
 import { ShareButtons } from "@/components/ui/ShareButtons";
-import { SITE_CONFIG } from "@/config/siteConfig";
 import { HoloCard } from "@/components/product/HoloCard";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 
@@ -340,17 +338,17 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
   const [inlineComparePrice, setInlineComparePrice] = useState<
     number | undefined
   >(product.comparePrice);
-  const [inlineStock, setInlineStock] = useState(product.inStock);
-  const [inlineStockQty, setInlineStockQty] = useState<string>(
+  const [inlineStock] = useState(product.inStock);
+  const [inlineStockQty] = useState<string>(
     product.stock !== undefined ? String(product.stock) : "",
   );
   const [descExpanded, setDescExpanded] = useState(false);
   const [descOverflows, setDescOverflows] = useState(false);
   const descRef = useRef<HTMLDivElement>(null);
   const [inlineImages, setInlineImages] = useState(product.images);
-  const [inlineGame, setInlineGame] = useState(product.game);
-  const [inlineCategory, setInlineCategory] = useState(product.category);
-  const [inlineLanguage, setInlineLanguage] = useState(product.language ?? "");
+  const [inlineGame] = useState(product.game);
+  const [inlineCategory] = useState(product.category);
+  const [inlineLanguage] = useState(product.language ?? "");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -457,9 +455,12 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
   }, [inlineTitle, inlineGame, inlineCategory, product.tags, product.packsPerBox, product.cardsPerPack]);
 
   const handleSave = useCallback(() => {
-    const overrides = JSON.parse(
-      localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
-    );
+    let overrides: Record<string, unknown> = {};
+    try {
+      overrides = JSON.parse(
+        localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
+      );
+    } catch { overrides = {}; }
     overrides[product.id] = {
       name: inlineTitle,
       description: inlineDesc,
@@ -480,7 +481,10 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
       JSON.stringify(overrides),
     );
     // Also save stock override
-    const stockOverrides = JSON.parse(localStorage.getItem("tcgacademy_stock_overrides") ?? "{}");
+    let stockOverrides: Record<string, unknown> = {};
+    try {
+      stockOverrides = JSON.parse(localStorage.getItem("tcgacademy_stock_overrides") ?? "{}");
+    } catch { stockOverrides = {}; }
     stockOverrides[product.id] = inlineStockQty.trim() === "" ? null : parseInt(inlineStockQty);
     localStorage.setItem("tcgacademy_stock_overrides", JSON.stringify(stockOverrides));
     window.dispatchEvent(new Event("tcga:products:updated"));

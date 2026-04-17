@@ -86,15 +86,9 @@ export default async function CategoryPage({
   const config = GAME_CONFIG[game];
   if (!config) notFound();
 
-  const { name, color, bgColor } = config;
+  const { name, color } = config;
   const products = getProductsByGameAndCategory(game, category);
   const allCategories = getAllCategories(game);
-  const catLabel = CATEGORY_LABELS[category] ?? category;
-
-  // Game logo from mega menu data (same logo as navbar/hero)
-  const menuGame = MEGA_MENU_DATA.find((g) => g.slug === game);
-  const logoSrc = menuGame?.logoSrc;
-  const abbrev = menuGame?.abbrev ?? name.slice(0, 3).toUpperCase();
 
   return (
     <div>
@@ -117,7 +111,7 @@ export default async function CategoryPage({
       </div>
 
       {/* Products with sidebar filters */}
-      <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 sm:py-5">
+      <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 sm:py-10">
         {products.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-gray-200 py-24 text-center">
             <p className="font-medium text-gray-400">

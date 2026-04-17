@@ -89,6 +89,7 @@ export default function CuponesPage() {
   const isClient = user?.role === "cliente";
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (user) setBalance(loadPoints(user.id));
   }, [user]);
 

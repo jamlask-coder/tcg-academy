@@ -14,7 +14,6 @@ import {
 import { useState, useEffect } from "react";
 import { getMergedProducts } from "@/lib/productStore";
 import type { KpiMode } from "@/components/admin/SalesChart";
-import { useDiscounts } from "@/context/DiscountContext";
 import { countNewIncidents } from "@/services/incidentService";
 import {
   getOrderMetrics,
@@ -47,10 +46,6 @@ const SalesChart = dynamic(
 export default function AdminDashboard() {
   const router = useRouter();
   const [activeKpi, setActiveKpi] = useState<KpiMode>("ventas");
-  const { discounts } = useDiscounts();
-  const activeDiscounts = Object.values(discounts).filter(
-    (d) => d.active,
-  ).length;
 
   const [productCount, setProductCount] = useState(() => getMergedProducts().length);
   const [lowStockCount, setLowStockCount] = useState(

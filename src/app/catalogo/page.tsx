@@ -135,7 +135,7 @@ function CatalogoPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6 sm:py-5">
+    <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 sm:py-10">
 
       {/* ── Mobile game picker screen ─────────────────────────── */}
       {mobilePicker && (
@@ -174,12 +174,21 @@ function CatalogoPage() {
                         alt={cfg.name}
                         className="h-14 w-auto object-contain drop-shadow-lg"
                         style={{ maxWidth: "100%" }}
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          img.style.display = "none";
+                          const span = img.nextElementSibling as HTMLElement | null;
+                          if (span) span.style.display = "inline";
+                        }}
                       />
-                    ) : (
-                      <span className="text-4xl" aria-hidden="true">
-                        {cfg.emoji}
-                      </span>
-                    )}
+                    ) : null}
+                    <span
+                      className="text-4xl"
+                      aria-hidden="true"
+                      style={{ display: logo ? "none" : "inline" }}
+                    >
+                      {cfg.emoji}
+                    </span>
                     {/* Name */}
                     <span className="text-center text-xs font-bold leading-tight text-white drop-shadow">
                       {cfg.name}

@@ -185,6 +185,7 @@ function AdminDashboard() {
     {},
   );
 
+  // eslint-disable-next-line react-hooks/purity
   const THIRTY_DAYS_AGO = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const recentOrders = orders.filter(
     (o) => new Date(o.date).getTime() >= THIRTY_DAYS_AGO,

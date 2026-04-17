@@ -15,7 +15,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Plus,
   Pencil,
   Copy,
   Trash2,

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { getMergedProducts, getMergedById } from "@/lib/productStore";
 import { SITE_CONFIG } from "@/config/siteConfig";
-import { printInvoice, generateInvoiceHTML } from "@/utils/invoiceGenerator";
+import { generateInvoiceHTML } from "@/utils/invoiceGenerator";
 import type { InvoiceData } from "@/utils/invoiceGenerator";
 
 // ─── Types ────────────────────────────────────────────────────────────────────

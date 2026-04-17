@@ -7,11 +7,9 @@ import Link from "next/link";
 import {
   Building2,
   CheckCircle2,
-  ChevronRight,
   FileText,
   AlertCircle,
   Upload,
-  X,
   Trash2,
 } from "lucide-react";
 import { checkRateLimit } from "@/utils/sanitize";
@@ -133,14 +131,6 @@ function SectionCard({
     </div>
   );
 }
-
-// ─── Step indicator ───────────────────────────────────────────────────────────
-const STEPS = [
-  "Solicitud",
-  "Verificación",
-  "Activación",
-  "Compra con precios B2B",
-];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function B2BPage() {
@@ -300,42 +290,6 @@ export default function B2BPage() {
             Rellena el formulario y activa tu acceso a precios exclusivos para
             profesionales.
           </p>
-        </div>
-      </div>
-
-      {/* Process steps */}
-      <div className="border-b border-gray-200 bg-gray-50 py-6">
-        <div className="mx-auto max-w-[1400px] px-6">
-          <div className="flex items-center gap-0 overflow-x-auto">
-            {STEPS.map((step, i) => (
-              <div key={step} className="flex items-center">
-                <div className="flex items-center gap-2 whitespace-nowrap">
-                  <div
-                    className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-black ${
-                      i === 0
-                        ? "bg-[#2563eb] text-white"
-                        : "bg-gray-200 text-gray-500"
-                    }`}
-                  >
-                    {i + 1}
-                  </div>
-                  <span
-                    className={`text-sm ${
-                      i === 0 ? "font-bold text-[#2563eb]" : "text-gray-400"
-                    }`}
-                  >
-                    {step}
-                  </span>
-                </div>
-                {i < STEPS.length - 1 && (
-                  <ChevronRight
-                    size={16}
-                    className="mx-3 flex-shrink-0 text-gray-300"
-                  />
-                )}
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -870,12 +824,12 @@ export default function B2BPage() {
                     >
                       648 635 712
                     </a>
-                    <a
+                    <Link
                       href="/contacto"
                       className="block w-full rounded-xl border border-gray-200 py-2.5 text-center text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
                     >
                       Formulario de contacto
-                    </a>
+                    </Link>
                     <a
                       href="mailto:tcgacademycalpe@gmail.com"
                       className="block w-full rounded-xl bg-gray-100 py-2.5 text-center text-sm font-semibold text-gray-700 transition hover:bg-gray-200"

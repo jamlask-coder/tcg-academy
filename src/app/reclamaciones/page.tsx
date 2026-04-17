@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SITE_CONFIG } from "@/config/siteConfig";
-import { Send, CheckCircle, AlertCircle, FileText } from "lucide-react";
+import { Send, CheckCircle } from "lucide-react";
 
 export default function ReclamacionesPage() {
   const [form, setForm] = useState({

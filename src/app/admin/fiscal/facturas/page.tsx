@@ -377,23 +377,6 @@ export default function FacturasPage() {
 
   const filterLabel = `${yearFilter}${quarterFilter !== "all" ? `_T${quarterFilter}` : ""}`;
 
-  function exportSingle(inv: InvoiceRecord) {
-    const csv = generateCSVForAdvisor([inv], {
-      period: null,
-      format: "CSV",
-      includeLineItems: false,
-      includeRecipientData: true,
-      filterByVatRate: null,
-    });
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${inv.invoiceNumber}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">

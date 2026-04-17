@@ -41,7 +41,6 @@ import { tripleCheckInvoice } from "@/lib/fiscalAudit";
 import { getDeadLetterQueue, resolveDeadLetter } from "@/lib/circuitBreaker";
 import { safeRead, safeWrite } from "@/lib/safeStorage";
 import { InvoiceStatus, VerifactuStatus, PaymentMethod } from "@/types/fiscal";
-import type { InvoiceRecord } from "@/types/fiscal";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -139,17 +138,8 @@ function releaseLock(): void {
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function r2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
 function daysUntil(target: Date): number {
   return Math.ceil((target.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
-}
-
-function getInvoiceDeadline(operationDate: string): Date {
-  const d = new Date(operationDate);
-  return new Date(d.getFullYear(), d.getMonth() + 1, 16);
 }
 
 function getVerifactuDeadline(invoiceDate: string): Date {

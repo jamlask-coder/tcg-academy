@@ -36,7 +36,6 @@ import {
   Clock,
   AlertTriangle,
   Trash2,
-  ChevronRight,
   Bell,
   RotateCcw,
   TrendingUp,
@@ -53,14 +52,6 @@ function avatarBg(index: number): string {
   return AVATAR_COLORS[index % AVATAR_COLORS.length];
 }
 
-function formatDate(ts: number): string {
-  return new Date(ts).toLocaleDateString("es-ES", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 function formatDateTime(ts: number): string {
   return new Date(ts).toLocaleDateString("es-ES", {
     day: "numeric",
@@ -69,11 +60,6 @@ function formatDateTime(ts: number): string {
     minute: "2-digit",
   });
 }
-
-// Puntos que gana cada asociado por €10 de compra
-const ASSOC_PTS_PER_10 = Math.floor(10 * REFERRAL_ASSOC_PTS_PER_100 / 100);
-// Puntos que gana el comprador por €10 de compra
-const BUYER_PTS_PER_10 = 10 * POINTS_PER_EURO;
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
@@ -92,109 +78,6 @@ function Avatar({
       style={{ width: size, height: size, backgroundColor: color, fontSize: Math.round(size * 0.36) }}
     >
       {initials}
-    </div>
-  );
-}
-
-// ─── Group member card ────────────────────────────────────────────────────────
-
-function MemberCard({
-  assoc,
-  index,
-  ptsGenerated,
-  userId,
-  cooldownOk,
-  cooldownNextAt,
-  onUpdate,
-}: {
-  assoc: AssociationRecord;
-  index: number;
-  ptsGenerated: number;
-  userId: string;
-  cooldownOk: boolean;
-  cooldownNextAt: number | null;
-  onUpdate: () => void;
-}) {
-  const [confirm, setConfirm] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-  const info = getUserDisplayInfo(assoc.referrerId);
-  const color = avatarBg(index);
-  const daysLeft = cooldownNextAt
-    ? Math.ceil((cooldownNextAt - Date.now()) / (24 * 60 * 60 * 1000))
-    : 0;
-
-  const handleRemove = () => {
-    const result = removeAssociation(userId, assoc.referrerId);
-    if (!result.ok) {
-      setErrorMsg(result.error ?? "Error");
-      setConfirm(false);
-    } else {
-      onUpdate();
-    }
-  };
-
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4">
-      <div className="flex items-start gap-3">
-        <Avatar initials={info.initials} color={color} size={44} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-bold text-gray-900">{info.name}</p>
-          {info.username && (
-            <p className="text-[11px] text-gray-400">@{info.username}</p>
-          )}
-          <p className="text-[10px] text-gray-400">
-            Miembro desde {formatDate(assoc.associatedAt)}
-          </p>
-        </div>
-        {!confirm ? (
-          <button
-            onClick={() => {
-              if (!cooldownOk) {
-                setErrorMsg(
-                  `Espera ${daysLeft} día${daysLeft !== 1 ? "s" : ""} antes de cambiar el grupo`,
-                );
-                return;
-              }
-              setConfirm(true);
-            }}
-            aria-label={`Eliminar a ${info.name} del grupo`}
-            className="flex-shrink-0 rounded-lg p-1.5 text-gray-300 transition hover:bg-red-50 hover:text-red-400"
-          >
-            <Trash2 size={14} />
-          </button>
-        ) : (
-          <div className="flex gap-1">
-            <button
-              onClick={handleRemove}
-              className="rounded-lg bg-red-500 px-2 py-1 text-[10px] font-bold text-white hover:bg-red-400"
-            >
-              Confirmar
-            </button>
-            <button
-              onClick={() => setConfirm(false)}
-              className="rounded-lg bg-gray-100 px-2 py-1 text-[10px] font-semibold text-gray-600 hover:bg-gray-200"
-            >
-              Cancelar
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Points generated */}
-      <div className="mt-3 flex items-center justify-between rounded-xl bg-green-50 px-3 py-2">
-        <p className="text-xs text-gray-500">Puntos generados para ti</p>
-        <div className="text-right">
-          <span className="font-black text-green-600">+{ptsGenerated.toLocaleString("es-ES")}</span>
-          <span className="ml-1 text-[11px] text-gray-400">pts</span>
-          <p className="text-[10px] text-green-600">= €{pointsToEuros(ptsGenerated).toFixed(2)}</p>
-        </div>
-      </div>
-
-      {errorMsg && (
-        <p className="mt-2 flex items-center gap-1 text-[11px] text-red-500">
-          <AlertTriangle size={11} /> {errorMsg}
-        </p>
-      )}
     </div>
   );
 }
@@ -302,26 +185,6 @@ function InviteModal({
   );
 }
 
-// ─── Empty slot ───────────────────────────────────────────────────────────────
-
-function EmptySlot({ index, onAdd }: { index: number; onAdd?: () => void }) {
-  return (
-    <button
-      onClick={onAdd}
-      disabled={!onAdd}
-      className="flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 p-4 text-center transition hover:border-[#2563eb] hover:bg-blue-50 disabled:cursor-default disabled:hover:border-gray-200 disabled:hover:bg-gray-50"
-    >
-      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gray-200 transition group-hover:bg-blue-100">
-        <UserPlus size={18} className="text-gray-400" />
-      </div>
-      <p className="text-xs font-semibold text-gray-400">Hueco {index + 1}</p>
-      <span className="rounded-full bg-[#2563eb] px-3 py-0.5 text-[10px] font-bold text-white">
-        Añadir
-      </span>
-    </button>
-  );
-}
-
 // ─── Pending invitation card ──────────────────────────────────────────────────
 
 function PendingInviteCard({
@@ -336,6 +199,7 @@ function PendingInviteCard({
   const [busy, setBusy] = useState(false);
   const [errMsg, setErrMsg] = useState("");
   const info = getUserDisplayInfo(invite.fromUserId);
+  // eslint-disable-next-line react-hooks/purity
   const hoursAgo = Math.floor((Date.now() - invite.sentAt) / (60 * 60 * 1000));
 
   const handle = (accept: boolean) => {
@@ -383,125 +247,6 @@ function PendingInviteCard({
   );
 }
 
-// ─── Invite form ──────────────────────────────────────────────────────────────
-
-function InviteForm({
-  userId,
-  slotsLeft,
-  sentInvites,
-  onSent,
-}: {
-  userId: string;
-  slotsLeft: number;
-  sentInvites: AssocInvitation[];
-  onSent: () => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [okMsg, setOkMsg] = useState("");
-  const [errMsg, setErrMsg] = useState("");
-
-  const handleSend = () => {
-    setErrMsg(""); setOkMsg("");
-    if (!query.trim()) return;
-    setBusy(true);
-    const result = sendInvitation(userId, query.trim());
-    setBusy(false);
-    if (result.ok) {
-      setQuery("");
-      setOkMsg("Invitación enviada. El otro usuario deberá aceptarla.");
-      onSent();
-      setTimeout(() => setOkMsg(""), 5000);
-    } else {
-      setErrMsg(result.error ?? "Error al enviar");
-    }
-  };
-
-  const STATUS_CFG = {
-    pending:  { label: "Pendiente", color: "#92400e", bg: "#fef3c7" },
-    accepted: { label: "Aceptada",  color: "#166534", bg: "#dcfce7" },
-    declined: { label: "Rechazada", color: "#991b1b", bg: "#fee2e2" },
-  } as const;
-
-  if (slotsLeft <= 0) {
-    return (
-      <p className="rounded-xl bg-green-50 px-4 py-3 text-center text-sm font-semibold text-green-700">
-        ✓ Tu grupo está completo ({MAX_ASSOCIATIONS}/{MAX_ASSOCIATIONS} miembros)
-      </p>
-    );
-  }
-
-  return (
-    <div>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder="correo@ejemplo.com o @nombredeusuario"
-          className="h-11 flex-1 rounded-xl border border-gray-200 px-3 text-sm placeholder-gray-300 focus:border-[#2563eb] focus:outline-none"
-        />
-        <button
-          onClick={handleSend}
-          disabled={busy || !query.trim()}
-          className="flex h-11 items-center gap-1.5 rounded-xl bg-[#2563eb] px-4 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-50"
-        >
-          <UserPlus size={15} />
-          {busy ? "..." : "Enviar"}
-        </button>
-      </div>
-      {errMsg && (
-        <p className="mt-1.5 flex items-center gap-1 text-xs text-red-500">
-          <AlertTriangle size={11} /> {errMsg}
-        </p>
-      )}
-      {okMsg && (
-        <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-green-600">
-          <Check size={12} /> {okMsg}
-        </p>
-      )}
-      <p className="mt-2 text-[11px] text-gray-400">
-        {slotsLeft} hueco{slotsLeft > 1 ? "s" : ""} disponible{slotsLeft > 1 ? "s" : ""} ·
-        La otra persona recibirá una notificación para aceptar o rechazar
-      </p>
-
-      {/* Sent invitations */}
-      {sentInvites.length > 0 && (
-        <div className="mt-4 space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-            Invitaciones enviadas
-          </p>
-          {sentInvites.map((inv) => {
-            const info = getUserDisplayInfo(inv.toUserId);
-            const cfg = STATUS_CFG[inv.status];
-            return (
-              <div
-                key={inv.id}
-                className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2"
-              >
-                <div className="flex items-center gap-2">
-                  <Avatar initials={info.initials} color="#9ca3af" size={28} />
-                  <div>
-                    <p className="text-xs font-semibold text-gray-800">{info.name}</p>
-                    <p className="text-[10px] text-gray-400">{formatDate(inv.sentAt)}</p>
-                  </div>
-                </div>
-                <span
-                  className="rounded-full px-2.5 py-0.5 text-[10px] font-bold"
-                  style={{ color: cfg.color, backgroundColor: cfg.bg }}
-                >
-                  {cfg.label}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Donut chart — % contribution per member ──────────────────────────────────
 
 function DonutChart({
@@ -518,12 +263,13 @@ function DonutChart({
   const circ = 2 * Math.PI * r;
   const total = segments.reduce((s, seg) => s + seg.pts, 0);
 
-  let acc = 0;
-  const segs = segments.map((seg) => {
+  const segs = segments.map((seg, i) => {
     const pct = total > 0 ? seg.pts / total : 0;
     const len = pct * circ;
-    const offset = circ - acc;
-    acc += len;
+    const prevAcc = segments
+      .slice(0, i)
+      .reduce((s, x) => s + (total > 0 ? x.pts / total : 0) * circ, 0);
+    const offset = circ - prevAcc;
     return { ...seg, pct, len, offset };
   });
 
@@ -595,7 +341,6 @@ function PointsTable({
   const HISTORY_TYPE_CFG: Record<string, { label: string; color: string }> = {
     compra:     { label: "Compra propia",   color: "#2563eb" },
     devolucion: { label: "Devolución",      color: "#dc2626" },
-    checkin:    { label: "Check-in",        color: "#f59e0b" },
     bienvenida: { label: "Bienvenida",      color: "#16a34a" },
     asociacion: { label: "Del grupo",        color: "#16a34a" },
   };
@@ -745,6 +490,7 @@ function OrgNode({
   const [errMsg, setErrMsg] = useState("");
   const info = getUserDisplayInfo(assoc.referrerId);
   const daysLeft = cooldownNextAt
+    // eslint-disable-next-line react-hooks/purity
     ? Math.ceil((cooldownNextAt - Date.now()) / (24 * 60 * 60 * 1000))
     : 0;
 
@@ -894,6 +640,7 @@ function GroupOrganigram({
           <Clock size={10} />
           Puedes cambiar una asociación en{" "}
           {cooldownNextAt
+            // eslint-disable-next-line react-hooks/purity
             ? Math.ceil((cooldownNextAt - Date.now()) / (24 * 60 * 60 * 1000))
             : 0}{" "}
           días (1 cambio cada 2 meses)
@@ -1120,6 +867,7 @@ export default function AsociacionesPage() {
   }, [user]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     const handler = () => refresh();
     window.addEventListener("tcga:assoc:updated", handler);

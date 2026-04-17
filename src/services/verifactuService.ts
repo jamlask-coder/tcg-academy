@@ -170,6 +170,19 @@ function delay(ms: number): Promise<void> {
  * Solo necesitas cambiar UNA línea aquí.
  */
 export function getVerifactuProvider(): VerifactuProvider {
+  // Fail-safe: en producción real (NODE_ENV=production) el modo mock NO está permitido.
+  // Esto evita enviar facturas simuladas cuando debería haberse conectado un proveedor real.
+  if (
+    typeof process !== "undefined" &&
+    process.env.NODE_ENV === "production" &&
+    VERIFACTU_CONFIG.mode === "mock" &&
+    process.env.NEXT_PUBLIC_BACKEND_MODE === "server"
+  ) {
+    throw new Error(
+      "[VeriFactu] modo 'mock' no permitido en producción. Configura un proveedor real (Seres, Edicom, B2Brouter) en src/services/verifactuService.ts.",
+    );
+  }
+
   if (VERIFACTU_CONFIG.mode === "mock") {
     return new MockVerifactuProvider();
   }

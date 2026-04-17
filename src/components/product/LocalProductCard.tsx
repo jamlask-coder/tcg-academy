@@ -34,6 +34,7 @@ function LocalProductCardInner({ product }: Props) {
   const [limitMsg, setLimitMsg] = useState<string | undefined>(undefined);
   const [hovered, setHovered] = useState(false);
   const [floatAnims, setFloatAnims] = useState<{ type: "plus" | "minus"; key: number }[]>([]);
+  const [imageBroken, setImageBroken] = useState(false);
   const [inlineComparePrice, setInlineComparePrice] = useState<
     number | undefined
   >(product.comparePrice);
@@ -94,6 +95,7 @@ function LocalProductCardInner({ product }: Props) {
   const staticHref = `/${product.game}/${product.category}/${product.slug}`;
   const [href, setHref] = useState(staticHref);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (isLocalProduct(product.id)) setHref(`/producto?id=${product.id}`);
   }, [product.id, staticHref]);
   const isCardCategory =
@@ -114,12 +116,13 @@ function LocalProductCardInner({ product }: Props) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {displayImage ? (
+      {displayImage && !imageBroken ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={displayImage}
           alt={product.name}
           loading="lazy"
+          onError={() => setImageBroken(true)}
           className={`h-full w-full ${imageObjectFit} transition-all duration-300 ${!product.inStock ? "opacity-50" : ""}`}
         />
       ) : (

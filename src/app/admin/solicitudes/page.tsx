@@ -468,11 +468,6 @@ function SolicitudRow({
   const hasDocs =
     typeof solicitud.datos.documentos === "object" &&
     solicitud.datos.documentos !== null;
-  const docCount = hasDocs
-    ? Object.values(
-        solicitud.datos.documentos as Record<string, DocumentFile | null>,
-      ).filter(Boolean).length
-    : 0;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">

@@ -10,10 +10,14 @@ import {
   Building2,
 } from "lucide-react";
 import { SITE_CONFIG } from "@/config/siteConfig";
+import { HeroCarousel } from "@/components/home/HeroCarousel";
 
 export default function HomePage() {
   return (
     <div>
+      {/* Hero carrusel (novedades destacadas) */}
+      <HeroCarousel />
+
       {/* HERO */}
       <section className="relative flex min-h-[460px] w-full max-w-full items-center overflow-hidden bg-[#0f172a] text-white md:min-h-[580px]">
         {/* Multi-layer gradient background */}

@@ -5,7 +5,9 @@
 
 export const SITE_CONFIG = {
   name: "TCG Academy",
+  legalName: "TCG Academy S.L.",
   cif: "B12345678",
+  address: "Av. Gabriel Miró 42, 03710 Calpe, Alicante",
   email: "hola@tcgacademy.es",
   phone: "+34 965 83 00 01",
 

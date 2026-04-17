@@ -255,7 +255,7 @@ export default function CondicionesPuntosPage() {
           <Section title="7. Caducidad de los puntos">
             <p>
               Los puntos caducan a los <strong>24 meses</strong> desde la última actividad
-              registrada en la cuenta (compra, check-in diario o canje). La caducidad se aplica
+              registrada en la cuenta (compra o canje). La caducidad se aplica
               automáticamente y no da lugar a reclamación ni compensación, dado que los puntos
               no representan un valor económico rescatable sino una ventaja comercial de uso
               temporal y discrecional.

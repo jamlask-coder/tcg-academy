@@ -3,19 +3,14 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   loadPoints,
-  performCheckin,
-  getCheckinInfo,
   buildRedemptionTiers,
   pointsToEuros,
   ensureReferralCode,
-  formatCountdown,
   POINTS_PER_EURO,
-  DAILY_CHECKIN_POINTS,
   POINTS_MAX_DISCOUNT_PCT,
 } from "@/services/pointsService";
 import {
   Trophy,
-  Zap,
   Gift,
   Clock,
   CheckCircle2,
@@ -29,34 +24,13 @@ import {
 import Link from "next/link";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
 
-// ─── Countdown timer ──────────────────────────────────────────────────────────
-
-function Countdown({ nextAt }: { nextAt: number }) {
-  const [remaining, setRemaining] = useState(Math.max(0, nextAt - Date.now()));
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      const r = Math.max(0, nextAt - Date.now());
-      setRemaining(r);
-    }, 1000);
-    return () => clearInterval(id);
-  }, [nextAt]);
-
-  return (
-    <span className="font-mono font-bold text-amber-600 tabular-nums">
-      {formatCountdown(remaining)}
-    </span>
-  );
-}
-
 // ─── Points history (simulated from orders) ───────────────────────────────────
 
 const HISTORY_ITEMS = [
-  { label: "Check-in diario", points: 10, type: "earn" as const, date: "Hoy" },
-  { label: "Compra #TCG-20260310", points: 150, type: "earn" as const, date: "10 mar" },
-  { label: "Canje de puntos", points: -100, type: "spend" as const, date: "5 mar" },
-  { label: "Compra #TCG-20260228", points: 80, type: "earn" as const, date: "28 feb" },
-  { label: "Referido: María G. compró", points: 60, type: "referral" as const, date: "20 feb" },
+  { label: "Compra #TCG-20260310", points: 15000, type: "earn" as const, date: "10 mar" },
+  { label: "Canje de puntos", points: -10000, type: "spend" as const, date: "5 mar" },
+  { label: "Compra #TCG-20260228", points: 8000, type: "earn" as const, date: "28 feb" },
+  { label: "Referido: María G. compró", points: 5000, type: "referral" as const, date: "20 feb" },
 ];
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -66,15 +40,11 @@ export default function PuntosPage() {
   const [balance, setBalance] = useState(0);
   const [myCode, setMyCode] = useState("");
   const [copied, setCopied] = useState(false);
-  const [checkinInfo, setCheckinInfo] = useState({ canCheckin: false, nextAt: null as number | null, lastAt: null as number | null });
-  const [checkinState, setCheckinState] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [checkinMsg, setCheckinMsg] = useState("");
 
   const refresh = useCallback(() => {
     if (!user) return;
     setBalance(loadPoints(user.id));
     setMyCode(ensureReferralCode(user.id));
-    setCheckinInfo(getCheckinInfo(user.id));
   }, [user]);
 
   const handleCopy = () => {
@@ -85,6 +55,7 @@ export default function PuntosPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
 
@@ -102,22 +73,6 @@ export default function PuntosPage() {
       </div>
     );
   }
-
-  const handleCheckin = () => {
-    if (!user) return;
-    setCheckinState("loading");
-    const result = performCheckin(user.id);
-    if (result.ok) {
-      setCheckinState("success");
-      setCheckinMsg(`+${result.points} puntos conseguidos`);
-      refresh();
-      setTimeout(() => setCheckinState("idle"), 4000);
-    } else {
-      setCheckinState("error");
-      setCheckinMsg(result.error ?? "No disponible");
-      setTimeout(() => setCheckinState("idle"), 3000);
-    }
-  };
 
   const redemptionTiers = buildRedemptionTiers(balance);
   const balanceEuros = pointsToEuros(balance);
@@ -146,10 +101,6 @@ export default function PuntosPage() {
               <p className="font-bold">{POINTS_PER_EURO} pts / €1</p>
             </div>
             <div className="border-l border-white/20 pl-4">
-              <p className="text-blue-300">Check-in diario</p>
-              <p className="font-bold">+{DAILY_CHECKIN_POINTS} pts</p>
-            </div>
-            <div className="border-l border-white/20 pl-4">
               <p className="text-blue-300">Canje</p>
               <p className="font-bold text-amber-300">10.000 pts = €1</p>
             </div>
@@ -157,85 +108,41 @@ export default function PuntosPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Daily check-in */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5">
-          <h2 className="mb-1 flex items-center gap-2 font-bold text-gray-900">
-            <Zap size={18} className="text-amber-500" /> Check-in diario
-          </h2>
-          <p className="mb-4 text-sm text-gray-500">
-            Visita tu perfil cada día y gana {DAILY_CHECKIN_POINTS} puntos gratis
-          </p>
-
-          {checkinState === "success" ? (
-            <div className="flex items-center gap-2 rounded-xl bg-green-50 px-4 py-3 text-green-700">
-              <CheckCircle2 size={18} /> <strong>{checkinMsg}</strong>
-            </div>
-          ) : checkinState === "error" ? (
-            <div className="flex items-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
-              <Clock size={16} /> {checkinMsg}
-            </div>
-          ) : checkinInfo.canCheckin ? (
-            <button
-              onClick={handleCheckin}
-              disabled={checkinState === "loading"}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-500 font-bold text-white transition hover:bg-amber-400 disabled:opacity-60"
-            >
-              {checkinState === "loading" ? (
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              ) : (
-                <>
-                  <Zap size={18} /> Reclamar {DAILY_CHECKIN_POINTS} puntos
-                </>
-              )}
-            </button>
-          ) : (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <p className="mb-1 text-sm font-semibold text-amber-700">Próximo check-in en:</p>
-              <p className="text-2xl">
-                <Countdown nextAt={checkinInfo.nextAt!} />
-              </p>
-              <p className="mt-1 text-xs text-amber-600">Vuelve mañana para conseguir más puntos</p>
-            </div>
-          )}
-        </div>
-
-        {/* Canje */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5">
-          <h2 className="mb-1 flex items-center gap-2 font-bold text-gray-900">
-            <Gift size={18} className="text-[#2563eb]" /> Canjear puntos
-          </h2>
-          <p className="mb-4 text-sm text-gray-500">
-            Usa tus puntos como descuento al finalizar tu compra
-          </p>
-          {redemptionTiers.length === 0 ? (
-            <div className="rounded-xl bg-gray-50 p-4 text-center text-sm text-gray-400">
-              Necesitas al menos 10.000 puntos (= €1) para canjear.
-              <br />
-              Te faltan {(10000 - balance).toLocaleString("es-ES")} puntos.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {redemptionTiers.slice(0, 4).map((tier) => (
-                <div
-                  key={tier.points}
-                  className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-2.5"
-                >
-                  <div className="flex items-center gap-2">
-                    <Star size={14} className="text-amber-500" />
-                    <span className="text-sm font-semibold text-gray-800">{tier.points.toLocaleString("es-ES")} pts</span>
-                  </div>
-                  <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-bold text-green-700">
-                    {tier.label} descuento
-                  </span>
+      {/* Canje */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-5">
+        <h2 className="mb-1 flex items-center gap-2 font-bold text-gray-900">
+          <Gift size={18} className="text-[#2563eb]" /> Canjear puntos
+        </h2>
+        <p className="mb-4 text-sm text-gray-500">
+          Usa tus puntos como descuento al finalizar tu compra
+        </p>
+        {redemptionTiers.length === 0 ? (
+          <div className="rounded-xl bg-gray-50 p-4 text-center text-sm text-gray-400">
+            Necesitas al menos 10.000 puntos (= €1) para canjear.
+            <br />
+            Te faltan {(10000 - balance).toLocaleString("es-ES")} puntos.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {redemptionTiers.slice(0, 4).map((tier) => (
+              <div
+                key={tier.points}
+                className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-2.5"
+              >
+                <div className="flex items-center gap-2">
+                  <Star size={14} className="text-amber-500" />
+                  <span className="text-sm font-semibold text-gray-800">{tier.points.toLocaleString("es-ES")} pts</span>
                 </div>
-              ))}
-              <p className="mt-2 text-xs text-gray-400">
-                Los puntos se canjean en el carrito antes de finalizar la compra.
-              </p>
-            </div>
-          )}
-        </div>
+                <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-bold text-green-700">
+                  {tier.label} descuento
+                </span>
+              </div>
+            ))}
+            <p className="mt-2 text-xs text-gray-400">
+              Los puntos se canjean en el carrito antes de finalizar la compra.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Referral code */}
@@ -279,35 +186,22 @@ export default function PuntosPage() {
         <h2 className="mb-4 flex items-center gap-2 font-bold text-gray-900">
           <TrendingUp size={18} className="text-[#2563eb]" /> Cómo ganar puntos
         </h2>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {[
-            {
-              icon: ShoppingBag,
-              color: "#2563eb",
-              title: "Compras",
-              desc: `${POINTS_PER_EURO} puntos por cada €1 gastado en productos`,
-              example: "Compra de €100 → 10.000 pts → €1 de descuento",
-            },
-            {
-              icon: Zap,
-              color: "#f59e0b",
-              title: "Check-in diario",
-              desc: `${DAILY_CHECKIN_POINTS} puntos gratis cada día`,
-              example: "30 días seguidos → 300 pts",
-            },
-          ].map(({ icon: Icon, color, title, desc, example }) => (
-            <div key={title} className="rounded-xl border border-gray-100 p-4">
-              <div
-                className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl"
-                style={{ backgroundColor: `${color}15` }}
-              >
-                <Icon size={18} style={{ color }} />
-              </div>
-              <p className="font-bold text-gray-900">{title}</p>
-              <p className="mt-0.5 text-sm text-gray-600">{desc}</p>
-              <p className="mt-1.5 text-xs text-gray-400">{example}</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-gray-100 p-4">
+            <div
+              className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl"
+              style={{ backgroundColor: "#2563eb15" }}
+            >
+              <ShoppingBag size={18} style={{ color: "#2563eb" }} />
             </div>
-          ))}
+            <p className="font-bold text-gray-900">Compras</p>
+            <p className="mt-0.5 text-sm text-gray-600">
+              {POINTS_PER_EURO} puntos por cada €1 gastado en productos
+            </p>
+            <p className="mt-1.5 text-xs text-gray-400">
+              Compra de €100 → 10.000 pts → €1 de descuento
+            </p>
+          </div>
 
           {/* Asociaciones — needs bilateral explanation */}
           <div className="rounded-xl border border-gray-100 p-4">
@@ -352,7 +246,7 @@ export default function PuntosPage() {
                   item.type === "spend" ? "text-red-500" : item.type === "referral" ? "text-green-600" : "text-[#2563eb]"
                 }`}
               >
-                {item.points > 0 ? "+" : ""}{item.points} pts
+                {item.points > 0 ? "+" : ""}{item.points.toLocaleString("es-ES")} pts
               </span>
             </div>
           ))}

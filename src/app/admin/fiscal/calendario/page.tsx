@@ -9,8 +9,6 @@ import {
   ExternalLink,
   FileText,
   Download,
-  Bell,
-  BellOff,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -51,6 +49,7 @@ export default function CalendarioFiscalPage() {
   const isLuri = user ? isFiscalResponsible(user.id) : false;
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNotifications(checkFiscalDeadlines());
   }, []);
 

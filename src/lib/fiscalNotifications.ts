@@ -14,7 +14,7 @@
  * Solo Luri ve estas notificaciones (user.id === "admin-luri").
  */
 
-import { generateTaxCalendar, type TaxObligation } from "@/accounting/advancedAccounting";
+import { generateTaxCalendar } from "@/accounting/advancedAccounting";
 import { safeRead, safeWrite } from "@/lib/safeStorage";
 
 // ═══════════════════════════════════════════════════════════════════════════════

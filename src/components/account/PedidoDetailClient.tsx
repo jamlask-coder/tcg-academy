@@ -99,6 +99,7 @@ export function PedidoDetailClient({ id }: Props) {
   useEffect(() => {
     if (!order) return;
     const incidents = getIncidentsByOrder(order.id);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (incidents.length > 0) setExistingIncident(incidents[0]);
   }, [order?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

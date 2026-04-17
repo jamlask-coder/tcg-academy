@@ -28,6 +28,7 @@ export function MegaMenu({ game, onClose, logoCenterX }: Props) {
   const hasRendered = useRef(false);
 
   const logoCenterRef = useRef(logoCenterX);
+  // eslint-disable-next-line react-hooks/refs
   logoCenterRef.current = logoCenterX;
 
   const measure = useCallback(() => {
@@ -75,6 +76,7 @@ export function MegaMenu({ game, onClose, logoCenterX }: Props) {
   const { color, columns } = displayedGame;
 
   // No CSS transition on first render (appear in place), then animate
+  // eslint-disable-next-line react-hooks/refs
   const cssTransition = hasRendered.current
     ? `left ${TRANSITION}, width ${TRANSITION}, height ${TRANSITION}, border-top-color ${TRANSITION}`
     : `border-top-color ${TRANSITION}`;

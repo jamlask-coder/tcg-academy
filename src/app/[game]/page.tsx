@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import {
   GAME_CONFIG,
   CATEGORY_LABELS,
@@ -8,7 +7,6 @@ import {
   CARD_CATEGORIES,
   isNewProduct,
 } from "@/data/products";
-import { MEGA_MENU_DATA } from "@/data/megaMenuData";
 import { CategoryTags, type TagItem } from "@/components/filters/CategoryTags";
 import { CategoryFilteredGrid } from "@/components/filters/CategoryFilteredGrid";
 import type { Metadata } from "next";
@@ -39,11 +37,9 @@ export default async function GamePage({
   const config = GAME_CONFIG[game];
   if (!config) notFound();
 
-  const { name, color, bgColor } = config;
+  const { color } = config;
   const categories = getAllCategories(game);
   const allProducts = getProductsByGame(game);
-
-  const menuGame = MEGA_MENU_DATA.find((g) => g.slug === game);
 
   const all = allProducts
     .filter((p) => !CARD_CATEGORIES.has(p.category))

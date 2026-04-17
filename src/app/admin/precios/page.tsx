@@ -52,11 +52,6 @@ function calcDiscountPct(price: number, comparePrice?: number): number {
   return Math.round((1 - price / comparePrice) * 100);
 }
 
-function calcMargin(price: number, cost: number): number {
-  if (price === 0) return 0;
-  return Math.round(((price - cost) / price) * 100);
-}
-
 function isExpired(end?: string): boolean {
   if (!end) return false;
   return new Date(end) < new Date();
@@ -695,16 +690,6 @@ export default function PreciosPage() {
               {pageRows.map((row) => {
                 const isDirty = dirtyIds.has(row.id);
                 const pct = calcDiscountPct(row.price, row.comparePrice);
-                const margin = row.costPrice
-                  ? calcMargin(row.price, row.costPrice)
-                  : calcMargin(row.price, row.wholesalePrice);
-                const finalPrice =
-                  row.discountActive &&
-                  row.comparePrice &&
-                  row.comparePrice > row.price
-                    ? row.price
-                    : row.price;
-                const expired = isExpired(row.discountEnd);
                 const _soon = isExpiringSoon(row.discountEnd);
                 const gameColor = GAME_CONFIG[row.game]?.color ?? "#2563eb";
 

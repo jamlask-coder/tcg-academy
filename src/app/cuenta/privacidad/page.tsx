@@ -3,10 +3,8 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import {
-  Shield,
   Download,
   Trash2,
-  Bell,
   FileCheck,
   AlertTriangle,
   CheckCircle,
@@ -16,7 +14,7 @@ import {
   Mail,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { exportUserData, downloadUserDataAsJSON, deleteUserData } from "@/services/gdprService";
+import { exportUserData, deleteUserData } from "@/services/gdprService";
 import {
   getAllConsentStatuses,
   getConsentHistory,
@@ -101,14 +99,10 @@ export default function PrivacidadPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [prefsSaved, setPrefsSaved] = useState(false);
 
-  if (!user) return null;
-
-  const consents = getAllConsentStatuses(user.id);
-  const history = getConsentHistory(user.id);
-  const prefs = getCommPreferences(user.id);
-
   // ─── Data Export ────────────────────────────────────────────────────────
+  // Hooks must be called before any early return to satisfy rules-of-hooks.
   const handleExport = useCallback(() => {
+    if (!user) return;
     setDownloading(true);
 
     // Collect ALL user data + consents
@@ -138,10 +132,11 @@ export default function PrivacidadPage() {
 
   // ─── Account Deletion ──────────────────────────────────────────────────
   const handleDelete = useCallback(() => {
+    if (!user) return;
     if (deleteConfirmText !== "ELIMINAR") return;
     setDeleting(true);
 
-    const result = deleteUserData(user.id, true);
+    deleteUserData(user.id, true);
 
     // Also clean consent records
     // (keeping a minimal audit record of the deletion itself)
@@ -160,6 +155,15 @@ export default function PrivacidadPage() {
       logout();
     }, 3000);
   }, [user, deleteConfirmText, logout]);
+
+  // Communication preferences state — must be called unconditionally.
+  const initialChannels = user ? getCommPreferences(user.id).channels : ({} as ReturnType<typeof getCommPreferences>["channels"]);
+  const [channels, setChannels] = useState(initialChannels);
+
+  if (!user) return null;
+
+  const consents = getAllConsentStatuses(user.id);
+  const history = getConsentHistory(user.id);
 
   // ─── Consent Revocation ────────────────────────────────────────────────
   const handleRevokeConsent = (type: ConsentType) => {
@@ -185,8 +189,6 @@ export default function PrivacidadPage() {
   };
 
   // ─── Communication Preferences ─────────────────────────────────────────
-  const [channels, setChannels] = useState(prefs.channels);
-
   const handleSavePrefs = () => {
     saveCommPreferences(user.id, channels);
 

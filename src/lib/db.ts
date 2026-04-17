@@ -599,82 +599,97 @@ export class ServerDbAdapter implements DbAdapter {
 
 // ─── Row mappers ────────────────────────────────────────────────────────────
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-function mapOrderRow(row: any): OrderRecord {
+type DbRow = Record<string, unknown>;
+
+function asNum(v: unknown): number {
+  if (typeof v === "number") return v;
+  if (typeof v === "string") return parseFloat(v);
+  return 0;
+}
+
+function asStr(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
+function asOpt<T>(v: unknown): T | undefined {
+  return v === null || v === undefined ? undefined : (v as T);
+}
+
+function mapOrderRow(row: DbRow): OrderRecord {
+  const items = Array.isArray(row.order_items) ? (row.order_items as DbRow[]) : [];
   return {
-    id: row.id,
-    userId: row.user_id,
-    customerEmail: row.customer_email,
-    customerName: row.customer_name,
-    customerPhone: row.customer_phone,
-    items: (row.order_items ?? []).map((i: any) => ({
-      productId: i.product_id,
-      name: i.name,
-      quantity: i.quantity,
-      unitPrice: parseFloat(i.unit_price),
-      imageUrl: i.image_url,
+    id: asStr(row.id),
+    userId: asOpt<string>(row.user_id),
+    customerEmail: asStr(row.customer_email),
+    customerName: asStr(row.customer_name),
+    customerPhone: asOpt<string>(row.customer_phone),
+    items: items.map((i) => ({
+      productId: Number(i.product_id),
+      name: asStr(i.name),
+      quantity: Number(i.quantity),
+      unitPrice: asNum(i.unit_price),
+      imageUrl: asStr(i.image_url),
     })),
-    subtotal: parseFloat(row.subtotal),
-    shippingCost: parseFloat(row.shipping_cost),
-    couponCode: row.coupon_code,
-    couponDiscount: row.coupon_discount ? parseFloat(row.coupon_discount) : 0,
-    pointsDiscount: row.points_discount ? parseFloat(row.points_discount) : 0,
-    total: parseFloat(row.total),
-    status: row.status,
-    shippingMethod: row.shipping_method,
-    paymentMethod: row.payment_method,
-    paymentStatus: row.payment_status,
-    paymentIntent: row.payment_intent,
-    trackingNumber: row.tracking_number,
-    trackingUrl: row.tracking_url,
-    notes: row.notes,
-    shippingAddress: row.shipping_address,
-    tiendaRecogida: row.tienda_recogida,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    subtotal: asNum(row.subtotal),
+    shippingCost: asNum(row.shipping_cost),
+    couponCode: asOpt<string>(row.coupon_code),
+    couponDiscount: row.coupon_discount ? asNum(row.coupon_discount) : 0,
+    pointsDiscount: row.points_discount ? asNum(row.points_discount) : 0,
+    total: asNum(row.total),
+    status: row.status as OrderRecord["status"],
+    shippingMethod: asStr(row.shipping_method),
+    paymentMethod: asStr(row.payment_method),
+    paymentStatus: asStr(row.payment_status),
+    paymentIntent: asOpt<string>(row.payment_intent),
+    trackingNumber: asOpt<string>(row.tracking_number),
+    trackingUrl: asOpt<string>(row.tracking_url),
+    notes: asOpt<string>(row.notes),
+    shippingAddress: row.shipping_address as OrderRecord["shippingAddress"],
+    tiendaRecogida: asOpt<string>(row.tienda_recogida),
+    createdAt: asStr(row.created_at),
+    updatedAt: asStr(row.updated_at),
   };
 }
 
-function mapUserRow(row: any): UserRecord {
+function mapUserRow(row: DbRow): UserRecord {
   return {
-    id: row.id,
-    email: row.email,
-    username: row.username,
-    passwordHash: row.password_hash,
-    name: row.name,
-    lastName: row.last_name,
-    phone: row.phone,
-    role: row.role,
-    referralCode: row.referral_code,
-    referredBy: row.referred_by,
-    birthDate: row.birth_date,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    id: asStr(row.id),
+    email: asStr(row.email),
+    username: asOpt<string>(row.username),
+    passwordHash: asStr(row.password_hash),
+    name: asStr(row.name),
+    lastName: asStr(row.last_name),
+    phone: asOpt<string>(row.phone),
+    role: row.role as UserRecord["role"],
+    referralCode: asOpt<string>(row.referral_code),
+    referredBy: asOpt<string>(row.referred_by),
+    birthDate: asOpt<string>(row.birth_date),
+    createdAt: asStr(row.created_at),
+    updatedAt: asStr(row.updated_at),
   };
 }
 
-function mapInvoiceRow(row: any): InvoiceRecord {
+function mapInvoiceRow(row: DbRow): InvoiceRecord {
   return {
-    id: row.id,
-    invoiceNumber: row.invoice_number,
-    orderId: row.order_id,
-    userId: row.user_id,
-    customerEmail: row.customer_email,
-    customerName: row.customer_name,
-    customerNif: row.customer_nif,
-    status: row.status,
-    subtotal: parseFloat(row.subtotal),
-    vatRate: parseFloat(row.vat_rate),
-    vatAmount: parseFloat(row.vat_amount),
-    total: parseFloat(row.total),
-    hash: row.hash,
-    prevHash: row.prev_hash,
-    verifactuId: row.verifactu_id,
-    data: row.data,
-    createdAt: row.created_at,
+    id: asStr(row.id),
+    invoiceNumber: asStr(row.invoice_number),
+    orderId: asOpt<string>(row.order_id),
+    userId: asOpt<string>(row.user_id),
+    customerEmail: asStr(row.customer_email),
+    customerName: asStr(row.customer_name),
+    customerNif: asOpt<string>(row.customer_nif),
+    status: row.status as InvoiceRecord["status"],
+    subtotal: asNum(row.subtotal),
+    vatRate: asNum(row.vat_rate),
+    vatAmount: asNum(row.vat_amount),
+    total: asNum(row.total),
+    hash: asOpt<string>(row.hash),
+    prevHash: asOpt<string>(row.prev_hash),
+    verifactuId: asOpt<string>(row.verifactu_id),
+    data: row.data as InvoiceRecord["data"],
+    createdAt: asStr(row.created_at),
   };
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // ─── Factory ────────────────────────────────────────────────────────────────
 

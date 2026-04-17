@@ -19,7 +19,6 @@ import type {
   PLSection,
 } from "@/types/accounting";
 import {
-  getAccountByCode,
   getAccountName,
   isDebitNature,
   getFullChartOfAccounts,

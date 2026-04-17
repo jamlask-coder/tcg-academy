@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -410,47 +410,12 @@ function printInvoicePDF(order: AdminOrder) {
 
 // ─── Albarán print ────────────────────────────────────────────────────────────
 
-function printAlbaran(order: AdminOrder) {
-  const lines = order.items
-    .map((i) => `${i.qty}x ${i.name} — ${(i.price * i.qty).toFixed(2)}€`)
-    .join("\n");
-  const content = [
-    "ALBARÁN DE ENVÍO — TCG Academy",
-    "================================",
-    `Pedido: ${order.id}`,
-    `Fecha: ${fmtDate(order.date)}`,
-    `Cliente: ${order.userName} (${order.userEmail})`,
-    "",
-    "DIRECCIÓN DE ENTREGA:",
-    order.address,
-    "",
-    "PRODUCTOS:",
-    lines,
-    "",
-    `SUBTOTAL: ${order.subtotal.toFixed(2)}€`,
-    `ENVÍO: ${order.shipping === 0 ? "Gratuito" : order.shipping.toFixed(2) + "€"}`,
-    `TOTAL: ${order.total.toFixed(2)}€`,
-    order.trackingNumber ? `\nTracking GLS: ${order.trackingNumber}` : "",
-    "\n================================",
-    "TCG Academy — www.tcgacademy.es",
-  ].join("\n");
-  const win = window.open("", "_blank");
-  if (win) {
-    const pre = win.document.createElement("pre");
-    pre.style.cssText = "font-family:monospace;font-size:14px;padding:24px";
-    pre.textContent = content;
-    win.document.body.appendChild(pre);
-    win.print();
-  }
-}
-
 // ─── Expanded order panel ─────────────────────────────────────────────────────
 
 function OrderPanel({
   order,
   onUpdateStatus,
   onSaveNotes,
-  onSendEmail,
   onSendMessage,
   onResolveIncident,
 }: {
@@ -461,7 +426,6 @@ function OrderPanel({
     tracking?: string,
   ) => void;
   onSaveNotes: (id: string, notes: string) => void;
-  onSendEmail: (order: AdminOrder) => void;
   onSendMessage: (order: AdminOrder) => void;
   onResolveIncident: (id: string, response: string) => void;
 }) {
@@ -1392,6 +1356,7 @@ export default function AdminPedidosPage() {
             localStorage.getItem("tcgacademy_notif_dynamic") ?? "[]",
           ) as Array<Record<string, unknown>>;
           notifications.unshift({
+            // eslint-disable-next-line react-hooks/purity
             id: `notif-${Date.now()}-${id}`,
             userId: order.userId,
             title: subject,
@@ -1797,7 +1762,6 @@ export default function AdminPedidosPage() {
                             order={order}
                             onUpdateStatus={handleUpdateStatus}
                             onSaveNotes={handleSaveNotes}
-                            onSendEmail={(o) => setEmailModal(o)}
                             onSendMessage={(o) => setMessageModal(o)}
                             onResolveIncident={handleResolveIncident}
                           />

@@ -16,7 +16,6 @@ import {
   AlertCircle,
   BarChart2,
   Trophy,
-  Zap,
   Gift,
   Share2,
   Star,
@@ -65,7 +64,6 @@ type TrafficChannel = "all" | "search" | "social" | "email" | "direct" | "referr
 
 const totalVisits = MOCK_PROVINCE_VISITS.reduce((s, p) => s + p.visits, 0);
 const totalOrders = MOCK_PROVINCE_VISITS.reduce((s, p) => s + p.orders, 0);
-const totalRevenue = MOCK_PROVINCE_VISITS.reduce((s, p) => s + p.revenue, 0);
 const totalTrafficVisits = MOCK_TRAFFIC_SOURCES_DETAIL.reduce((s, t) => s + t.visits, 0);
 
 const CHANNEL_LABELS: Record<TrafficChannel, string> = {
@@ -124,7 +122,6 @@ export default function EstadisticasPage() {
   const ptsByType = (type: HistoryEntryType) =>
     allHistoryEntries.filter((e) => e.type === type && e.pts > 0).reduce((s, e) => s + e.pts, 0);
 
-  const totalEarned = allHistoryEntries.filter((e) => e.pts > 0).reduce((s, e) => s + e.pts, 0);
   const totalSpentPts = Math.abs(allHistoryEntries.filter((e) => e.pts < 0 && e.type !== "devolucion").reduce((s, e) => s + e.pts, 0));
   const totalRefundedPts = Math.abs(allHistoryEntries.filter((e) => e.type === "devolucion" && e.pts < 0).reduce((s, e) => s + e.pts, 0));
 
@@ -138,17 +135,14 @@ export default function EstadisticasPage() {
 
   // Points origin breakdown (use mock proportions if no live history)
   const earnedByType: { type: HistoryEntryType; label: string; icon: React.ElementType; color: string; pts: number }[] = [
-    { type: "compra",     label: "Compras",        icon: ShoppingBag, color: "#2563eb", pts: ptsByType("compra") || Math.round(totalPointsIssued * 0.72) },
-    { type: "checkin",    label: "Check-in diario", icon: Zap,         color: "#f59e0b", pts: ptsByType("checkin") || Math.round(totalPointsIssued * 0.15) },
-    { type: "asociacion", label: "Asociaciones",    icon: Share2,      color: "#16a34a", pts: ptsByType("asociacion") || Math.round(totalPointsIssued * 0.09) },
+    { type: "compra",     label: "Compras",        icon: ShoppingBag, color: "#2563eb", pts: ptsByType("compra") || Math.round(totalPointsIssued * 0.85) },
+    { type: "asociacion", label: "Asociaciones",    icon: Share2,      color: "#16a34a", pts: ptsByType("asociacion") || Math.round(totalPointsIssued * 0.11) },
     { type: "bienvenida", label: "Bienvenida",      icon: Gift,        color: "#7c3aed", pts: ptsByType("bienvenida") || Math.round(totalPointsIssued * 0.04) },
   ];
   const totalEarnedForPct = earnedByType.reduce((s, e) => s + e.pts, 0) || 1;
 
   // Redemption breakdown (mock since no real spend history)
   const totalRedeemedEuros = pointsToEuros(totalSpentPts || Math.round(totalPointsIssued * 0.18));
-  const checkinUsers = clientUsers.filter((u) => getPointsHistory(u.id).some((e) => e.type === "checkin")).length;
-  const checkinRate = clientUsers.length > 0 ? Math.round((checkinUsers / clientUsers.length) * 100) : 34;
 
   // ── Location data ───────────────────────────────────────────────────────────
   const locationRows = (() => {
@@ -598,13 +592,6 @@ export default function EstadisticasPage() {
               sub: `= €${totalRedeemedEuros.toFixed(2)} descontados`,
               icon: ArrowDownRight,
               color: "#dc2626",
-            },
-            {
-              label: "Tasa de uso check-in",
-              value: `${checkinRate}%`,
-              sub: `${checkinUsers || Math.round(clientUsers.length * 0.34)} usuarios activos`,
-              icon: Zap,
-              color: "#16a34a",
             },
           ].map(({ label, value, sub, icon: Icon, color }) => (
             <div key={label} className="rounded-2xl border border-gray-200 bg-white p-4">

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import {
   ShoppingCart,
-  ShoppingBag,
   Heart,
   User,
   Search,
@@ -18,8 +17,6 @@ import {
   ChevronDown,
   LogOut,
   LayoutDashboard,
-  Home,
-  Gamepad2,
   Inbox,
   ChevronRight,
   Menu,
@@ -473,7 +470,10 @@ export function Header() {
 
   // Avoid hydration mismatch: cart/auth state comes from localStorage (client only)
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
   // For admin: track separate counts for header badges
   const [pendingOrders, setPendingOrders] = useState(0);
@@ -505,7 +505,6 @@ export function Header() {
   const [mobileQuery, setMobileQuery] = useState("");
   const debouncedMobileQuery = useDebounce(mobileQuery, 300);
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
-  const [mobileSearchVisible, setMobileSearchVisible] = useState(false);
   const mobileSearchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

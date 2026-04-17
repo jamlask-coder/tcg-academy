@@ -9,8 +9,8 @@
  *   2. RACE CONDITION DE STOCK: dos usuarios compran el último item al
  *      mismo tiempo — uno recibe un pedido que no puede cumplirse.
  *
- *   3. PUNTO FARMING: bot que hace check-in diario + compras de 0€ con
- *      cupones para acumular puntos infinitos.
+ *   3. PUNTO FARMING: bot que hace compras de 0€ con cupones y
+ *      devoluciones encadenadas para acumular puntos infinitos.
  *
  *   4. COUPON REPLAY: reutilización de un cupón ya usado copiando el
  *      localStorage de otra sesión.
@@ -27,8 +27,8 @@
  *   8. REFUND ABUSE: solicitar devolución de un pedido que nunca existió
  *      o que ya fue devuelto.
  *
- *   9. TIME TRAVEL: cambiar el reloj del sistema para saltarse rate limits,
- *      check-ins, o expiración de cupones.
+ *   9. TIME TRAVEL: cambiar el reloj del sistema para saltarse rate limits
+ *      o expiración de cupones.
  *
  *  10. OVERFLOW/UNDERFLOW: enviar cantidades extremas (MAX_SAFE_INTEGER,
  *      -1, 0.0001) para explotar cálculos de precios.

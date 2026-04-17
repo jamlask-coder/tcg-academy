@@ -38,6 +38,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     const toAdd = pending.filter((id) => !user.favorites.includes(id));
     for (const id of toAdd) authToggle(id);
     writeLocal([]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocal([]);
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 

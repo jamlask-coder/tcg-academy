@@ -20,13 +20,11 @@
  *   chain_broken       → Factura con hash chain roto
  */
 
-import type { InvoiceRecord } from "@/types/fiscal";
-import { InvoiceStatus, InvoiceType, VerifactuStatus } from "@/types/fiscal";
+import { InvoiceStatus, VerifactuStatus } from "@/types/fiscal";
 import { loadInvoices, saveInvoice, createInvoice } from "@/services/invoiceService";
 import { tripleCheckInvoice } from "@/lib/fiscalAudit";
 import { getDeadLetterQueue, resolveDeadLetter } from "@/lib/circuitBreaker";
 import { safeRead, safeWrite } from "@/lib/safeStorage";
-import type { DeadLetterItem } from "@/lib/circuitBreaker";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TIPOS

@@ -2,7 +2,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { Sparkles } from "lucide-react";
 import type { LocalProduct } from "@/data/products";
-import { GAME_CONFIG } from "@/data/products";
 import { LocalProductCard } from "@/components/product/LocalProductCard";
 import { getMergedProducts } from "@/lib/productStore";
 
@@ -28,6 +27,7 @@ export default function NovedadesPage() {
   }, []);
 
   // Filter to products from last 60 days
+  // eslint-disable-next-line react-hooks/purity
   const cutoff = useMemo(() => Date.now() - 60 * 24 * 60 * 60 * 1000, []);
   const novedades = useMemo(() => {
     return products.filter((p) => {

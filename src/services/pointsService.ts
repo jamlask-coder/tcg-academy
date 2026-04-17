@@ -1,5 +1,5 @@
 /**
- * Servicio de puntos, check-in diario y programa de asociaciones.
+ * Servicio de puntos y programa de asociaciones.
  *
  * ⚠️ REGLAS DE NEGOCIO A FUEGO (NO TOCAR SIN AUTORIZACIÓN ADMIN + AVISO FUERTE):
  *
@@ -14,13 +14,10 @@
  *
  *   Otros:
  *   - Cada asociado: 5 pts por cada €10 que gaste el comprador (regla heredada)
- *   - Check-in diario: 10 pts gratis
- *   - Registro con código: 100 pts de bienvenida
+ *   - Registro con código: 10.000 pts de bienvenida (= €1)
  *   - En caso de devolución se revierten los puntos de comprador y asociados
  *
  * Seguridad (client-side):
- *   - El timestamp del check-in está protegido con un hash simple que impide
- *     manipular el localStorage sin revelar el salt.
  *   - En producción, mover toda la lógica al backend.
  */
 
@@ -29,8 +26,6 @@
 // ⚠️ CAMBIO ADMIN-ONLY con aviso fuerte — afecta al balance económico global.
 export const POINTS_PER_EURO = 100;          // 100 pts por €1 gastado en productos puros
 export const POINTS_PER_EURO_REDEMPTION = 10000; // 10.000 pts = €1 de descuento
-export const DAILY_CHECKIN_POINTS = 10;
-export const CHECKIN_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 export const POINTS_MAX_DISCOUNT_PCT    = 0.5; // los puntos no pueden descontar más del 50% del subtotal de productos
 export const MAX_ASSOCIATIONS           = 4;   // máximo de asociados en el grupo
@@ -41,29 +36,11 @@ export const ASSOCIATION_LOCK_MS = 365 * 24 * 60 * 60 * 1000; // bloqueo 1 año
 
 // Storage keys
 const POINTS_KEY   = "tcgacademy_pts";
-const CHECKIN_KEY  = "tcgacademy_checkin";
 const REFCODE_KEY  = "tcgacademy_refcodes";
 const USERCODE_KEY = "tcgacademy_usercodes";
 const ASSOC_KEY    = "tcgacademy_assoc";
 const ATTR_KEY     = "tcgacademy_pts_attr";
 const HISTORY_KEY  = "tcgacademy_pts_history"; // { [userId]: HistoryEntry[] }
-
-const HASH_SALT = "tcga-pts-2025-v3-secure";
-
-// ─── Internal helpers ─────────────────────────────────────────────────────────
-
-function simpleHash(input: string): string {
-  let h = 2166136261;
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i);
-    h = (h * 16777619) >>> 0;
-  }
-  return h.toString(36).padStart(7, "0");
-}
-
-function makeCheckinHash(userId: string, ts: number): string {
-  return simpleHash(`${HASH_SALT}|${userId}|${ts}|${HASH_SALT}`);
-}
 
 function loadMap<T>(key: string): Record<string, T> {
   if (typeof window === "undefined") return {};
@@ -109,7 +86,6 @@ function saveMap(key: string, data: Record<string, unknown>): boolean {
 export type HistoryEntryType =
   | "compra"
   | "devolucion"
-  | "checkin"
   | "bienvenida"
   | "asociacion";
 
@@ -240,73 +216,6 @@ export function buildRedemptionTiers(balance: number): RedemptionTier[] {
     { points: 500000, euros: 50,  label: "€50" },
   ];
   return ALL_TIERS.filter((t) => t.points <= balance);
-}
-
-// ─── Daily check-in ───────────────────────────────────────────────────────────
-
-export interface CheckinInfo {
-  canCheckin: boolean;
-  nextAt: number | null;
-  lastAt: number | null;
-}
-
-export function getCheckinInfo(userId: string): CheckinInfo {
-  if (typeof window === "undefined")
-    return { canCheckin: false, nextAt: null, lastAt: null };
-
-  const map = loadMap<{ ts: number; hash: string }>(CHECKIN_KEY);
-  const entry = map[userId];
-
-  if (!entry) return { canCheckin: true, nextAt: null, lastAt: null };
-
-  const expectedHash = makeCheckinHash(userId, entry.ts);
-  if (entry.hash !== expectedHash) {
-    return { canCheckin: false, nextAt: Date.now() + CHECKIN_INTERVAL_MS, lastAt: entry.ts };
-  }
-
-  const elapsed = Date.now() - entry.ts;
-  if (elapsed >= CHECKIN_INTERVAL_MS) {
-    return { canCheckin: true, nextAt: null, lastAt: entry.ts };
-  }
-
-  return {
-    canCheckin: false,
-    nextAt: entry.ts + CHECKIN_INTERVAL_MS,
-    lastAt: entry.ts,
-  };
-}
-
-export function performCheckin(userId: string): { ok: boolean; points: number; error?: string } {
-  const info = getCheckinInfo(userId);
-  if (!info.canCheckin) {
-    const remaining = info.nextAt ? info.nextAt - Date.now() : 0;
-    const hours = Math.ceil(remaining / (60 * 60 * 1000));
-    return {
-      ok: false,
-      points: 0,
-      error: `Próximo check-in disponible en ${hours} hora${hours !== 1 ? "s" : ""}`,
-    };
-  }
-
-  const ts = Date.now();
-  const hash = makeCheckinHash(userId, ts);
-  const map = loadMap<{ ts: number; hash: string }>(CHECKIN_KEY);
-  map[userId] = { ts, hash };
-  saveMap(CHECKIN_KEY, map);
-
-  addPoints(userId, DAILY_CHECKIN_POINTS);
-  addHistory(userId, {
-    ts,
-    pts: DAILY_CHECKIN_POINTS,
-    type: "checkin",
-    desc: "Check-in diario",
-  });
-  const newBalance = loadPoints(userId);
-  return { ok: true, points: DAILY_CHECKIN_POINTS, newBalance } as {
-    ok: true;
-    points: number;
-    newBalance: number;
-  };
 }
 
 // ─── Referral / association system ────────────────────────────────────────────
@@ -603,14 +512,4 @@ export function removeMutualAssociation(userIdA: string, userIdB: string): void 
   assocMap[userIdA] = (assocMap[userIdA] ?? []).filter((a) => a.referrerId !== userIdB);
   assocMap[userIdB] = (assocMap[userIdB] ?? []).filter((a) => a.referrerId !== userIdA);
   saveMap(ASSOC_KEY, assocMap);
-}
-
-/** Formatea la cuenta atrás en HH:MM:SS */
-export function formatCountdown(msRemaining: number): string {
-  if (msRemaining <= 0) return "00:00:00";
-  const totalSec = Math.floor(msRemaining / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  return [h, m, s].map((n) => String(n).padStart(2, "0")).join(":");
 }

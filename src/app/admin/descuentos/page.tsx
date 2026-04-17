@@ -7,7 +7,7 @@ import {
 } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
 import { useDiscounts, type ProductDiscount } from "@/context/DiscountContext";
-import { Tag, Zap, Save, X, ChevronDown, Plus, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Tag, Zap, Save, X, ChevronDown, Plus, Trash2, ToggleRight } from "lucide-react";
 
 export default function AdminDescuentosPage() {
   const {

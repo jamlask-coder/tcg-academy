@@ -8,8 +8,6 @@ import {
   Truck,
   User,
   Mail,
-  MapPin,
-  CreditCard,
   Clock,
   CheckCircle2,
   XCircle,
@@ -17,14 +15,11 @@ import {
   FileText,
   StickyNote,
   History,
-  Store,
   Copy,
   ExternalLink,
   Tag,
-  Shield,
   Printer,
   Receipt,
-  Ban,
   RefreshCw,
 } from "lucide-react";
 import {
@@ -57,11 +52,6 @@ const ROLE_COLORS: Record<string, { color: string; bg: string; label: string }> 
   cliente: { color: "#6b7280", bg: "#f3f4f6", label: "Cliente" },
   mayorista: { color: "#2563eb", bg: "#dbeafe", label: "Mayorista" },
   tienda: { color: "#16a34a", bg: "#dcfce7", label: "Tienda TCG" },
-};
-
-const PAYMENT_ICONS: Record<string, string> = {
-  Visa: "💳", Mastercard: "💳", PayPal: "🅿️", Bizum: "📱",
-  Transferencia: "🏦", transferencia: "🏦", Tarjeta: "💳",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -106,13 +96,6 @@ function timeStr(iso: string): string {
     day: "2-digit", month: "long", year: "numeric",
     hour: "2-digit", minute: "2-digit",
   });
-}
-
-function getPaymentIcon(method: string): string {
-  for (const [key, icon] of Object.entries(PAYMENT_ICONS)) {
-    if (method.toLowerCase().includes(key.toLowerCase())) return icon;
-  }
-  return "💳";
 }
 
 const PAYMENT_STATUS_KEY = "tcgacademy_payment_status";
@@ -455,6 +438,7 @@ export default function PedidoDetailClient() {
   const orderDate = new Date(order.statusHistory[0]?.date ?? order.date);
    
   const isUrgent = order.adminStatus === "pendiente_envio" &&
+    // eslint-disable-next-line react-hooks/purity
     Date.now() - orderDate.getTime() > 48 * 3600 * 1000;
 
   const copyToClipboard = (text: string, label: string) => {

@@ -97,6 +97,7 @@ export function UserRoleManager({ userId, defaultRole }: Props) {
 
   useEffect(() => {
     const overrides = loadOverrides();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (overrides[userId]) setRole(overrides[userId]);
   }, [userId]);
 

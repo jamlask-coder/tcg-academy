@@ -1262,6 +1262,24 @@ export default function CheckoutPage() {
                   {orderError}
                 </div>
               )}
+              {/* Información precontractual — Art. 97 TRLGDCU + Art. 60 RD 1/2007 */}
+              <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs leading-relaxed text-blue-900">
+                <p className="mb-1.5 font-bold text-blue-800">Información precontractual obligatoria</p>
+                <ul className="space-y-1 text-blue-900/90">
+                  <li>
+                    <strong>Total a pagar:</strong> {finalTotal.toFixed(2)}€ (IVA {SITE_CONFIG.vatRate}% incluido). Envío: {shipping === 0 ? "gratuito" : `${shipping.toFixed(2)}€`}.
+                  </li>
+                  <li>
+                    <strong>Vendedor:</strong> {SITE_CONFIG.legalName} — CIF {SITE_CONFIG.cif} — {SITE_CONFIG.address}.
+                  </li>
+                  <li>
+                    <strong>Derecho de desistimiento:</strong> 14 días naturales desde la recepción (Art. 102 TRLGDCU), sin justificación.
+                  </li>
+                  <li>
+                    <strong>Entrega estimada:</strong> {SITE_CONFIG.dispatchHours}h laborables tras confirmación de pago.
+                  </li>
+                </ul>
+              </div>
               {/* Legal checkboxes — Art. 97 TRLGDCU + Art. 6 RGPD */}
               <div className="space-y-2.5 rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <label className="flex cursor-pointer items-start gap-2.5 select-none">

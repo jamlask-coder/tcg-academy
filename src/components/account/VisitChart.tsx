@@ -30,7 +30,7 @@ interface Props {
   roleColor: string;
 }
 
-export function VisitChart({ visitData, totalVisits, avgVisits, pageViews, roleColor }: Props) {
+export function VisitChart({ visitData, totalVisits, pageViews, roleColor }: Props) {
   const [period, setPeriod] = useState<Period>("all");
 
   const filtered = useMemo(() => {

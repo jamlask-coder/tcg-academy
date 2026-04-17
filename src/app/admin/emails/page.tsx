@@ -211,7 +211,10 @@ export default function AdminEmailsPage() {
 
   // Log
   const [sentLog, setSentLog] = useState<SentEmailLog[]>([]);
-  useEffect(() => { setSentLog(loadSentEmails()); }, [tab]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSentLog(loadSentEmails());
+  }, [tab]);
 
   const selectTemplate = useCallback((t: EmailTemplate) => {
     setSelected(t);

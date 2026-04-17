@@ -25,9 +25,6 @@ const BG = "#e8edf5";
 const SPRITE_SRC = "/images/ssGamesBig.png";
 const SPRITE_H = 140; // original sprite height
 
-// Total sprite sheet width (from Navbar.tsx)
-const SHEET_ORIG_W = 6295;
-
 // Use the SAME logos as the desktop navbar / OtrosMenu
 const DRAWER_GAMES: {
   slug: string; label: string; bg: string;

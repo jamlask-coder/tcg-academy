@@ -229,14 +229,21 @@ async function fetchMagicHighlights(setCode: string, lang: string): Promise<High
       { headers: { "Accept": "application/json" } },
     );
     if (!res.ok) return [];
-    const data = await res.json();
-     
-    return (data.data || [])
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .filter((c: any) => c.image_uris || c.card_faces?.[0]?.image_uris)
+    interface ScryfallImgs { normal?: string; small?: string; }
+    interface ScryfallCard {
+      id: string;
+      name: string;
+      printed_name?: string;
+      rarity?: string;
+      image_uris?: ScryfallImgs;
+      card_faces?: { image_uris?: ScryfallImgs }[];
+    }
+    const data = (await res.json()) as { data?: ScryfallCard[] };
+
+    return (data.data ?? [])
+      .filter((c) => c.image_uris || c.card_faces?.[0]?.image_uris)
       .slice(0, 20)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((c: any) => {
+      .map((c) => {
         const imgs = c.image_uris ?? c.card_faces?.[0]?.image_uris ?? {};
         return {
           id: c.id,
@@ -375,18 +382,25 @@ async function fetchYugiohHighlights(setName: string, lang: string): Promise<Hig
       `https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(setName)}`,
     );
     if (!res.ok) return [];
-    const data = await res.json();
+    interface YgoCardSet { set_name: string; set_rarity?: string; }
+    interface YgoCardImage { image_url?: string; image_url_small?: string; }
+    interface YgoCardPrice { cardmarket_price?: string; }
+    interface YgoCard {
+      id: number | string;
+      name: string;
+      card_prices?: YgoCardPrice[];
+      card_images?: YgoCardImage[];
+      card_sets?: YgoCardSet[];
+    }
+    const data = (await res.json()) as { data?: YgoCard[] };
     // Sort by Cardmarket price descending — most expensive first
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sorted = (data.data || []).sort((a: any, b: any) =>
+    const sorted = (data.data ?? []).sort((a, b) =>
       parseFloat(b.card_prices?.[0]?.cardmarket_price ?? "0") - parseFloat(a.card_prices?.[0]?.cardmarket_price ?? "0"),
     );
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return sorted.slice(0, 20).map((c: any) => {
+    return sorted.slice(0, 20).map((c) => {
       const img = c.card_images?.[0];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const setInfo = (c.card_sets as any[] | undefined)?.find(
-        (s: { set_name: string }) => s.set_name.toLowerCase().includes(setName.toLowerCase()),
+      const setInfo = c.card_sets?.find(
+        (s) => s.set_name.toLowerCase().includes(setName.toLowerCase()),
       );
       const rarity = setInfo?.set_rarity ?? "";
       return {
@@ -516,8 +530,14 @@ async function fetchLorcanaHighlights(setName: string): Promise<HighlightCard[]>
     if (!lorcanaAllCards) {
       const res = await fetch("https://api.lorcana-api.com/cards/all");
       if (!res.ok) return [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      lorcanaAllCards = ((await res.json()) as any[]).map((c) => ({
+      interface LorcanaCard {
+        Set_Num: string | number;
+        Name: string;
+        Image?: string;
+        Rarity?: string;
+        Set_Name?: string;
+      }
+      lorcanaAllCards = ((await res.json()) as LorcanaCard[]).map((c) => ({
         id: `${c.Set_Num}-${c.Name}`, name: c.Name, imageUrl: c.Image ?? "",
         rarity: c.Rarity ?? "", setName: c.Set_Name ?? "", isHolo: isHoloRarity(c.Rarity),
       }));
@@ -968,14 +988,13 @@ export function SetHighlightCards({ product }: Props) {
   const [cards, setCards] = useState<HighlightCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [scrollPos, setScrollPos] = useState(0);
+  const [scrollPos] = useState(0);
   const [detectedGame, setDetectedGame] = useState<string | null>(null);
   const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set());
 
   // Full collection state
   const [collection, setCollection] = useState<HighlightCard[]>([]);
   const [colGridOpen, setColGridOpen] = useState(false);
-  const [colCardIdx, setColCardIdx] = useState<number | null>(null);
   const [colLightboxIndex, setColLightboxIndex] = useState<number | null>(null);
 
   const markBroken = useCallback((id: string) => {
@@ -987,6 +1006,7 @@ export function SetHighlightCards({ product }: Props) {
 
   useEffect(() => {
     const detected = detectSet(product);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!detected) { setLoading(false); return; }
 
     setDetectedGame(detected.game);
@@ -1004,12 +1024,13 @@ export function SetHighlightCards({ product }: Props) {
         : (TCGDEX_EN_SET[detected.setKey] ?? detected.setKey);
       const isJpStyle = /^[A-Z]/.test(setId);
       const series = isJpStyle ? "SV" : "sv";
+      interface TcgdexCard { id: string; name: string; localId: string; }
+      interface TcgdexSet { cards?: TcgdexCard[]; }
       fetch(`https://api.tcgdex.net/v2/${lang}/sets/${setId}`)
         .then((r) => r.ok ? r.json() : null)
-        .then((data) => {
+        .then((data: TcgdexSet | null) => {
           if (!data?.cards) return;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setCollection(data.cards.map((c: any) => ({
+          setCollection(data.cards.map((c) => ({
             id: c.id,
             name: c.name,
             imageUrl: `https://assets.tcgdex.net/${lang}/${series}/${setId}/${c.localId}/high.webp`,
@@ -1060,7 +1081,7 @@ export function SetHighlightCards({ product }: Props) {
           <AutoScrollRow
             items={validCards.slice(0, 18)}
             onCardClick={(globalIdx) => setLightboxIndex(globalIdx)}
-            renderCard={(card, i) => (
+            renderCard={(card) => (
               <div className="group/card relative">
                 <div className="relative overflow-hidden rounded-lg transition-transform duration-200 hover:scale-105 hover:shadow-lg">
                   {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -245,8 +245,6 @@ export function Navbar() {
                     pathname === href || pathname.startsWith(href + "/");
                   const open = activeItem === slug;
                   const isHoveredGame = activeItem === slug;
-                  const anotherGameHovered = activeItem !== null && activeItem !== slug && activeItem !== TIENDAS_KEY && activeItem !== MAYORISTAS_KEY && activeItem !== OTROS_KEY;
-                  const isCurrentPage = active;
                   return (
                     <div
                       key={slug}

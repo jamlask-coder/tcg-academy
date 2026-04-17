@@ -219,6 +219,7 @@ export default function AdminIncidenciasPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     reload();
     window.addEventListener("tcga:incidents:updated", reload);
     window.addEventListener("storage", reload);

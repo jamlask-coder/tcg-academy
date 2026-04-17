@@ -21,33 +21,6 @@ function IconTikTok() {
   );
 }
 
-function IconX() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.748l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  );
-}
-
-
-
-// ─── GLS logo (official colors: dark blue bg + yellow text) ──────────────────
-
-function IconGLS() {
-  return (
-    <svg viewBox="0 0 60 24" className="h-5" aria-label="GLS" role="img">
-      <rect width="60" height="24" rx="4" fill="#003366" />
-      <text x="30" y="17" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontWeight="900" fontSize="15" fill="#FFD500" letterSpacing="1">GLS</text>
-    </svg>
-  );
-}
-
-const SOCIAL_LINKS = [
-  { label: "Instagram", href: "#", Icon: IconInstagram },
-  { label: "TikTok", href: "#", Icon: IconTikTok },
-  { label: "X", href: "#", Icon: IconX },
-];
-
 const LINKS: [string, string][] = [
   ["Nuestras tiendas", "/tiendas"],
   ["Contacto", "/contacto"],

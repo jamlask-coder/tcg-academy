@@ -38,6 +38,7 @@ export function CookieConsent() {
   useEffect(() => {
     const prefs = loadPreferences();
     if (!prefs) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisible(true);
     }
   }, []);
@@ -235,6 +236,7 @@ export function useCookieConsent(): {
   const [prefs, setPrefs] = useState<CookiePreferences | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPrefs(loadPreferences());
   }, []);
 
