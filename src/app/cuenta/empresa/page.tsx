@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Building2, CheckCircle } from "lucide-react";
+import { AccountTabs } from "@/components/cuenta/AccountTabs";
 
 export default function EmpresaPage() {
   const { user } = useAuth();
@@ -19,11 +20,14 @@ export default function EmpresaPage() {
 
   if (user.role === "cliente") {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center">
-        <Building2 size={48} className="mx-auto mb-4 text-gray-200" />
-        <p className="font-bold text-gray-700">
-          Esta sección es solo para mayoristas y tiendas
-        </p>
+      <div>
+        <AccountTabs group="perfil" />
+        <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center">
+          <Building2 size={48} className="mx-auto mb-4 text-gray-200" />
+          <p className="font-bold text-gray-700">
+            Esta sección es solo para mayoristas y tiendas
+          </p>
+        </div>
       </div>
     );
   }
@@ -42,12 +46,7 @@ export default function EmpresaPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Datos de empresa</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Información comercial y fiscal de tu empresa
-        </p>
-      </div>
+      <AccountTabs group="perfil" />
 
       <form
         onSubmit={handleSave}
@@ -69,7 +68,9 @@ export default function EmpresaPage() {
               "Email de facturación *",
               "facturas@empresa.com",
             ],
-          ].map(([key, label, placeholder]) => (
+          ].map(([key, label, placeholder]) => {
+            const isLocked = key === "cif" || key === "razonSocial";
+            return (
             <div
               key={key}
               className={key === "direccionFiscal" ? "sm:col-span-2" : ""}
@@ -80,12 +81,19 @@ export default function EmpresaPage() {
               <input
                 type={key === "emailFacturacion" ? "email" : "text"}
                 value={form[key as keyof typeof form]}
-                onChange={set(key)}
+                onChange={isLocked ? undefined : set(key)}
+                readOnly={isLocked}
                 placeholder={placeholder}
-                className={inputCls}
+                className={`${inputCls} ${isLocked ? "cursor-not-allowed bg-gray-50 text-gray-400" : ""}`}
               />
+              {isLocked && (
+                <p className="mt-1 text-xs text-gray-400">
+                  Dato fiscal — contacta con soporte para modificar
+                </p>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {saved && (

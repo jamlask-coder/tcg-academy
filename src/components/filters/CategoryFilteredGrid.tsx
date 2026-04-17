@@ -68,7 +68,7 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
       window.removeEventListener("tcga:products:updated", load);
       window.removeEventListener("storage", load);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [game, category]);
 
   const langs = params.get("lang")?.split(",").filter(Boolean) ?? [];

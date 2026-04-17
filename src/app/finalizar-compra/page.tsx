@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { useCart } from "@/context/CartContext";
 import { getMergedById } from "@/lib/productStore";
@@ -47,7 +47,8 @@ import {
   Trophy,
   ChevronDown,
   X,
-  AlertTriangle,
+  MapPin,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -74,7 +75,7 @@ interface PendingCheckout {
 
 export default function CheckoutPage() {
   const { items, total, count, clearCart } = useCart();
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const [step, setStep] = useState<Step>("datos");
   const [pending] = useState<PendingCheckout | null>(() => {
     try {
@@ -94,6 +95,8 @@ export default function CheckoutPage() {
   const [triedSubmitDatos, setTriedSubmitDatos] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
 
   useEffect(() => {
     if (user?.role === "cliente") setUserPoints(loadPoints(user.id));
@@ -113,6 +116,68 @@ export default function CheckoutPage() {
     pago: "tarjeta",
     tiendaRecogida: "",
   });
+
+  // ── Address selector ────────────────────────────────────────────────────────
+  // "new" = el usuario introduce manualmente una nueva dirección.
+  // Si tiene direcciones guardadas preseleccionamos la predeterminada.
+  const [selectedAddrId, setSelectedAddrId] = useState<string>("new");
+  const savedAddresses = useMemo(() => user?.addresses ?? [], [user]);
+
+  // Pre-rellenar al montar (una sola vez) con la dirección predeterminada del usuario + sus datos personales
+  const prefilledRef = useRef(false);
+  useEffect(() => {
+    if (prefilledRef.current) return;
+    if (!user) return;
+    prefilledRef.current = true;
+    const defaultAddr =
+      savedAddresses.find((a) => a.predeterminada) ?? savedAddresses[0] ?? null;
+    setForm((f) => ({
+      ...f,
+      nombre: f.nombre || user.name || "",
+      apellidos: f.apellidos || user.lastName || "",
+      email: f.email || user.email || "",
+      telefono: f.telefono || user.phone || "",
+      ...(defaultAddr
+        ? {
+            direccion: `${defaultAddr.calle} ${defaultAddr.numero}${defaultAddr.piso ? ", " + defaultAddr.piso : ""}`.trim(),
+            cp: defaultAddr.cp,
+            ciudad: defaultAddr.ciudad,
+            provincia: defaultAddr.provincia,
+            pais: defaultAddr.pais || "ES",
+          }
+        : {}),
+    }));
+    if (defaultAddr) setSelectedAddrId(defaultAddr.id);
+  }, [user, savedAddresses]);
+
+  /** Cambiar dirección seleccionada → rellenar (o limpiar) los campos de envío */
+  const applySelectedAddress = (id: string) => {
+    setSelectedAddrId(id);
+    if (id === "new") {
+      setForm((f) => ({
+        ...f,
+        direccion: "",
+        cp: "",
+        ciudad: "",
+        provincia: "",
+        pais: "ES",
+      }));
+      return;
+    }
+    const addr = savedAddresses.find((a) => a.id === id);
+    if (!addr) return;
+    setForm((f) => ({
+      ...f,
+      direccion: `${addr.calle} ${addr.numero}${addr.piso ? ", " + addr.piso : ""}`.trim(),
+      cp: addr.cp,
+      ciudad: addr.ciudad,
+      provincia: addr.provincia,
+      pais: addr.pais || "ES",
+    }));
+  };
+
+  /** true si el usuario está usando una dirección guardada (no editable inline) */
+  const usingSavedAddress = selectedAddrId !== "new" && savedAddresses.some((a) => a.id === selectedAddrId);
 
   const isStorePickup = form.envio === "tienda";
   const hasFreeShippingCoupon = pending?.freeShippingCoupon === true;
@@ -298,6 +363,42 @@ export default function CheckoutPage() {
     }
 
     localStorage.removeItem("tcgacademy_pending_checkout");
+
+    // ── PHASE 1.5: Persist shipping address to user profile if new ──
+    // Fixes bug where addresses used in checkout don't appear in "Mis direcciones".
+    // Match by calle+cp+ciudad (case-insensitive) to avoid duplicates.
+    // Solo persistimos si el usuario NO está usando una dirección ya guardada
+    // (evita duplicar la existente con formato "calle numero, piso" distinto).
+    if (user && !isStorePickup && !usingSavedAddress) {
+      try {
+        const norm = (s: string) => s.trim().toLowerCase();
+        const exists = user.addresses.some(
+          (a) =>
+            norm(a.calle) === norm(sDireccion) &&
+            norm(a.cp) === norm(sCp) &&
+            norm(a.ciudad) === norm(sCiudad),
+        );
+        if (!exists) {
+          const newAddr = {
+            id: `addr-${Date.now()}`,
+            label: "Envío",
+            nombre: sNombre,
+            apellidos: sApellidos,
+            calle: sDireccion,
+            numero: "",
+            cp: sCp,
+            ciudad: sCiudad,
+            provincia: sProvincia,
+            pais: form.pais,
+            telefono: sTelefono,
+            predeterminada: user.addresses.length === 0,
+          };
+          updateProfile({ addresses: [...user.addresses, newAddr] });
+        }
+      } catch {
+        /* non-blocking — address save is best-effort */
+      }
+    }
 
     // ── PHASE 2: Points deduction (must happen BEFORE award) ──
     let pointsDeducted = false;
@@ -596,6 +697,25 @@ export default function CheckoutPage() {
             </span>
           </div>
         )}
+        {/* Right of withdrawal notice — Art. 102 TRLGDCU */}
+        <div className="mx-auto mb-6 max-w-md rounded-xl border border-gray-200 bg-gray-50 p-4 text-left text-xs leading-relaxed text-gray-500">
+          <p className="mb-1 font-semibold text-gray-700">
+            Derecho de desistimiento
+          </p>
+          <p>
+            De conformidad con el art. 102 del TRLGDCU, dispones de{" "}
+            <strong>14 días naturales</strong> desde la recepción del pedido
+            para ejercer tu derecho de desistimiento sin necesidad de
+            justificación.{" "}
+            <Link
+              href="/devoluciones"
+              className="font-medium text-[#2563eb] hover:underline"
+            >
+              Más información y formulario
+            </Link>
+          </p>
+        </div>
+
         <div className="flex flex-col justify-center gap-3 sm:flex-row">
           <Link
             href="/cuenta/pedidos"
@@ -689,6 +809,80 @@ export default function CheckoutPage() {
               <h2 className="pt-4 text-lg font-bold text-gray-900">
                 Dirección de envío
               </h2>
+
+              {/* Selector de direcciones guardadas (solo usuarios con direcciones) */}
+              {savedAddresses.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-500">
+                    Elige una dirección guardada o añade una nueva
+                  </p>
+                  {savedAddresses.map((addr) => {
+                    const checked = selectedAddrId === addr.id;
+                    return (
+                      <label
+                        key={addr.id}
+                        className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 transition ${
+                          checked
+                            ? "border-[#2563eb] bg-blue-50/40"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="savedAddress"
+                          value={addr.id}
+                          checked={checked}
+                          onChange={() => applySelectedAddress(addr.id)}
+                          className="mt-1 h-4 w-4 shrink-0 accent-[#2563eb]"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <MapPin size={14} className="text-gray-400" />
+                            <span className="text-sm font-bold text-gray-900">
+                              {addr.label}
+                            </span>
+                            {addr.predeterminada && (
+                              <span className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[#2563eb]">
+                                <Star size={9} className="fill-[#2563eb]" /> Predeterminada
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-sm text-gray-700">
+                            {addr.nombre} {addr.apellidos}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {addr.calle} {addr.numero}
+                            {addr.piso ? `, ${addr.piso}` : ""} · {addr.cp}{" "}
+                            {addr.ciudad}
+                            {addr.provincia ? `, ${addr.provincia}` : ""}
+                          </p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                  <label
+                    className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 p-4 transition ${
+                      selectedAddrId === "new"
+                        ? "border-[#2563eb] bg-blue-50/40"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="savedAddress"
+                      value="new"
+                      checked={selectedAddrId === "new"}
+                      onChange={() => applySelectedAddress("new")}
+                      className="h-4 w-4 shrink-0 accent-[#2563eb]"
+                    />
+                    <Plus size={16} className="text-[#2563eb]" />
+                    <span className="text-sm font-semibold text-gray-800">
+                      Añadir nueva dirección
+                    </span>
+                  </label>
+                </div>
+              )}
+
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-gray-700">
                   Dirección *
@@ -696,11 +890,14 @@ export default function CheckoutPage() {
                 <input
                   required
                   value={form.direccion}
+                  readOnly={usingSavedAddress}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, direccion: e.target.value }))
                   }
                   placeholder="Calle, número, piso..."
-                  className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${triedSubmitDatos && !form.direccion.trim() ? "border-red-400" : "border-gray-200"}`}
+                  className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${
+                    usingSavedAddress ? "cursor-not-allowed bg-gray-50 text-gray-500" : ""
+                  } ${triedSubmitDatos && !form.direccion.trim() ? "border-red-400" : "border-gray-200"}`}
                 />
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
@@ -713,11 +910,14 @@ export default function CheckoutPage() {
                     pattern="[0-9]{5}"
                     title="Código postal de 5 dígitos"
                     value={form.cp}
+                    readOnly={usingSavedAddress}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, cp: e.target.value }))
                     }
                     placeholder="28001"
-                    className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${triedSubmitDatos && (!form.cp.trim() || !/^[0-9]{5}$/.test(form.cp)) ? "border-red-400" : "border-gray-200"}`}
+                    className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${
+                      usingSavedAddress ? "cursor-not-allowed bg-gray-50 text-gray-500" : ""
+                    } ${triedSubmitDatos && (!form.cp.trim() || !/^[0-9]{5}$/.test(form.cp)) ? "border-red-400" : "border-gray-200"}`}
                   />
                 </div>
                 <div>
@@ -727,10 +927,13 @@ export default function CheckoutPage() {
                   <input
                     required
                     value={form.ciudad}
+                    readOnly={usingSavedAddress}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, ciudad: e.target.value }))
                     }
-                    className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${triedSubmitDatos && !form.ciudad.trim() ? "border-red-400" : "border-gray-200"}`}
+                    className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${
+                      usingSavedAddress ? "cursor-not-allowed bg-gray-50 text-gray-500" : ""
+                    } ${triedSubmitDatos && !form.ciudad.trim() ? "border-red-400" : "border-gray-200"}`}
                   />
                 </div>
                 <div>
@@ -739,13 +942,25 @@ export default function CheckoutPage() {
                   </label>
                   <input
                     value={form.provincia}
+                    readOnly={usingSavedAddress}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, provincia: e.target.value }))
                     }
-                    className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
+                    className={`h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${
+                      usingSavedAddress ? "cursor-not-allowed bg-gray-50 text-gray-500" : ""
+                    }`}
                   />
                 </div>
               </div>
+              {usingSavedAddress && (
+                <p className="text-xs text-gray-500">
+                  Editando bloqueado — para modificar esta dirección, ve a{" "}
+                  <Link href="/cuenta/datos" className="font-semibold text-[#2563eb] underline">
+                    Mis direcciones
+                  </Link>
+                  .
+                </p>
+              )}
               <button
                 type="submit"
                 className="w-full rounded-xl bg-[#2563eb] py-4 font-bold text-white transition hover:bg-[#1d4ed8]"
@@ -1047,6 +1262,46 @@ export default function CheckoutPage() {
                   {orderError}
                 </div>
               )}
+              {/* Legal checkboxes — Art. 97 TRLGDCU + Art. 6 RGPD */}
+              <div className="space-y-2.5 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <label className="flex cursor-pointer items-start gap-2.5 select-none">
+                  <input
+                    type="checkbox"
+                    checked={acceptTerms}
+                    onChange={(e) => setAcceptTerms(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-[#2563eb] focus:ring-[#2563eb]"
+                    aria-label="Aceptar términos y condiciones"
+                  />
+                  <span className="text-xs leading-relaxed text-gray-600">
+                    He leído y acepto los{" "}
+                    <Link href="/terminos" target="_blank" className="font-semibold text-[#2563eb] hover:underline">
+                      términos y condiciones
+                    </Link>{" "}
+                    y el{" "}
+                    <Link href="/devoluciones" target="_blank" className="font-semibold text-[#2563eb] hover:underline">
+                      derecho de desistimiento
+                    </Link>{" "}
+                    (14 días) *
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2.5 select-none">
+                  <input
+                    type="checkbox"
+                    checked={acceptPrivacy}
+                    onChange={(e) => setAcceptPrivacy(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-[#2563eb] focus:ring-[#2563eb]"
+                    aria-label="Aceptar política de privacidad"
+                  />
+                  <span className="text-xs leading-relaxed text-gray-600">
+                    He leído la{" "}
+                    <Link href="/privacidad" target="_blank" className="font-semibold text-[#2563eb] hover:underline">
+                      política de privacidad
+                    </Link>{" "}
+                    y autorizo el tratamiento de mis datos para procesar este pedido (Art. 6.1.b RGPD) *
+                  </span>
+                </label>
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setStep("envio")}
@@ -1056,7 +1311,7 @@ export default function CheckoutPage() {
                 </button>
                 <button
                   onClick={handleOrder}
-                  disabled={submitting}
+                  disabled={submitting || !acceptTerms || !acceptPrivacy}
                   className="flex-1 rounded-xl bg-[#2563eb] py-3.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitting ? "Procesando..." : `Confirmar pedido — ${finalTotal.toFixed(2)}€`}

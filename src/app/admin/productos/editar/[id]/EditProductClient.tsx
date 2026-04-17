@@ -24,7 +24,7 @@ export default function EditProductClient({
       "tcgacademy_deleted_products",
       JSON.stringify(deleted),
     );
-    router.push("/admin/preciosystock");
+    router.push("/admin/stock");
   };
 
   const handleSave = (
@@ -40,7 +40,7 @@ export default function EditProductClient({
       "tcgacademy_product_overrides",
       JSON.stringify(overrides),
     );
-    setTimeout(() => router.push("/admin/preciosystock"), 1200);
+    setTimeout(() => router.push("/admin/stock"), 1200);
   };
 
   return (

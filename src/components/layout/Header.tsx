@@ -334,6 +334,14 @@ function HeaderInlineAuth() {
         >
           <span className="text-xs text-blue-200">Bienvenido,&nbsp;</span>
           <span className="text-xs font-bold text-white">{firstName}</span>
+          {(user.role === "mayorista" || user.role === "tienda" || user.role === "admin") && (
+            <span
+              className="ml-1.5 inline-flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-amber-400 px-1.5 text-[10px] font-bold leading-none text-gray-900"
+              aria-label={`Rol: ${user.role}`}
+            >
+              {user.role === "mayorista" ? "Mayorista" : user.role === "tienda" ? "Tienda" : "Admin"}
+            </span>
+          )}
           <ChevronDown
             size={10}
             className={`ml-0.5 text-white/50 transition-transform ${menuOpen ? "rotate-180" : ""}`}
@@ -773,7 +781,7 @@ export function Header() {
             >
               <ShoppingCart size={24} className="text-white lg:h-[22px] lg:w-[22px]" />
               {mounted && count > 0 && (
-                <span className="absolute -top-2 right-1 flex h-5 min-w-5 badge-ping-wrap items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white lg:-top-0.5 lg:right-0.5 lg:h-[18px] lg:min-w-[18px] lg:text-[10px]">
+                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
                   {count > 99 ? "99+" : count}
                 </span>
               )}

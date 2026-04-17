@@ -216,7 +216,7 @@ export default function FacturasPage() {
 
   useEffect(() => {
     syncPaidOrdersAsInvoices().then(() => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setInvoices(loadInvoices());
     });
   }, []);

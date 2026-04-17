@@ -9,7 +9,6 @@ import {
   User as UserIcon,
   Package,
   Heart,
-  Building2,
   LogOut,
   ChevronRight,
   Receipt,
@@ -25,32 +24,46 @@ import {
   Wrench,
   BookOpen,
   Trophy,
-  Share2,
   AlertTriangle,
   Mail,
-  MapPin,
-  FileText,
 } from "lucide-react";
 import { countNewIncidents } from "@/services/incidentService";
 
 const PUBLIC_PATHS = ["/login", "/registro", "/recuperar-contrasena"];
 
+const PERFIL_PATHS = [
+  "/cuenta/datos",
+  "/cuenta/direcciones",
+  "/cuenta/facturacion",
+  "/cuenta/empresa",
+  "/cuenta/privacidad",
+];
+const PEDIDOS_PATHS = [
+  "/cuenta/pedidos",
+  "/cuenta/facturas",
+  "/cuenta/devoluciones",
+];
+const RECOMPENSAS_PATHS = [
+  "/cuenta/puntos",
+  "/cuenta/cupones",
+  "/cuenta/grupo",
+  "/cuenta/bonos",
+];
+
 const NAV_ITEMS_BASE = [
-  { href: "/cuenta", label: "Mi cuenta", icon: UserIcon, exact: true },
-  { href: "/cuenta/pedidos", label: "Mis pedidos", icon: Package },
-  { href: "/cuenta/puntos", label: "Mis puntos", icon: Trophy, clientOnly: true },
-  { href: "/cuenta/grupo", label: "Mi grupo", icon: Share2, clientOnly: true },
+  { href: "/cuenta", label: "Resumen", icon: UserIcon, exact: true },
+  { href: "/cuenta/pedidos", label: "Mis pedidos", icon: Package, matchPaths: PEDIDOS_PATHS },
+  { href: "/cuenta/datos", label: "Mis datos", icon: UserIcon, matchPaths: PERFIL_PATHS },
+  { href: "/cuenta/puntos", label: "Mis recompensas", icon: Trophy, matchPaths: RECOMPENSAS_PATHS, clientOnly: true },
+  { href: "/cuenta/cupones", label: "Mis recompensas", icon: Gift, matchPaths: RECOMPENSAS_PATHS, b2bOnly: true },
+  { href: "/cuenta/favoritos", label: "Favoritos", icon: Heart },
   {
     href: "/cuenta/notificaciones",
     label: "Notificaciones",
     icon: Bell,
     badge: true,
   },
-  { href: "/cuenta/datos", label: "Mis datos", icon: UserIcon },
-  { href: "/cuenta/direcciones", label: "Mis direcciones", icon: MapPin },
-  { href: "/cuenta/facturacion", label: "Facturación", icon: FileText },
-  { href: "/cuenta/favoritos", label: "Favoritos", icon: Heart },
-  { href: "/cuenta/mensajes", label: "Mensajes", icon: MessageSquare },
+  { href: "/cuenta/mensajes", label: "Mensajes", icon: MessageSquare, b2bOnly: true },
 ];
 
 const ADMIN_NAV_ITEMS = [
@@ -62,7 +75,7 @@ const ADMIN_NAV_ITEMS = [
   },
   { href: "/admin/precios", label: "Precios", icon: Euro, primary: true },
   { href: "/admin/pedidos", label: "Pedidos", icon: Package, primary: true },
-  { href: "/admin/preciosystock", label: "Precios y Stock", icon: Grid },
+  { href: "/admin/stock", label: "Stock", icon: Grid },
   { href: "/admin/usuarios", label: "Usuarios", icon: Users },
   { href: "/admin/cupones", label: "Cupones", icon: Gift },
   { href: "/admin/fiscal", label: "Fiscal", icon: Receipt },
@@ -125,6 +138,7 @@ type NavItemConfig = {
   badge?: boolean;
   primary?: boolean;
   badgeCount?: number;
+  matchPaths?: string[];
 };
 
 function CuentaSidebar({
@@ -173,8 +187,12 @@ function CuentaSidebar({
 
       {/* Nav */}
       <nav className="mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white">
-        {navItems.map(({ href, label, icon, exact, badge, primary, badgeCount }) => {
-          const active = exact ? pathname === href : pathname.startsWith(href);
+        {navItems.map(({ href, label, icon, exact, badge, primary, badgeCount, matchPaths }) => {
+          const active = exact
+            ? pathname === href
+            : matchPaths
+              ? matchPaths.some((p) => pathname === p || pathname.startsWith(p + "/"))
+              : pathname === href || pathname.startsWith(href + "/");
           return (
             <NavItem
               key={href}
@@ -266,27 +284,11 @@ export default function CuentaLayout({
           ? { ...item, badgeCount: newIncidentCount }
           : item,
       )
-    : [
-        ...(isB2B ? NAV_ITEMS_BASE.filter((item) => !("clientOnly" in item && item.clientOnly)) : NAV_ITEMS_BASE),
-        ...(isB2B
-          ? [
-              {
-                href: "/cuenta/facturas",
-                label: "Mis facturas",
-                icon: Receipt,
-                badge: false,
-                exact: false,
-              },
-              {
-                href: "/cuenta/empresa",
-                label: "Datos de empresa",
-                icon: Building2,
-                badge: false,
-                exact: false,
-              },
-            ]
-          : []),
-      ];
+    : NAV_ITEMS_BASE.filter((item) => {
+        if ("clientOnly" in item && item.clientOnly && isB2B) return false;
+        if ("b2bOnly" in item && item.b2bOnly && !isB2B) return false;
+        return true;
+      });
 
   const handleLogout = () => {
     logout();

@@ -14,6 +14,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${BASE}/mayoristas`, priority: 0.6 },
     { url: `${BASE}/franquicias`, priority: 0.5 },
     { url: `${BASE}/vending`, priority: 0.5 },
+    // Legal pages
+    { url: `${BASE}/aviso-legal`, priority: 0.4 },
+    { url: `${BASE}/privacidad`, priority: 0.4 },
+    { url: `${BASE}/terminos`, priority: 0.4 },
+    { url: `${BASE}/cookies`, priority: 0.3 },
+    { url: `${BASE}/devoluciones`, priority: 0.5 },
+    { url: `${BASE}/reclamaciones`, priority: 0.3 },
   ];
 
   const gameRoutes: MetadataRoute.Sitemap = Object.keys(GAME_CONFIG).map(

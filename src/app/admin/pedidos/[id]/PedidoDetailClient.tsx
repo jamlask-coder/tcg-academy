@@ -453,7 +453,7 @@ export default function PedidoDetailClient() {
   const StatusIcon = status.icon;
   const role = ROLE_COLORS[order.userRole] ?? ROLE_COLORS.cliente;
   const orderDate = new Date(order.statusHistory[0]?.date ?? order.date);
-  // eslint-disable-next-line react-hooks/purity
+   
   const isUrgent = order.adminStatus === "pendiente_envio" &&
     Date.now() - orderDate.getTime() > 48 * 3600 * 1000;
 

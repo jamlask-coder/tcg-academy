@@ -27,6 +27,7 @@ import {
   Copy,
 } from "lucide-react";
 import Link from "next/link";
+import { AccountTabs } from "@/components/cuenta/AccountTabs";
 
 // ─── Countdown timer ──────────────────────────────────────────────────────────
 
@@ -89,12 +90,15 @@ export default function PuntosPage() {
 
   if (!user || user.role !== "cliente") {
     return (
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center">
-        <Trophy size={40} className="mx-auto mb-3 text-amber-400" />
-        <p className="font-semibold text-amber-700">El programa de puntos es exclusivo para clientes.</p>
-        <p className="mt-1 text-sm text-amber-600">
-          Los usuarios profesionales (mayoristas/tiendas) tienen acceso a otras ventajas.
-        </p>
+      <div>
+        <AccountTabs group="recompensas" />
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center">
+          <Trophy size={40} className="mx-auto mb-3 text-amber-400" />
+          <p className="font-semibold text-amber-700">El programa de puntos es exclusivo para clientes.</p>
+          <p className="mt-1 text-sm text-amber-600">
+            Los usuarios profesionales (mayoristas/tiendas) tienen acceso a otras ventajas.
+          </p>
+        </div>
       </div>
     );
   }
@@ -120,15 +124,7 @@ export default function PuntosPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-          <Trophy size={24} className="text-amber-500" /> Mis puntos
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Gana puntos con cada compra y canjéalos por descuentos
-        </p>
-      </div>
+      <AccountTabs group="recompensas" />
 
       {/* Balance card */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#1e3a8a] to-[#2563eb] p-6 text-white">
@@ -154,8 +150,8 @@ export default function PuntosPage() {
               <p className="font-bold">+{DAILY_CHECKIN_POINTS} pts</p>
             </div>
             <div className="border-l border-white/20 pl-4">
-              <p className="text-blue-300">1 punto =</p>
-              <p className="font-bold text-amber-300">€0.01 descuento</p>
+              <p className="text-blue-300">Canje</p>
+              <p className="font-bold text-amber-300">10.000 pts = €1</p>
             </div>
           </div>
         </div>
@@ -214,9 +210,9 @@ export default function PuntosPage() {
           </p>
           {redemptionTiers.length === 0 ? (
             <div className="rounded-xl bg-gray-50 p-4 text-center text-sm text-gray-400">
-              Necesitas al menos 100 puntos para canjear.
+              Necesitas al menos 10.000 puntos (= €1) para canjear.
               <br />
-              Te faltan {100 - balance} puntos.
+              Te faltan {(10000 - balance).toLocaleString("es-ES")} puntos.
             </div>
           ) : (
             <div className="space-y-2">
@@ -289,8 +285,8 @@ export default function PuntosPage() {
               icon: ShoppingBag,
               color: "#2563eb",
               title: "Compras",
-              desc: `${POINTS_PER_EURO} punto por cada €1 gastado`,
-              example: "Compra de €100 → 100 pts = €1.00",
+              desc: `${POINTS_PER_EURO} puntos por cada €1 gastado en productos`,
+              example: "Compra de €100 → 10.000 pts → €1 de descuento",
             },
             {
               icon: Zap,
@@ -323,14 +319,14 @@ export default function PuntosPage() {
             </div>
             <p className="font-bold text-gray-900">Asociaciones</p>
             <p className="mt-0.5 text-sm text-gray-600">
-              50 pts por cada €100 que gaste un asociado — y ellos ganan lo mismo de tus compras
+              5.000 pts por cada €100 que gaste un asociado — y ellos ganan lo mismo de tus compras
             </p>
             <div className="mt-2 space-y-1">
               <p className="text-xs text-gray-400">
-                <span className="font-semibold text-green-600">Asociado compra €100</span> → tú recibes <span className="font-semibold">+50 pts</span> (= €0.50)
+                <span className="font-semibold text-green-600">Asociado compra €100</span> → tú recibes <span className="font-semibold">+5.000 pts</span> (= €0,50)
               </p>
               <p className="text-xs text-gray-400">
-                <span className="font-semibold text-[#2563eb]">Tú compras €100</span> → cada asociado recibe <span className="font-semibold">+50 pts</span> (= €0.50)
+                <span className="font-semibold text-[#2563eb]">Tú compras €100</span> → cada asociado recibe <span className="font-semibold">+5.000 pts</span> (= €0,50)
               </p>
             </div>
           </div>

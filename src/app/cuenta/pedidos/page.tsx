@@ -20,6 +20,7 @@ import {
   X,
   RefreshCw,
 } from "lucide-react";
+import { AccountTabs } from "@/components/cuenta/AccountTabs";
 
 type OrderStatus =
   | "pedido"
@@ -397,6 +398,7 @@ export default function PedidosPage() {
 
   return (
     <div>
+      <AccountTabs group="pedidos" />
       {incidentModal && (
         <IncidentModal
           orderId={incidentModal}
@@ -433,9 +435,8 @@ export default function PedidosPage() {
         </div>
       )}
 
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Mis pedidos</h1>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="mb-6">
+        <p className="text-sm text-gray-500">
           {orders.length} pedidos realizados
         </p>
       </div>

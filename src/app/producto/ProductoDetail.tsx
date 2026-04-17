@@ -22,14 +22,14 @@ export function ProductoDetail() {
     }
     const id = Number(idStr);
     if (isNaN(id)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setProduct(null);
       return;
     }
     // Try immediately first; retry after a tick in case localStorage isn't ready yet
     const found = getMergedById(id);
     if (found) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setProduct(found);
       return;
     }

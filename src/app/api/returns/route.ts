@@ -1,11 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest} from "next/server";
+import { NextResponse } from "next/server";
 import { requireAuth, requireAdmin } from "@/lib/apiAuth";
 import { logger } from "@/lib/logger";
 
 // POST /api/returns — Create a return request (customer)
 export async function POST(req: NextRequest) {
   try {
-    const authResult = requireAuth(req);
+    const authResult = await requireAuth(req);
     if (authResult instanceof NextResponse) return authResult;
 
     const body = await req.json();
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
 
 // GET /api/returns — List returns (admin: all, customer: own)
 export async function GET(req: NextRequest) {
-  const authResult = requireAuth(req);
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) return authResult;
 
   const status = req.nextUrl.searchParams.get("status");
@@ -83,7 +84,7 @@ export async function GET(req: NextRequest) {
 // PATCH /api/returns — Update return status (admin only)
 export async function PATCH(req: NextRequest) {
   try {
-    const adminResult = requireAdmin(req);
+    const adminResult = await requireAdmin(req);
     if (adminResult instanceof NextResponse) return adminResult;
 
     const body = await req.json();

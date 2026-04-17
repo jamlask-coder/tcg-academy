@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { ScrollToTop } from "@/components/layout/ScrollToTop";
+import { CookieConsent } from "@/components/legal/CookieConsent";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
@@ -43,6 +44,7 @@ export default function RootLayout({
             </div>
             <main className="flex-1 bg-gray-50 pb-16 lg:pb-0">{children}</main>
             <Footer />
+            <CookieConsent />
           </div>
         </Providers>
       </body>

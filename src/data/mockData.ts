@@ -513,12 +513,12 @@ export const MOCK_POINTS_HISTORY: PointsTransaction[] = [
 
 export const MOCK_POINTS_BALANCE = 520;
 
-// 100 puntos = €1.00 (tasa: 100 pts por €1 de descuento)
+// 10.000 puntos = €1 (tasa de canje, escala actual)
 export const POINTS_REDEMPTION_TABLE = [
-  { points: 100, euros: 1.0 },
-  { points: 250, euros: 2.5 },
-  { points: 500, euros: 5.0 },
-  { points: 1000, euros: 10.0 },
+  { points: 10000,  euros: 1 },
+  { points: 25000,  euros: 2.5 },
+  { points: 50000,  euros: 5 },
+  { points: 100000, euros: 10 },
 ];
 
 // ─── Notifications ────────────────────────────────────────────────────────────

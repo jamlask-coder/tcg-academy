@@ -82,7 +82,7 @@ function CatalogoPage() {
   // Re-load when admin adds/edits products
   useEffect(() => {
     const reload = () =>
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setAllProducts(getMergedProducts());
     window.addEventListener("tcga:products:updated", reload);
     window.addEventListener("storage", reload);

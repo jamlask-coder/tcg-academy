@@ -177,6 +177,7 @@ function PriceDisplay({
   } = usePrice(product);
 
   const isAdmin = role === "admin";
+  const isB2B = role === "mayorista" || role === "tienda";
   const effectiveComparePrice = isAdmin ? inlineComparePrice : origComparePrice;
   const effectiveHasDiscount =
     effectiveComparePrice !== undefined && effectiveComparePrice > displayPrice;
@@ -250,7 +251,7 @@ function PriceDisplay({
           {displayPrice.toFixed(2)}€
         </span>
         <span className="mb-0.5 text-xs text-gray-400">IVA incl.</span>
-        {effectiveHasDiscount && (
+        {effectiveHasDiscount && !isB2B && (
           <>
             <span className="mb-0.5 text-base text-gray-400 line-through">
               {effectiveComparePrice!.toFixed(2)}€
@@ -269,7 +270,12 @@ function PriceDisplay({
       {(retailPrice !== undefined || wholesaleRef !== undefined) && (
         <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-400">
           {retailPrice !== undefined && (
-            <span>PV Público: {retailPrice.toFixed(2)} €</span>
+            <span>
+              PV Público:{" "}
+              <span className="line-through decoration-gray-400 decoration-[0.75px]">
+                {retailPrice.toFixed(2)} €
+              </span>
+            </span>
           )}
           {wholesaleRef !== undefined && (
             <span>Mayoristas: {wholesaleRef.toFixed(2)} €</span>
@@ -492,7 +498,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
     setSavedToast(true);
     setTimeout(() => setSavedToast(false), 2500);
     setEditMode(false);
-  }, [product.id, inlineTitle, inlineDesc, inlineGame, inlineCategory, inlineLanguage, inlinePrice, inlineWholesalePrice, inlineStorePrice, inlineCostPrice, inlineComparePrice, inlineStock, inlineStockQty, inlineImages]);
+  }, [product.id, product.inStock, product.stock, product.images, inlineTitle, inlineDesc, inlineGame, inlineCategory, inlineLanguage, inlinePrice, inlineWholesalePrice, inlineStorePrice, inlineCostPrice, inlineComparePrice, inlineStock, inlineStockQty, inlineImages]);
 
   const handleDelete = useCallback(() => {
     const deleted = JSON.parse(

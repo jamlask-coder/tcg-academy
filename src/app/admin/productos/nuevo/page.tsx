@@ -22,7 +22,7 @@ export default function NuevoProductoPage() {
       JSON.stringify([...stored, product]),
     );
     window.dispatchEvent(new Event("tcga:products:updated"));
-    router.push("/admin/preciosystock");
+    router.push("/admin/stock");
   };
 
   const handleSaveAndNew = (

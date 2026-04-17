@@ -230,7 +230,7 @@ async function fetchMagicHighlights(setCode: string, lang: string): Promise<High
     );
     if (!res.ok) return [];
     const data = await res.json();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     return (data.data || [])
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .filter((c: any) => c.image_uris || c.card_faces?.[0]?.image_uris)
@@ -915,7 +915,7 @@ function AutoScrollRow<T extends { id: string }>({
     if (items.length === 0 || paused) return;
     const timer = setInterval(() => scrollByCards(1), intervalMs);
     return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [items.length, paused, intervalMs]);
 
   if (items.length === 0) return null;

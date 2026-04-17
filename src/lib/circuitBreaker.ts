@@ -91,7 +91,7 @@ export async function withCircuitBreaker<T>(
     circuit.lastSuccess = Date.now();
     updateCircuit(name, circuit);
     return { result, fromFallback: false };
-  } catch (err) {
+  } catch {
     circuit.failures++;
     circuit.lastFailure = Date.now();
 

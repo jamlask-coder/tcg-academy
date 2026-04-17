@@ -1,13 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest} from "next/server";
+import { NextResponse } from "next/server";
 import { verifyOrder } from "@/lib/priceVerification";
-import { getApiUser } from "@/lib/apiAuth";
+import { getApiUser, requireAuth } from "@/lib/apiAuth";
 import { generateOrderId } from "@/lib/orderIds";
 import { serverRateLimit } from "@/utils/sanitize";
+import { getDb, type OrderRecord } from "@/lib/db";
+import { sendOrderNotification, getEmailService } from "@/lib/email";
+import { getClientIp } from "@/lib/auth";
 
 interface OrderItem {
   product_id: number;
   quantity: number;
   price: number;
+  name?: string;
+  image?: string;
 }
 
 interface OrderBody {
@@ -18,9 +24,12 @@ interface OrderBody {
     email: string;
     telefono?: string;
     direccion: string;
+    numero?: string;
+    piso?: string;
     ciudad: string;
     cp: string;
     provincia?: string;
+    pais?: string;
   };
   shipping: {
     method: string;
@@ -37,56 +46,36 @@ interface OrderBody {
   clientTotal?: number;
 }
 
-// Max request body size (prevents memory abuse)
-const MAX_BODY_SIZE = 64 * 1024; // 64KB
+const MAX_BODY_SIZE = 64 * 1024;
 
 // POST /api/orders — Create a new order with server-side price verification
 export async function POST(req: NextRequest) {
   try {
-    // ── Rate limiting (10 orders per minute per IP) ──
-    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-      ?? req.headers.get("x-real-ip")
-      ?? "unknown";
+    const ip = getClientIp(req);
     const rl = serverRateLimit(`orders:${ip}`, 10, 60_000);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Demasiadas solicitudes. Espera un momento." },
-        {
-          status: 429,
-          headers: {
-            "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)),
-          },
-        },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } },
       );
     }
 
-    // ── Guard: request body size ──
     const contentLength = req.headers.get("content-length");
     if (contentLength && parseInt(contentLength, 10) > MAX_BODY_SIZE) {
-      return NextResponse.json(
-        { error: "La solicitud es demasiado grande" },
-        { status: 413 },
-      );
+      return NextResponse.json({ error: "La solicitud es demasiado grande" }, { status: 413 });
     }
 
     const body: OrderBody = await req.json();
     const { items, customer, shipping, payment, coupon, pointsDiscount } = body;
 
-    // 1. Basic validation
-    if (!items?.length) {
-      return NextResponse.json({ error: "El carrito está vacío" }, { status: 400 });
-    }
-    if (items.length > 100) {
-      return NextResponse.json({ error: "Demasiados productos en el carrito" }, { status: 400 });
-    }
+    // ── Validation ────────────────────────────────────────────────────────
+    if (!items?.length) return NextResponse.json({ error: "El carrito está vacío" }, { status: 400 });
+    if (items.length > 100) return NextResponse.json({ error: "Demasiados productos" }, { status: 400 });
     if (!customer?.email || !customer?.nombre || !customer?.direccion) {
       return NextResponse.json({ error: "Datos del cliente incompletos" }, { status: 400 });
     }
-    if (!payment?.method) {
-      return NextResponse.json({ error: "Método de pago requerido" }, { status: 400 });
-    }
+    if (!payment?.method) return NextResponse.json({ error: "Método de pago requerido" }, { status: 400 });
 
-    // 1b. Validate each item has sane values (prevent NaN/Infinity injection)
     for (const item of items) {
       if (!Number.isFinite(item.price) || item.price <= 0 || item.price > 99999) {
         return NextResponse.json({ error: "Precio de producto inválido" }, { status: 400 });
@@ -99,40 +88,30 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 1c. Validate discount values are sane
-    if (coupon?.discount !== undefined) {
-      if (!Number.isFinite(coupon.discount) || coupon.discount < 0 || coupon.discount > 99999) {
-        return NextResponse.json({ error: "Descuento de cupón inválido" }, { status: 400 });
-      }
+    if (coupon?.discount !== undefined && (!Number.isFinite(coupon.discount) || coupon.discount < 0)) {
+      return NextResponse.json({ error: "Descuento de cupón inválido" }, { status: 400 });
     }
-    if (pointsDiscount !== undefined) {
-      if (!Number.isFinite(pointsDiscount) || pointsDiscount < 0 || pointsDiscount > 99999) {
-        return NextResponse.json({ error: "Descuento de puntos inválido" }, { status: 400 });
-      }
+    if (pointsDiscount !== undefined && (!Number.isFinite(pointsDiscount) || pointsDiscount < 0)) {
+      return NextResponse.json({ error: "Descuento de puntos inválido" }, { status: 400 });
     }
-
-    // 1d. Validate email format
     if (!/^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/.test(customer.email)) {
       return NextResponse.json({ error: "Email del cliente no válido" }, { status: 400 });
     }
 
-    // 1e. Validate string lengths (prevent storage abuse)
     const MAX_STR = 500;
-    if (customer.nombre.length > MAX_STR || customer.apellidos.length > MAX_STR ||
-        customer.direccion.length > MAX_STR || customer.email.length > 254) {
-      return NextResponse.json({ error: "Datos del cliente demasiado largos" }, { status: 400 });
+    if (customer.nombre.length > MAX_STR || customer.direccion.length > MAX_STR || customer.email.length > 254) {
+      return NextResponse.json({ error: "Datos demasiado largos" }, { status: 400 });
     }
 
-    // 2. Determine user role for pricing
-    const apiUser = getApiUser(req);
+    // ── Price verification ────────────────────────────────────────────────
+    const apiUser = await getApiUser(req);
     const userRole = apiUser?.role ?? "cliente";
 
-    // 3. Server-side price + stock verification
     const verification = verifyOrder(items, shipping?.method ?? "estandar", userRole);
 
     if (!verification.priceResult.valid) {
       return NextResponse.json({
-        error: "Discrepancia de precios detectada. Los precios han podido cambiar.",
+        error: "Discrepancia de precios detectada.",
         discrepancies: verification.priceResult.discrepancies,
       }, { status: 409 });
     }
@@ -144,80 +123,119 @@ export async function POST(req: NextRequest) {
       }, { status: 409 });
     }
 
-    // 4. Calculate final total
+    // ── Calculate final total ─────────────────────────────────────────────
     let subtotal = verification.priceResult.verifiedTotal;
     const shippingCost = verification.shipping;
 
-    // Apply coupon discount
     if (coupon?.discount && coupon.discount > 0) {
       subtotal = Math.max(0, subtotal - coupon.discount);
     }
-
-    // Apply points discount
     if (pointsDiscount && pointsDiscount > 0) {
       subtotal = Math.max(0, subtotal - pointsDiscount);
     }
 
     const total = Math.round((subtotal + shippingCost) * 100) / 100;
-
-    // 5. Generate secure order ID
     const orderId = generateOrderId();
 
-    // 6. Build order object
-    const order = {
+    // ── Build order record ────────────────────────────────────────────────
+    const order: OrderRecord = {
       id: orderId,
-      customer,
-      items: verification.priceResult.items,
-      shipping: { method: shipping.method, cost: shippingCost, tiendaRecogida: shipping.tiendaRecogida },
-      payment: { method: payment.method, status: (payment.method === "transferencia" || payment.method === "tienda") ? "pendiente" : "cobrado" },
-      coupon: coupon ?? null,
-      pointsDiscount: pointsDiscount ?? 0,
+      userId: apiUser?.id,
+      customerEmail: customer.email,
+      customerName: `${customer.nombre} ${customer.apellidos ?? ""}`.trim(),
+      customerPhone: customer.telefono,
+      items: verification.priceResult.items.map((item) => ({
+        productId: item.productId,
+        name: item.name,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      })),
       subtotal: verification.priceResult.verifiedTotal,
       shippingCost,
+      couponCode: coupon?.code,
+      couponDiscount: coupon?.discount ?? 0,
+      pointsDiscount: pointsDiscount ?? 0,
       total,
-      status: "pedido",
+      status: "pendiente",
+      shippingMethod: shipping.method,
+      paymentMethod: payment.method,
+      paymentStatus: (payment.method === "transferencia" || payment.method === "tienda") ? "pendiente" : "pendiente",
+      shippingAddress: {
+        calle: customer.direccion,
+        numero: customer.numero ?? "",
+        piso: customer.piso,
+        cp: customer.cp,
+        ciudad: customer.ciudad,
+        provincia: customer.provincia,
+        pais: customer.pais ?? "ES",
+      },
+      tiendaRecogida: shipping.tiendaRecogida,
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
+    // ── Persist ───────────────────────────────────────────────────────────
     const backendMode = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
+    const db = getDb();
 
     if (backendMode === "server") {
-      // TODO: Persist order to database via getDb().createOrder(order)
-      // TODO: Create invoice via invoiceService
-      // TODO: Send confirmation email via getEmailService()
-      // TODO: Notify admin
-      // TODO: Deduct stock in database
-      // TODO: Award loyalty points
+      await db.createOrder(order);
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://tcgacademy.es";
+
+      // Send confirmation email to customer
+      await sendOrderNotification(orderId, "confirmado", customer.email, {
+        total: total.toFixed(2),
+        customerName: order.customerName,
+        appUrl,
+      });
+
+      // Notify admin
+      const adminEmail = await db.getSetting("notification_email") ?? "admin@tcgacademy.es";
+      const emailService = getEmailService();
+      await emailService.sendTemplatedEmail("admin_nuevo_pedido", adminEmail, {
+        orderId,
+        customerName: order.customerName,
+        customerEmail: customer.email,
+        total: total.toFixed(2),
+        appUrl,
+      });
+
+      // Audit log
+      await db.logAudit({
+        entityType: "order",
+        entityId: orderId,
+        action: "create",
+        performedBy: apiUser?.id,
+        ipAddress: ip,
+      });
     }
 
-    // Return verified order — client persists to localStorage in local mode
-    return NextResponse.json({
-      ok: true,
-      order,
-      verifiedTotal: total,
-    });
-  } catch {
-    return NextResponse.json(
-      { error: "Error al procesar el pedido" },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: true, order, verifiedTotal: total });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Error al procesar el pedido";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
-// GET /api/orders — List orders (admin or user-specific)
+// GET /api/orders — List orders
 export async function GET(req: NextRequest) {
-  const userId = req.nextUrl.searchParams.get("userId");
   const backendMode = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
 
-  if (backendMode === "server") {
-    // TODO: Fetch from database via getDb().getOrders(userId)
-    // TODO: Verify auth token — only return user's orders (or all if admin)
+  if (backendMode !== "server") {
+    return NextResponse.json({
+      ok: true,
+      orders: [],
+      message: "Modo local: pedidos en localStorage.",
+    });
   }
 
-  return NextResponse.json({
-    ok: true,
-    orders: [],
-    userId,
-    message: "Modo local: pedidos en localStorage del navegador.",
-  });
+  const authResult = await requireAuth(req);
+  if (authResult instanceof NextResponse) return authResult;
+
+  const db = getDb();
+  const isAdmin = authResult.role === "admin";
+  const orders = await db.getOrders(isAdmin ? undefined : authResult.id);
+
+  return NextResponse.json({ ok: true, orders });
 }

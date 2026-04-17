@@ -19,6 +19,7 @@ import {
   type ReturnRequest,
   type ReturnStatus,
 } from "@/data/mockData";
+import { AccountTabs } from "@/components/cuenta/AccountTabs";
 
 const STATUS_CONFIG: Record<
   ReturnStatus,
@@ -331,15 +332,11 @@ export default function DevolucionesPage() {
 
   return (
     <div>
+      <AccountTabs group="pedidos" />
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-            <RefreshCw size={22} className="text-[#2563eb]" /> Mis Devoluciones
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Gestiona tus solicitudes de devolución y reembolso
-          </p>
-        </div>
+        <p className="text-sm text-gray-500">
+          Gestiona tus solicitudes de devolución y reembolso
+        </p>
         <button
           onClick={() => setShowForm(true)}
           className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"

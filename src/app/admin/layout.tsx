@@ -18,7 +18,6 @@ import {
   Inbox,
   BarChart2,
   PackagePlus,
-  Tag,
   UserCircle,
   Layers,
   Ticket,
@@ -27,6 +26,8 @@ import {
   Mail,
   Star,
   Settings,
+  Euro,
+  Boxes,
 } from "lucide-react";
 
 const SOLICITUDES_KEY = "tcgacademy_solicitudes";
@@ -56,7 +57,8 @@ const NAV_ITEMS: NavItem[] = [
     label: "Añadir producto",
     icon: PackagePlus,
   },
-  { href: "/admin/preciosystock", label: "Precios y Stock", icon: Tag },
+  { href: "/admin/precios", label: "Precios", icon: Euro },
+  { href: "/admin/stock", label: "Stock", icon: Boxes },
   { href: "/admin/usuarios", label: "Usuarios registrados", icon: Users },
   { href: "/admin/solicitudes", label: "Solicitudes B2B", icon: Inbox },
   { href: "/admin/fiscal/facturas", label: "Facturas", icon: Receipt },

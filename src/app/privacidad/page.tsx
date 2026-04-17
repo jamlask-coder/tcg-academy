@@ -23,7 +23,7 @@ export default function PrivacidadPage() {
             Política de privacidad
           </h1>
           <p className="mb-10 text-sm text-gray-400">
-            Última actualización: enero de 2025
+            Última actualización: abril de 2026
           </p>
 
           <Section title="1. Responsable del tratamiento">
@@ -185,9 +185,17 @@ export default function PrivacidadPage() {
           <Section title="7. Cookies">
             <p>
               Utilizamos exclusivamente cookies técnicas necesarias para el
-              funcionamiento del sitio (sesión, carrito, preferencias de
-              idioma). No utilizamos cookies de análisis ni publicidad de
-              terceros sin su consentimiento previo.
+              funcionamiento del sitio (sesión, carrito, preferencias). No
+              utilizamos cookies de análisis ni publicidad de terceros sin su
+              consentimiento previo e informado.
+            </p>
+            <p>
+              Puede consultar el detalle completo de las cookies utilizadas,
+              sus finalidades y cómo gestionarlas en nuestra{" "}
+              <Link href="/cookies" className="text-[#2563eb] hover:underline">
+                Política de Cookies
+              </Link>
+              .
             </p>
           </Section>
 

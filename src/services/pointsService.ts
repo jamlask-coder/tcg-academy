@@ -1,12 +1,21 @@
 /**
  * Servicio de puntos, check-in diario y programa de asociaciones.
  *
- * Reglas de negocio:
- *   - Comprador: 10 pts por cada €10 gastados (1 pt/€)
- *   - Cada asociado: 5 pts por cada €10 que gaste el comprador (0,5 pt/€)
+ * ⚠️ REGLAS DE NEGOCIO A FUEGO (NO TOCAR SIN AUTORIZACIÓN ADMIN + AVISO FUERTE):
+ *
+ *   GANAR:    100 puntos por cada 1€ de compra PURA
+ *             (solo productos reales; sin envío; sin descuento por puntos)
+ *   CANJEAR:  10.000 puntos = 1€ de descuento  (1 punto = 0,0001€)
+ *   ⇒ Cashback efectivo: 1%
+ *
+ *   Ejemplo de referencia:
+ *     Pedido 104€ = 99€ productos + 4€ envío + 1€ descuento puntos
+ *     ⇒ Base efectiva 99€ → gana 9.900 pts → equivale a 0,99€ próximo pedido
+ *
+ *   Otros:
+ *   - Cada asociado: 5 pts por cada €10 que gaste el comprador (regla heredada)
  *   - Check-in diario: 10 pts gratis
  *   - Registro con código: 100 pts de bienvenida
- *   - 1 punto = €0.01 de descuento
  *   - En caso de devolución se revierten los puntos de comprador y asociados
  *
  * Seguridad (client-side):
@@ -17,16 +26,17 @@
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-export const POINTS_PER_EURO = 1;           // 1 pt por €1 (= 10 pts por €10)
+// ⚠️ CAMBIO ADMIN-ONLY con aviso fuerte — afecta al balance económico global.
+export const POINTS_PER_EURO = 100;          // 100 pts por €1 gastado en productos puros
+export const POINTS_PER_EURO_REDEMPTION = 10000; // 10.000 pts = €1 de descuento
 export const DAILY_CHECKIN_POINTS = 10;
-export const POINTS_PER_100 = 0.1;          // referencia: 1 pt = €0.01
 export const CHECKIN_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 export const POINTS_MAX_DISCOUNT_PCT    = 0.5; // los puntos no pueden descontar más del 50% del subtotal de productos
 export const MAX_ASSOCIATIONS           = 4;   // máximo de asociados en el grupo
-export const REFERRAL_WELCOME_BONUS     = 100; // pts al registrarse con código
-// 50 pts por cada €100 gastados = 5 pts por cada €10 gastados (0.5 pt/€)
-export const REFERRAL_ASSOC_PTS_PER_100 = 50;
+export const REFERRAL_WELCOME_BONUS     = 10000; // pts al registrarse con código (= €1 de bienvenida)
+// Asociados: 0,50€ por cada 100€ del comprador (adaptado a escala 10.000 pts=€1)
+export const REFERRAL_ASSOC_PTS_PER_100 = 5000;
 export const ASSOCIATION_LOCK_MS = 365 * 24 * 60 * 60 * 1000; // bloqueo 1 año
 
 // Storage keys
@@ -203,14 +213,14 @@ export function deductPoints(
 
 // ─── Conversions ──────────────────────────────────────────────────────────────
 
-/** 1 pt = €0.01  →  100 pts = €1.00 */
+/** 10.000 pts = €1.00  →  1 pt = €0.0001 */
 export function pointsToEuros(points: number): number {
-  return Math.floor(points) / 100;
+  return Math.floor(points) / POINTS_PER_EURO_REDEMPTION;
 }
 
-/** €1 = 100 pts */
+/** €1 = 10.000 pts (equivalencia de canje) */
 export function eurosToPoints(euros: number): number {
-  return Math.floor(euros * 100);
+  return Math.floor(euros * POINTS_PER_EURO_REDEMPTION);
 }
 
 export interface RedemptionTier {
@@ -220,15 +230,14 @@ export interface RedemptionTier {
 }
 
 export function buildRedemptionTiers(balance: number): RedemptionTier[] {
+  // 10.000 pts = €1  → tiers en múltiplos redondos
   const ALL_TIERS: RedemptionTier[] = [
-    { points: 10,   euros: 0.1,  label: "€0.10" },
-    { points: 50,   euros: 0.5,  label: "€0.50" },
-    { points: 100,  euros: 1.0,  label: "€1.00" },
-    { points: 200,  euros: 2.0,  label: "€2.00" },
-    { points: 500,  euros: 5.0,  label: "€5.00" },
-    { points: 1000, euros: 10.0, label: "€10.00" },
-    { points: 2000, euros: 20.0, label: "€20.00" },
-    { points: 5000, euros: 50.0, label: "€50.00" },
+    { points: 10000,  euros: 1,   label: "€1" },
+    { points: 25000,  euros: 2.5, label: "€2,50" },
+    { points: 50000,  euros: 5,   label: "€5" },
+    { points: 100000, euros: 10,  label: "€10" },
+    { points: 200000, euros: 20,  label: "€20" },
+    { points: 500000, euros: 50,  label: "€50" },
   ];
   return ALL_TIERS.filter((t) => t.points <= balance);
 }

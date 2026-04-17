@@ -3,6 +3,8 @@
  * Genera HTML listo para imprimir como PDF con window.print().
  */
 
+import { SITE_CONFIG } from "@/config/siteConfig";
+
 export interface InvoiceItem {
   name: string;
   quantity: number;
@@ -107,7 +109,7 @@ export function generateInvoiceHTML(data: InvoiceData): string {
 
   // Per-line calculations
   const lines = items.map((item) => {
-    const vatRate = item.vatRate ?? 21;
+    const vatRate = item.vatRate ?? SITE_CONFIG.vatRate;
     const { base, vatAmount, totalWithVAT, effectiveVAT } = calcBase(
       item.unitPriceWithVAT,
       vatRate,
@@ -118,7 +120,7 @@ export function generateInvoiceHTML(data: InvoiceData): string {
   });
 
   // Shipping VAT
-  const shippingVATRate = intracomunitario ? 0 : 21;
+  const shippingVATRate = intracomunitario ? 0 : SITE_CONFIG.vatRate;
   const shippingBase = shipping / (1 + shippingVATRate / 100);
   const shippingVAT = shipping - shippingBase;
 
@@ -486,7 +488,7 @@ export function buildInvoiceFromOrder(
       name: i.name,
       quantity: i.quantity ?? i.qty ?? 1,
       unitPriceWithVAT: i.price,
-      vatRate: 21,
+      vatRate: SITE_CONFIG.vatRate,
     })),
     shipping: order.shipping ?? 0,
     couponCode: order.coupon?.code,

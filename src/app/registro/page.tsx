@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { checkRateLimit } from "@/utils/sanitize";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_\.]{3,20}$/;
 
@@ -26,6 +27,7 @@ const schema = z
   .object({
     nombre: z.string().min(1, "El nombre es obligatorio").max(100),
     apellidos: z.string().min(1, "Los apellidos son obligatorios").max(100),
+    tratamiento: z.enum(["M", "F", "X"], { error: "Selecciona una opción" }),
     username: z
       .string()
       .min(3, "Mínimo 3 caracteres")
@@ -167,7 +169,9 @@ export default function RegistroPage() {
       name: data.nombre,
       lastName: data.apellidos,
       phone: data.telefono ?? "",
+      gender: data.tratamiento,
       referralCode: data.referralCode?.toUpperCase().trim() || undefined,
+      marketingConsent: data.comunicaciones ?? false,
       address: {
         nombre: data.nombre,
         apellidos: data.apellidos,
@@ -279,6 +283,18 @@ export default function RegistroPage() {
             </p>
           </div>
 
+          {/* Google Sign-In — auto-registers as cliente if env var is set */}
+          <div className="mb-6">
+            <GoogleSignInButton redirectTo="/cuenta" />
+          </div>
+
+          {/* Divider (only visible alongside Google button; harmless otherwise) */}
+          <div className="mb-6 flex items-center gap-4">
+            <div className="h-px flex-1 bg-gray-200" />
+            <span className="text-xs text-gray-400">o regístrate con email</span>
+            <div className="h-px flex-1 bg-gray-200" />
+          </div>
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* Nombre + Apellidos */}
             <div className="grid gap-4 sm:grid-cols-2">
@@ -316,6 +332,42 @@ export default function RegistroPage() {
                   </p>
                 )}
               </div>
+            </div>
+
+            {/* Tratamiento */}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                Tratamiento *
+              </label>
+              <div className="flex gap-3">
+                {([
+                  { value: "M", label: "Sr." },
+                  { value: "F", label: "Sra." },
+                  { value: "X", label: "Prefiero no decirlo" },
+                ] as const).map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex cursor-pointer items-center gap-2 rounded-xl border-2 px-4 py-2.5 text-sm transition select-none ${
+                      watch("tratamiento") === opt.value
+                        ? "border-[#2563eb] bg-blue-50 font-semibold text-[#2563eb]"
+                        : "border-gray-200 text-gray-600 hover:border-gray-300"
+                    }`}
+                  >
+                    <input
+                      {...register("tratamiento")}
+                      type="radio"
+                      value={opt.value}
+                      className="sr-only"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+              {errors.tratamiento && (
+                <p className="mt-1 text-xs text-red-500">
+                  {errors.tratamiento.message}
+                </p>
+              )}
             </div>
 
             {/* Username */}

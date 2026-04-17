@@ -57,7 +57,7 @@ export default function AdminUsuariosPage() {
 
   useEffect(() => {
     refreshUsers();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, []);
 
   const filtered = useMemo(() => {

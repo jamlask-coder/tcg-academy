@@ -107,6 +107,37 @@ function dispatch(): void {
 
 // ─── User lookup ──────────────────────────────────────────────────────────────
 
+/**
+ * Devuelve el rol de un usuario por su ID, o null si no se encuentra.
+ * Los grupos de puntos son **exclusivos de clientes**: mayoristas, tiendas y
+ * admins no pueden formar grupos ni ser invitados a uno.
+ */
+function getUserRoleById(userId: string): User["role"] | null {
+  if (typeof window === "undefined") return null;
+  // Demo users (hardcoded IDs)
+  const DEMO_ROLES: Record<string, User["role"]> = {
+    "demo-cliente": "cliente",
+    "demo-mayorista": "mayorista",
+    "demo-tienda": "tienda",
+    "demo-admin": "admin",
+    "admin-luri": "admin",
+    "admin-font": "admin",
+  };
+  if (DEMO_ROLES[userId]) return DEMO_ROLES[userId];
+  // Registered users
+  try {
+    const registered = JSON.parse(
+      localStorage.getItem(REGISTERED_KEY) ?? "{}",
+    ) as Record<string, { password: string; user: User }>;
+    for (const entry of Object.values(registered)) {
+      if (entry.user.id === userId) return entry.user.role;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 /** Información de display (nombre, iniciales) para un userId */
 export function getUserDisplayInfo(userId: string): UserDisplayInfo {
   if (typeof window === "undefined") return { name: "Usuario", initials: "?" };
@@ -147,6 +178,12 @@ export function findUserByQuery(query: string, currentUserId: string): string | 
   const q = query.trim();
   if (!q) return null;
 
+  // Solo devolvemos usuarios con rol "cliente": los grupos son exclusivos entre clientes.
+  const onlyIfClient = (userId: string | null): string | null => {
+    if (!userId) return null;
+    return getUserRoleById(userId) === "cliente" ? userId : null;
+  };
+
   // 1. Por email (contiene @ en posición > 0)
   if (q.includes("@") && q.indexOf("@") > 0) {
     try {
@@ -154,7 +191,9 @@ export function findUserByQuery(query: string, currentUserId: string): string | 
         localStorage.getItem(REGISTERED_KEY) ?? "{}",
       ) as Record<string, { password: string; user: User }>;
       const entry = registered[q.toLowerCase()];
-      if (entry && entry.user.id !== currentUserId) return entry.user.id;
+      if (entry && entry.user.id !== currentUserId) {
+        return onlyIfClient(entry.user.id);
+      }
     } catch {
       /* ignore */
     }
@@ -173,7 +212,9 @@ export function findUserByQuery(query: string, currentUserId: string): string | 
           localStorage.getItem(REGISTERED_KEY) ?? "{}",
         ) as Record<string, { password: string; user: User }>;
         const entry = registered[email];
-        if (entry && entry.user.id !== currentUserId) return entry.user.id;
+        if (entry && entry.user.id !== currentUserId) {
+          return onlyIfClient(entry.user.id);
+        }
       }
     } catch {
       /* ignore */
@@ -182,7 +223,7 @@ export function findUserByQuery(query: string, currentUserId: string): string | 
 
   // 3. Fallback: código de referido (compatibilidad interna)
   const byCode = getReferrerUserId(q);
-  if (byCode && byCode !== currentUserId) return byCode;
+  if (byCode && byCode !== currentUserId) return onlyIfClient(byCode);
 
   return null;
 }
@@ -197,9 +238,23 @@ export function sendInvitation(
   fromUserId: string,
   query: string,
 ): { ok: boolean; error?: string } {
+  // Los grupos son exclusivos de cuentas "cliente" — bloquear a mayoristas/tiendas/admin
+  const fromRole = getUserRoleById(fromUserId);
+  if (fromRole !== "cliente") {
+    return {
+      ok: false,
+      error: "Los grupos de puntos son solo para cuentas de cliente",
+    };
+  }
+
   const toUserId = findUserByQuery(query, fromUserId);
   if (!toUserId) return { ok: false, error: "Usuario o código no encontrado" };
   if (toUserId === fromUserId) return { ok: false, error: "No puedes invitarte a ti mismo" };
+
+  // findUserByQuery ya filtra por rol cliente, pero re-comprobamos por seguridad
+  if (getUserRoleById(toUserId) !== "cliente") {
+    return { ok: false, error: "Solo puedes invitar a cuentas de cliente" };
+  }
 
   const myAssocs = getAssociations(fromUserId);
   if (myAssocs.some((a) => a.referrerId === toUserId))
@@ -259,6 +314,14 @@ export function acceptInvitation(
   inviteId: string,
   userId: string,
 ): { ok: boolean; error?: string } {
+  // Los grupos son exclusivos de clientes
+  if (getUserRoleById(userId) !== "cliente") {
+    return {
+      ok: false,
+      error: "Los grupos de puntos son solo para cuentas de cliente",
+    };
+  }
+
   const invites = loadInvites();
   const idx = invites.findIndex(
     (i) => i.id === inviteId && i.toUserId === userId && i.status === "pending",
@@ -266,6 +329,13 @@ export function acceptInvitation(
   if (idx === -1) return { ok: false, error: "Invitación no encontrada o ya respondida" };
 
   const invite = invites[idx];
+  // Re-comprobar el rol del que invitó (por si cambió de rol tras enviar la invitación)
+  if (getUserRoleById(invite.fromUserId) !== "cliente") {
+    return {
+      ok: false,
+      error: "La cuenta que envió la invitación ya no es de cliente",
+    };
+  }
 
   // Re-validar slots
   const myAssocs = getAssociations(userId);

@@ -9,6 +9,14 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import {
+  Euro,
+  ShoppingBag,
+  Receipt,
+  Package as PackageIcon,
+  Trophy,
+  Calendar,
+} from "lucide-react";
 import { GAME_CONFIG } from "@/data/products";
 
 interface OrderData {
@@ -43,6 +51,15 @@ function getGameColor(slug: string, fallback: string): string {
   return GAME_CONFIG[slug]?.color ?? fallback;
 }
 
+function getCutoff(period: Period, now: Date): Date {
+  switch (period) {
+    case "1m": return new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+    case "3m": return new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+    case "1y": return new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    default:   return new Date(2000, 0, 1);
+  }
+}
+
 function buildMonthlyData(orders: OrderData[], period: Period): { month: string; gasto: number }[] {
   const now = new Date();
   let monthsBack: number;
@@ -70,19 +87,9 @@ function buildMonthlyData(orders: OrderData[], period: Period): { month: string;
   return buckets.map(({ month, key }) => ({ month, gasto: Math.round(spend[key] * 100) / 100 }));
 }
 
-function buildGameData(orders: OrderData[], period: Period): { game: string; gasto: number }[] {
-  const now = new Date();
-  let cutoff: Date;
-  switch (period) {
-    case "1m": cutoff = new Date(now.getFullYear(), now.getMonth() - 1, 1); break;
-    case "3m": cutoff = new Date(now.getFullYear(), now.getMonth() - 3, 1); break;
-    case "1y": cutoff = new Date(now.getFullYear() - 1, now.getMonth(), 1); break;
-    default: cutoff = new Date(2000, 0, 1); break;
-  }
-
+function buildGameData(orders: OrderData[]): { game: string; gasto: number }[] {
   const gameSpend: Record<string, number> = {};
   for (const order of orders) {
-    if (new Date(order.date) < cutoff) continue;
     for (const item of order.items) {
       if (item.game) {
         gameSpend[item.game] = (gameSpend[item.game] ?? 0) + item.price * item.qty;
@@ -96,30 +103,117 @@ function buildGameData(orders: OrderData[], period: Period): { game: string; gas
     .slice(0, 6);
 }
 
+function formatShortDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+  } catch {
+    return "—";
+  }
+}
+
 export function B2BCharts({ monthlyData, gameData, roleColor, orders }: Props) {
   const [period, setPeriod] = useState<Period>("all");
+  const hasOrders = !!orders && orders.length > 0;
+
+  // Orders filtered by the selected period
+  const filteredOrders = useMemo(() => {
+    if (!orders || orders.length === 0) return [];
+    const cutoff = getCutoff(period, new Date());
+    return orders.filter((o) => new Date(o.date) >= cutoff);
+  }, [orders, period]);
 
   const chartMonthly = useMemo(() => {
-    if (!orders || orders.length === 0) return monthlyData;
-    return buildMonthlyData(orders, period);
-  }, [orders, period, monthlyData]);
+    if (!hasOrders) return monthlyData;
+    return buildMonthlyData(orders ?? [], period);
+  }, [orders, hasOrders, period, monthlyData]);
 
   const chartGame = useMemo(() => {
-    if (!orders || orders.length === 0) return gameData;
-    return buildGameData(orders, period);
-  }, [orders, period, gameData]);
+    if (!hasOrders) return gameData;
+    return buildGameData(filteredOrders);
+  }, [filteredOrders, hasOrders, gameData]);
+
+  // KPIs computed from period-filtered orders
+  const kpis = useMemo(() => {
+    if (!hasOrders) {
+      return {
+        totalSpent: 0,
+        orderCount: 0,
+        avgTicket: 0,
+        totalUnits: 0,
+        topGame: null as null | { slug: string; gasto: number },
+        lastOrderDate: null as null | string,
+      };
+    }
+    const totalSpent = filteredOrders.reduce((s, o) => s + o.total, 0);
+    const orderCount = filteredOrders.length;
+    const avgTicket = orderCount > 0 ? totalSpent / orderCount : 0;
+    const totalUnits = filteredOrders.reduce(
+      (s, o) => s + o.items.reduce((u, it) => u + (it.qty ?? 0), 0),
+      0,
+    );
+    const games = buildGameData(filteredOrders);
+    const topGame = games.length > 0 ? { slug: games[0].game, gasto: games[0].gasto } : null;
+    const lastOrderDate =
+      orderCount > 0
+        ? filteredOrders
+            .slice()
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0].date
+        : null;
+    return { totalSpent, orderCount, avgTicket, totalUnits, topGame, lastOrderDate };
+  }, [filteredOrders, hasOrders]);
 
   const total = chartGame.reduce((s, d) => s + d.gasto, 0);
+
+  const kpiCards = [
+    {
+      label: "Total gastado",
+      value: `${kpis.totalSpent.toFixed(2)} €`,
+      icon: Euro,
+      color: roleColor,
+    },
+    {
+      label: "Nº pedidos",
+      value: String(kpis.orderCount),
+      icon: ShoppingBag,
+      color: "#7c3aed",
+    },
+    {
+      label: "Ticket medio",
+      value: `${kpis.avgTicket.toFixed(2)} €`,
+      icon: Receipt,
+      color: "#0891b2",
+    },
+    {
+      label: "Unidades compradas",
+      value: String(kpis.totalUnits),
+      icon: PackageIcon,
+      color: "#16a34a",
+    },
+    {
+      label: "Juego favorito",
+      value: kpis.topGame ? getGameName(kpis.topGame.slug) : "—",
+      icon: Trophy,
+      color: kpis.topGame ? getGameColor(kpis.topGame.slug, roleColor) : "#f59e0b",
+    },
+    {
+      label: "Último pedido",
+      value: kpis.lastOrderDate ? formatShortDate(kpis.lastOrderDate) : "—",
+      icon: Calendar,
+      color: "#dc2626",
+    },
+  ];
 
   return (
     <div className="space-y-4">
       {/* Period selector */}
-      {orders && orders.length > 0 && (
+      {hasOrders && (
         <div className="flex items-center gap-1 rounded-xl bg-gray-100 p-1">
           {PERIOD_LABELS.map(({ value, label }) => (
             <button
               key={value}
               onClick={() => setPeriod(value)}
+              aria-pressed={period === value}
               className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                 period === value
                   ? "bg-white text-gray-900 shadow-sm"
@@ -128,6 +222,31 @@ export function B2BCharts({ monthlyData, gameData, roleColor, orders }: Props) {
             >
               {label}
             </button>
+          ))}
+        </div>
+      )}
+
+      {/* KPI grid */}
+      {hasOrders && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {kpiCards.map(({ label, value, icon: Icon, color }) => (
+            <div
+              key={label}
+              className="rounded-2xl border border-gray-200 bg-white p-4"
+            >
+              <div
+                className="mb-2 flex h-8 w-8 items-center justify-center rounded-xl"
+                style={{ backgroundColor: `${color}18` }}
+              >
+                <Icon size={16} style={{ color }} />
+              </div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                {label}
+              </p>
+              <p className="mt-0.5 truncate text-lg font-bold text-gray-900">
+                {value}
+              </p>
+            </div>
           ))}
         </div>
       )}
@@ -198,23 +317,15 @@ export function B2BCharts({ monthlyData, gameData, roleColor, orders }: Props) {
 
           {chartGame.length > 0 ? (
             <div className="space-y-3">
-              {chartGame.map((item, i) => {
+              {chartGame.map((item) => {
                 const color = getGameColor(item.game, roleColor);
                 const pct = total > 0 ? (item.gasto / total) * 100 : 0;
                 return (
                   <div key={item.game}>
                     <div className="mb-1.5 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span
-                          className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg text-[10px] font-black text-white"
-                          style={{ backgroundColor: color }}
-                        >
-                          {i + 1}
-                        </span>
-                        <span className="truncate text-sm font-semibold text-gray-800">
-                          {getGameName(item.game)}
-                        </span>
-                      </div>
+                      <span className="truncate text-sm font-semibold text-gray-800 min-w-0">
+                        {getGameName(item.game)}
+                      </span>
                       <div className="flex flex-shrink-0 items-center gap-2 text-xs">
                         <span className="font-bold text-gray-900 tabular-nums">
                           {item.gasto.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€

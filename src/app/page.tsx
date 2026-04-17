@@ -9,6 +9,7 @@ import {
   Zap,
   Building2,
 } from "lucide-react";
+import { SITE_CONFIG } from "@/config/siteConfig";
 
 export default function HomePage() {
   return (
@@ -269,7 +270,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {[
-              [Truck, "Envío gratis", "En pedidos desde 149€", "#3b82f6"],
+              [Truck, "Envío gratis", `En pedidos desde ${SITE_CONFIG.shippingThreshold}€`, "#3b82f6"],
               [Shield, "Compra segura", "Pago 100% protegido", "#16a34a"],
               [
                 Store,

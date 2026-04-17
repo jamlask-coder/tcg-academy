@@ -268,7 +268,7 @@ export default function AdminDashboard() {
                     {lowStockCount} productos sin stock
                   </p>
                   <Link
-                    href="/admin/preciosystock"
+                    href="/admin/stock"
                     className="text-xs text-amber-600 hover:underline"
                   >
                     Revisar →

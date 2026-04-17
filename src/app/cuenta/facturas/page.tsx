@@ -13,6 +13,7 @@ import { MOCK_INVOICES, type Invoice, type InvoiceItem } from "@/data/mockData";
 import { useAuth } from "@/context/AuthContext";
 import { calcVAT } from "@/hooks/usePrice";
 import { printInvoiceWithCSV, type InvoiceData } from "@/utils/invoiceGenerator";
+import { AccountTabs } from "@/components/cuenta/AccountTabs";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -303,12 +304,10 @@ export default function FacturasPage() {
 
   return (
     <div>
+      <AccountTabs group="pedidos" />
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-            <Receipt size={22} className="text-[#2563eb]" /> Mis Facturas
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="text-sm text-gray-500">
             Descarga tus facturas con desglose de IVA
           </p>
         </div>

@@ -1,14 +1,15 @@
 "use client";
 import { useState } from "react";
-import { Star, Settings, TrendingUp, Plus, Check } from "lucide-react";
+import { Star, Settings, TrendingUp, Plus, AlertTriangle } from "lucide-react";
 import { MOCK_USERS, POINTS_REDEMPTION_TABLE } from "@/data/mockData";
+import { POINTS_PER_EURO, POINTS_PER_EURO_REDEMPTION } from "@/services/pointsService";
 
 const TOP_USERS = [...MOCK_USERS]
   .sort((a, b) => b.points - a.points)
   .slice(0, 5);
 
 export default function AdminBonosPage() {
-  const [pointsPerEuro, setPointsPerEuro] = useState(1);
+  const [pointsPerEuro, setPointsPerEuro] = useState(POINTS_PER_EURO);
   const [redeemTable, setRedeemTable] = useState(POINTS_REDEMPTION_TABLE);
   const [addPointsUser, setAddPointsUser] = useState("");
   const [addPointsAmount, setAddPointsAmount] = useState("");
@@ -17,6 +18,29 @@ export default function AdminBonosPage() {
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleSaveRatio = () => {
+    const confirmMsg =
+      `⚠️ ATENCIÓN — CAMBIO DE RATIO DE PUNTOS\n\n` +
+      `Vas a modificar el ratio de ganancia de puntos a ${pointsPerEuro} pts/€.\n\n` +
+      `Esto afecta al BALANCE ECONÓMICO GLOBAL del programa.\n` +
+      `Referencia actual: ${POINTS_PER_EURO} pts ganados / €1 · canje ${POINTS_PER_EURO_REDEMPTION.toLocaleString("es-ES")} pts = €1.\n\n` +
+      `¿Confirmas el cambio?`;
+    if (window.confirm(confirmMsg)) {
+      showToast("Configuración guardada");
+    }
+  };
+
+  const handleSaveTable = () => {
+    const confirmMsg =
+      `⚠️ ATENCIÓN — CAMBIO DE TABLA DE CANJE\n\n` +
+      `Vas a modificar los tramos de canje de puntos.\n\n` +
+      `Esto afecta al VALOR que los clientes obtienen por sus puntos.\n` +
+      `¿Confirmas el cambio?`;
+    if (window.confirm(confirmMsg)) {
+      showToast("Tabla de canje actualizada");
+    }
   };
 
   return (
@@ -38,6 +62,20 @@ export default function AdminBonosPage() {
         </p>
       </div>
 
+      {/* ⚠️ Advertencia crítica sobre cambios de configuración */}
+      <div className="mb-6 flex items-start gap-3 rounded-2xl border-2 border-red-300 bg-red-50 p-4">
+        <AlertTriangle size={22} className="mt-0.5 flex-shrink-0 text-red-600" />
+        <div className="text-sm text-red-800">
+          <p className="font-bold">Zona sensible — cambios con impacto económico global</p>
+          <p className="mt-1">
+            Los ratios de este panel afectan al programa de fidelidad de <strong>toda la tienda</strong>.
+            Cualquier modificación se aplica a clientes actuales y futuros.
+            Regla vigente: <strong>{POINTS_PER_EURO} pts por €1 gastado en productos · {POINTS_PER_EURO_REDEMPTION.toLocaleString("es-ES")} pts = €1 de descuento</strong>.
+            Envío y descuentos por puntos <strong>no generan puntos</strong>.
+          </p>
+        </div>
+      </div>
+
       <div className="mb-6 grid gap-6 lg:grid-cols-2">
         {/* Points ratio */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -48,27 +86,30 @@ export default function AdminBonosPage() {
           <div className="space-y-4">
             <div>
               <label className="mb-2 block text-sm font-semibold text-gray-700">
-                Puntos por cada euro gastado
+                Puntos por cada euro gastado (solo productos)
               </label>
               <div className="flex items-center gap-3">
                 <input
                   type="number"
                   value={pointsPerEuro}
                   min="1"
-                  max="10"
+                  max="1000"
                   onChange={(e) =>
                     setPointsPerEuro(parseInt(e.target.value) || 1)
                   }
-                  className="h-11 w-24 rounded-xl border-2 border-gray-200 px-3 text-center text-xl font-bold focus:border-[#2563eb] focus:outline-none"
+                  className="h-11 w-28 rounded-xl border-2 border-gray-200 px-3 text-center text-xl font-bold focus:border-[#2563eb] focus:outline-none"
                 />
                 <span className="text-sm text-gray-500">puntos / €</span>
               </div>
+              <p className="mt-2 text-xs text-gray-500">
+                Referencia: {POINTS_PER_EURO_REDEMPTION.toLocaleString("es-ES")} pts = €1 de descuento al canjear.
+              </p>
             </div>
             <button
-              onClick={() => showToast("Configuración guardada")}
-              className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[#2563eb] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
+              onClick={handleSaveRatio}
+              className="flex min-h-[44px] items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-red-700"
             >
-              <Check size={15} /> Guardar configuración
+              <AlertTriangle size={15} /> Guardar (con confirmación)
             </button>
           </div>
         </div>
@@ -121,10 +162,10 @@ export default function AdminBonosPage() {
             ))}
           </div>
           <button
-            onClick={() => showToast("Tabla de canje actualizada")}
-            className="mt-4 flex min-h-[44px] items-center gap-2 rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
+            onClick={handleSaveTable}
+            className="mt-4 flex min-h-[44px] items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-700"
           >
-            <Check size={14} /> Guardar tabla
+            <AlertTriangle size={14} /> Guardar tabla (con confirmación)
           </button>
         </div>
       </div>

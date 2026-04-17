@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { CheckCircle, Eye, EyeOff, MapPin, Plus, Pencil, Trash2, Star } from "lucide-react";
+import { CheckCircle, Eye, EyeOff, MapPin, Plus, Pencil, Trash2, Star, AlertCircle } from "lucide-react";
 import type { Address } from "@/types/user";
+import { AccountTabs } from "@/components/cuenta/AccountTabs";
 
 const ADDR_EMPTY: Partial<Address> = {
   label: "Casa",
@@ -18,7 +19,7 @@ const ADDR_EMPTY: Partial<Address> = {
 };
 
 export default function DatosPage() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, changePassword } = useAuth();
   const [form, setForm] = useState({
     name: user?.name ?? "",
     lastName: user?.lastName ?? "",
@@ -31,12 +32,17 @@ export default function DatosPage() {
   });
   const [showPwd, setShowPwd] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdError, setPwdError] = useState("");
+  const [pwdSuccess, setPwdSuccess] = useState(false);
 
   // Address management
   const [addresses, setAddresses] = useState<Address[]>(user?.addresses ?? []);
   const [showAddrForm, setShowAddrForm] = useState(false);
   const [editAddrId, setEditAddrId] = useState<string | null>(null);
   const [addrForm, setAddrForm] = useState<Partial<Address>>(ADDR_EMPTY);
+  const [addrError, setAddrError] = useState("");
+  const [addrSaved, setAddrSaved] = useState(false);
 
   if (!user) return null;
 
@@ -45,36 +51,84 @@ export default function DatosPage() {
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setAddrForm((f) => ({ ...f, [key]: e.target.value }));
 
+  /** Persist addresses to AuthContext + localStorage and sync local state */
+  const persistAddresses = (next: Address[]) => {
+    setAddresses(next);
+    updateProfile({ addresses: next });
+    setAddrSaved(true);
+    setTimeout(() => setAddrSaved(false), 2500);
+  };
+
   const handleSaveAddr = () => {
+    // Validación mínima: campos obligatorios para que la dirección sea usable en checkout
+    const required: Array<keyof Address> = [
+      "nombre",
+      "apellidos",
+      "calle",
+      "numero",
+      "cp",
+      "ciudad",
+      "provincia",
+    ];
+    const missing = required.filter(
+      (k) => !(addrForm[k] as string | undefined)?.toString().trim(),
+    );
+    if (missing.length > 0) {
+      setAddrError("Rellena todos los campos obligatorios");
+      return;
+    }
+    // Validación básica de código postal español (5 dígitos) si país = ES
+    if (
+      (addrForm.pais ?? "ES") === "ES" &&
+      !/^\d{5}$/.test((addrForm.cp ?? "").trim())
+    ) {
+      setAddrError("El código postal debe tener 5 dígitos");
+      return;
+    }
+    setAddrError("");
+
+    let next: Address[];
     if (editAddrId) {
-      setAddresses((prev) =>
-        prev.map((a) => (a.id === editAddrId ? ({ ...a, ...addrForm } as Address) : a)),
+      next = addresses.map((a) =>
+        a.id === editAddrId ? ({ ...a, ...addrForm } as Address) : a,
       );
     } else {
       const newAddr: Address = {
-        id: `addr-${Date.now()}`,
+        id: `addr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         predeterminada: addresses.length === 0,
         ...addrForm,
       } as Address;
-      setAddresses((prev) => [...prev, newAddr]);
+      next = [...addresses, newAddr];
     }
+    persistAddresses(next);
     setShowAddrForm(false);
     setEditAddrId(null);
     setAddrForm(ADDR_EMPTY);
   };
 
-  const handleDeleteAddr = (id: string) =>
-    setAddresses((prev) => prev.filter((a) => a.id !== id));
+  const handleDeleteAddr = (id: string) => {
+    const wasDefault = addresses.find((a) => a.id === id)?.predeterminada;
+    let next = addresses.filter((a) => a.id !== id);
+    // Si eliminamos la predeterminada y quedan otras, la primera pasa a serlo
+    if (wasDefault && next.length > 0) {
+      next = next.map((a, i) => ({ ...a, predeterminada: i === 0 }));
+    }
+    persistAddresses(next);
+  };
 
-  const handleSetDefaultAddr = (id: string) =>
-    setAddresses((prev) =>
-      prev.map((a) => ({ ...a, predeterminada: a.id === id })),
-    );
+  const handleSetDefaultAddr = (id: string) => {
+    const next = addresses.map((a) => ({
+      ...a,
+      predeterminada: a.id === id,
+    }));
+    persistAddresses(next);
+  };
 
   const handleEditAddr = (addr: Address) => {
     setAddrForm(addr);
     setEditAddrId(addr.id);
     setShowAddrForm(true);
+    setAddrError("");
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -86,14 +140,7 @@ export default function DatosPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Mis datos personales
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Actualiza tu perfil y contraseña
-        </p>
-      </div>
+      <AccountTabs group="perfil" />
 
       {/* Profile form */}
       <form
@@ -109,7 +156,9 @@ export default function DatosPage() {
               ["phone", "Teléfono", form.phone],
               ["email", "Email", user.email],
             ] as const
-          ).map(([key, label, value]) => (
+          ).map(([key, label, value]) => {
+            const isLocked = key === "email" || key === "name" || key === "lastName";
+            return (
             <div key={key}>
               <label className="mb-1.5 block text-sm font-semibold text-gray-700">
                 {label}
@@ -118,24 +167,27 @@ export default function DatosPage() {
                 type={key === "email" ? "email" : "text"}
                 value={value}
                 onChange={
-                  key !== "email"
+                  !isLocked
                     ? (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
                     : undefined
                 }
-                readOnly={key === "email"}
+                readOnly={isLocked}
                 className={`h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:outline-none ${
-                  key === "email"
+                  isLocked
                     ? "cursor-not-allowed bg-gray-50 text-gray-400"
                     : "focus:border-[#2563eb]"
                 }`}
               />
-              {key === "email" && (
+              {isLocked && (
                 <p className="mt-1 text-xs text-gray-400">
-                  El email no se puede cambiar
+                  {key === "email"
+                    ? "El email no se puede cambiar"
+                    : "Dato fiscal — contacta con soporte para modificar"}
                 </p>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {saved && (
@@ -153,7 +205,39 @@ export default function DatosPage() {
       </form>
 
       {/* Password form */}
-      <div className="space-y-5 rounded-2xl border border-gray-200 bg-white p-6">
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setPwdError("");
+          setPwdSuccess(false);
+
+          if (pwdForm.next.length < 6) {
+            setPwdError("La nueva contraseña debe tener al menos 6 caracteres");
+            return;
+          }
+          if (pwdForm.next !== pwdForm.confirm) {
+            setPwdError("Las contraseñas no coinciden");
+            return;
+          }
+          if (pwdForm.current === pwdForm.next) {
+            setPwdError("La nueva contraseña debe ser diferente a la actual");
+            return;
+          }
+
+          setPwdLoading(true);
+          const { ok, error } = await changePassword(pwdForm.current, pwdForm.next);
+          setPwdLoading(false);
+
+          if (ok) {
+            setPwdSuccess(true);
+            setPwdForm({ current: "", next: "", confirm: "" });
+            setTimeout(() => setPwdSuccess(false), 4000);
+          } else {
+            setPwdError(error ?? "Error al cambiar la contraseña");
+          }
+        }}
+        className="space-y-5 rounded-2xl border border-gray-200 bg-white p-6"
+      >
         <h2 className="font-bold text-gray-900">Cambiar contraseña</h2>
         <div className="max-w-sm space-y-4">
           {(["current", "next", "confirm"] as const).map((key) => (
@@ -172,14 +256,16 @@ export default function DatosPage() {
                   onChange={(e) =>
                     setPwdForm((f) => ({ ...f, [key]: e.target.value }))
                   }
-                  placeholder="••••••••"
+                  placeholder={key === "next" ? "Mínimo 6 caracteres" : "••••••••"}
+                  maxLength={128}
                   className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 pr-10 text-sm transition focus:border-[#2563eb] focus:outline-none"
                 />
                 {key === "current" && (
                   <button
                     type="button"
                     onClick={() => setShowPwd(!showPwd)}
-                    className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400"
+                    aria-label={showPwd ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
                     {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -188,11 +274,26 @@ export default function DatosPage() {
             </div>
           ))}
         </div>
-        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-600">
-          El cambio de contraseña estará disponible cuando se conecte con el
-          backend de autenticación.
-        </div>
-      </div>
+
+        {pwdError && (
+          <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle size={16} className="shrink-0" /> {pwdError}
+          </div>
+        )}
+        {pwdSuccess && (
+          <div className="flex items-center gap-2 text-sm font-semibold text-green-600">
+            <CheckCircle size={16} /> Contraseña actualizada correctamente
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={pwdLoading}
+          className="rounded-xl bg-[#2563eb] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
+        >
+          {pwdLoading ? "Cambiando..." : "Cambiar contraseña"}
+        </button>
+      </form>
 
       {/* Addresses */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6">
@@ -309,6 +410,11 @@ export default function DatosPage() {
                 );
               })}
             </div>
+            {addrError && (
+              <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <AlertCircle size={16} className="shrink-0" /> {addrError}
+              </div>
+            )}
             <div className="mt-5 flex gap-3">
               <button
                 onClick={handleSaveAddr}
@@ -317,12 +423,22 @@ export default function DatosPage() {
                 Guardar dirección
               </button>
               <button
-                onClick={() => { setShowAddrForm(false); setEditAddrId(null); }}
+                onClick={() => {
+                  setShowAddrForm(false);
+                  setEditAddrId(null);
+                  setAddrError("");
+                }}
                 className="rounded-xl border-2 border-gray-200 px-6 py-2.5 text-sm font-semibold text-gray-600 transition hover:border-gray-300"
               >
                 Cancelar
               </button>
             </div>
+          </div>
+        )}
+
+        {addrSaved && (
+          <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-green-600">
+            <CheckCircle size={16} /> Direcciones actualizadas
           </div>
         )}
       </div>

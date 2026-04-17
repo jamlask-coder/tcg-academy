@@ -204,11 +204,11 @@ export default function AdminMensajesPage() {
   const [bcPreview, setBcPreview] = useState(false);
   const [bcConfirm, setBcConfirm] = useState(false);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+   
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMessages(loadMessages());
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setBroadcasts(loadBroadcasts());
   }, []);
 

@@ -23,7 +23,7 @@ export default function TerminosPage() {
             Términos y condiciones
           </h1>
           <p className="mb-10 text-sm text-gray-400">
-            Última actualización: enero de 2025
+            Última actualización: abril de 2026
           </p>
 
           <Section title="1. Identificación del titular">
@@ -107,6 +107,17 @@ export default function TerminosPage() {
               Los productos deben devolverse en su embalaje original y en
               perfectas condiciones. Los gastos de devolución corren a cargo del
               cliente salvo que el motivo sea un error imputable a TCG Academy.
+            </p>
+            <p>
+              Consulta el proceso completo, formulario de desistimiento y
+              excepciones en nuestra página de{" "}
+              <Link
+                href="/devoluciones"
+                className="text-[#2563eb] hover:underline"
+              >
+                Devoluciones y desistimiento
+              </Link>
+              .
             </p>
           </Section>
 

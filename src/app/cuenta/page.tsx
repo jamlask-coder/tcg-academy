@@ -3,12 +3,9 @@ import Link from "next/link";
 import {
   Package,
   Heart,
-  Building2,
   ChevronRight,
   User,
   TrendingUp,
-  Euro,
-  ShoppingBag,
   Gift,
   Share2,
   Trophy,
@@ -51,6 +48,11 @@ interface B2BStats {
   orderCount: number;
   monthlyData: { month: string; gasto: number }[];
   gameData: { game: string; gasto: number }[];
+  orders: Array<{
+    date: string;
+    total: number;
+    items: { game: string; price: number; qty: number }[];
+  }>;
 }
 
 function buildMonthlyData(orders: Array<{ total: number; date: string }>) {
@@ -533,13 +535,52 @@ export default function CuentaPage() {
     if (!user) return;
     if (user.role !== "mayorista" && user.role !== "tienda") return;
     try {
-      const orders = JSON.parse(
-        localStorage.getItem("tcgacademy_orders") ?? "[]",
-      ) as Array<{
+      const raw = localStorage.getItem("tcgacademy_orders");
+      const stored = raw
+        ? (JSON.parse(raw) as Array<{
+            total: number;
+            date: string;
+            items?: Array<{
+              game?: string;
+              price: number;
+              qty?: number;
+              quantity?: number;
+            }>;
+          }>)
+        : [];
+      // Fallback to MOCK_ORDERS (same source as /cuenta/pedidos) so stats
+      // reflect what the user actually sees in their order history.
+      const raw_orders: Array<{
         total: number;
         date: string;
-        items?: Array<{ game: string; price: number; qty: number }>;
-      }>;
+        items?: Array<{
+          game?: string;
+          price: number;
+          qty?: number;
+          quantity?: number;
+        }>;
+      }> =
+        stored.length > 0
+          ? stored
+          : MOCK_ORDERS.map((o) => ({
+              total: o.total,
+              date: o.date,
+              items: o.items.map((it) => ({
+                game: it.game,
+                price: it.price,
+                qty: it.qty,
+              })),
+            }));
+      // Normalize items: real checkout orders use `quantity`, mock uses `qty`.
+      const orders = raw_orders.map((o) => ({
+        total: o.total,
+        date: o.date,
+        items: (o.items ?? []).map((it) => ({
+          game: it.game ?? "otros",
+          price: it.price,
+          qty: it.qty ?? it.quantity ?? 1,
+        })),
+      }));
       const total = orders.reduce((s, o) => s + o.total, 0);
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setB2bStats({
@@ -547,6 +588,7 @@ export default function CuentaPage() {
         orderCount: orders.length,
         monthlyData: buildMonthlyData(orders),
         gameData: buildGameData(orders),
+        orders,
       });
     } catch {}
   }, [user]);
@@ -586,13 +628,17 @@ export default function CuentaPage() {
       desc: "Puntos acumulados",
       color: "#f59e0b",
     },
-    {
-      href: "/cuenta/grupo",
-      label: "Mi grupo",
-      icon: Share2,
-      desc: "Comprad juntos y todos ganáis puntos",
-      color: "#0891b2",
-    },
+    ...(!isB2B
+      ? [
+          {
+            href: "/cuenta/grupo",
+            label: "Mi grupo",
+            icon: Share2,
+            desc: "Comprad juntos y todos ganáis puntos",
+            color: "#0891b2",
+          },
+        ]
+      : []),
     {
       href: "/cuenta/cupones",
       label: "Cupones y descuentos",
@@ -622,13 +668,6 @@ export default function CuentaPage() {
             icon: Receipt,
             desc: "Descarga tus facturas",
             color: "#0f766e",
-          },
-          {
-            href: "/cuenta/empresa",
-            label: "Datos de empresa",
-            icon: Building2,
-            desc: "Datos fiscales",
-            color: "#374151",
           },
         ]
       : []),
@@ -724,47 +763,14 @@ export default function CuentaPage() {
             Estadísticas de compra
           </h2>
 
-          {/* KPI cards */}
-          <div className="mb-6 grid grid-cols-2 gap-4">
-            {[
-              {
-                label: "Total gastado",
-                value: `${(b2bStats?.totalSpent ?? 0).toFixed(2)} €`,
-                icon: Euro,
-                color: "#2563eb",
-              },
-              {
-                label: "Nº pedidos",
-                value: String(b2bStats?.orderCount ?? 0),
-                icon: ShoppingBag,
-                color: "#7c3aed",
-              },
-            ].map(({ label, value, icon: Icon, color }) => (
-              <div
-                key={label}
-                className="rounded-2xl border border-gray-200 bg-white p-5"
-              >
-                <div
-                  className="mb-3 flex h-8 w-8 items-center justify-center rounded-xl"
-                  style={{ backgroundColor: `${color}18` }}
-                >
-                  <Icon size={16} style={{ color }} />
-                </div>
-                <p className="mb-1 text-xs font-semibold tracking-wide text-gray-500 uppercase">
-                  {label}
-                </p>
-                <p className="text-xl font-bold text-gray-900">{value}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Charts */}
+          {/* Interactive stats + charts (KPIs live inside and respond to the period selector) */}
           <B2BCharts
             monthlyData={
               b2bStats?.monthlyData ??
               MONTH_LABELS.map((m) => ({ month: m, gasto: 0 }))
             }
             gameData={b2bStats?.gameData ?? []}
+            orders={b2bStats?.orders}
             roleColor={roleColor}
           />
         </div>

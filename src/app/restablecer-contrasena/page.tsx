@@ -14,6 +14,16 @@ interface ResetToken {
   expiresAt: number;
 }
 
+/** Demo users that can be "migrated" to registered on password reset */
+const DEMO_USERS: Record<string, { id: string; name: string; lastName: string; phone: string; role: string }> = {
+  "cliente@test.com": { id: "demo-cliente", name: "Maria", lastName: "Garcia", phone: "+34 666 111 111", role: "cliente" },
+  "mayorista@test.com": { id: "demo-mayorista", name: "Carlos", lastName: "Lopez", phone: "+34 666 222 222", role: "mayorista" },
+  "tienda@test.com": { id: "demo-tienda", name: "Ana", lastName: "Martinez", phone: "+34 666 333 333", role: "tienda" },
+  "admin@tcgacademy.es": { id: "demo-admin", name: "Admin", lastName: "TCG", phone: "+34 666 000 000", role: "admin" },
+  "luri@tcgacademy.es": { id: "admin-luri", name: "Luri", lastName: "", phone: "+34 666 000 001", role: "admin" },
+  "font@tcgacademy.es": { id: "admin-font", name: "Font", lastName: "", phone: "+34 666 000 002", role: "admin" },
+};
+
 function ResetForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -68,14 +78,34 @@ function ResetForm() {
         localStorage.getItem(REGISTERED_KEY) ?? "{}",
       ) as Record<string, { password: string; user: User }>;
 
-      if (!registered[email]) {
+      const hashed = await hashPassword(password);
+
+      if (registered[email]) {
+        // Normal registered user — update password
+        registered[email].password = hashed;
+      } else if (DEMO_USERS[email]) {
+        // Demo user — migrate to registered with new password
+        const demo = DEMO_USERS[email];
+        registered[email] = {
+          password: hashed,
+          user: {
+            id: demo.id,
+            email,
+            name: demo.name,
+            lastName: demo.lastName,
+            phone: demo.phone,
+            role: demo.role as User["role"],
+            addresses: [],
+            favorites: [],
+            createdAt: new Date().toISOString(),
+          },
+        };
+      } else {
         setError("No se encontró la cuenta asociada a este email");
         setLoading(false);
         return;
       }
 
-      const hashed = await hashPassword(password);
-      registered[email].password = hashed;
       localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered));
 
       // Remove the used token

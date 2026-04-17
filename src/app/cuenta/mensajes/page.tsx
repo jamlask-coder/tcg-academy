@@ -1,12 +1,36 @@
 "use client";
 import { useState, useEffect } from "react";
-import { MessageSquare, Send, Inbox, Check, Megaphone } from "lucide-react";
+import {
+  MessageSquare,
+  Send,
+  Inbox,
+  CheckCircle,
+  Megaphone,
+  Plus,
+  X,
+} from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
   MOCK_MESSAGES,
   MSG_STORAGE_KEY,
   type AppMessage,
 } from "@/data/mockData";
+
+/**
+ * Asuntos predefinidos para mensajes B2B (mayoristas y tiendas).
+ * Forzamos un asunto concreto para que el admin pueda clasificar y priorizar.
+ */
+const B2B_SUBJECTS = [
+  "Problema técnico",
+  "Consulta sobre pedido",
+  "Consulta de stock / disponibilidad",
+  "Facturación",
+  "Devolución",
+  "Precios / condiciones comerciales",
+  "Sugerencia",
+  "Reclamación",
+  "Otros",
+] as const;
 
 function fmtDate(iso: string) {
   try {
@@ -58,6 +82,10 @@ export default function MensajesPage() {
   const [selected, setSelected] = useState<AppMessage | null>(null);
   const [replyBody, setReplyBody] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeSubject, setComposeSubject] =
+    useState<(typeof B2B_SUBJECTS)[number] | "">("");
+  const [composeBody, setComposeBody] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -66,6 +94,33 @@ export default function MensajesPage() {
   }, [user]);
 
   if (!user) return null;
+
+  const isB2B = user.role === "mayorista" || user.role === "tienda";
+  if (!isB2B) {
+    return (
+      <div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Mis mensajes</h1>
+        </div>
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center">
+          <MessageSquare size={40} className="mx-auto mb-3 text-amber-400" />
+          <p className="font-semibold text-amber-700">
+            La sección de mensajes es exclusiva para mayoristas y tiendas.
+          </p>
+          <p className="mt-1 text-sm text-amber-600">
+            Si necesitas ayuda, escríbenos a{" "}
+            <a
+              href="mailto:hola@tcgacademy.es"
+              className="font-semibold underline"
+            >
+              hola@tcgacademy.es
+            </a>
+            .
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const unread = messages.filter(
     (m) => m.toUserId === user.id && !m.read,
@@ -86,6 +141,28 @@ export default function MensajesPage() {
       setMessages(updated);
       saveMessages(updated);
     }
+  };
+
+  const handleCompose = () => {
+    if (!composeSubject || !composeBody.trim()) return;
+    const newMsg: AppMessage = {
+      id: `msg-${Date.now()}`,
+      fromUserId: user.id,
+      toUserId: "admin",
+      fromName: `${user.name} ${user.lastName}`.trim() || user.email,
+      toName: "TCG Academy",
+      subject: `[${composeSubject}] — ${user.empresa?.razonSocial ?? user.name}`,
+      body: composeBody,
+      date: new Date().toISOString(),
+      read: false,
+    };
+    const updated = [newMsg, ...messages];
+    setMessages(updated);
+    saveMessages(updated);
+    setComposeSubject("");
+    setComposeBody("");
+    setComposeOpen(false);
+    showToast("Mensaje enviado a TCG Academy");
   };
 
   const handleReply = () => {
@@ -114,19 +191,100 @@ export default function MensajesPage() {
   return (
     <div>
       {toast && (
-        <div className="fixed right-6 bottom-6 z-50 flex items-center gap-2 rounded-2xl bg-[#2563eb] px-5 py-3 text-sm font-medium text-white shadow-xl">
-          <Check size={14} className="text-green-300" /> {toast}
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed right-6 bottom-6 z-50 flex items-center gap-2.5 rounded-2xl border border-green-200 bg-green-50 px-5 py-3 text-sm font-semibold text-green-700 shadow-xl"
+        >
+          <CheckCircle size={18} className="text-green-600" />
+          {toast}
         </div>
       )}
 
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Mis mensajes</h1>
         {unread > 0 && (
           <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
             {unread} nuevo{unread !== 1 ? "s" : ""}
           </span>
         )}
+        <button
+          onClick={() => setComposeOpen((v) => !v)}
+          className="ml-auto flex items-center gap-1.5 rounded-xl bg-[#2563eb] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
+        >
+          {composeOpen ? <X size={14} /> : <Plus size={14} />}
+          {composeOpen ? "Cancelar" : "Nuevo mensaje"}
+        </button>
       </div>
+
+      {composeOpen && (
+        <div className="mb-6 space-y-4 rounded-2xl border border-gray-200 bg-white p-5">
+          <div>
+            <label
+              htmlFor="compose-subject"
+              className="mb-1.5 block text-sm font-semibold text-gray-700"
+            >
+              Asunto *
+            </label>
+            <select
+              id="compose-subject"
+              value={composeSubject}
+              onChange={(e) =>
+                setComposeSubject(
+                  e.target.value as (typeof B2B_SUBJECTS)[number],
+                )
+              }
+              className="h-11 w-full rounded-xl border-2 border-gray-200 px-3 text-sm focus:border-[#2563eb] focus:outline-none"
+            >
+              <option value="">Selecciona un asunto…</option>
+              {B2B_SUBJECTS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label
+              htmlFor="compose-body"
+              className="mb-1.5 block text-sm font-semibold text-gray-700"
+            >
+              Mensaje *
+            </label>
+            <textarea
+              id="compose-body"
+              value={composeBody}
+              onChange={(e) => setComposeBody(e.target.value)}
+              rows={6}
+              maxLength={2000}
+              placeholder="Cuéntanos tu duda, sugerencia o problema con el máximo detalle posible…"
+              className="w-full resize-none rounded-xl border-2 border-gray-200 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none"
+            />
+            <p className="mt-1 text-right text-[11px] text-gray-400">
+              {composeBody.length} / 2000
+            </p>
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={() => {
+                setComposeOpen(false);
+                setComposeSubject("");
+                setComposeBody("");
+              }}
+              className="rounded-xl border-2 border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleCompose}
+              disabled={!composeSubject || !composeBody.trim()}
+              className="flex items-center gap-1.5 rounded-xl bg-[#2563eb] px-4 py-2 text-sm font-bold text-white hover:bg-[#1d4ed8] disabled:opacity-50"
+            >
+              <Send size={14} /> Enviar
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid min-h-[400px] gap-4 lg:grid-cols-[280px_1fr]">
         {/* List */}

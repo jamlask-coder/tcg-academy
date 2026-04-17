@@ -51,6 +51,7 @@ import { exportAnomaliesCSV } from "@/lib/anomalyDetection";
 import { exportDLQcsv } from "@/lib/circuitBreaker";
 import {
   generateInvoiceHTML,
+  printInvoice,
   type InvoiceData,
 } from "@/utils/invoiceGenerator";
 
@@ -384,7 +385,6 @@ function recordToData(inv: InvoiceRecord): InvoiceData {
 
 /** Print a single invoice as PDF */
 export function printSingleInvoicePDF(inv: InvoiceRecord): void {
-  const { printInvoice } = require("@/utils/invoiceGenerator");
   printInvoice(recordToData(inv));
 }
 

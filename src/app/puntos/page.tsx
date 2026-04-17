@@ -10,7 +10,7 @@ const STEPS = [
   {
     icon: ShoppingCart,
     title: "Compra",
-    desc: "Gana 1 punto por cada céntimo que gastes. Una compra de 40€ = 4.000 puntos.",
+    desc: "Gana 100 puntos por cada euro en productos. Una compra de 100€ = 10.000 puntos = 1€ de descuento.",
   },
   {
     icon: Star,
@@ -24,11 +24,14 @@ const STEPS = [
   },
 ];
 
+// Escala: 10.000 pts = €1 (canje estándar). Los tramos superiores mantienen la
+// misma equivalencia directa — los incentivos extra van en tramos grandes
+// (envío gratis a partir de 100.000 pts).
 const TIERS = [
-  { points: "5.000", reward: "Cupón de 2€", color: "bg-gray-100 text-gray-700" },
-  { points: "15.000", reward: "Cupón de 7€", color: "bg-amber-50 text-amber-700" },
-  { points: "30.000", reward: "Cupón de 15€", color: "bg-amber-100 text-amber-800" },
-  { points: "60.000", reward: "Cupón de 35€ + envío gratis", color: "bg-amber-200 text-amber-900" },
+  { points: "10.000", reward: "Cupón de 1€", color: "bg-gray-100 text-gray-700" },
+  { points: "25.000", reward: "Cupón de 2,50€", color: "bg-amber-50 text-amber-700" },
+  { points: "50.000", reward: "Cupón de 5€", color: "bg-amber-100 text-amber-800" },
+  { points: "100.000", reward: "Cupón de 10€ + envío gratis", color: "bg-amber-200 text-amber-900" },
 ];
 
 export default function PuntosPage() {

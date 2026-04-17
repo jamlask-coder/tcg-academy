@@ -21,16 +21,11 @@
  *   - PGC (Plan General Contable) — Para Balance y Cuenta de Resultados
  */
 
-import type {
-  InvoiceRecord,
-  InvoiceLineItem,
-  TaxBreakdown,
-} from "@/types/fiscal";
+import type { InvoiceRecord } from "@/types/fiscal";
 import { InvoiceStatus, InvoiceType } from "@/types/fiscal";
 import type { Quarter } from "@/types/tax";
 import {
   calculateVAT,
-  calculateTaxBreakdown,
   filterByPeriod,
   getTaxPeriod,
   generateQuarterlyReport,

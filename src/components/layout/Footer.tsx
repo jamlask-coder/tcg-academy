@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Container } from "@/components/ui/Container";
+import { CookieSettingsButton } from "@/components/legal/CookieConsent";
 
 // ─── Social icons (official brand SVGs, monochrome white) ─────────────────────
 
@@ -56,10 +57,12 @@ const LINKS: [string, string][] = [
 ];
 
 const LEGAL: [string, string][] = [
-  ["Envíos y plazos", "/contacto"],
+  ["Aviso legal", "/aviso-legal"],
   ["Política de privacidad", "/privacidad"],
+  ["Política de cookies", "/cookies"],
   ["Términos y condiciones", "/terminos"],
-  ["Cookies", "/privacidad"],
+  ["Devoluciones y desistimiento", "/devoluciones"],
+  ["Reclamaciones", "/reclamaciones"],
 ];
 
 function FooterLink({
@@ -169,6 +172,9 @@ export function Footer() {
                     {label}
                   </FooterLink>
                 ))}
+                <li>
+                  <CookieSettingsButton />
+                </li>
               </ul>
             </div>
           </div>

@@ -1,9 +1,11 @@
 /**
  * Email service abstraction with adapter pattern.
  *
- * Local mode: stores sent emails in localStorage (mirrors emailService.ts).
- * Server mode: stub for Resend API integration.
+ * Local mode: stores sent emails in localStorage.
+ * Server mode: sends real emails via Resend API.
  */
+
+import { SITE_CONFIG } from "@/config/siteConfig";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -60,7 +62,7 @@ function logToLocalStorage(entry: SentEmailEntry): void {
     emails.unshift(entry);
     localStorage.setItem(SENT_EMAILS_KEY, JSON.stringify(emails.slice(0, MAX_LOG)));
   } catch {
-    // Storage full or unavailable — silently skip
+    // Storage full or unavailable
   }
 }
 
@@ -69,13 +71,7 @@ function logToLocalStorage(entry: SentEmailEntry): void {
 export class LocalEmailAdapter implements EmailAdapter {
   async sendEmail(to: string, subject: string, html: string): Promise<SendResult> {
     const emailId = generateEmailId();
-    logToLocalStorage({
-      id: emailId,
-      to,
-      subject,
-      html,
-      sentAt: new Date().toISOString(),
-    });
+    logToLocalStorage({ id: emailId, to, subject, html, sentAt: new Date().toISOString() });
     return { ok: true, emailId };
   }
 
@@ -84,48 +80,59 @@ export class LocalEmailAdapter implements EmailAdapter {
     to: string,
     vars: TemplatedEmailVars,
   ): Promise<SendResult> {
+    const template = EMAIL_TEMPLATES[templateId];
+    if (template) {
+      const subject = replaceVars(template.subject, vars);
+      const html = replaceVars(template.html, vars);
+      return this.sendEmail(to, subject, html);
+    }
     const subject = `[Template: ${templateId}] Email to ${to}`;
     const html = `<p>Template: ${templateId}</p><pre>${JSON.stringify(vars, null, 2)}</pre>`;
     return this.sendEmail(to, subject, html);
   }
 }
 
-// ─── Resend adapter (stub) ──────────────────────────────────────────────────
+// ─── Resend adapter (production) ────────────────────────────────────────────
 
 export class ResendEmailAdapter implements EmailAdapter {
+  private apiKey: string;
+  private fromEmail: string;
+
+  constructor() {
+    this.apiKey = process.env.RESEND_API_KEY ?? "";
+    this.fromEmail = process.env.RESEND_FROM_EMAIL ?? "hola@tcgacademy.es";
+  }
+
   async sendEmail(to: string, subject: string, html: string): Promise<SendResult> {
-    // TODO: Implement with Resend API
-    //
-    // const res = await fetch("https://api.resend.com/emails", {
-    //   method: "POST",
-    //   headers: {
-    //     "Content-Type": "application/json",
-    //     Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-    //   },
-    //   body: JSON.stringify({
-    //     from: process.env.RESEND_FROM_EMAIL,
-    //     to,
-    //     subject,
-    //     html,
-    //   }),
-    // });
-    //
-    // if (!res.ok) {
-    //   return { ok: false, emailId: "" };
-    // }
-    //
-    // const data = (await res.json()) as { id: string };
-    // return { ok: true, emailId: data.id };
-
-    void to;
-    void subject;
-    void html;
-
-    if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
-      // eslint-disable-next-line no-console
-      console.warn("[ResendEmailAdapter] Resend not configured — email not sent");
+    if (!this.apiKey) {
+      return { ok: false, emailId: "" };
     }
-    return { ok: false, emailId: "" };
+
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          from: `TCG Academy <${this.fromEmail}>`,
+          to: [to],
+          subject,
+          html,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorBody = await res.text();
+        throw new Error(`Resend API error ${res.status}: ${errorBody}`);
+      }
+
+      const data = (await res.json()) as { id: string };
+      return { ok: true, emailId: data.id };
+    } catch {
+      return { ok: false, emailId: "" };
+    }
   }
 
   async sendTemplatedEmail(
@@ -133,40 +140,128 @@ export class ResendEmailAdapter implements EmailAdapter {
     to: string,
     vars: TemplatedEmailVars,
   ): Promise<SendResult> {
-    // TODO: Implement with Resend templates or render server-side
-    //
-    // Option A: Use Resend's built-in templates
-    // const res = await fetch("https://api.resend.com/emails", {
-    //   method: "POST",
-    //   headers: {
-    //     "Content-Type": "application/json",
-    //     Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-    //   },
-    //   body: JSON.stringify({
-    //     from: process.env.RESEND_FROM_EMAIL,
-    //     to,
-    //     template_id: templateId,
-    //     data: vars,
-    //   }),
-    // });
-    //
-    // Option B: Render template locally and send as HTML
-    // import { renderEmailTemplate } from "@/services/emailService";
-    // const rendered = renderEmailTemplate(templateId, vars);
-    // if (!rendered) return { ok: false, emailId: "" };
-    // return this.sendEmail(to, rendered.subject, rendered.html);
-
-    void templateId;
-    void to;
-    void vars;
-
-    if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
-      // eslint-disable-next-line no-console
-      console.warn("[ResendEmailAdapter] Resend not configured — templated email not sent");
+    const template = EMAIL_TEMPLATES[templateId];
+    if (!template) {
+      return { ok: false, emailId: "" };
     }
-    return { ok: false, emailId: "" };
+    const subject = replaceVars(template.subject, vars);
+    const html = replaceVars(template.html, vars);
+    return this.sendEmail(to, subject, html);
   }
 }
+
+// ─── Email Templates ────────────────────────────────────────────────────────
+
+function replaceVars(text: string, vars: TemplatedEmailVars): string {
+  return text.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "");
+}
+
+const BRAND_HEADER = `
+  <div style="background:#1e40af;padding:20px 24px;text-align:center">
+    <span style="color:white;font-size:22px;font-weight:900;letter-spacing:0.5px">TCG <span style="color:#fbbf24">Academy</span></span>
+  </div>
+`;
+
+const BRAND_FOOTER = `
+  <div style="padding:20px 24px;text-align:center;color:#999;font-size:11px;border-top:1px solid #eee">
+    <p>TCG Academy S.L. — La mejor tienda TCG de España</p>
+    <p>Si no deseas recibir estos emails, puedes gestionar tus preferencias desde tu cuenta.</p>
+  </div>
+`;
+
+function wrap(content: string): string {
+  return `
+  <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+    ${BRAND_HEADER}
+    <div style="padding:24px">${content}</div>
+    ${BRAND_FOOTER}
+  </div>`;
+}
+
+const EMAIL_TEMPLATES: Record<string, { subject: string; html: string }> = {
+  bienvenida: {
+    subject: "¡Bienvenido a TCG Academy, {{nombre}}!",
+    html: wrap(`
+      <h2 style="color:#1e40af;margin:0 0 12px">¡Hola {{nombre}}!</h2>
+      <p>Tu cuenta en TCG Academy ha sido creada correctamente.</p>
+      <p>Ya puedes explorar nuestra tienda con más de 10.000 productos TCG, acumular puntos y disfrutar de envío gratis en pedidos superiores a ${SITE_CONFIG.shippingThreshold}€.</p>
+      <a href="{{appUrl}}/catalogo" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0">
+        Explorar catálogo
+      </a>
+    `),
+  },
+  pedido_confirmado: {
+    subject: "Pedido {{orderId}} confirmado — TCG Academy",
+    html: wrap(`
+      <h2 style="color:#1e40af;margin:0 0 12px">¡Pedido confirmado!</h2>
+      <p>Hemos recibido tu pedido <strong>{{orderId}}</strong> correctamente.</p>
+      <p>Total: <strong>{{total}}€</strong></p>
+      <p>Te enviaremos un email cuando tu pedido sea enviado.</p>
+      <a href="{{appUrl}}/cuenta/pedidos" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0">
+        Ver mis pedidos
+      </a>
+    `),
+  },
+  pedido_enviado: {
+    subject: "Tu pedido {{orderId}} ha sido enviado",
+    html: wrap(`
+      <h2 style="color:#16a34a;margin:0 0 12px">¡Pedido enviado!</h2>
+      <p>Tu pedido <strong>{{orderId}}</strong> está de camino.</p>
+      <p>Seguimiento: <strong>{{tracking}}</strong></p>
+      <a href="{{trackingUrl}}" style="display:inline-block;background:#16a34a;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0">
+        Seguir envío
+      </a>
+    `),
+  },
+  pedido_entregado: {
+    subject: "Tu pedido {{orderId}} ha sido entregado",
+    html: wrap(`
+      <h2 style="color:#16a34a;margin:0 0 12px">¡Pedido entregado!</h2>
+      <p>Tu pedido <strong>{{orderId}}</strong> ha sido entregado correctamente.</p>
+      <p>¡Gracias por confiar en TCG Academy!</p>
+    `),
+  },
+  pedido_cancelado: {
+    subject: "Pedido {{orderId}} cancelado — TCG Academy",
+    html: wrap(`
+      <h2 style="color:#dc2626;margin:0 0 12px">Pedido cancelado</h2>
+      <p>Tu pedido <strong>{{orderId}}</strong> ha sido cancelado.</p>
+      <p>Si tienes alguna duda, no dudes en contactarnos.</p>
+    `),
+  },
+  recuperar_contrasena: {
+    subject: "Restablece tu contraseña — TCG Academy",
+    html: wrap(`
+      <h2 style="color:#1e40af;margin:0 0 12px">Restablecer contraseña</h2>
+      <p>Has solicitado restablecer tu contraseña.</p>
+      <p>Haz clic en el siguiente enlace (válido durante 1 hora):</p>
+      <a href="{{resetLink}}" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0">
+        Restablecer contraseña
+      </a>
+      <p style="color:#666;font-size:13px">Si no has solicitado este cambio, ignora este email.</p>
+    `),
+  },
+  devolucion_aceptada: {
+    subject: "Devolución {{rmaNumber}} aceptada — TCG Academy",
+    html: wrap(`
+      <h2 style="color:#f59e0b;margin:0 0 12px">Devolución aceptada</h2>
+      <p>Tu solicitud de devolución <strong>{{rmaNumber}}</strong> ha sido aceptada.</p>
+      <p>Por favor, envía los productos a la dirección indicada. Una vez recibidos, procesaremos el reembolso.</p>
+    `),
+  },
+  admin_nuevo_pedido: {
+    subject: "[Admin] Nuevo pedido {{orderId}}",
+    html: wrap(`
+      <h2 style="color:#1e40af;margin:0 0 12px">Nuevo pedido recibido</h2>
+      <p>Pedido: <strong>{{orderId}}</strong></p>
+      <p>Cliente: {{customerName}} ({{customerEmail}})</p>
+      <p>Total: <strong>{{total}}€</strong></p>
+      <a href="{{appUrl}}/admin/pedidos" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0">
+        Ver en admin
+      </a>
+    `),
+  },
+};
 
 // ─── Factory ────────────────────────────────────────────────────────────────
 
@@ -174,7 +269,6 @@ let _instance: EmailAdapter | null = null;
 
 export function getEmailService(): EmailAdapter {
   if (_instance) return _instance;
-
   const mode = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
   _instance = mode === "server" ? new ResendEmailAdapter() : new LocalEmailAdapter();
   return _instance;
@@ -184,7 +278,7 @@ export function getEmailService(): EmailAdapter {
 
 const ORDER_TEMPLATE_MAP: Record<string, string> = {
   confirmado: "pedido_confirmado",
-  procesando: "pedido_procesando",
+  procesando: "pedido_confirmado",
   enviado: "pedido_enviado",
   entregado: "pedido_entregado",
   cancelado: "pedido_cancelado",
@@ -198,16 +292,9 @@ export async function sendOrderNotification(
 ): Promise<SendResult> {
   const service = getEmailService();
   const templateId = ORDER_TEMPLATE_MAP[status];
+  if (!templateId) return { ok: false, emailId: "" };
 
-  if (!templateId) {
-    return { ok: false, emailId: "" };
-  }
-
-  const enrichedVars: TemplatedEmailVars = {
-    ...vars,
-    orderId,
-    status,
-  };
-
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const enrichedVars: TemplatedEmailVars = { ...vars, orderId, status, appUrl };
   return service.sendTemplatedEmail(templateId, customerEmail, enrichedVars);
 }

@@ -12,7 +12,12 @@
       "WebFetch(domain:api.pokemontcg.io)",
       "WebFetch(domain:www.cardmarket.com)",
       "WebFetch(domain:en.digimoncard.com)",
-      "WebFetch(domain:www.paniniamerica.net)"
+      "WebFetch(domain:www.paniniamerica.net)",
+      "WebFetch(domain:tcgacademy.es)",
+      "WebFetch(domain:api.tcgdex.net)",
+      "WebFetch(domain:assets.tcgdex.net)",
+      "WebFetch(domain:www.pricecharting.com)",
+      "WebFetch(domain:localhost)"
     ]
   }
 }

@@ -350,7 +350,34 @@ export function deleteUserData(
     deleted.push("Notificaciones eliminadas");
   }
 
-  // 8. Log the deletion in audit trail
+  // 8. Delete consent records
+  const CONSENTS_KEY = "tcgacademy_consents";
+  const consents = safeGetJSON<Array<Record<string, unknown>>>(CONSENTS_KEY, []);
+  const filteredConsents = consents.filter((c) => c.userId !== userId);
+  if (filteredConsents.length < consents.length) {
+    safeSetJSON(CONSENTS_KEY, filteredConsents);
+    deleted.push("Registros de consentimiento eliminados");
+  }
+
+  // 9. Delete communication preferences
+  const PREFS_KEY = "tcgacademy_comm_preferences";
+  const prefs = safeGetJSON<Record<string, unknown>>(PREFS_KEY, {});
+  if (prefs[userId]) {
+    delete prefs[userId];
+    safeSetJSON(PREFS_KEY, prefs);
+    deleted.push("Preferencias de comunicación eliminadas");
+  }
+
+  // 10. Delete reset tokens
+  const TOKENS_KEY = "tcgacademy_reset_tokens";
+  const tokens = safeGetJSON<Record<string, unknown>>(TOKENS_KEY, {});
+  if (tokens[userEmail]) {
+    delete tokens[userEmail];
+    safeSetJSON(TOKENS_KEY, tokens);
+    deleted.push("Tokens de recuperación eliminados");
+  }
+
+  // 11. Log the deletion in audit trail
   logAudit({
     entityType: "user",
     entityId: userId,

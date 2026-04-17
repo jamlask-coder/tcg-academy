@@ -7,6 +7,7 @@ import {
   getAssociations,
   getMyPointsAttribution,
   getPointsHistory,
+  pointsToEuros,
   MAX_ASSOCIATIONS,
   REFERRAL_ASSOC_PTS_PER_100,
   POINTS_PER_EURO,
@@ -42,6 +43,7 @@ import {
   ArrowDown,
 } from "lucide-react";
 import Link from "next/link";
+import { AccountTabs } from "@/components/cuenta/AccountTabs";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -182,9 +184,9 @@ function MemberCard({
       <div className="mt-3 flex items-center justify-between rounded-xl bg-green-50 px-3 py-2">
         <p className="text-xs text-gray-500">Puntos generados para ti</p>
         <div className="text-right">
-          <span className="font-black text-green-600">+{ptsGenerated}</span>
+          <span className="font-black text-green-600">+{ptsGenerated.toLocaleString("es-ES")}</span>
           <span className="ml-1 text-[11px] text-gray-400">pts</span>
-          <p className="text-[10px] text-green-600">= €{(ptsGenerated / 100).toFixed(2)}</p>
+          <p className="text-[10px] text-green-600">= €{pointsToEuros(ptsGenerated).toFixed(2)}</p>
         </div>
       </div>
 
@@ -638,7 +640,7 @@ function PointsTable({
             {associations.map((assoc, i) => {
               const info = getUserDisplayInfo(assoc.referrerId);
               const pts = attribution[assoc.referrerId] ?? 0;
-              const euros = pts / 100;
+              const euros = pointsToEuros(pts);
               const pct = totalFromAssocs > 0 ? (pts / totalFromAssocs) * 100 : 0;
               return (
                 <div key={assoc.referrerId} className="flex items-center gap-3 px-5 py-4">
@@ -923,11 +925,11 @@ function HowItWorks() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-bold text-gray-900">Carlos compra €100</p>
-              <p className="text-xs text-gray-500">Recibe 1 pt/€1 = 100 pts = €1.00</p>
+              <p className="text-xs text-gray-500">Recibe 100 pts/€1 = 10.000 pts (= €1)</p>
             </div>
             <div className="rounded-xl bg-[#2563eb] px-3 py-1.5 text-center">
-              <p className="text-xl font-black text-white">+100</p>
-              <p className="text-[10px] text-blue-200">pts = €1.00</p>
+              <p className="text-xl font-black text-white">+10.000</p>
+              <p className="text-[10px] text-blue-200">pts = €1</p>
             </div>
           </div>
 
@@ -938,7 +940,7 @@ function HowItWorks() {
               <p className="text-[11px] font-semibold text-gray-500">
                 Distribuye automáticamente a su grupo (hasta 4 personas)
               </p>
-              <p className="text-[10px] text-gray-400">0,5 pts por €1 → 50 pts para cada asociado</p>
+              <p className="text-[10px] text-gray-400">5.000 pts por cada €100 → 5.000 pts para cada asociado</p>
             </div>
           </div>
 
@@ -954,8 +956,8 @@ function HowItWorks() {
                 </div>
                 <p className="mt-1 text-[10px] font-bold text-gray-700">{name}</p>
                 <div className="mt-1 rounded-lg bg-white px-2 py-0.5 shadow-sm">
-                  <p className="font-black text-green-600 text-base">+50</p>
-                  <p className="text-[9px] text-gray-400">pts = €0.50</p>
+                  <p className="font-black text-green-600 text-base">+5.000</p>
+                  <p className="text-[9px] text-gray-400">pts = €0,50</p>
                 </div>
               </div>
             ))}
@@ -991,12 +993,12 @@ function HowItWorks() {
                   <tr key={amt} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-semibold text-gray-900">€{amt}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className="font-black text-[#2563eb]">+{buyerPts} pts</span>
-                      <span className="ml-1.5 text-[11px] text-gray-400">= €{(buyerPts / 100).toFixed(2)}</span>
+                      <span className="font-black text-[#2563eb]">+{buyerPts.toLocaleString("es-ES")} pts</span>
+                      <span className="ml-1.5 text-[11px] text-gray-400">= €{pointsToEuros(buyerPts).toFixed(2)}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="font-black text-green-600">+{assocPts} pts</span>
-                      <span className="ml-1.5 text-[11px] text-gray-400">= €{(assocPts / 100).toFixed(2)}</span>
+                      <span className="font-black text-green-600">+{assocPts.toLocaleString("es-ES")} pts</span>
+                      <span className="ml-1.5 text-[11px] text-gray-400">= €{pointsToEuros(assocPts).toFixed(2)}</span>
                     </td>
                   </tr>
                 );
@@ -1005,7 +1007,7 @@ function HowItWorks() {
           </table>
         </div>
         <div className="border-t border-gray-100 bg-gray-50 px-5 py-3 text-xs text-gray-500">
-          <strong>Regla de oro:</strong> comprador gana 1 pt/€1 (100 pts = €1.00) · cada asociado gana 0,5 pts/€1 (50 pts por cada €100) · 100 pts = €1.00 de descuento
+          <strong>Regla de oro:</strong> comprador gana 100 pts por €1 · cada asociado gana 5.000 pts por cada €100 (= €0,50) · canje 10.000 pts = €1 de descuento
         </div>
       </div>
 
@@ -1130,11 +1132,14 @@ export default function AsociacionesPage() {
 
   if (!user || user.role !== "cliente") {
     return (
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center">
-        <Users size={40} className="mx-auto mb-3 text-amber-400" />
-        <p className="font-semibold text-amber-700">
-          El programa de grupos es exclusivo para cuentas de cliente.
-        </p>
+      <div>
+        <AccountTabs group="recompensas" />
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center">
+          <Users size={40} className="mx-auto mb-3 text-amber-400" />
+          <p className="font-semibold text-amber-700">
+            El programa de grupos es exclusivo para cuentas de cliente.
+          </p>
+        </div>
       </div>
     );
   }
@@ -1149,6 +1154,8 @@ export default function AsociacionesPage() {
 
   return (
     <div className="space-y-6">
+      <AccountTabs group="recompensas" />
+
       {/* ── Invite modal ── */}
       {modalOpen && (
         <InviteModal
@@ -1157,17 +1164,6 @@ export default function AsociacionesPage() {
           onSent={refresh}
         />
       )}
-
-      {/* ── Header ── */}
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-          <Users size={24} className="text-[#2563eb]" /> Mi grupo
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Forma un grupo de hasta {MAX_ASSOCIATIONS} personas. Cuando cualquiera compra,
-          todos los miembros ganáis puntos canjeables.
-        </p>
-      </div>
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-3 gap-3">
@@ -1268,7 +1264,7 @@ export default function AsociacionesPage() {
       <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-700">
         <Info size={16} className="mt-0.5 flex-shrink-0 text-blue-400" />
         <p>
-          1 punto = €0.01 · Los puntos se canjean en el{" "}
+          10.000 puntos = €1 · Los puntos se canjean en el{" "}
           <Link href="/cuenta/puntos" className="font-semibold underline">
             panel de puntos
           </Link>{" "}

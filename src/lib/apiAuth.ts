@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest} from "next/server";
+import { NextResponse } from "next/server";
+import { getSessionFromRequest, type SessionPayload } from "@/lib/auth";
 
 /**
  * API authentication and authorization middleware helpers.
@@ -6,10 +8,10 @@ import { NextRequest, NextResponse } from "next/server";
  * In local mode (NEXT_PUBLIC_BACKEND_MODE=local), auth is permissive —
  * the client handles auth via localStorage.
  *
- * In server mode, these functions validate JWT tokens from cookies/headers.
+ * In server mode, validates JWT tokens from httpOnly cookies or Authorization headers.
  */
 
-interface ApiUser {
+export interface ApiUser {
   id: string;
   email: string;
   role: string;
@@ -20,11 +22,11 @@ interface ApiUser {
  * Extract and validate the current user from the request.
  * Returns null if not authenticated.
  */
-export function getApiUser(req: NextRequest): ApiUser | null {
+export async function getApiUser(req: NextRequest): Promise<ApiUser | null> {
   const mode = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
 
   if (mode === "local") {
-    // In local mode, trust the X-User-Id header (set by client)
+    // In local mode, trust the X-User-* headers (set by client)
     const userId = req.headers.get("x-user-id");
     const userRole = req.headers.get("x-user-role") ?? "cliente";
     const userName = req.headers.get("x-user-name") ?? "";
@@ -34,25 +36,22 @@ export function getApiUser(req: NextRequest): ApiUser | null {
   }
 
   // Server mode: validate JWT from cookie or Authorization header
-  // TODO: Implement JWT validation
-  // const token = req.cookies.get("session")?.value
-  //   ?? req.headers.get("authorization")?.replace("Bearer ", "");
-  // if (!token) return null;
-  // try {
-  //   const payload = jwt.verify(token, process.env.SESSION_SECRET!);
-  //   return payload as ApiUser;
-  // } catch {
-  //   return null;
-  // }
+  const session: SessionPayload | null = await getSessionFromRequest(req);
+  if (!session || !session.sub) return null;
 
-  return null;
+  return {
+    id: session.sub,
+    email: session.email,
+    role: session.role,
+    name: session.name,
+  };
 }
 
 /**
  * Require authentication. Returns error response if not authenticated.
  */
-export function requireAuth(req: NextRequest): ApiUser | NextResponse {
-  const user = getApiUser(req);
+export async function requireAuth(req: NextRequest): Promise<ApiUser | NextResponse> {
+  const user = await getApiUser(req);
   if (!user) {
     return NextResponse.json(
       { error: "No autenticado. Inicia sesión." },
@@ -65,8 +64,8 @@ export function requireAuth(req: NextRequest): ApiUser | NextResponse {
 /**
  * Require admin role. Returns error response if not admin.
  */
-export function requireAdmin(req: NextRequest): ApiUser | NextResponse {
-  const result = requireAuth(req);
+export async function requireAdmin(req: NextRequest): Promise<ApiUser | NextResponse> {
+  const result = await requireAuth(req);
   if (result instanceof NextResponse) return result;
   if (result.role !== "admin") {
     return NextResponse.json(

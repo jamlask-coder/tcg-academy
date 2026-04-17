@@ -10,6 +10,17 @@ import {
 import type { User, UserRole, RegisterData } from "@/types/user";
 import { ensureReferralCode, registerWithReferral } from "@/services/pointsService";
 import { sanitizeString } from "@/utils/sanitize";
+import { recordBulkConsent, type ConsentType } from "@/services/consentService";
+
+export interface GoogleSignInPayload {
+  email: string;
+  email_verified?: boolean;
+  given_name?: string;
+  family_name?: string;
+  name?: string;
+  picture?: string;
+  sub: string;
+}
 
 interface AuthContextValue {
   user: User | null;
@@ -20,11 +31,18 @@ interface AuthContextValue {
     password: string,
     rememberMe?: boolean,
   ) => Promise<{ ok: boolean; error?: string }>;
+  loginWithGoogle: (
+    payload: GoogleSignInPayload,
+  ) => Promise<{ ok: boolean; error?: string; created?: boolean }>;
   logout: () => void;
   register: (data: RegisterData) => Promise<{ ok: boolean; error?: string }>;
   updateProfile: (
-    updates: Partial<Pick<User, "name" | "lastName" | "phone">>,
+    updates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses">>,
   ) => void;
+  changePassword: (
+    currentPassword: string,
+    newPassword: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
   checkUsernameAvailable: (username: string) => boolean;
   toggleFavorite: (productId: number) => void;
   isFavorite: (productId: number) => boolean;
@@ -322,6 +340,91 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persist],
   );
 
+  const loginWithGoogle = useCallback(
+    async (
+      payload: GoogleSignInPayload,
+    ): Promise<{ ok: boolean; error?: string; created?: boolean }> => {
+      if (!payload?.email) {
+        return { ok: false, error: "Google no devolvió un email" };
+      }
+      if (payload.email_verified === false) {
+        return { ok: false, error: "Tu email de Google no está verificado" };
+      }
+      const email = payload.email.toLowerCase();
+
+      // Existing demo account with same email → log in directly
+      const demo = DEMO_USERS[email];
+      if (demo) {
+        persist(demo.user, REMEMBER_ME_MS);
+        return { ok: true };
+      }
+
+      try {
+        const registered = JSON.parse(
+          localStorage.getItem(REGISTERED_KEY) ?? "{}",
+        ) as Record<string, { password: string; user: User }>;
+
+        if (registered[email]) {
+          persist(registered[email].user, REMEMBER_ME_MS);
+          return { ok: true };
+        }
+
+        // Auto-register as cliente (B2B must register manually with CIF)
+        const newUserId = `user-${crypto.randomUUID()}`;
+        const refCode = ensureReferralCode(newUserId);
+        const rawName =
+          payload.given_name ?? payload.name?.split(" ")[0] ?? "";
+        const rawLastName =
+          payload.family_name ??
+          payload.name?.split(" ").slice(1).join(" ") ??
+          "";
+        const name = sanitizeString(rawName);
+        const lastName = sanitizeString(rawLastName);
+
+        const newUser: User = {
+          id: newUserId,
+          email,
+          name,
+          lastName,
+          phone: "",
+          role: "cliente",
+          addresses: [],
+          favorites: [],
+          createdAt: new Date().toISOString(),
+          referralCode: refCode,
+        };
+
+        // Random password — Google users can still request a password reset
+        // to set their own if they ever want to log in without Google.
+        const randomPw = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+        const hashedPw = await hashPassword(randomPw);
+        registered[email] = { password: hashedPw, user: newUser };
+        localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered));
+
+        // Record GDPR consents (Art. 7 — proof of consent)
+        const consentEntries: Array<{
+          type: ConsentType;
+          status: "granted" | "revoked";
+        }> = [
+          { type: "terms", status: "granted" },
+          { type: "privacy", status: "granted" },
+          { type: "data_processing", status: "granted" },
+        ];
+        recordBulkConsent({
+          userId: newUserId,
+          consents: consentEntries,
+          method: "google_signin",
+        });
+
+        persist(newUser, REMEMBER_ME_MS);
+        return { ok: true, created: true };
+      } catch {
+        return { ok: false, error: "Error al iniciar sesión con Google" };
+      }
+    },
+    [persist],
+  );
+
   const logout = useCallback(() => {
     persist(null);
   }, [persist]);
@@ -361,6 +464,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           name: sanitizedName,
           lastName: sanitizedLastName,
           phone: sanitizedPhone,
+          gender: data.gender,
           role: "cliente",
           addresses: [
             {
@@ -392,6 +496,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           saveUsernameIndex(index);
         }
 
+        // Record GDPR consents (Art. 7 — proof of consent)
+        const consentEntries: Array<{ type: ConsentType; status: "granted" | "revoked" }> = [
+          { type: "terms", status: "granted" },
+          { type: "privacy", status: "granted" },
+          { type: "data_processing", status: "granted" },
+          { type: "marketing_email", status: data.marketingConsent ? "granted" : "revoked" },
+        ];
+        recordBulkConsent({
+          userId: newUserId,
+          consents: consentEntries,
+          method: "registration_form",
+        });
+
         persist(newUser);
         return { ok: true };
       } catch {
@@ -408,12 +525,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateProfile = useCallback(
-    (updates: Partial<Pick<User, "name" | "lastName" | "phone">>) => {
+    (updates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses">>) => {
       if (!user) return;
-      const sanitizedUpdates: Partial<Pick<User, "name" | "lastName" | "phone">> = {};
+      const sanitizedUpdates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses">> = {};
       if (updates.name !== undefined) sanitizedUpdates.name = sanitizeString(updates.name);
       if (updates.lastName !== undefined) sanitizedUpdates.lastName = sanitizeString(updates.lastName);
       if (updates.phone !== undefined) sanitizedUpdates.phone = sanitizeString(updates.phone);
+      if (updates.addresses !== undefined) sanitizedUpdates.addresses = updates.addresses;
       const updated = { ...user, ...sanitizedUpdates };
       persist(updated);
       // Also update in registered store if applicable
@@ -433,6 +551,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     [user, persist],
+  );
+
+  const changePassword = useCallback(
+    async (
+      currentPassword: string,
+      newPassword: string,
+    ): Promise<{ ok: boolean; error?: string }> => {
+      if (!user) return { ok: false, error: "No has iniciado sesión" };
+
+      const email = user.email.toLowerCase();
+
+      // Check if it's a demo user (demo passwords are plaintext)
+      const demo = DEMO_USERS[email];
+      if (demo) {
+        if (demo.password !== currentPassword) {
+          return { ok: false, error: "La contraseña actual no es correcta" };
+        }
+        // Migrate demo user to registered with new password
+        try {
+          const registered = JSON.parse(
+            localStorage.getItem(REGISTERED_KEY) ?? "{}",
+          ) as Record<string, { password: string; user: User }>;
+          const hashedNew = await hashPassword(newPassword);
+          registered[email] = { password: hashedNew, user };
+          localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered));
+          return { ok: true };
+        } catch {
+          return { ok: false, error: "Error al guardar la nueva contraseña" };
+        }
+      }
+
+      // Registered user — verify current password
+      try {
+        const registered = JSON.parse(
+          localStorage.getItem(REGISTERED_KEY) ?? "{}",
+        ) as Record<string, { password: string; user: User }>;
+        const entry = registered[email];
+        if (!entry) return { ok: false, error: "Cuenta no encontrada" };
+
+        const hashedCurrent = await hashPassword(currentPassword);
+        const matches =
+          entry.password === hashedCurrent || entry.password === currentPassword;
+        if (!matches) {
+          return { ok: false, error: "La contraseña actual no es correcta" };
+        }
+
+        const hashedNew = await hashPassword(newPassword);
+        entry.password = hashedNew;
+        localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered));
+        return { ok: true };
+      } catch {
+        return { ok: false, error: "Error al cambiar la contraseña" };
+      }
+    },
+    [user],
   );
 
   const toggleFavorite = useCallback(
@@ -460,9 +633,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: user?.role ?? null,
         isLoading,
         login,
+        loginWithGoogle,
         logout,
         register,
         updateProfile,
+        changePassword,
         checkUsernameAvailable,
         toggleFavorite,
         isFavorite,

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { CheckCircle } from "lucide-react";
+import { AccountTabs } from "@/components/cuenta/AccountTabs";
 
 export default function FacturacionPage() {
   const { user } = useAuth();
@@ -34,14 +35,7 @@ export default function FacturacionPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Datos de facturación
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Tus datos fiscales para las facturas
-        </p>
-      </div>
+      <AccountTabs group="perfil" />
 
       <form
         onSubmit={handleSave}
@@ -55,10 +49,13 @@ export default function FacturacionPage() {
             <input
               type="text"
               value={form.nif}
-              onChange={set("nif")}
+              readOnly
               placeholder="12345678A"
-              className={inputCls}
+              className={`${inputCls} cursor-not-allowed bg-gray-50 text-gray-400`}
             />
+            <p className="mt-1 text-xs text-gray-400">
+              Dato fiscal — contacta con soporte para modificar
+            </p>
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-gray-700">
@@ -67,10 +64,13 @@ export default function FacturacionPage() {
             <input
               type="text"
               value={form.razonSocial}
-              onChange={set("razonSocial")}
+              readOnly
               placeholder="Nombre empresa S.L."
-              className={inputCls}
+              className={`${inputCls} cursor-not-allowed bg-gray-50 text-gray-400`}
             />
+            <p className="mt-1 text-xs text-gray-400">
+              Dato fiscal — contacta con soporte para modificar
+            </p>
           </div>
           <div className="sm:col-span-2">
             <label className="mb-1.5 block text-sm font-semibold text-gray-700">

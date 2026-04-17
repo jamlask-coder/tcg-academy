@@ -44,7 +44,7 @@ export function MegaMenu({ game, onClose, logoCenterX }: Props) {
   useEffect(() => {
     if (game.slug === prevSlugRef.current) return;
     prevSlugRef.current = game.slug;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setContentVisible(false);
     const t = setTimeout(() => {
       setDisplayedGame(game);

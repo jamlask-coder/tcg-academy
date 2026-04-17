@@ -1,10 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, Lock, Mail, LogIn } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail, LogIn, CheckCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { checkRateLimit } from "@/utils/sanitize";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 const DEMO_ACCOUNTS = [
   { email: "cliente@test.com", role: "Cliente" },
@@ -13,9 +14,11 @@ const DEMO_ACCOUNTS = [
   { email: "admin@tcgacademy.es", role: "Admin" },
 ];
 
-export default function LoginPage() {
+function LoginForm() {
   const { login, user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const resetOk = searchParams.get("reset") === "ok";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -26,6 +29,7 @@ export default function LoginPage() {
   const [mounted, setMounted] = useState(false);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [countdown, setCountdown] = useState(0);
+  const [showResetBanner, setShowResetBanner] = useState(resetOk);
 
   useEffect(() => {
     const id = setTimeout(() => setMounted(true), 0);
@@ -97,6 +101,22 @@ export default function LoginPage() {
         <div className="rounded-2xl border border-gray-200 bg-white px-8 pt-7 pb-8 shadow-sm">
           <h1 className="mb-1 text-2xl font-bold text-gray-900">Inicia sesión</h1>
           <p className="mb-6 text-sm text-gray-500">Accede a tu cuenta de TCG Academy</p>
+
+          {showResetBanner && (
+            <div className="mb-5 flex items-center gap-2.5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+              <CheckCircle size={18} className="shrink-0 text-green-500" />
+              <span>
+                <strong>Contraseña restablecida correctamente.</strong> Ya puedes iniciar sesión con tu nueva contraseña.
+              </span>
+              <button
+                onClick={() => setShowResetBanner(false)}
+                className="ml-auto shrink-0 text-green-400 hover:text-green-600"
+                aria-label="Cerrar mensaje"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           <form
             onSubmit={handleSubmit}
@@ -243,10 +263,13 @@ export default function LoginPage() {
             <div className="h-px flex-1 bg-gray-200" />
           </div>
 
+          {/* Google Sign-In (only renders if NEXT_PUBLIC_GOOGLE_CLIENT_ID is set) */}
+          <GoogleSignInButton redirectTo="/cuenta" />
+
           {/* Register CTA */}
           <Link
             href="/registro"
-            className="flex h-11 w-full items-center justify-center rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-700 transition hover:border-[#2563eb] hover:text-[#2563eb]"
+            className="mt-4 flex h-11 w-full items-center justify-center rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-700 transition hover:border-[#2563eb] hover:text-[#2563eb]"
           >
             Crear cuenta nueva
           </Link>
@@ -292,5 +315,19 @@ export default function LoginPage() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <p className="text-gray-500">Cargando...</p>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

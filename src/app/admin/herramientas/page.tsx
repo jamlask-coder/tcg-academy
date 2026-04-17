@@ -206,7 +206,7 @@ export default function AdminHerramientasPage() {
 
   useEffect(() => {
     const reload = () =>
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setAllProducts(getMergedProducts());
     window.addEventListener("tcga:products:updated", reload);
     window.addEventListener("storage", reload);

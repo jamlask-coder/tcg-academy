@@ -1140,7 +1140,7 @@ export default function AdminPedidosPage() {
 
   // Reset page when any filter changes
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setPage(1);
   }, [statusFilter, roleFilter, urgentOnly, search]);
 

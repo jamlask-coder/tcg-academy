@@ -163,7 +163,7 @@ const SECTIONS: Section[] = [
       },
       {
         heading: "Puntos por euro",
-        text: "Configura cuántos puntos gana el cliente por cada euro gastado. El valor por defecto es 1 punto/€.",
+        text: "Configura cuántos puntos gana el cliente por cada euro gastado en PRODUCTOS (envío y descuento por puntos no cuentan). Valor por defecto: 100 pts/€, con canje 10.000 pts = €1 (cashback efectivo del 1%). Cambios con impacto económico global — requiere confirmación fuerte.",
       },
       {
         heading: "Tabla de canje",

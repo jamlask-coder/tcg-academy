@@ -448,7 +448,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
         <p style="text-align:center;">
           <a href="{{redeem_url}}" class="btn-secondary">Ver mis puntos y canjear</a>
         </p>
-        <p style="font-size:13px; color:#6b7280; text-align:center;">Recuerda: 100 puntos = 1€ de descuento en tu próxima compra.</p>
+        <p style="font-size:13px; color:#6b7280; text-align:center;">Recuerda: 10.000 puntos = 1€ de descuento en tu próxima compra.</p>
         <p><strong>El equipo de TCG Academy</strong></p>
       </div>
     `),
@@ -615,9 +615,9 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
         </div>
       </div>
       <hr/>
-      <div class="ben"><div class="ben-icon" style="background:#eff6ff">🛒</div><div class="ben-text">Cuando <strong>{{fromName}}</strong> compre, <strong>tú recibes 50 pts por cada €100</strong> de su pedido (= €0.50 de descuento)</div></div>
-      <div class="ben"><div class="ben-icon" style="background:#f0fdf4">💰</div><div class="ben-text">Cuando <strong>tú compres</strong>, <strong>{{fromName}} recibe 50 pts por cada €100</strong> de tu pedido (= €0.50 de descuento)</div></div>
-      <div class="ben"><div class="ben-icon" style="background:#fef3c7">⭐</div><div class="ben-text"><strong>100 puntos = €1 de descuento</strong> en cualquier compra. Los puntos no caducan</div></div>
+      <div class="ben"><div class="ben-icon" style="background:#eff6ff">🛒</div><div class="ben-text">Cuando <strong>{{fromName}}</strong> compre, <strong>tú recibes 5.000 pts por cada €100</strong> de su pedido (= €0,50 de descuento)</div></div>
+      <div class="ben"><div class="ben-icon" style="background:#f0fdf4">💰</div><div class="ben-text">Cuando <strong>tú compres</strong>, <strong>{{fromName}} recibe 5.000 pts por cada €100</strong> de tu pedido (= €0,50 de descuento)</div></div>
+      <div class="ben"><div class="ben-icon" style="background:#fef3c7">⭐</div><div class="ben-text"><strong>10.000 puntos = €1 de descuento</strong> en cualquier compra. Los puntos no caducan</div></div>
     </div>
     <div class="cta-wrap"><a href="https://tcgacademy.es/cuenta/grupo" class="cta">Ver solicitud →</a></div>
     <div class="note">💡 <strong>¿Cómo funciona?</strong> Accede a tu cuenta, entra en <em>Mi grupo</em> y acepta o rechaza la solicitud. Puedes tener hasta <strong>4 personas en tu grupo</strong>.</div>

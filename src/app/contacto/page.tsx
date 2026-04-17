@@ -239,6 +239,24 @@ export default function ContactoPage() {
                     Has alcanzado el límite de mensajes. Inténtalo de nuevo mañana.
                   </p>
                 )}
+                {/* GDPR notice — Art. 13 RGPD */}
+                <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-[11px] leading-relaxed text-blue-700">
+                  <p>
+                    <span className="font-semibold">Protección de datos:</span>{" "}
+                    Tus datos serán tratados por TCG Academy S.L. con la
+                    finalidad de responder a tu consulta (base legal: interés
+                    legítimo, art. 6.1.f RGPD). No se cederán a terceros. Puedes
+                    ejercer tus derechos en{" "}
+                    <Link
+                      href="/privacidad"
+                      className="font-medium underline"
+                    >
+                      política de privacidad
+                    </Link>
+                    .
+                  </p>
+                </div>
+
                 <button
                   type="submit"
                   disabled={isSubmitting}

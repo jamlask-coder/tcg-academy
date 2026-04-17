@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest} from "next/server";
+import { NextResponse } from "next/server";
 import { requireAuth, requireAdmin } from "@/lib/apiAuth";
 import { logger } from "@/lib/logger";
 
@@ -8,7 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const authResult = requireAuth(req);
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) return authResult;
 
   const backendMode = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
@@ -34,7 +35,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const adminResult = requireAdmin(req);
+    const adminResult = await requireAdmin(req);
     if (adminResult instanceof NextResponse) return adminResult;
 
     const body = await req.json();

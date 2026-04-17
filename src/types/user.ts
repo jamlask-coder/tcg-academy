@@ -26,6 +26,8 @@ export interface BillingInfo {
   pais: string;
 }
 
+export type UserGender = "M" | "F" | "X"; // M=varón, F=mujer, X=prefiero no decirlo
+
 export interface User {
   id: string;
   email: string;
@@ -33,6 +35,7 @@ export interface User {
   name: string;
   lastName: string;
   phone: string;
+  gender?: UserGender;
   role: UserRole;
   addresses: Address[];
   billing?: BillingInfo;
@@ -59,6 +62,8 @@ export interface RegisterData {
   name: string;
   lastName: string;
   phone: string;
+  gender?: UserGender;
   address: Omit<Address, "id" | "predeterminada" | "label">;
   referralCode?: string;
+  marketingConsent?: boolean;
 }
