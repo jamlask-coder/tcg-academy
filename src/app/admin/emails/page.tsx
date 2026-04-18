@@ -28,11 +28,12 @@ import {
   type SentEmailLog,
 } from "@/services/emailService";
 import { EMAIL_TEMPLATES, type EmailTemplate } from "@/data/emailTemplates";
+import { SITE_CONFIG } from "@/config/siteConfig";
 
 // ─── Categories ───────────────────────────────────────────────────────────────
 
 const CATEGORIES: { label: string; ids: string[] }[] = [
-  { label: "Pedidos", ids: ["confirmacion_pedido", "pedido_enviado", "pedido_entregado"] },
+  { label: "Pedidos", ids: ["confirmacion_pedido", "pedido_enviado"] },
   { label: "Fiscal", ids: ["factura_disponible"] },
   { label: "Comercial", ids: ["nuevo_cupon", "carrito_abandonado"] },
   { label: "Puntos", ids: ["puntos_anadidos"] },
@@ -53,10 +54,6 @@ const DEFAULT_VARS: Record<string, Record<string, string>> = {
   pedido_enviado: {
     nombre: "María García", order_id: "TCG-260412-A3BX9K", tracking_number: "ES2026041200001",
     carrier: "GLS", estimated_date: "14 de abril de 2026", tracking_url: "#", unsubscribe_link: "#",
-  },
-  pedido_entregado: {
-    nombre: "María García", order_id: "TCG-260412-A3BX9K", points_earned: "90",
-    current_balance: "350", review_url: "#", unsubscribe_link: "#",
   },
   factura_disponible: {
     nombre: "Carlos López", invoice_id: "FAC-2026-0042", order_id: "TCG-260412-A3BX9K",
@@ -120,7 +117,7 @@ function loadSender(): SenderConfig {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) return JSON.parse(raw);
   } catch { /* empty */ }
-  return { email: "hola@tcgacademy.es", password: "", validated: false };
+  return { email: SITE_CONFIG.email, password: "", validated: false };
 }
 
 function saveSender(config: SenderConfig): void {
@@ -482,7 +479,7 @@ export default function AdminEmailsPage() {
                       type="email"
                       value={senderEmail}
                       onChange={(e) => { setSenderEmail(e.target.value); setValidationResult(null); }}
-                      placeholder="hola@tcgacademy.es"
+                      placeholder={SITE_CONFIG.email}
                       className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
                     />
                   </div>

@@ -2,9 +2,9 @@ export type UserRole = "cliente" | "mayorista" | "tienda" | "admin";
 
 export interface Address {
   id: string;
-  label: string; // "Casa", "Trabajo", etc.
-  nombre: string;
-  apellidos: string;
+  label: string; // "Casa", "Trabajo", etc. — texto libre introducido por el cliente
+  nombre?: string;
+  apellidos?: string;
   calle: string;
   numero: string;
   piso?: string;
@@ -37,6 +37,13 @@ export interface User {
   phone: string;
   gender?: UserGender;
   role: UserRole;
+  /**
+   * NIF / NIE / CIF del usuario — OBLIGATORIO para emitir facturas
+   * conforme al Art. 6.1.d RD 1619/2012. Validado con `validateSpanishNIF`.
+   */
+  nif?: string;
+  /** Tipo del identificador fiscal, detectado automáticamente */
+  nifType?: "DNI" | "NIE" | "CIF";
   addresses: Address[];
   billing?: BillingInfo;
   // empresa fields (mayorista / tienda only)

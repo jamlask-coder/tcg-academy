@@ -15,7 +15,18 @@ export interface LocalProduct {
   images: string[]; // URLs de imagen — vacío = muestra placeholder
   inStock: boolean;
   stock?: number;       // Numeric stock count. undefined = unlimited
-  maxPerUser?: number;  // Max units per user per order. undefined = unlimited
+  /**
+   * @deprecated Generic lifetime limit — usado solo como fallback si no hay
+   * límite específico por rol. Preferir `maxPerClient`/`maxPerWholesaler`/`maxPerStore`.
+   */
+  maxPerUser?: number;
+  /** Máximo de unidades que un usuario con rol "cliente" puede comprar EN TOTAL
+   *  (acumulado de todos sus pedidos, no por pedido). undefined = ilimitado. */
+  maxPerClient?: number;
+  /** Máximo de unidades que un usuario con rol "mayorista" puede comprar EN TOTAL. */
+  maxPerWholesaler?: number;
+  /** Máximo de unidades que un usuario con rol "tienda" puede comprar EN TOTAL. */
+  maxPerStore?: number;
   isNew: boolean;
   createdAt?: string; // ISO date — used for "Nuevo" badge (45-day window)
   isFeatured?: boolean;

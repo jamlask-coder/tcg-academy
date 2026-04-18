@@ -13,6 +13,7 @@ import { loadInvoices, verifyIntegrity } from "@/services/invoiceService";
 import type { InvoiceRecord } from "@/types/fiscal";
 import { VerifactuStatus } from "@/types/fiscal";
 import { VERIFACTU_CONFIG } from "@/config/verifactuConfig";
+import { formatDateShort } from "@/lib/format";
 
 function verifactuBadge(status: VerifactuStatus) {
   const map: Record<VerifactuStatus, { label: string; cls: string }> = {
@@ -46,8 +47,7 @@ function verifactuBadge(status: VerifactuStatus) {
 
 function formatDate(d: Date | string | null): string {
   if (!d) return "—";
-  const dt = new Date(d);
-  return `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}`;
+  return formatDateShort(d);
 }
 
 export default function VerifactuPage() {

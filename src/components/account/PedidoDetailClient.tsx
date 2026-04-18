@@ -31,6 +31,8 @@ import {
   buildInvoiceFromOrder,
   generateInvoiceNumber,
 } from "@/utils/invoiceGenerator";
+import { PaymentInfo } from "@/components/cuenta/PaymentInfo";
+import { parseFiscalAddress } from "@/lib/fiscalAddress";
 
 type OrderStatus = "pedido" | "enviado" | "entregado" | "incidencia" | "cancelado" | "devolucion";
 
@@ -127,7 +129,7 @@ export function PedidoDetailClient({ id }: Props) {
 
   const handleDownloadInvoice = async () => {
     const invNum = generateInvoiceNumber(order.id);
-    const addrParts = order.address ? order.address.split(",").map((s) => s.trim()) : [];
+    const parsed = order.address ? parseFiscalAddress(order.address) : null;
     const data = buildInvoiceFromOrder(
       {
         id: order.id,
@@ -137,11 +139,11 @@ export function PedidoDetailClient({ id }: Props) {
         total: order.total,
         paymentMethod: order.paymentMethod,
         clientName: user ? `${user.name} ${user.lastName ?? ""}`.trim() : undefined,
-        shippingAddress: order.address ? {
-          direccion: addrParts[0],
-          cp: addrParts[1]?.match(/\d{5}/)?.[0],
-          ciudad: addrParts[1]?.replace(/\d{5}\s*/, "").trim() || addrParts[2],
-          pais: "España",
+        shippingAddress: parsed ? {
+          direccion: parsed.street,
+          cp: parsed.postalCode || undefined,
+          ciudad: parsed.city,
+          pais: parsed.country,
         } : undefined,
       },
       invNum,
@@ -336,10 +338,10 @@ export function PedidoDetailClient({ id }: Props) {
           <h2 className="mb-4 flex items-center gap-2 font-bold text-gray-900">
             <CreditCard size={18} className="text-gray-400" /> Método de pago
           </h2>
-          <p className="text-sm text-gray-600">
-            {order.paymentMethod ?? "—"}
-          </p>
-          <p className="mt-2 text-xs text-gray-400">Pago procesado correctamente</p>
+          <PaymentInfo
+            method={order.paymentMethod}
+            status={order.paymentStatus ?? "paid"}
+          />
         </div>
       </div>
 

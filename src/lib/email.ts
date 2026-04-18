@@ -45,7 +45,10 @@ export interface EmailAdapter {
 
 // ─── localStorage keys ──────────────────────────────────────────────────────
 
-const SENT_EMAILS_KEY = "tcgacademy_sent_emails";
+// Canonical storage key: `tcgacademy_email_log`.
+// The legacy `tcgacademy_sent_emails` was a duplicate and has been eliminated
+// (see dataHub/registry.ts → "logs" entity).
+const SENT_EMAILS_KEY = "tcgacademy_email_log";
 const MAX_LOG = 200;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -100,7 +103,7 @@ export class ResendEmailAdapter implements EmailAdapter {
 
   constructor() {
     this.apiKey = process.env.RESEND_API_KEY ?? "";
-    this.fromEmail = process.env.RESEND_FROM_EMAIL ?? "hola@tcgacademy.es";
+    this.fromEmail = process.env.RESEND_FROM_EMAIL ?? SITE_CONFIG.email;
   }
 
   async sendEmail(to: string, subject: string, html: string): Promise<SendResult> {
@@ -164,7 +167,8 @@ const BRAND_HEADER = `
 
 const BRAND_FOOTER = `
   <div style="padding:20px 24px;text-align:center;color:#999;font-size:11px;border-top:1px solid #eee">
-    <p>TCG Academy S.L. — La mejor tienda TCG de España</p>
+    <p>${SITE_CONFIG.legalName} — La mejor tienda TCG de España</p>
+    <p>CIF: ${SITE_CONFIG.cif} · ${SITE_CONFIG.address}</p>
     <p>Si no deseas recibir estos emails, puedes gestionar tus preferencias desde tu cuenta.</p>
   </div>
 `;
@@ -202,6 +206,28 @@ const EMAIL_TEMPLATES: Record<string, { subject: string; html: string }> = {
       </a>
     `),
   },
+  pedido_confirmado_recogida: {
+    subject: "Pedido {{orderId}} recibido — Recogida en {{tiendaNombre}}",
+    html: wrap(`
+      <h2 style="color:#1e40af;margin:0 0 12px">¡Pedido recibido!</h2>
+      <p>Hemos recibido tu pedido <strong>{{orderId}}</strong> para recogida en nuestra tienda <strong>{{tiendaNombre}}</strong>.</p>
+      <p>Total: <strong>{{total}}€</strong> — Pago al recoger.</p>
+      <p>Te avisaremos por email cuando tu pedido esté preparado para recoger.</p>
+      <p style="color:#6b7280;font-size:13px">Dirección de recogida: {{tiendaDireccion}}</p>
+      <a href="{{appUrl}}/cuenta/pedidos" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0">
+        Ver mis pedidos
+      </a>
+    `),
+  },
+  pedido_listo_recoger: {
+    subject: "Tu pedido {{orderId}} está listo para recoger",
+    html: wrap(`
+      <h2 style="color:#16a34a;margin:0 0 12px">¡Listo para recoger!</h2>
+      <p>Tu pedido <strong>{{orderId}}</strong> ya está preparado en <strong>{{tiendaNombre}}</strong>.</p>
+      <p style="color:#6b7280;font-size:13px">{{tiendaDireccion}} — Horario: {{tiendaHorario}}</p>
+      <p>Recuerda llevar tu DNI y el número de pedido. Pago en tienda: <strong>{{total}}€</strong>.</p>
+    `),
+  },
   pedido_enviado: {
     subject: "Tu pedido {{orderId}} ha sido enviado",
     html: wrap(`
@@ -211,14 +237,6 @@ const EMAIL_TEMPLATES: Record<string, { subject: string; html: string }> = {
       <a href="{{trackingUrl}}" style="display:inline-block;background:#16a34a;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0">
         Seguir envío
       </a>
-    `),
-  },
-  pedido_entregado: {
-    subject: "Tu pedido {{orderId}} ha sido entregado",
-    html: wrap(`
-      <h2 style="color:#16a34a;margin:0 0 12px">¡Pedido entregado!</h2>
-      <p>Tu pedido <strong>{{orderId}}</strong> ha sido entregado correctamente.</p>
-      <p>¡Gracias por confiar en TCG Academy!</p>
     `),
   },
   pedido_cancelado: {
@@ -280,7 +298,16 @@ const ORDER_TEMPLATE_MAP: Record<string, string> = {
   confirmado: "pedido_confirmado",
   procesando: "pedido_confirmado",
   enviado: "pedido_enviado",
-  entregado: "pedido_entregado",
+  // "entregado" eliminado 2026-04-18 — "enviado" es el estado final del pipeline.
+  cancelado: "pedido_cancelado",
+  listo_recoger: "pedido_listo_recoger",
+};
+
+/** Pickup-specific map overrides when order is store pickup */
+const PICKUP_TEMPLATE_MAP: Record<string, string> = {
+  confirmado: "pedido_confirmado_recogida",
+  procesando: "pedido_confirmado_recogida",
+  listo_recoger: "pedido_listo_recoger",
   cancelado: "pedido_cancelado",
 };
 
@@ -289,9 +316,11 @@ export async function sendOrderNotification(
   status: string,
   customerEmail: string,
   vars: TemplatedEmailVars,
+  options?: { isStorePickup?: boolean },
 ): Promise<SendResult> {
   const service = getEmailService();
-  const templateId = ORDER_TEMPLATE_MAP[status];
+  const map = options?.isStorePickup ? PICKUP_TEMPLATE_MAP : ORDER_TEMPLATE_MAP;
+  const templateId = map[status];
   if (!templateId) return { ok: false, emailId: "" };
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";

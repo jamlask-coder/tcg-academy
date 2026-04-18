@@ -35,9 +35,9 @@ export default function AvisoLegalPage() {
             </p>
             <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 p-5">
               <dl className="space-y-2 text-sm">
-                <Row label="Denominación social" value="TCG Academy S.L." />
+                <Row label="Denominación social" value={SITE_CONFIG.legalName} />
                 <Row label="CIF" value={SITE_CONFIG.cif} />
-                <Row label="Domicilio social" value="C/ Ejemplo, 1 — 03710 Calpe, Alicante" />
+                <Row label="Domicilio social" value={SITE_CONFIG.address} />
                 <Row label="Correo electrónico" value={SITE_CONFIG.email} link={`mailto:${SITE_CONFIG.email}`} />
                 <Row label="Teléfono" value={SITE_CONFIG.phone} />
                 <Row label="Sitio web" value="https://tcgacademy.es" />

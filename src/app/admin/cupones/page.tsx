@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Ticket,
   Plus,
@@ -11,7 +11,13 @@ import {
   Pencil,
   ChevronDown,
 } from "lucide-react";
-import { MOCK_ADMIN_COUPONS, type AdminCoupon } from "@/data/mockData";
+import { type AdminCoupon } from "@/data/mockData";
+import {
+  loadAdminCoupons,
+  saveAdminCoupons,
+  upsertAdminCoupon,
+  deleteAdminCoupon as deleteAdminCouponSvc,
+} from "@/services/couponService";
 import { GAME_CONFIG } from "@/data/products";
 
 function generateCode() {
@@ -40,7 +46,15 @@ const DEFAULT_FORM: Omit<AdminCoupon, "timesUsed" | "totalSaved"> = {
 };
 
 export default function AdminCuponesPage() {
-  const [coupons, setCoupons] = useState<AdminCoupon[]>(MOCK_ADMIN_COUPONS);
+  // SSOT: lee desde store persistente (semilla MOCK_ADMIN_COUPONS al primer load).
+  const [coupons, setCoupons] = useState<AdminCoupon[]>([]);
+
+  useEffect(() => {
+    setCoupons(loadAdminCoupons());
+    const reload = () => setCoupons(loadAdminCoupons());
+    window.addEventListener("tcga:coupons:updated", reload);
+    return () => window.removeEventListener("tcga:coupons:updated", reload);
+  }, []);
   const [showForm, setShowForm] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [form, setForm] =
@@ -53,14 +67,17 @@ export default function AdminCuponesPage() {
   };
 
   const toggleCoupon = useCallback((code: string) => {
-    setCoupons((prev) =>
-      prev.map((c) => (c.code === code ? { ...c, active: !c.active } : c)),
-    );
+    setCoupons((prev) => {
+      const next = prev.map((c) => (c.code === code ? { ...c, active: !c.active } : c));
+      saveAdminCoupons(next);
+      return next;
+    });
     showToast("Estado del cupón actualizado");
   }, []);
 
   const deleteCoupon = useCallback((code: string) => {
-    setCoupons((prev) => prev.filter((c) => c.code !== code));
+    const next = deleteAdminCouponSvc(code);
+    setCoupons(next);
     showToast(`Cupón ${code} eliminado`);
   }, []);
 
@@ -98,19 +115,19 @@ export default function AdminCuponesPage() {
     if (!form.code || !form.endsAt) return;
 
     if (editingCode) {
-      // Update existing coupon
-      setCoupons((prev) =>
-        prev.map((c) =>
-          c.code === editingCode
-            ? { ...c, ...form }
-            : c,
-        ),
-      );
+      // Update existing coupon — preserva timesUsed/totalSaved.
+      const existing = coupons.find((c) => c.code === editingCode);
+      const merged: AdminCoupon = {
+        ...form,
+        timesUsed: existing?.timesUsed ?? 0,
+        totalSaved: existing?.totalSaved ?? 0,
+      };
+      setCoupons(upsertAdminCoupon(merged));
       showToast(`Cupón ${form.code} actualizado`);
     } else {
       // Create new coupon
       const newCoupon: AdminCoupon = { ...form, timesUsed: 0, totalSaved: 0 };
-      setCoupons((prev) => [newCoupon, ...prev]);
+      setCoupons(upsertAdminCoupon(newCoupon));
       showToast(`Cupón ${form.code} creado correctamente`);
     }
     closeForm();

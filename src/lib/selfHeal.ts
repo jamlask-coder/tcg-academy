@@ -16,6 +16,7 @@
 
 import { safeRead, safeWrite, safeReadArray } from "@/lib/safeStorage";
 import { logger } from "@/lib/logger";
+import { getCriticalJsonKeys } from "@/lib/dataHub";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -262,19 +263,16 @@ export function runSelfHealing(): HealingReport {
 
   const checks: HealingCheck[] = [];
 
-  // 1. Verificar JSON de todas las keys críticas
-  const criticalKeys: [string, unknown][] = [
-    ["tcgacademy_orders", []],
-    ["tcgacademy_invoices", []],
-    ["tcgacademy_pts", {}],
-    ["tcgacademy_product_overrides", {}],
-    ["tcgacademy_returns", []],
-    ["tcgacademy_user_coupons", []],
-    ["tcgacademy_email_log", []],
-    ["tcgacademy_payment_status", {}],
-    ["tcga_cart", []],
-  ];
-  for (const [key, fallback] of criticalKeys) {
+  // 1. Verificar JSON de todas las keys críticas.
+  //    Lista derivada del registry de DataHub (flag `criticalJson: true`).
+  //    El fallback por defecto es [] salvo para las claves tipo diccionario conocidas.
+  const dictionaryKeys = new Set([
+    "tcgacademy_pts",
+    "tcgacademy_pts_attr",
+    "tcgacademy_product_overrides",
+  ]);
+  for (const key of getCriticalJsonKeys()) {
+    const fallback: unknown = dictionaryKeys.has(key) ? {} : [];
     checks.push(healJsonKey(key, fallback));
   }
 

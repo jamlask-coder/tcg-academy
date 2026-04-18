@@ -26,6 +26,7 @@ import {
   type CommChannel,
 } from "@/services/consentService";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
+import { SITE_CONFIG } from "@/config/siteConfig";
 
 const CONSENT_LABELS: Record<ConsentType, { label: string; description: string; revocable: boolean }> = {
   terms: {
@@ -569,10 +570,10 @@ export default function PrivacidadPage() {
           oposición, portabilidad y limitación del tratamiento. Puedes hacerlo
           desde este panel o escribiendo a{" "}
           <a
-            href="mailto:hola@tcgacademy.es"
+            href={`mailto:${SITE_CONFIG.email}`}
             className="font-medium text-[#2563eb] hover:underline"
           >
-            hola@tcgacademy.es
+            {SITE_CONFIG.email}
           </a>{" "}
           adjuntando copia de tu documento de identidad.
         </p>

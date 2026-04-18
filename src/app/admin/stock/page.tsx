@@ -18,7 +18,6 @@ import {
   Pencil,
   Copy,
   Trash2,
-  PackagePlus,
   AlertTriangle,
   RotateCcw,
 } from "lucide-react";
@@ -28,7 +27,9 @@ const PAGE_SIZE = 50;
 
 type StockEdit = {
   stock?: string; // raw input; "" = ilimitado
-  maxPerUser?: string;
+  maxPerClient?: string;
+  maxPerWholesaler?: string;
+  maxPerStore?: string;
 };
 
 export default function AdminStockPage() {
@@ -50,7 +51,7 @@ export default function AdminStockPage() {
   const [search, setSearch] = useState("");
   const [gameFilter, setGameFilter] = useState("");
   const [catFilter, setCatFilter] = useState("");
-  const [stockFilter, setStockFilter] = useState<"" | "out" | "low" | "ok" | "unlimited">("");
+  const [stockFilter, setStockFilter] = useState<"" | "out" | "low" | "ok">("");
   const [page, setPage] = useState(1);
   const [saved, setSaved] = useState(false);
 
@@ -115,7 +116,6 @@ export default function AdminStockPage() {
     if (stockFilter) {
       list = list.filter((p) => {
         const s = p.stock;
-        if (stockFilter === "unlimited") return s === undefined;
         if (stockFilter === "out") return s !== undefined && s <= 0;
         if (stockFilter === "low") return s !== undefined && s > 0 && s <= 5;
         if (stockFilter === "ok") return s === undefined || s > 5;
@@ -133,9 +133,11 @@ export default function AdminStockPage() {
     return p.stock !== undefined ? String(p.stock) : "";
   };
 
-  const getMaxPerUser = (p: LocalProduct): string => {
-    if (edits[p.id]?.maxPerUser !== undefined) return edits[p.id]!.maxPerUser!;
-    return p.maxPerUser !== undefined ? String(p.maxPerUser) : "";
+  const getLimit = (p: LocalProduct, field: "maxPerClient" | "maxPerWholesaler" | "maxPerStore"): string => {
+    const edit = edits[p.id]?.[field];
+    if (edit !== undefined) return edit;
+    const val = p[field];
+    return val !== undefined ? String(val) : "";
   };
 
   const updateField = (id: number, field: keyof StockEdit, val: string) => {
@@ -152,46 +154,53 @@ export default function AdminStockPage() {
     const stored = JSON.parse(
       localStorage.getItem("tcgacademy_new_products") ?? "[]",
     ) as LocalProduct[];
-    const stockOverrides = JSON.parse(
-      localStorage.getItem("tcgacademy_stock_overrides") ?? "{}",
-    ) as Record<string, number | null>;
-    const maxOverrides = JSON.parse(
-      localStorage.getItem("tcgacademy_max_per_user_overrides") ?? "{}",
-    ) as Record<string, number | null>;
+    // SSOT: stock y maxPerUser de productos del catálogo estático viven en
+    // `tcgacademy_product_overrides[id]` (lo que lee `getMergedProducts`).
+    // La antigua clave `tcgacademy_stock_overrides` queda deprecada.
+    const productOverrides = JSON.parse(
+      localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
+    ) as Record<string, Partial<LocalProduct>>;
 
     for (const [idStr, changes] of Object.entries(edits)) {
       const id = Number(idStr);
+      const adminIdx = stored.findIndex((sp) => sp.id === id);
+      const isAdminProduct = adminIdx >= 0;
+
       // stock
       if (changes.stock !== undefined) {
         const raw = changes.stock.trim();
-        const stockVal = raw === "" ? null : parseInt(raw);
-        const idx = stored.findIndex((sp) => sp.id === id);
-        if (idx >= 0) {
-          stored[idx].stock = stockVal ?? undefined;
-          stored[idx].inStock = stockVal === null || stockVal > 0;
+        const stockVal = raw === "" ? undefined : parseInt(raw);
+        if (isAdminProduct) {
+          stored[adminIdx].stock = stockVal;
+          stored[adminIdx].inStock = stockVal === undefined || stockVal > 0;
+        } else {
+          productOverrides[idStr] = {
+            ...productOverrides[idStr],
+            stock: stockVal,
+            inStock: stockVal === undefined || stockVal > 0,
+          };
         }
-        stockOverrides[idStr] = stockVal;
       }
-      // maxPerUser
-      if (changes.maxPerUser !== undefined) {
-        const raw = changes.maxPerUser.trim();
-        const maxVal = raw === "" ? null : parseInt(raw);
-        const idx = stored.findIndex((sp) => sp.id === id);
-        if (idx >= 0) {
-          stored[idx].maxPerUser = maxVal ?? undefined;
+      // Límites por rol (acumulados de por vida)
+      for (const field of ["maxPerClient", "maxPerWholesaler", "maxPerStore"] as const) {
+        if (changes[field] === undefined) continue;
+        const raw = changes[field]!.trim();
+        const val = raw === "" ? undefined : parseInt(raw);
+        if (isAdminProduct) {
+          stored[adminIdx][field] = val;
+        } else {
+          productOverrides[idStr] = {
+            ...productOverrides[idStr],
+            [field]: val,
+          };
         }
-        maxOverrides[idStr] = maxVal;
       }
     }
 
     localStorage.setItem("tcgacademy_new_products", JSON.stringify(stored));
     localStorage.setItem(
-      "tcgacademy_stock_overrides",
-      JSON.stringify(stockOverrides),
-    );
-    localStorage.setItem(
-      "tcgacademy_max_per_user_overrides",
-      JSON.stringify(maxOverrides),
+      "tcgacademy_product_overrides",
+      JSON.stringify(productOverrides),
     );
     window.dispatchEvent(new Event("tcga:products:updated"));
     setEdits({});
@@ -210,15 +219,14 @@ export default function AdminStockPage() {
   const stats = useMemo(() => {
     let out = 0,
       low = 0,
-      ok = 0,
-      unlimited = 0;
+      ok = 0;
     for (const p of allProducts.filter((p) => !deletedIds.has(p.id))) {
-      if (p.stock === undefined) unlimited++;
+      if (p.stock === undefined) ok++;
       else if (p.stock <= 0) out++;
       else if (p.stock <= 5) low++;
       else ok++;
     }
-    return { out, low, ok, unlimited };
+    return { out, low, ok };
   }, [allProducts, deletedIds]);
 
   return (
@@ -242,23 +250,11 @@ export default function AdminStockPage() {
               ✓ Guardado
             </span>
           )}
-          <Link
-            href="/admin/precios"
-            className="flex min-h-[44px] items-center gap-2 rounded-xl border border-[#2563eb]/20 px-4 py-2.5 text-sm font-bold text-[#2563eb] transition hover:bg-blue-50"
-          >
-            Ver precios
-          </Link>
-          <Link
-            href="/admin/productos/nuevo"
-            className="flex min-h-[44px] items-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-green-700"
-          >
-            <PackagePlus size={16} /> Añadir producto
-          </Link>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <button
           onClick={() => setStockFilter(stockFilter === "out" ? "" : "out")}
           className={`rounded-xl border p-3 text-left transition ${stockFilter === "out" ? "border-red-500 bg-red-50" : "border-gray-200 bg-white hover:border-red-300"}`}
@@ -279,17 +275,6 @@ export default function AdminStockPage() {
         >
           <p className="text-xs font-semibold text-green-600">Con stock</p>
           <p className="mt-1 text-2xl font-bold text-green-600">{stats.ok}</p>
-        </button>
-        <button
-          onClick={() =>
-            setStockFilter(stockFilter === "unlimited" ? "" : "unlimited")
-          }
-          className={`rounded-xl border p-3 text-left transition ${stockFilter === "unlimited" ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white hover:border-blue-300"}`}
-        >
-          <p className="text-xs font-semibold text-blue-600">Ilimitado (∞)</p>
-          <p className="mt-1 text-2xl font-bold text-blue-600">
-            {stats.unlimited}
-          </p>
         </button>
       </div>
 
@@ -394,11 +379,23 @@ export default function AdminStockPage() {
                 <th className="px-3 py-3 text-center font-semibold whitespace-nowrap text-gray-600">
                   Stock
                 </th>
-                <th className="px-3 py-3 text-center font-semibold whitespace-nowrap text-gray-600">
-                  Estado
+                <th
+                  className="px-3 py-3 text-center font-semibold whitespace-nowrap text-gray-600"
+                  title="Máximo acumulado (de por vida) de unidades que un cliente puede comprar. Incluye todos sus pedidos, no solo uno."
+                >
+                  Máx / clientes
                 </th>
-                <th className="px-3 py-3 text-center font-semibold whitespace-nowrap text-gray-600">
-                  Máx / usuario
+                <th
+                  className="px-3 py-3 text-center font-semibold whitespace-nowrap text-gray-600"
+                  title="Máximo acumulado por mayorista (suma todas sus compras históricas)."
+                >
+                  Máx / mayoristas
+                </th>
+                <th
+                  className="px-3 py-3 text-center font-semibold whitespace-nowrap text-gray-600"
+                  title="Máximo acumulado por tienda (suma todas sus compras históricas)."
+                >
+                  Máx / tiendas
                 </th>
                 <th className="hidden px-4 py-3 text-center font-semibold text-gray-600 sm:table-cell">
                   Acciones
@@ -419,14 +416,6 @@ export default function AdminStockPage() {
                       : si.level === "low"
                         ? "border-amber-300 bg-amber-50 text-amber-700"
                         : "border-gray-200";
-                const badgeCls =
-                  si.level === "out"
-                    ? "bg-red-100 text-red-700"
-                    : si.level === "last" || si.level === "low"
-                      ? "bg-amber-100 text-amber-700"
-                      : numVal === undefined
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-green-100 text-green-700";
                 return (
                   <tr
                     key={p.id}
@@ -479,26 +468,40 @@ export default function AdminStockPage() {
                       />
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <span
-                        className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${badgeCls}`}
-                      >
-                        {numVal === undefined
-                          ? "Ilimitado"
-                          : numVal <= 0
-                            ? "Sin stock"
-                            : numVal <= 5
-                              ? `Quedan ${numVal}`
-                              : `${numVal} uds`}
-                      </span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={getLimit(p, "maxPerClient")}
+                        placeholder="∞"
+                        title="Unidades máx. por cliente (acumulado histórico)"
+                        onChange={(e) =>
+                          updateField(p.id, "maxPerClient", e.target.value)
+                        }
+                        className={inputCls}
+                      />
                     </td>
                     <td className="px-3 py-3 text-center">
                       <input
                         type="number"
                         min="1"
-                        value={getMaxPerUser(p)}
-                        placeholder="—"
+                        value={getLimit(p, "maxPerWholesaler")}
+                        placeholder="∞"
+                        title="Unidades máx. por mayorista (acumulado histórico)"
                         onChange={(e) =>
-                          updateField(p.id, "maxPerUser", e.target.value)
+                          updateField(p.id, "maxPerWholesaler", e.target.value)
+                        }
+                        className={inputCls}
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      <input
+                        type="number"
+                        min="1"
+                        value={getLimit(p, "maxPerStore")}
+                        placeholder="∞"
+                        title="Unidades máx. por tienda (acumulado histórico)"
+                        onChange={(e) =>
+                          updateField(p.id, "maxPerStore", e.target.value)
                         }
                         className={inputCls}
                       />
@@ -551,7 +554,7 @@ export default function AdminStockPage() {
               {paginated.length === 0 && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-4 py-12 text-center text-sm text-gray-400"
                   >
                     No se encontraron productos con los filtros aplicados.

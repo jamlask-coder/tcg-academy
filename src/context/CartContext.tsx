@@ -1,6 +1,8 @@
 "use client";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { getMergedById } from "@/lib/productStore";
+import { useAuth } from "@/context/AuthContext";
+import { getRoleLimit, getPurchasedQty } from "@/services/purchaseLimitService";
 
 export interface CartItem {
   key: string;
@@ -37,6 +39,7 @@ const MAX_QTY_PER_LINE = 99;
 const CartContext = createContext<CartCtx | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const { user, role } = useAuth();
   const [items, setItems] = useState<CartItem[]>(() => {
     try {
       const s =
@@ -70,16 +73,40 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     let effectiveQty = qty;
 
-    // Cap at absolute maximum per line
-    const maxPerUser = product?.maxPerUser !== undefined && typeof product.maxPerUser === "number"
-      ? Math.min(product.maxPerUser, MAX_QTY_PER_LINE)
+    // Límite acumulado de por vida por rol (maxPerClient / maxPerWholesaler /
+    // maxPerStore, con fallback a maxPerUser). Se suman compras históricas +
+    // carrito actual, y el usuario nunca puede superar ese tope.
+    const roleLimit = product ? getRoleLimit(product, role) : undefined;
+    const absoluteMax = roleLimit !== undefined
+      ? Math.min(roleLimit, MAX_QTY_PER_LINE)
       : MAX_QTY_PER_LINE;
 
-    if (currentQty >= maxPerUser) {
-      return { added: false, reason: `Límite por persona alcanzado (máx. ${maxPerUser} uds)` };
+    const purchased = roleLimit !== undefined && user?.id
+      ? getPurchasedQty(user.id, id)
+      : 0;
+
+    // Cupo restante por rol, descontando compras ya realizadas.
+    const roleRemaining = roleLimit !== undefined
+      ? Math.max(0, roleLimit - purchased - currentQty)
+      : Infinity;
+
+    if (roleLimit !== undefined && roleRemaining <= 0) {
+      const whoLabel = role === "mayorista" ? "mayorista" : role === "tienda" ? "tienda" : "cliente";
+      return {
+        added: false,
+        reason: `Ya alcanzaste el máximo por ${whoLabel} para este producto (${roleLimit} uds, incluyendo pedidos anteriores).`,
+      };
     }
-    if (currentQty + effectiveQty > maxPerUser) {
-      effectiveQty = maxPerUser - currentQty;
+
+    if (currentQty >= absoluteMax) {
+      return { added: false, reason: `Límite por persona alcanzado (máx. ${absoluteMax} uds)` };
+    }
+    if (currentQty + effectiveQty > absoluteMax) {
+      effectiveQty = absoluteMax - currentQty;
+    }
+    // Aplicar también el remaining acumulado
+    if (effectiveQty > roleRemaining) {
+      effectiveQty = roleRemaining;
     }
 
     if (product?.stock !== undefined && typeof product.stock === "number") {
@@ -89,6 +116,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (currentQty + effectiveQty > product.stock) {
         effectiveQty = product.stock - currentQty;
       }
+    }
+
+    if (effectiveQty <= 0) {
+      return { added: false, reason: "No se pueden añadir más unidades de este producto." };
     }
 
     if (ex) {

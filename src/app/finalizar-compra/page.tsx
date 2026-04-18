@@ -17,9 +17,10 @@ import {
   saveInvoice,
   buildLineItem,
 } from "@/services/invoiceService";
-import { PaymentMethod } from "@/types/fiscal";
+import { PaymentMethod, TaxIdType } from "@/types/fiscal";
 import type { CustomerData } from "@/types/fiscal";
 import { recordCouponUsage, markCouponUsed } from "@/services/couponService";
+import { renderEmailTemplate, logSentEmail } from "@/services/emailService";
 import { sanitizeString, isValidEmail, clampNumber } from "@/utils/sanitize";
 import {
   acquireCheckoutLock,
@@ -27,7 +28,13 @@ import {
   checkOrderIdempotency,
   orderFingerprint,
 } from "@/lib/checkoutGuard";
-import { safeWrite, safeRead, emergencyTrimStorage } from "@/lib/safeStorage";
+import { safeWrite, safeRead, emergencyTrimStorage, aggressiveCleanup } from "@/lib/safeStorage";
+import {
+  appendToAdminInbox,
+  patchCheckoutOrder,
+  isDeferredPayment,
+  type CheckoutOrder,
+} from "@/lib/orderAdapter";
 import {
   detectImpossibleDiscount,
   detectRapidFire,
@@ -52,15 +59,21 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { STORES } from "@/data/stores";
 
-const TIENDAS = [
-  { id: "calpe", name: "TCG Academy Calpe", address: "Av. Gabriel Miró 42, 03710 Calpe", email: "tcgacademycalpe@gmail.com" },
-  { id: "bejar", name: "TCG Academy Béjar", address: "C/ Mayor 15, 37700 Béjar", email: "bejar@tcgacademy.es" },
-  { id: "madrid", name: "TCG Academy Madrid", address: "C/ Gran Vía 28, 28013 Madrid", email: "madrid@tcgacademy.es" },
-  { id: "barcelona", name: "TCG Academy Barcelona", address: "C/ Pelai 12, 08001 Barcelona", email: "barcelona@tcgacademy.es" },
-];
+// Proyección ligera del registro central de tiendas para el checkout.
+// Fuente única: src/data/stores.ts — añadir/editar tiendas ahí.
+const TIENDAS = Object.values(STORES).map((s) => ({
+  id: s.id,
+  name: s.name,
+  address: s.address,
+  email: s.email,
+}));
 
-type Step = "datos" | "envio" | "pago" | "confirmado";
+// Flujo consolidado: el método de envío se elige en el primer paso "datos"
+// junto con los datos personales. La dirección sólo se pide si NO es recogida
+// en tienda — así no tiene sentido pedirla sin saber si el cliente recoge.
+type Step = "datos" | "pago" | "confirmado";
 
 interface PendingCheckout {
   appliedCoupon: {
@@ -105,6 +118,7 @@ export default function CheckoutPage() {
   const [form, setForm] = useState({
     nombre: "",
     apellidos: "",
+    nif: "",
     email: "",
     telefono: "",
     direccion: "",
@@ -135,6 +149,7 @@ export default function CheckoutPage() {
       ...f,
       nombre: f.nombre || user.name || "",
       apellidos: f.apellidos || user.lastName || "",
+      nif: f.nif || user.nif || "",
       email: f.email || user.email || "",
       telefono: f.telefono || user.phone || "",
       ...(defaultAddr
@@ -244,6 +259,18 @@ export default function CheckoutPage() {
         return;
       }
 
+      // ── Guard 5b: Validate NIF (obligatorio para factura — Art. 6.1.d RD 1619/2012) ──
+      const { validateSpanishNIF } = await import("@/lib/validations/nif");
+      const nifCheck = validateSpanishNIF(form.nif);
+      if (!nifCheck.valid) {
+        setOrderError(
+          nifCheck.error
+            ? `NIF / NIE / CIF: ${nifCheck.error}`
+            : "El NIF / NIE / CIF es obligatorio para emitir la factura.",
+        );
+        return;
+      }
+
       // ── Guard 6: Validate prices are sane ──
       const badPriceItem = items.find(
         (i) => !Number.isFinite(i.price) || i.price <= 0,
@@ -340,7 +367,71 @@ export default function CheckoutPage() {
         pago: form.pago,
         userRole: user?.role ?? "guest",
         userId: user?.id ?? null,
+        // NIF del comprador (ya validado arriba con validateSpanishNIF)
+        // — obligatorio para factura (Art. 6.1.d RD 1619/2012).
+        nif: nifCheck.normalized,
+        nifType:
+          nifCheck.type === "NIE"
+            ? "NIE"
+            : nifCheck.type === "CIF"
+              ? "CIF"
+              : "DNI",
       };
+
+      // ── INTENT BRANCH — pago diferido (recogida en tienda / transferencia) ──
+      // Regla de negocio (2026-04-18): cobro pendiente ≠ pedido. Para pago
+      // diferido NO se persiste el pedido, NO se crea factura, NO se acumulan
+      // puntos ni se descuenta stock. Solo se envía un email a la tienda con
+      // la intención del cliente y un email de confirmación al cliente. Si
+      // finalmente compra (viene a tienda, hace la transferencia), la venta
+      // real se registrará desde el PoS/admin en ese momento.
+      if (isDeferredPayment(form.pago)) {
+        try {
+          const tienda =
+            isStorePickup && form.tiendaRecogida
+              ? TIENDAS.find((t) => t.id === form.tiendaRecogida)
+              : null;
+          const nowIso = new Date().toISOString();
+          const productList = items
+            .map((i) => `${i.quantity}× ${i.name}`)
+            .join(", ");
+          const customerContact = `${form.nombre} ${form.apellidos} · ${form.email} · ${form.telefono}`;
+
+          // Email a la tienda / admin con la intención
+          logSentEmail({
+            id: `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            to: tienda ? tienda.email : SITE_CONFIG.email,
+            toName: tienda ? tienda.name : SITE_CONFIG.name,
+            subject: tienda
+              ? `Intención de recogida — ${form.nombre} ${form.apellidos}`
+              : `Intención de pago diferido — ${form.nombre} ${form.apellidos}`,
+            templateId: "confirmacion_pedido",
+            sentAt: nowIso,
+            preview: `${customerContact} · ${productList} · Total aprox: ${safeFinalTotal.toFixed(2)}€ · ${tienda ? "cobrar al recoger" : form.pago}`,
+          });
+
+          // Email al cliente confirmando la intención (no es un pedido cerrado)
+          logSentEmail({
+            id: `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            to: form.email,
+            toName: `${form.nombre} ${form.apellidos}`.trim(),
+            subject: tienda
+              ? `Te esperamos en ${tienda.name}`
+              : "Hemos recibido tu solicitud",
+            templateId: "confirmacion_pedido",
+            sentAt: nowIso,
+            preview: tienda
+              ? `Pasa por ${tienda.name} para abonar y recoger tu pedido (${safeFinalTotal.toFixed(2)}€). Recomendamos confirmar disponibilidad por teléfono antes de desplazarte.`
+              : `Hemos recibido tu solicitud. Te contactaremos para confirmar el pago y los siguientes pasos.`,
+          });
+        } catch {
+          /* email log es non-critical */
+        }
+
+        clearCart();
+        setStep("confirmado");
+        return;
+      }
 
     // ── PHASE 1: Save order (CRITICAL — must succeed) ──
     const orderSaved = safeWrite(
@@ -352,10 +443,22 @@ export default function CheckoutPage() {
     );
 
     if (!orderSaved) {
-      // Try emergency cleanup and retry once
+      // Level 1: gentle trim + retry
       emergencyTrimStorage();
-      const retryData = safeRead<unknown[]>("tcgacademy_orders", []);
-      const retrySaved = safeWrite("tcgacademy_orders", [order, ...retryData]);
+      let retryData = safeRead<unknown[]>("tcgacademy_orders", []);
+      let retrySaved = safeWrite("tcgacademy_orders", [order, ...retryData]);
+      if (!retrySaved) {
+        // Level 2: aggressive purge of non-essential keys + retry
+        aggressiveCleanup();
+        retryData = safeRead<unknown[]>("tcgacademy_orders", []);
+        retrySaved = safeWrite("tcgacademy_orders", [order, ...retryData]);
+      }
+      if (!retrySaved) {
+        // Level 3: last resort — trim oldest orders (keep last 200)
+        const existing = safeRead<unknown[]>("tcgacademy_orders", []);
+        const trimmed = existing.slice(0, 200);
+        retrySaved = safeWrite("tcgacademy_orders", [order, ...trimmed]);
+      }
       if (!retrySaved) {
         setOrderError("Error al guardar el pedido: almacenamiento lleno. Por favor, contacta con soporte.");
         return;
@@ -363,6 +466,17 @@ export default function CheckoutPage() {
     }
 
     localStorage.removeItem("tcgacademy_pending_checkout");
+
+    // ── PHASE 1.2: Mirror order to admin inbox ────────────────────────────
+    // Sin esto el pedido vive sólo en `tcgacademy_orders` y el panel admin
+    // NO lo ve (lee de `tcgacademy_admin_orders`). Es la relación comprador-
+    // vendedor: cada pedido de cliente/mayorista/tienda debe llegarnos.
+    try {
+      appendToAdminInbox(order as CheckoutOrder);
+    } catch {
+      // Best-effort: si falla, el admin panel lo recupera con
+      // readAdminOrdersMerged() al leer (escanea también tcgacademy_orders).
+    }
 
     // ── PHASE 1.5: Persist shipping address to user profile if new ──
     // Fixes bug where addresses used in checkout don't appear in "Mis direcciones".
@@ -436,6 +550,15 @@ export default function CheckoutPage() {
 
         const recipient: CustomerData = {
           name: `${sNombre} ${sApellidos}`.trim(),
+          taxId: nifCheck.normalized,
+          taxIdType:
+            nifCheck.type === "DNI"
+              ? TaxIdType.NIF
+              : nifCheck.type === "NIE"
+                ? TaxIdType.NIE
+                : nifCheck.type === "CIF"
+                  ? TaxIdType.CIF
+                  : TaxIdType.NIF,
           email: form.email,
           phone: sTelefono,
           countryCode: form.pais || "ES",
@@ -505,17 +628,8 @@ export default function CheckoutPage() {
           })();
         }
 
-        // Store invoice ID in the order
-        try {
-          const orders = JSON.parse(
-            localStorage.getItem("tcgacademy_orders") ?? "[]",
-          ) as { id: string; invoiceId?: string }[];
-          const orderIdx = orders.findIndex((o) => o.id === id);
-          if (orderIdx !== -1) {
-            orders[orderIdx].invoiceId = invoice.invoiceId;
-            localStorage.setItem("tcgacademy_orders", JSON.stringify(orders));
-          }
-        } catch { /* invoice link is non-critical */ }
+        // Store invoice ID in the order (vía adapter SSOT: safeWrite + evento).
+        patchCheckoutOrder(id, { invoiceId: invoice.invoiceId } as Partial<CheckoutOrder> & { invoiceId: string });
       } catch (invoiceErr) {
         // Dead letter queue — invoice can be regenerated later by admin
         enqueueDeadLetter("invoice_send", {
@@ -539,14 +653,9 @@ export default function CheckoutPage() {
       }
     }
 
-    // ── PHASE 4: Mark payment status ──
-    if (form.pago === "transferencia" || form.pago === "tienda") {
-      try {
-        const ps = JSON.parse(localStorage.getItem("tcgacademy_payment_status") ?? "{}");
-        ps[id] = "pendiente";
-        localStorage.setItem("tcgacademy_payment_status", JSON.stringify(ps));
-      } catch { /* non-critical */ }
-    }
+    // ── PHASE 4: Payment status is set by checkoutOrderToAdmin()
+    // via derivePaymentStatus() when appendToAdminInbox() runs.
+    // No separate storage key needed — SSOT lives on AdminOrder.paymentStatus.
 
     // ── PHASE 5: Award purchase points (on discounted base, not full price) ──
     if (user?.role === "cliente") {
@@ -584,49 +693,74 @@ export default function CheckoutPage() {
       } catch { /* coupon tracking is non-critical */ }
     }
 
-    // ── PHASE 8: Log confirmation emails ──
+    // ── PHASE 8: Log confirmation emails (canonical SentEmailLog shape) ──
     try {
-      const emailLog = safeRead<unknown[]>("tcgacademy_email_log", []);
-      emailLog.unshift({
-        date: new Date().toISOString(),
-        to: form.email,
-        subject: `Confirmación de pedido ${id}`,
-        status: "enviado",
-        orderId: id,
-        body: `Pedido ${id} confirmado. Total: ${safeFinalTotal.toFixed(2)}€. ${isStorePickup ? `Recogida en ${TIENDAS.find(t => t.id === form.tiendaRecogida)?.name ?? "tienda"}.` : `Envío a: ${form.direccion}, ${form.ciudad}.`}`,
+      const nowIso = new Date().toISOString();
+      const tienda = isStorePickup && form.tiendaRecogida
+        ? TIENDAS.find(t => t.id === form.tiendaRecogida)
+        : null;
+      const paymentLabel: Record<string, string> = {
+        tarjeta: "Tarjeta",
+        paypal: "PayPal",
+        bizum: "Bizum",
+        "google-pay": "Google Pay",
+        "apple-pay": "Apple Pay",
+        transferencia: "Transferencia bancaria",
+        tienda: "Pago en tienda al recoger",
+      };
+      const itemsHtml = items
+        .map(i => `<tr><td>${i.name}</td><td>${i.quantity}</td><td>${(i.price * i.quantity).toFixed(2)}€</td></tr>`)
+        .join("");
+      const addressBlock = tienda
+        ? `Recogida en: ${tienda.name} — ${tienda.address ?? ""}`
+        : `${form.direccion}, ${form.ciudad} ${form.cp}, ${form.provincia}`;
+
+      const rendered = renderEmailTemplate("confirmacion_pedido", {
+        nombre: form.nombre || "cliente",
+        order_id: id,
+        order_date: new Date().toLocaleDateString("es-ES"),
+        items_html: itemsHtml,
+        subtotal: total.toFixed(2),
+        shipping: isStorePickup ? "Gratis (recogida)" : shipping === 0 ? "Gratis" : `${shipping.toFixed(2)}€`,
+        total: safeFinalTotal.toFixed(2),
+        address: addressBlock,
+        payment_method: paymentLabel[form.pago] ?? form.pago,
+        unsubscribe_link: "#",
       });
 
-      if (isStorePickup && form.tiendaRecogida) {
-        const tienda = TIENDAS.find(t => t.id === form.tiendaRecogida);
-        if (tienda) {
-          const productList = items.map(i => `${i.quantity}× ${i.name}`).join(", ");
-          emailLog.unshift({
-            date: new Date().toISOString(),
-            to: tienda.email,
-            subject: `Nuevo pedido para recoger en ${tienda.name} — ${id}`,
-            status: "enviado",
-            orderId: id,
-            body: `Nuevo pedido ${id} para recogida en ${tienda.name}.\n\nCliente: ${form.nombre} ${form.apellidos}\nEmail: ${form.email}\nTeléfono: ${form.telefono}\n\nProductos: ${productList}\nTotal: ${safeFinalTotal.toFixed(2)}€\nPago: En tienda al recoger.\n\nPor favor, preparad el pedido para que el cliente pueda recogerlo.`,
-          });
-        }
+      if (rendered) {
+        logSentEmail({
+          id: `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          to: form.email,
+          toName: `${form.nombre} ${form.apellidos}`.trim(),
+          subject: rendered.subject,
+          templateId: "confirmacion_pedido",
+          sentAt: nowIso,
+          preview: isStorePickup && tienda
+            ? `Pedido ${id} para recoger en ${tienda.name}. Total: ${safeFinalTotal.toFixed(2)}€ (pago al recoger)`
+            : `Pedido ${id} confirmado. Total: ${safeFinalTotal.toFixed(2)}€`,
+        });
       }
 
-      // Keep more email history (was 100, now 500)
-      if (emailLog.length > 500) emailLog.length = 500;
-      safeWrite("tcgacademy_email_log", emailLog);
+      // Notificación adicional a la tienda para pedidos de recogida
+      if (tienda) {
+        const productList = items.map(i => `${i.quantity}× ${i.name}`).join(", ");
+        logSentEmail({
+          id: `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          to: tienda.email,
+          toName: tienda.name,
+          subject: `Nuevo pedido para recoger en ${tienda.name} — ${id}`,
+          templateId: "confirmacion_pedido",
+          sentAt: nowIso,
+          preview: `Cliente: ${form.nombre} ${form.apellidos} · ${productList} · Total: ${safeFinalTotal.toFixed(2)}€ (cobrar al recoger)`,
+        });
+      }
     } catch { /* email log is non-critical */ }
 
     // ── Log point deduction failure for admin to see ──
     if (user?.role === "cliente" && appliedPoints?.points && !pointsDeducted) {
-      // Order went through but points weren't deducted — flag it
-      try {
-        const existing = JSON.parse(localStorage.getItem("tcgacademy_orders") ?? "[]");
-        const orderIdx = existing.findIndex((o: { id: string }) => o.id === id);
-        if (orderIdx !== -1) {
-          existing[orderIdx].pointsDeductionFailed = true;
-          localStorage.setItem("tcgacademy_orders", JSON.stringify(existing));
-        }
-      } catch { /* non-critical */ }
+      // Order went through but points weren't deducted — flag it vía adapter SSOT.
+      patchCheckoutOrder(id, { pointsDeductionFailed: true } as Partial<CheckoutOrder> & { pointsDeductionFailed: boolean });
     }
 
     clearCart();
@@ -745,7 +879,7 @@ export default function CheckoutPage() {
 
       {/* Steps */}
       <div className="mb-10 flex items-center gap-2">
-        {(isStorePickup ? ["datos", "envio"] as Step[] : ["datos", "envio", "pago"] as Step[]).map((s, i, arr) => (
+        {(isStorePickup ? (["datos"] as Step[]) : (["datos", "pago"] as Step[])).map((s, i, arr) => (
           <div key={s} className="flex items-center gap-2">
             <div
               className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition ${step === s ? "bg-[#2563eb] text-white" : arr.indexOf(step) > i ? "bg-green-500 text-white" : "bg-gray-200 text-gray-500"}`}
@@ -755,7 +889,7 @@ export default function CheckoutPage() {
             <span
               className={`text-sm font-medium ${step === s ? "text-[#2563eb]" : "text-gray-400"}`}
             >
-              {s === "datos" ? "Datos personales" : s === "envio" ? "Envío" : "Pago"}
+              {s === "datos" ? "Datos y entrega" : "Pago"}
             </span>
             {i < arr.length - 1 && <div className="mx-1 h-0.5 w-8 bg-gray-200" />}
           </div>
@@ -772,13 +906,116 @@ export default function CheckoutPage() {
                 e.preventDefault();
                 setTriedSubmitDatos(true);
                 const formEl = e.currentTarget;
-                if (formEl.checkValidity()) {
-                  setStep("envio");
+                // Validación extra: si es pickup, debe haber tienda seleccionada.
+                if (isStorePickup && !form.tiendaRecogida) return;
+                if (!formEl.checkValidity()) return;
+                // Pickup → sin pago online, confirmamos directo.
+                // Envío a domicilio → al paso "pago".
+                if (isStorePickup) {
+                  handleOrder();
+                } else {
+                  setStep("pago");
                 }
               }}
               className="space-y-4 rounded-2xl border border-gray-200 bg-white p-6"
             >
-              <h2 className="mb-4 text-lg font-bold text-gray-900">
+              {/* Método de entrega — PRIMERO, para saber si pedir dirección */}
+              <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-gray-900">
+                <Truck size={20} /> ¿Cómo quieres recibirlo?
+              </h2>
+              <div className="space-y-2">
+                {[
+                  {
+                    id: "estandar",
+                    label: "Envío a domicilio (GLS)",
+                    sub: "Entrega en menos de 24h",
+                    price: total >= SITE_CONFIG.shippingThreshold ? "Gratis" : "3,99€",
+                    icon: null,
+                  },
+                  {
+                    id: "tienda",
+                    label: "Recogida en tienda",
+                    sub: "Sin coste de envío · paga al recoger si quieres",
+                    price: "Gratis",
+                    icon: <Store size={14} className="text-[#2563eb]" />,
+                  },
+                ].map((opt) => (
+                  <label
+                    key={opt.id}
+                    className={`flex cursor-pointer items-center gap-4 rounded-xl border-2 p-4 transition ${
+                      form.envio === opt.id ? "border-[#2563eb] bg-blue-50/40" : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="envio"
+                      value={opt.id}
+                      checked={form.envio === opt.id}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          envio: e.target.value,
+                          // Si elige pickup, limpiar tienda previa si queda inválida.
+                          tiendaRecogida: e.target.value === "tienda" ? f.tiendaRecogida : "",
+                          // Pago coherente con método de entrega.
+                          pago: e.target.value === "tienda" ? "tienda" : f.pago === "tienda" ? "tarjeta" : f.pago,
+                        }))
+                      }
+                      className="accent-[#2563eb]"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                        {opt.icon}
+                        {opt.label}
+                      </div>
+                      <div className="mt-0.5 text-xs text-gray-500">{opt.sub}</div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-900">{opt.price}</span>
+                  </label>
+                ))}
+              </div>
+
+              {/* Selector de tienda — inline, sólo si pickup */}
+              {isStorePickup && (
+                <div className="space-y-2 rounded-xl border-2 border-[#2563eb]/20 bg-blue-50/30 p-4">
+                  <p className="mb-2 text-sm font-semibold text-gray-800">
+                    Elige la tienda de recogida:
+                  </p>
+                  {TIENDAS.map((t) => (
+                    <label
+                      key={t.id}
+                      className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3 transition ${
+                        form.tiendaRecogida === t.id ? "border-[#2563eb] bg-white" : "border-gray-200 bg-white hover:border-gray-300"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="tiendaRecogida"
+                        value={t.id}
+                        checked={form.tiendaRecogida === t.id}
+                        onChange={(e) => setForm((f) => ({ ...f, tiendaRecogida: e.target.value }))}
+                        className="accent-[#2563eb]"
+                      />
+                      <div>
+                        <div className="text-sm font-semibold text-gray-900">{t.name}</div>
+                        <div className="text-xs text-gray-500">{t.address}</div>
+                      </div>
+                    </label>
+                  ))}
+                  {triedSubmitDatos && !form.tiendaRecogida && (
+                    <p className="text-xs font-semibold text-red-600">
+                      Selecciona una tienda para poder continuar.
+                    </p>
+                  )}
+                  <p className="mt-2 text-xs leading-relaxed text-gray-600">
+                    <strong>Pagarás al recoger.</strong> Recibirás la factura
+                    oficial en el momento de la recogida, una vez confirmado el
+                    cobro.
+                  </p>
+                </div>
+              )}
+
+              <h2 className="mb-4 pt-4 text-lg font-bold text-gray-900">
                 Datos personales
               </h2>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -786,10 +1023,13 @@ export default function CheckoutPage() {
                   [
                     ["nombre", "Nombre *", "text", true],
                     ["apellidos", "Apellidos *", "text", true],
+                    ["nif", "NIF / NIE / CIF *", "text", true],
                     ["email", "Email *", "email", true],
-                    ["telefono", "Teléfono", "tel", false],
+                    ["telefono", "Teléfono *", "tel", true],
                   ] as [keyof typeof form, string, string, boolean][]
-                ).map(([key, label, type, req]) => (
+                ).map(([key, label, type, req]) => {
+                  const isNif = key === "nif";
+                  return (
                   <div key={key}>
                     <label className="mb-1.5 block text-sm font-semibold text-gray-700">
                       {label}
@@ -798,14 +1038,30 @@ export default function CheckoutPage() {
                       required={req}
                       type={type}
                       value={form[key]}
+                      maxLength={isNif ? 9 : undefined}
+                      autoComplete={isNif ? "off" : undefined}
                       onChange={(e) =>
-                        setForm((f) => ({ ...f, [key]: e.target.value }))
+                        setForm((f) => ({
+                          ...f,
+                          [key]: isNif
+                            ? e.target.value.toUpperCase()
+                            : e.target.value,
+                        }))
                       }
-                      className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${triedSubmitDatos && req && !form[key].trim() ? "border-red-400" : "border-gray-200"}`}
+                      className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${triedSubmitDatos && req && !form[key].toString().trim() ? "border-red-400" : "border-gray-200"} ${isNif ? "font-mono uppercase tracking-wider" : ""}`}
                     />
+                    {isNif && (
+                      <p className="mt-1 text-[11px] text-gray-500">
+                        Obligatorio para factura (Art. 6.1.d RD 1619/2012)
+                      </p>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
+              {/* ── Dirección de envío — SÓLO si NO es recogida en tienda ── */}
+              {!isStorePickup && (
+              <>
               <h2 className="pt-4 text-lg font-bold text-gray-900">
                 Dirección de envío
               </h2>
@@ -961,132 +1217,20 @@ export default function CheckoutPage() {
                   .
                 </p>
               )}
+              </>
+              )}
               <button
                 type="submit"
-                className="w-full rounded-xl bg-[#2563eb] py-4 font-bold text-white transition hover:bg-[#1d4ed8]"
+                disabled={submitting || (isStorePickup && !form.tiendaRecogida)}
+                className="w-full rounded-xl bg-[#2563eb] py-4 font-bold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Continuar
+                {isStorePickup
+                  ? submitting
+                    ? "Procesando…"
+                    : `Confirmar pedido — ${finalTotal.toFixed(2)}€`
+                  : "Continuar al pago"}
               </button>
             </form>
-          )}
-
-          {step === "envio" && (
-            <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-6">
-              <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900">
-                <Truck size={20} /> Método de envío
-              </h2>
-              {[
-                {
-                  id: "estandar",
-                  label: "Envío estándar con GLS",
-                  sub: "Entrega en menos de 24h",
-                  price:
-                    total >= SITE_CONFIG.shippingThreshold ? "Gratis" : "3,99€",
-                },
-                {
-                  id: "tienda",
-                  label: "Recogida en tienda",
-                  sub: "Gratis",
-                  price: "Gratis",
-                },
-              ].map((opt) => (
-                <label
-                  key={opt.id}
-                  className={`flex cursor-pointer items-center gap-4 rounded-xl border-2 p-4 transition ${form.envio === opt.id ? "border-[#2563eb] bg-blue-50/40" : "border-gray-200 hover:border-gray-300"}`}
-                >
-                  <input
-                    type="radio"
-                    name="envio"
-                    value={opt.id}
-                    checked={form.envio === opt.id}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        envio: e.target.value,
-                        pago:
-                          e.target.value === "tienda"
-                            ? "tienda"
-                            : f.pago === "tienda"
-                              ? "tarjeta"
-                              : f.pago,
-                      }))
-                    }
-                    className="accent-[#2563eb]"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-                      {opt.id === "tienda" && (
-                        <Store size={14} className="text-[#2563eb]" />
-                      )}
-                      {opt.label}
-                    </div>
-                    <div className="mt-0.5 text-xs text-gray-500">
-                      {opt.sub}
-                    </div>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">
-                    {opt.price}
-                  </span>
-                </label>
-              ))}
-
-              {/* Store selector — only when pickup is chosen */}
-              {isStorePickup && (
-                <div className="space-y-2 rounded-xl border-2 border-[#2563eb]/20 bg-blue-50/30 p-4">
-                  <p className="mb-3 text-sm font-semibold text-gray-800">
-                    Selecciona la tienda de recogida:
-                  </p>
-                  {TIENDAS.map((t) => (
-                    <label
-                      key={t.id}
-                      className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3 transition ${form.tiendaRecogida === t.id ? "border-[#2563eb] bg-white" : "border-gray-200 bg-white hover:border-gray-300"}`}
-                    >
-                      <input
-                        type="radio"
-                        name="tiendaRecogida"
-                        value={t.id}
-                        checked={form.tiendaRecogida === t.id}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            tiendaRecogida: e.target.value,
-                          }))
-                        }
-                        className="accent-[#2563eb]"
-                      />
-                      <div>
-                        <div className="text-sm font-semibold text-gray-900">
-                          {t.name}
-                        </div>
-                        <div className="text-xs text-gray-500">{t.address}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setStep("datos")}
-                  className="flex-1 rounded-xl border-2 border-gray-200 py-3.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
-                >
-                  Atrás
-                </button>
-                <button
-                  onClick={() => {
-                    if (isStorePickup) {
-                      handleOrder();
-                    } else {
-                      setStep("pago");
-                    }
-                  }}
-                  disabled={(isStorePickup && !form.tiendaRecogida) || (isStorePickup && submitting)}
-                  className="flex-1 rounded-xl bg-[#2563eb] py-3.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isStorePickup && submitting ? "Procesando..." : isStorePickup ? "Confirmar pedido" : "Continuar"}
-                </button>
-              </div>
-            </div>
           )}
 
           {step === "pago" && (
@@ -1322,7 +1466,7 @@ export default function CheckoutPage() {
 
               <div className="flex gap-3 pt-2">
                 <button
-                  onClick={() => setStep("envio")}
+                  onClick={() => setStep("datos")}
                   className="flex-1 rounded-xl border-2 border-gray-200 py-3.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
                 >
                   Atrás

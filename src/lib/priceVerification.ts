@@ -1,5 +1,7 @@
-import { PRODUCTS } from "@/data/products";
+import { PRODUCTS, type LocalProduct } from "@/data/products";
 import { SITE_CONFIG } from "@/config/siteConfig";
+import { getRoleLimit, getPurchasedQty } from "@/services/purchaseLimitService";
+import type { UserRole } from "@/types/user";
 
 interface CartItem {
   product_id: number;
@@ -167,23 +169,101 @@ export function calculateShipping(
 }
 
 /**
- * Full order verification: prices + stock + shipping.
+ * Aplica sobre un producto los overrides de localStorage (stock + límites
+ * por rol). En servidor se devuelve el producto tal cual (los overrides son
+ * datos de cliente; el motor server-side real debería leerlos de BD).
+ */
+function applyOverrides(p: LocalProduct): LocalProduct {
+  if (typeof window === "undefined") return p;
+  try {
+    const overrides = JSON.parse(
+      localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
+    ) as Record<string, Partial<LocalProduct>>;
+    const ov = overrides[String(p.id)];
+    return ov ? { ...p, ...ov } : p;
+  } catch {
+    return p;
+  }
+}
+
+/**
+ * Verifica que ningún usuario supere su límite acumulado de por vida para
+ * cada producto del carrito. Suma compras previas + qty del pedido actual.
+ *
+ * Devuelve los productos donde se ha excedido el tope (incluye cuánto puede
+ * todavía comprar, si es que puede).
+ */
+export function verifyPurchaseLimits(
+  items: CartItem[],
+  userId: string,
+  userRole: UserRole,
+): {
+  valid: boolean;
+  issues: Array<{
+    productId: number;
+    name: string;
+    requested: number;
+    purchased: number;
+    limit: number;
+    remaining: number;
+  }>;
+} {
+  const issues: Array<{
+    productId: number;
+    name: string;
+    requested: number;
+    purchased: number;
+    limit: number;
+    remaining: number;
+  }> = [];
+
+  if (!userId) return { valid: true, issues };
+
+  for (const item of items) {
+    const base = PRODUCTS.find((p) => p.id === item.product_id);
+    if (!base) continue;
+    const product = applyOverrides(base);
+    const limit = getRoleLimit(product, userRole);
+    if (limit === undefined) continue;
+
+    const purchased = getPurchasedQty(userId, item.product_id);
+    const remaining = Math.max(0, limit - purchased);
+    if (item.quantity > remaining) {
+      issues.push({
+        productId: item.product_id,
+        name: product.name,
+        requested: item.quantity,
+        purchased,
+        limit,
+        remaining,
+      });
+    }
+  }
+
+  return { valid: issues.length === 0, issues };
+}
+
+/**
+ * Full order verification: prices + stock + per-role lifetime limits + shipping.
  * Call this before creating an order.
  */
 export function verifyOrder(
   items: CartItem[],
   shippingMethod: string,
   userRole: string = "cliente",
+  userId: string = "",
 ): {
   valid: boolean;
   priceResult: PriceVerificationResult;
   stockResult: ReturnType<typeof verifyStockAvailability>;
+  limitResult: ReturnType<typeof verifyPurchaseLimits>;
   shipping: number;
   total: number;
   errors: string[];
 } {
   const priceResult = verifyCartPrices(items, userRole);
   const stockResult = verifyStockAvailability(items);
+  const limitResult = verifyPurchaseLimits(items, userId, userRole as UserRole);
   const shipping = calculateShipping(shippingMethod, priceResult.verifiedTotal);
   const total = Math.round((priceResult.verifiedTotal + shipping) * 100) / 100;
 
@@ -196,11 +276,20 @@ export function verifyOrder(
       errors.push(`${issue.name}: solicitados ${issue.requested}, disponibles ${issue.available}`);
     }
   }
+  if (!limitResult.valid) {
+    for (const issue of limitResult.issues) {
+      const who = userRole === "mayorista" ? "mayorista" : userRole === "tienda" ? "tienda" : "cliente";
+      errors.push(
+        `${issue.name}: máx. por ${who} alcanzado (${issue.purchased}/${issue.limit} ya comprado, solo ${issue.remaining} disponibles)`,
+      );
+    }
+  }
 
   return {
     valid: errors.length === 0,
     priceResult,
     stockResult,
+    limitResult,
     shipping,
     total,
     errors,

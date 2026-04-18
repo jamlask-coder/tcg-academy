@@ -11,26 +11,25 @@ import {
   TrendingUp,
   Ticket,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getMergedProducts } from "@/lib/productStore";
-import type { KpiMode } from "@/components/admin/SalesChart";
+import type { KpiMode, PeriodOverride } from "@/components/admin/SalesChart";
 import { countNewIncidents } from "@/services/incidentService";
 import {
   getOrderMetrics,
   getRevenueSummary,
   getTopProducts,
+  getLiveUserStats,
+  countPendingAdminOrders,
+  buildSalesSeries,
+  buildUsersSeries,
+  buildProductsSeries,
 } from "@/services/analyticsService";
 import type { OrderMetrics, TopProduct } from "@/services/analyticsService";
-import {
-  ALL_ORDERS,
-  MOCK_USERS,
-  MOCK_ADMIN_COUPONS,
-  MOCK_SALES_7D,
-  MOCK_SALES_30D,
-  MOCK_SALES_3M,
-  MOCK_SALES_1Y,
-  MOCK_SALES_ALL,
-} from "@/data/mockData";
+import { readAdminOrdersMerged } from "@/lib/orderAdapter";
+import { ADMIN_ORDERS } from "@/data/mockData";
+import { loadAdminCoupons } from "@/services/couponService";
+import type { AdminCoupon } from "@/data/mockData";
 
 const SalesChart = dynamic(
   () => import("@/components/admin/SalesChart").then((m) => m.SalesChart),
@@ -77,38 +76,163 @@ export default function AdminDashboard() {
     };
   }, []);
 
-  // ── Analytics from real order data ──
+  // ── Analytics from real order data (fuente única: readAdminOrdersMerged) ──
   const [metrics, setMetrics] = useState<OrderMetrics>(() => getOrderMetrics());
   const [totalRevFromOrders, setTotalRevFromOrders] = useState(() => getRevenueSummary().total);
   const [topProducts, setTopProducts] = useState<TopProduct[]>(() => getTopProducts(5));
+  const [userStats, setUserStats] = useState(() => getLiveUserStats());
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(() => countPendingAdminOrders());
+  const [allOrders, setAllOrders] = useState(() => readAdminOrdersMerged(ADMIN_ORDERS));
+  const [coupons, setCoupons] = useState<AdminCoupon[]>([]);
+  const [salesSeries, setSalesSeries] = useState(() => ({
+    "7d": buildSalesSeries("7d"),
+    "30d": buildSalesSeries("30d"),
+    "3m": buildSalesSeries("3m"),
+    "1a": buildSalesSeries("1a"),
+    "todo": buildSalesSeries("todo"),
+  }));
+  const [usersSeries, setUsersSeries] = useState(() => ({
+    "7d": buildUsersSeries("7d"),
+    "30d": buildUsersSeries("30d"),
+    "3m": buildUsersSeries("3m"),
+    "1a": buildUsersSeries("1a"),
+    "todo": buildUsersSeries("todo"),
+  }));
+  const [productsSeries, setProductsSeries] = useState(() => ({
+    "7d": buildProductsSeries("7d"),
+    "30d": buildProductsSeries("30d"),
+    "3m": buildProductsSeries("3m"),
+    "1a": buildProductsSeries("1a"),
+    "todo": buildProductsSeries("todo"),
+  }));
+
   useEffect(() => {
     const refresh = () => {
       setMetrics(getOrderMetrics());
       setTotalRevFromOrders(getRevenueSummary().total);
       setTopProducts(getTopProducts(5));
+      setUserStats(getLiveUserStats());
+      setPendingOrdersCount(countPendingAdminOrders());
+      setAllOrders(readAdminOrdersMerged(ADMIN_ORDERS));
+      setSalesSeries({
+        "7d": buildSalesSeries("7d"),
+        "30d": buildSalesSeries("30d"),
+        "3m": buildSalesSeries("3m"),
+        "1a": buildSalesSeries("1a"),
+        "todo": buildSalesSeries("todo"),
+      });
+      setUsersSeries({
+        "7d": buildUsersSeries("7d"),
+        "30d": buildUsersSeries("30d"),
+        "3m": buildUsersSeries("3m"),
+        "1a": buildUsersSeries("1a"),
+        "todo": buildUsersSeries("todo"),
+      });
+      setProductsSeries({
+        "7d": buildProductsSeries("7d"),
+        "30d": buildProductsSeries("30d"),
+        "3m": buildProductsSeries("3m"),
+        "1a": buildProductsSeries("1a"),
+        "todo": buildProductsSeries("todo"),
+      });
     };
     window.addEventListener("storage", refresh);
-    return () => window.removeEventListener("storage", refresh);
+    window.addEventListener("tcga:orders:updated", refresh);
+    window.addEventListener("tcga:products:updated", refresh);
+    window.addEventListener("tcga:users:updated", refresh);
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("tcga:orders:updated", refresh);
+      window.removeEventListener("tcga:products:updated", refresh);
+      window.removeEventListener("tcga:users:updated", refresh);
+    };
+  }, []);
+
+  // Cupones admin: SSOT vía couponService (localStorage + evento canónico).
+  useEffect(() => {
+    const reload = () => setCoupons(loadAdminCoupons());
+    reload();
+    window.addEventListener("tcga:coupons:updated", reload);
+    window.addEventListener("storage", reload);
+    return () => {
+      window.removeEventListener("tcga:coupons:updated", reload);
+      window.removeEventListener("storage", reload);
+    };
   }, []);
 
   const [revPeriod, setRevPeriod] = useState<"hoy"|"7d"|"30d"|"3m"|"1a"|"todo">("hoy");
 
-  const todayOrders = ALL_ORDERS.filter((o) => o.date === "2025-01-28");
-  const todayRevenue = todayOrders.reduce((s, o) => s + o.total, 0);
-
-  const REV_PERIODS = {
-    hoy:  { value: todayRevenue,  orders: todayOrders.length,  label: "Ingresos hoy" },
-    "7d": { value: MOCK_SALES_7D.reduce((s,d)=>s+d.sales,0),  orders: MOCK_SALES_7D.reduce((s,d)=>s+d.orders,0),  label: "Ingresos 7 días" },
-    "30d":{ value: MOCK_SALES_30D.reduce((s,d)=>s+d.sales,0), orders: MOCK_SALES_30D.reduce((s,d)=>s+d.orders,0), label: "Ingresos 30 días" },
-    "3m": { value: MOCK_SALES_3M.reduce((s,d)=>s+d.sales,0),  orders: MOCK_SALES_3M.reduce((s,d)=>s+d.orders,0),  label: "Ingresos 3 meses" },
-    "1a": { value: MOCK_SALES_1Y.reduce((s,d)=>s+d.sales,0),  orders: MOCK_SALES_1Y.reduce((s,d)=>s+d.orders,0),  label: "Ingresos 1 año" },
-    todo: { value: MOCK_SALES_ALL.reduce((s,d)=>s+d.sales,0), orders: MOCK_SALES_ALL.reduce((s,d)=>s+d.orders,0), label: "Ingresos totales" },
-  } as const;
+  // Ingresos por periodo — derivados de los MISMOS pedidos que todo el admin.
+  const REV_PERIODS = useMemo(() => {
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const todayOrders = allOrders.filter((o) => o.date.slice(0, 10) === todayKey);
+    const sum = (s: { sales: number; orders: number }[]) => ({
+      value: s.reduce((a, d) => a + d.sales, 0),
+      orders: s.reduce((a, d) => a + d.orders, 0),
+    });
+    const s7 = sum(salesSeries["7d"]);
+    const s30 = sum(salesSeries["30d"]);
+    const s3m = sum(salesSeries["3m"]);
+    const s1a = sum(salesSeries["1a"]);
+    const sAll = sum(salesSeries["todo"]);
+    return {
+      hoy:  { value: todayOrders.reduce((a, o) => a + o.total, 0), orders: todayOrders.length, label: "Ingresos hoy" },
+      "7d": { value: s7.value,  orders: s7.orders,  label: "Ingresos 7 días" },
+      "30d":{ value: s30.value, orders: s30.orders, label: "Ingresos 30 días" },
+      "3m": { value: s3m.value, orders: s3m.orders, label: "Ingresos 3 meses" },
+      "1a": { value: s1a.value, orders: s1a.orders, label: "Ingresos 1 año" },
+      todo: { value: sAll.value, orders: sAll.orders, label: "Ingresos totales" },
+    } as const;
+  }, [allOrders, salesSeries]);
   const currentRev = REV_PERIODS[revPeriod];
 
-  const expiringCoupons = MOCK_ADMIN_COUPONS.filter(
-    (c) => c.active && new Date(c.endsAt) <= new Date("2025-02-28"),
+  // Cupones activos y próximos a caducar (calculado contra hoy, no fecha fija).
+  const now = new Date();
+  const inTwoWeeks = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+  const expiringCoupons = coupons.filter(
+    (c) => c.active && new Date(c.endsAt) <= inTwoWeeks,
   );
+  const activeCouponsCount = coupons.filter((c) => c.active).length;
+
+  // Mapa de overrides para SalesChart: cada mode lleva sus series vivas.
+  const salesOverride: PeriodOverride = useMemo(() => {
+    const prev = (arr: { sales: number }[]) => arr.reduce((s, d) => s + d.sales, 0);
+    return {
+      "7d":  { data: salesSeries["7d"],  prev: prev(salesSeries["7d"]) },
+      "30d": { data: salesSeries["30d"], prev: prev(salesSeries["30d"]) },
+      "3m":  { data: salesSeries["3m"],  prev: prev(salesSeries["3m"]) },
+      "1a":  { data: salesSeries["1a"],  prev: prev(salesSeries["1a"]) },
+      "todo": { data: salesSeries["todo"], prev: 0 },
+    };
+  }, [salesSeries]);
+
+  const usersOverride: PeriodOverride = useMemo(() => {
+    const last = (arr: { totalUsers: number }[]) => arr[arr.length - 1]?.totalUsers ?? 0;
+    return {
+      "7d":  { data: usersSeries["7d"],  prev: last(usersSeries["7d"]) },
+      "30d": { data: usersSeries["30d"], prev: last(usersSeries["30d"]) },
+      "3m":  { data: usersSeries["3m"],  prev: last(usersSeries["3m"]) },
+      "1a":  { data: usersSeries["1a"],  prev: last(usersSeries["1a"]) },
+      "todo": { data: usersSeries["todo"], prev: 0 },
+    };
+  }, [usersSeries]);
+
+  const productsOverride: PeriodOverride = useMemo(() => {
+    const last = (arr: { totalProducts: number }[]) => arr[arr.length - 1]?.totalProducts ?? 0;
+    return {
+      "7d":  { data: productsSeries["7d"],  prev: last(productsSeries["7d"]) },
+      "30d": { data: productsSeries["30d"], prev: last(productsSeries["30d"]) },
+      "3m":  { data: productsSeries["3m"],  prev: last(productsSeries["3m"]) },
+      "1a":  { data: productsSeries["1a"],  prev: last(productsSeries["1a"]) },
+      "todo": { data: productsSeries["todo"], prev: 0 },
+    };
+  }, [productsSeries]);
+
+  const activeOverride =
+    activeKpi === "ventas" ? salesOverride :
+    activeKpi === "usuarios" ? usersOverride :
+    activeKpi === "productos" ? productsOverride :
+    undefined; // descuentos sigue usando mock hasta tener log real
 
   return (
     <div>
@@ -144,15 +268,15 @@ export default function AdminDashboard() {
             {
               kpi: "usuarios" as KpiMode,
               label: "Usuarios registrados",
-              value: MOCK_USERS.length,
-              sub: `${MOCK_USERS.filter((u) => u.active).length} activos`,
+              value: userStats.total,
+              sub: `${userStats.active} activos`,
               icon: Users,
               color: "#0891b2",
             },
             {
               kpi: "descuentos" as KpiMode,
               label: "Cupones activos",
-              value: MOCK_ADMIN_COUPONS.filter((c) => c.active).length,
+              value: activeCouponsCount,
               sub: "cupones vigentes",
               icon: Tag,
               color: "#dc2626",
@@ -243,7 +367,7 @@ export default function AdminDashboard() {
               {activeKpi === "descuentos" && "Uso de cupones"}
             </h2>
           </div>
-          <SalesChart mode={activeKpi} />
+          <SalesChart mode={activeKpi} livePeriods={activeOverride} />
         </div>
 
         {/* Alerts */}
@@ -290,7 +414,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
-            {ALL_ORDERS.filter((o) => o.status === "pedido").length > 0 && (
+            {pendingOrdersCount > 0 && (
               <div className="flex items-start gap-3 rounded-xl bg-red-50 p-3">
                 <ShoppingBag
                   size={15}
@@ -298,7 +422,7 @@ export default function AdminDashboard() {
                 />
                 <div>
                   <p className="text-sm font-semibold text-red-600">
-                    {ALL_ORDERS.filter((o) => o.status === "pedido").length}{" "}
+                    {pendingOrdersCount}{" "}
                     pedidos pendientes
                   </p>
                   <Link

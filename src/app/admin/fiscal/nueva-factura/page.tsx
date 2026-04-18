@@ -356,7 +356,7 @@ export default function NuevaFacturaPage() {
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
             Emisor (precargado)
           </h2>
-          <p className="text-sm font-semibold text-gray-700">TCG Academy S.L.</p>
+          <p className="text-sm font-semibold text-gray-700">{SITE_CONFIG.legalName}</p>
           <p className="text-xs text-gray-500">
             CIF: {SITE_CONFIG.cif} · {SITE_CONFIG.email} · {SITE_CONFIG.phone}
           </p>

@@ -37,9 +37,10 @@
  */
 
 import { loadInvoices, saveInvoice, createInvoice, buildLineItem } from "@/services/invoiceService";
-import { tripleCheckInvoice } from "@/lib/fiscalAudit";
+import { tripleCheckInvoice, checkMissingNIFs } from "@/lib/fiscalAudit";
 import { getDeadLetterQueue, resolveDeadLetter } from "@/lib/circuitBreaker";
 import { safeRead, safeWrite } from "@/lib/safeStorage";
+import { getPaymentStatusMap } from "@/lib/orderAdapter";
 import { InvoiceStatus, VerifactuStatus, PaymentMethod } from "@/types/fiscal";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -54,6 +55,7 @@ export type ActionType =
   | "chain_alert"          // Cadena hash rota — solo informa
   | "verifactu_pending"    // VeriFactu pendiente — solo informa
   | "deadline_alert"       // Plazo legal próximo a vencer
+  | "nif_missing"          // Factura COMPLETA a ES sin NIF válido — solo informa
   | "scan_ok"             // Escaneo sin incidencias
   | "verification_passed"  // Verificación post-reparación correcta
   | "verification_failed"; // Verificación post-reparación fallida
@@ -192,8 +194,11 @@ export async function runFiscalAutopilot(): Promise<AutopilotReport> {
       items?: { key: string; name: string; quantity: number; price: number }[];
       shippingAddress?: { nombre?: string; apellidos?: string; email?: string; telefono?: string; direccion?: string; ciudad?: string; cp?: string; provincia?: string; pais?: string };
       couponDiscount?: number; pointsDiscount?: number;
+      nif?: string;
+      nifType?: "DNI" | "NIE" | "CIF";
     }[]>("tcgacademy_orders", []);
-    const paymentStatus = safeRead<Record<string, string>>("tcgacademy_payment_status", {});
+    // SSOT: estado de cobro leído desde AdminOrder vía orderAdapter.
+    const paymentStatus = getPaymentStatusMap();
     const invoiceOrderIds = new Set(invoices.map((i) => i.sourceOrderId).filter(Boolean));
 
     // ════════════════════════════════════════════════════════
@@ -209,9 +214,39 @@ export async function runFiscalAutopilot(): Promise<AutopilotReport> {
 
       // REPARAR: generar factura automáticamente
       try {
+        // Guard fiscal: sin NIF no se puede emitir factura — registrar y seguir.
+        const { validateSpanishNIF } = await import("@/lib/validations/nif");
+        const { TaxIdType } = await import("@/types/fiscal");
+        const nifCheck = order.nif
+          ? validateSpanishNIF(order.nif)
+          : null;
+        if (!nifCheck || !nifCheck.valid) {
+          actions.push({
+            ts: new Date().toISOString(),
+            type: "nif_missing",
+            severity: "error",
+            description: `Pedido ${order.id}: factura NO emitida — NIF/NIE/CIF ausente o inválido.`,
+            legalBasis: "Art. 6.1.d RD 1619/2012",
+            orderId: order.id,
+            amount: order.total,
+            actionTaken: false,
+            proposedSolution:
+              "Contactar al cliente para obtener NIF/NIE/CIF válido y emitir factura manualmente desde /admin/fiscal/nueva-factura o marcar el pedido como anulado.",
+          });
+          continue;
+        }
+        const taxIdType =
+          nifCheck.type === "NIE"
+            ? TaxIdType.NIE
+            : nifCheck.type === "CIF"
+              ? TaxIdType.CIF
+              : TaxIdType.NIF;
+
         const addr = order.shippingAddress ?? {};
         const recipient = {
           name: `${addr.nombre ?? ""} ${addr.apellidos ?? ""}`.trim() || "Cliente",
+          taxId: nifCheck.normalized,
+          taxIdType,
           email: addr.email,
           phone: addr.telefono,
           countryCode: addr.pais || "ES",
@@ -449,6 +484,38 @@ export async function runFiscalAutopilot(): Promise<AutopilotReport> {
               `La AEAT puede sancionar el retraso (art. 201 LGT).`
             : `Quedan ${days} día(s). Verificar que el proveedor VeriFactu está operativo. ` +
               `Si está en modo demo, considerar activar sandbox para pruebas.`,
+        });
+      }
+    }
+
+    // ════════════════════════════════════════════════════════
+    // FASE 1: NIF FALTANTE EN FACTURA COMPLETA (solo informar)
+    // Art. 6.1.d RD 1619/2012 — NIF obligatorio del destinatario.
+    // No se repara automáticamente: requiere acción del cliente
+    // (aportar NIF) + emisión de rectificativa por parte del admin.
+    // ════════════════════════════════════════════════════════
+
+    const nifMissing = checkMissingNIFs(freshInvoices);
+    if (nifMissing.total > 0) {
+      for (const invNumber of nifMissing.invoiceNumbers) {
+        const inv = freshInvoices.find((i) => i.invoiceNumber === invNumber);
+        if (!inv) continue;
+        actions.push({
+          ts: new Date().toISOString(),
+          type: "nif_missing",
+          severity: "critical",
+          description:
+            `${inv.invoiceNumber}: factura COMPLETA sin NIF/NIE/CIF válido del destinatario. ` +
+            `Incumplimiento directo del Art. 6.1.d RD 1619/2012.`,
+          legalBasis: "Art. 6.1.d RD 1619/2012 — identificación fiscal obligatoria del destinatario.",
+          invoiceNumber: inv.invoiceNumber,
+          amount: inv.totals.totalInvoice,
+          actionTaken: false,
+          proposedSolution:
+            `1) Contactar al cliente ${inv.recipient.email ?? "(sin email)"} para obtener su NIF/NIE/CIF. ` +
+            `2) Anular la factura ${inv.invoiceNumber} y emitir rectificativa (motivo R1) con el NIF correcto. ` +
+            `3) Asignado fiscalmente a Luri (admin fiscal). ` +
+            `La cadena VeriFactu se mantiene intacta — la rectificativa enlaza con la original.`,
         });
       }
     }

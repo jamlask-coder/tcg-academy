@@ -179,16 +179,29 @@ function CustomTooltip({
   );
 }
 
+export type PeriodOverride = Partial<
+  Record<PeriodKey, { data: object[]; prev: number }>
+>;
+
 export function SalesChart({
   height = 220,
   mode = "ventas",
+  livePeriods,
 }: {
   height?: number;
   mode?: KpiMode;
+  /**
+   * Datos vivos por periodo que sustituyen al mock. Si se pasa, TODOS los
+   * buckets del chart vendrán de esta fuente en vez de MOCK_*. Unifica el
+   * panel con el resto del admin (misma fuente: readAdminOrdersMerged).
+   */
+  livePeriods?: PeriodOverride;
 }) {
   const [period, setPeriod] = useState<PeriodKey>("7d");
   const cfg = MODE_CONFIG[mode];
-  const { data, prev } = cfg.periods[period];
+  const override = livePeriods?.[period];
+  const data = override?.data ?? cfg.periods[period].data;
+  const prev = override?.prev ?? cfg.periods[period].prev;
   const primaryKey = cfg.keys.primary;
   const totalPrimary = (data as Record<string, number>[]).reduce(
     (s, d) => s + (d[primaryKey] ?? 0),
@@ -198,7 +211,7 @@ export function SalesChart({
     (data as Record<string, number>[])[data.length - 1]?.[primaryKey] ??
     totalPrimary;
   const compare = mode === "ventas" ? totalPrimary : lastPrimary;
-  const trend = (((compare - prev) / prev) * 100).toFixed(1);
+  const trend = prev > 0 ? (((compare - prev) / prev) * 100).toFixed(1) : "—";
   const trendUp = compare >= prev;
 
   return (
@@ -218,7 +231,7 @@ export function SalesChart({
                   : "bg-red-100 text-red-700"
               }`}
             >
-              {trendUp ? "▲" : "▼"} {Math.abs(Number(trend))}%
+              {trendUp ? "▲" : "▼"} {trend === "—" ? "—" : `${Math.abs(Number(trend))}%`}
             </span>
           </div>
           <p className="text-xs text-gray-400">{cfg.summary(data, period)}</p>

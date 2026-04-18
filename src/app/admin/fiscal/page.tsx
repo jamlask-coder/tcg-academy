@@ -16,6 +16,7 @@ import {
   BookOpen,
   Download,
   Plus,
+  Palette,
 } from "lucide-react";
 import { loadInvoices } from "@/services/invoiceService";
 import {
@@ -43,6 +44,13 @@ const FISCAL_SECTIONS = [
     title: "Libro de Facturas",
     desc: "Todas las facturas emitidas con filtros y exportación",
     color: "#2563eb",
+  },
+  {
+    href: "/admin/fiscal/contabilidad",
+    icon: BookOpen,
+    title: "Contabilidad PGC",
+    desc: "Libro diario, sumas y saldos, pérdidas y ganancias, validación cruzada",
+    color: "#0f766e",
   },
   {
     href: "/admin/fiscal/trimestral",
@@ -92,6 +100,13 @@ const FISCAL_SECTIONS = [
     title: "Presupuestos",
     desc: "Crear y gestionar presupuestos para clientes",
     color: "#059669",
+  },
+  {
+    href: "/admin/fiscal/editor-factura",
+    icon: Palette,
+    title: "Editor de Factura",
+    desc: "Edita visualmente la plantilla: colores, márgenes, bloques, marca de agua",
+    color: "#db2777",
   },
   {
     href: "/admin/fiscal/documentacion",

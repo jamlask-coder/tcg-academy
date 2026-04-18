@@ -23,10 +23,6 @@ export async function POST(req: NextRequest) {
         subject: `Tu pedido ${orderId} ha sido enviado`,
         body: `Hola ${customerName ?? ""},\n\nTu pedido ${orderId} ha sido enviado.${tracking ? `\n\nNúmero de seguimiento: ${tracking}\nPuedes rastrear tu envío en: https://www.gls-spain.es/seguimiento/${tracking}` : ""}\n\nGracias por comprar en TCG Academy.`,
       },
-      entregado: {
-        subject: `Tu pedido ${orderId} ha sido entregado`,
-        body: `Hola ${customerName ?? ""},\n\nTu pedido ${orderId} ha sido entregado.\n\nEsperamos que disfrutes tu compra. Si tienes algún problema, no dudes en contactarnos.\n\nGracias por comprar en TCG Academy.`,
-      },
       cancelado: {
         subject: `Tu pedido ${orderId} ha sido cancelado`,
         body: `Hola ${customerName ?? ""},\n\nTu pedido ${orderId} ha sido cancelado.${note ? `\n\nMotivo: ${note}` : ""}\n\nSi tienes preguntas, contacta con nosotros.\n\nTCG Academy`,

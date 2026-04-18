@@ -7,6 +7,7 @@
  */
 
 import type { Notification } from "@/data/mockData";
+import { DataHub } from "@/lib/dataHub";
 
 const DYNAMIC_KEY = "tcgacademy_notif_dynamic";
 
@@ -38,6 +39,10 @@ export function pushUserNotification(
     };
     all[userId] = [newNotif, ...(all[userId] ?? [])];
     localStorage.setItem(DYNAMIC_KEY, JSON.stringify(all));
+    // Canonical event (DataHub fires `tcga:notifications:updated`). Keeps the
+    // legacy `tcga:notification:new` dispatch for back-compat until every
+    // subscriber migrates.
+    DataHub.emit("notifications");
     window.dispatchEvent(new Event("tcga:notification:new"));
   } catch {
     /* ignore quota */

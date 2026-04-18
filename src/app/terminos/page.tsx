@@ -30,7 +30,7 @@ export default function TerminosPage() {
             <p>
               En cumplimiento de la Ley 34/2002, de Servicios de la Sociedad de
               la Información (LSSI-CE), le informamos que este sitio web es
-              titularidad de <strong>TCG Academy S.L.</strong> (CIF:{" "}
+              titularidad de <strong>{SITE_CONFIG.legalName}</strong> (CIF:{" "}
               {SITE_CONFIG.cif}), con domicilio a efectos de comunicaciones en{" "}
               la dirección indicada en la sección{" "}
               <Link href="/contacto" className="text-[#2563eb] hover:underline">
@@ -61,7 +61,7 @@ export default function TerminosPage() {
               actualizados, siendo responsable de mantenerlos al día.
             </p>
             <p>
-              TCG Academy S.L. se reserva el derecho de cancelar cuentas que
+              {SITE_CONFIG.legalName} se reserva el derecho de cancelar cuentas que
               incumplan estas condiciones o que contengan información falsa o
               fraudulenta.
             </p>
@@ -75,7 +75,7 @@ export default function TerminosPage() {
               el pedido por correo electrónico.
             </p>
             <p>
-              TCG Academy S.L. se reserva el derecho de rechazar o cancelar
+              {SITE_CONFIG.legalName} se reserva el derecho de rechazar o cancelar
               pedidos en los que se detecte un error de precio o disponibilidad,
               informando al cliente en el menor tiempo posible.
             </p>
@@ -124,7 +124,7 @@ export default function TerminosPage() {
           <Section title="7. Propiedad intelectual">
             <p>
               Todos los contenidos del sitio web (textos, imágenes, logotipos,
-              diseño) son propiedad de TCG Academy S.L. o de sus respectivos
+              diseño) son propiedad de {SITE_CONFIG.legalName} o de sus respectivos
               titulares, y están protegidos por la legislación española e
               internacional de propiedad intelectual e industrial.
             </p>
@@ -136,7 +136,7 @@ export default function TerminosPage() {
 
           <Section title="8. Limitación de responsabilidad">
             <p>
-              TCG Academy S.L. no será responsable de los daños o perjuicios
+              {SITE_CONFIG.legalName} no será responsable de los daños o perjuicios
               derivados del uso o la imposibilidad de uso del sitio web, ni de
               los errores u omisiones en los contenidos, siempre que no sean
               imputables a una actuación dolosa o negligente.
@@ -163,7 +163,7 @@ export default function TerminosPage() {
 
           <Section title="10. Modificaciones">
             <p>
-              TCG Academy S.L. se reserva el derecho de modificar estas
+              {SITE_CONFIG.legalName} se reserva el derecho de modificar estas
               condiciones en cualquier momento. Las modificaciones serán
               efectivas desde su publicación en el sitio web. El uso continuado
               del sitio tras la publicación implica la aceptación de las nuevas

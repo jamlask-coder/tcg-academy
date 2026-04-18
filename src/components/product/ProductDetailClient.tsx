@@ -480,13 +480,9 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
       "tcgacademy_product_overrides",
       JSON.stringify(overrides),
     );
-    // Also save stock override
-    let stockOverrides: Record<string, unknown> = {};
-    try {
-      stockOverrides = JSON.parse(localStorage.getItem("tcgacademy_stock_overrides") ?? "{}");
-    } catch { stockOverrides = {}; }
-    stockOverrides[product.id] = inlineStockQty.trim() === "" ? null : parseInt(inlineStockQty);
-    localStorage.setItem("tcgacademy_stock_overrides", JSON.stringify(stockOverrides));
+    // SSOT: el stock ya vive dentro de `tcgacademy_product_overrides[id].stock`
+    // (ver `overrides[product.id].stock` arriba). La antigua clave paralela
+    // `tcgacademy_stock_overrides` queda deprecada.
     window.dispatchEvent(new Event("tcga:products:updated"));
 
     // Trigger restock emails if product went from out-of-stock to in-stock
@@ -1114,9 +1110,21 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
               </button>
 
             </div>
-            {typeof product.maxPerUser === "number" && (
-              <p className="text-xs text-gray-500">Máx. {product.maxPerUser} uds/persona</p>
-            )}
+            {(() => {
+              const who = user?.role === "mayorista" ? "mayorista" : user?.role === "tienda" ? "tienda" : "cliente";
+              const limit =
+                user?.role === "mayorista"
+                  ? product.maxPerWholesaler
+                  : user?.role === "tienda"
+                    ? product.maxPerStore
+                    : product.maxPerClient;
+              const effectiveLimit = typeof limit === "number" ? limit : product.maxPerUser;
+              return typeof effectiveLimit === "number" ? (
+                <p className="text-xs text-gray-500">
+                  Máx. {effectiveLimit} uds/{who} (acumulado histórico)
+                </p>
+              ) : null;
+            })()}
             {limitMsg && (
               <p className="text-xs font-semibold text-red-500">{limitMsg}</p>
             )}

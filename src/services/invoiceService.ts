@@ -29,6 +29,7 @@ import {
   AuditAction,
 } from "@/types/fiscal";
 import { SITE_CONFIG } from "@/config/siteConfig";
+import { getIssuerAddress } from "@/lib/fiscalAddress";
 import {
   INVOICE_STORAGE_KEY,
   INVOICE_INTEGRITY_KEY,
@@ -40,21 +41,25 @@ import {
   calculateSurcharge,
 } from "@/services/taxService";
 import { buildVerifactuQRUrl } from "@/services/verifactuService";
+import { DataHub } from "@/lib/dataHub";
 
 // ─── Datos del emisor (TCG Academy) ──────────────────────────────────────────
 
 function buildIssuer(): CompanyData {
+  // El parser de dirección vive en `@/lib/fiscalAddress` — fuente única para
+  // todo el sistema (facturas, presupuestos, PDFs, emails).
+  const issuer = getIssuerAddress();
   return {
-    name: "TCG Academy S.L.",
+    name: SITE_CONFIG.legalName,
     taxId: SITE_CONFIG.cif,
     taxIdType: TaxIdType.CIF,
     address: {
-      street: "Calle Ejemplo, 1",
-      city: "Alicante",
-      postalCode: "03001",
-      province: "Alicante",
-      country: "España",
-      countryCode: "ES",
+      street: issuer.street,
+      city: issuer.city,
+      postalCode: issuer.postalCode,
+      province: issuer.province,
+      country: issuer.country,
+      countryCode: issuer.countryCode,
     },
     phone: SITE_CONFIG.phone,
     email: SITE_CONFIG.email,
@@ -92,8 +97,89 @@ function releaseInvoiceLock(): void {
   } catch { /* non-critical */ }
 }
 
+// ─── Dígitos de control (sistema propio basado en primos) ────────────────────
+//
+// Formato final: FAC-YYYY-NNNNNXXXXXE
+//   NNNNN = secuencial 5 dígitos (correlativo, requisito art. 6 RD 1619/2012)
+//   XXXXX = número de control determinista, derivado de (N, año) vía aritmética
+//           modular sobre primos. No aleatorio: la misma factura siempre produce
+//           el mismo XXXXX. Pero sin conocer los primos es computacionalmente
+//           impredecible → evita falsificación por numeración.
+//   E     = origen "Electrónica / web". Reservado para futuras series
+//           (ej. T = tienda, B = B2B manual).
+//
+// Para verificar una factura: recomputar computeControlDigits(N, year) y comparar.
+//
+// IMPORTANTE: estos primos son parte del "secreto" del sistema. No cambiar nunca
+// una vez emitida la primera factura con ellos, porque invalidaría la verificación
+// de todas las anteriores. Si necesitas rotarlos, introduce un nuevo sufijo de
+// origen (ej. "E2") y conserva la antigua fórmula para verificar las históricas.
+
+const CONTROL_PRIME_MULT = 104729;   // 10.000º primo
+const CONTROL_PRIME_YEAR = 32771;    // primo impar, > 2*año max razonable
+const CONTROL_PRIME_OFFSET = 17389;  // primo impar, evita colisión con N=0
+const CONTROL_MODULUS = 99991;       // mayor primo ≤ 99999 → rango [0, 99990]
+
+export const INVOICE_ORIGIN_WEB = "E";
+
 /**
- * Genera el siguiente número de factura en formato FAC-YYYY-NNNNN.
+ * Calcula los 5 dígitos de control para una factura dada.
+ * Determinista: misma entrada → misma salida.
+ * Impredecible sin conocer los primos del módulo.
+ */
+export function computeControlDigits(sequentialN: number, year: number): string {
+  // Aritmética modular pura — no usar punto flotante.
+  // Cuidado con overflow: en JS todos los enteros hasta 2^53 son seguros.
+  // 999999 * 104729 ≈ 1.05e11 « 2^53, safe.
+  const raw = (sequentialN * CONTROL_PRIME_MULT
+             + year * CONTROL_PRIME_YEAR
+             + CONTROL_PRIME_OFFSET) % CONTROL_MODULUS;
+  return String(raw).padStart(5, "0");
+}
+
+/**
+ * Extrae el número secuencial (N) de un número de factura en cualquiera de
+ * los formatos soportados:
+ *   - Nuevo:    FAC-YYYY-NNNNNXXXXXE  → primeros 5 dígitos tras el prefijo
+ *   - Legacy:   FAC-YYYY-NNNNN        → todos los dígitos
+ * Devuelve NaN si no es parseable.
+ */
+function extractSequentialNumber(invoiceNumber: string, prefix: string): number {
+  if (!invoiceNumber.startsWith(prefix)) return NaN;
+  const body = invoiceNumber.slice(prefix.length);
+  // Primeros 5 caracteres = N. Si el número legacy tenía menos de 5 no debería
+  // existir (siempre padStart 5), pero por si acaso, usamos /^\d+/ con tope.
+  const first5 = body.slice(0, 5);
+  if (!/^\d{1,5}$/.test(first5)) return NaN;
+  return parseInt(first5, 10);
+}
+
+/**
+ * Verifica si un número de factura es válido (dígitos de control OK).
+ * Sólo aplica al formato nuevo. El legacy (sin XXXXXE) se considera válido
+ * por convención (emitido antes del sistema de control).
+ */
+export function verifyInvoiceNumber(invoiceNumber: string): { valid: boolean; reason?: string } {
+  const match = invoiceNumber.match(/^([A-Z]+)-(\d{4})-(\d{5})(\d{5})([A-Z])$/);
+  if (!match) {
+    // Posible formato legacy FAC-YYYY-NNNNN — se da por válido
+    if (/^[A-Z]+-\d{4}-\d{5}$/.test(invoiceNumber)) {
+      return { valid: true, reason: "legacy" };
+    }
+    return { valid: false, reason: "formato no reconocido" };
+  }
+  const [, , yearStr, nStr, xStr] = match;
+  const n = parseInt(nStr, 10);
+  const y = parseInt(yearStr, 10);
+  const expected = computeControlDigits(n, y);
+  if (expected !== xStr) {
+    return { valid: false, reason: `dígitos de control esperados ${expected}, recibidos ${xStr}` };
+  }
+  return { valid: true };
+}
+
+/**
+ * Genera el siguiente número de factura en formato FAC-YYYY-NNNNNXXXXXE.
  * Garantiza correlatividad sin saltos (requisito art. 6 RD 1619/2012).
  *
  * HARDENED: Uses a localStorage lock to prevent concurrent tabs from generating
@@ -120,16 +206,16 @@ export function generateInvoiceNumber(): string {
     // Extract the actual max number from existing invoices (not array length)
     let maxNum = 0;
     for (const inv of invoices) {
-      if (inv.invoiceNumber.startsWith(prefix)) {
-        const numPart = parseInt(inv.invoiceNumber.slice(prefix.length), 10);
-        if (Number.isFinite(numPart) && numPart > maxNum) {
-          maxNum = numPart;
-        }
+      const numPart = extractSequentialNumber(inv.invoiceNumber, prefix);
+      if (Number.isFinite(numPart) && numPart > maxNum) {
+        maxNum = numPart;
       }
     }
 
     const nextNum = maxNum + 1;
-    return `${INVOICE_SERIES}-${year}-${String(nextNum).padStart(5, "0")}`;
+    const nStr = String(nextNum).padStart(5, "0");
+    const xStr = computeControlDigits(nextNum, year);
+    return `${INVOICE_SERIES}-${year}-${nStr}${xStr}${INVOICE_ORIGIN_WEB}`;
   } finally {
     releaseInvoiceLock();
   }
@@ -501,11 +587,31 @@ export function validateInvoice(invoice: InvoiceRecord): ValidationResult {
   if (invoice.items.length === 0)
     errors.push("La factura debe tener al menos una línea");
 
-  // Receptor obligatorio en factura completa
+  // Receptor obligatorio en factura completa (Art. 6.1.d RD 1619/2012)
   if (invoice.invoiceType === InvoiceType.COMPLETA) {
     const recipient = invoice.recipient as CompanyData;
     if (!recipient.name)
       errors.push("Nombre del receptor obligatorio en factura completa");
+    if (!recipient.taxId)
+      errors.push(
+        "NIF/NIE/CIF del receptor obligatorio en factura completa (Art. 6.1.d RD 1619/2012)",
+      );
+    if (recipient.taxId) {
+      // Validación estructural para clientes españoles
+      const country = recipient.countryCode ?? "ES";
+      if (country === "ES") {
+        // Import perezoso para evitar ciclos
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { validateSpanishNIF } =
+          require("@/lib/validations/nif") as typeof import("@/lib/validations/nif");
+        const v = validateSpanishNIF(recipient.taxId);
+        if (!v.valid) {
+          errors.push(
+            `NIF/NIE/CIF del receptor no válido: ${v.error ?? "formato incorrecto"}`,
+          );
+        }
+      }
+    }
   }
 
   // Totales
@@ -528,6 +634,138 @@ export function validateInvoice(invoice: InvoiceRecord): ValidationResult {
   return { valid: errors.length === 0, errors, warnings };
 }
 
+// ─── Migración de numeración (legacy → FAC-YYYY-NNNNNXXXXXE) ─────────────────
+//
+// Toda factura existente anterior a la adopción del formato nuevo se re-numera
+// de forma determinista y se re-encadena:
+//   1. Se agrupan por año y se ordenan por (invoiceDate, createdAt, invoiceId).
+//   2. A cada una se le asigna N = posición ordinal dentro del año (1..M).
+//   3. Se calcula XXXXX = computeControlDigits(N, año) y se añade el sufijo "E".
+//   4. Se recalcula verifactuHash con el nuevo invoiceNumber.
+//   5. Se recalcula toda la cadena verifactuChainHash en orden cronológico global.
+//   6. Se añade una entrada en auditLog describiendo el cambio.
+//   7. Se persiste la versión del esquema para no volver a ejecutar la migración.
+//
+// Idempotente: ya migrado → no-op. Las facturas que ya cumplen el formato v2
+// y superan verifyInvoiceNumber() se dejan intactas (solo se re-encadenan).
+
+const INVOICE_NUMBER_VERSION_KEY = "tcgacademy_invoice_number_version";
+const INVOICE_NUMBER_VERSION_CURRENT = 2;
+
+export interface InvoiceMigrationReport {
+  migrated: number;       // facturas cuyo número cambió
+  preserved: number;      // facturas ya en formato v2 que se mantienen tal cual
+  rechained: number;      // total re-encadenadas (incluye preserved si cambió alguna anterior)
+  errors: string[];
+  alreadyUpToDate: boolean;
+}
+
+export async function migrateInvoiceNumbersIfNeeded(): Promise<InvoiceMigrationReport> {
+  const empty: InvoiceMigrationReport = {
+    migrated: 0,
+    preserved: 0,
+    rechained: 0,
+    errors: [],
+    alreadyUpToDate: true,
+  };
+  if (typeof window === "undefined") return empty;
+
+  const currentVersion = Number(localStorage.getItem(INVOICE_NUMBER_VERSION_KEY) ?? "1");
+  const invoices = loadInvoices();
+  if (invoices.length === 0) {
+    localStorage.setItem(INVOICE_NUMBER_VERSION_KEY, String(INVOICE_NUMBER_VERSION_CURRENT));
+    return empty;
+  }
+  if (currentVersion >= INVOICE_NUMBER_VERSION_CURRENT) {
+    return { ...empty, preserved: invoices.length };
+  }
+
+  const report: InvoiceMigrationReport = {
+    migrated: 0,
+    preserved: 0,
+    rechained: 0,
+    errors: [],
+    alreadyUpToDate: false,
+  };
+
+  // 1. Orden global cronológico estable (crítico para la cadena de hashes).
+  const sorted = [...invoices].sort((a, b) => {
+    const da = new Date(a.invoiceDate).getTime();
+    const db = new Date(b.invoiceDate).getTime();
+    if (da !== db) return da - db;
+    const ca = new Date(a.createdAt).getTime();
+    const cb = new Date(b.createdAt).getTime();
+    if (ca !== cb) return ca - cb;
+    return a.invoiceId.localeCompare(b.invoiceId);
+  });
+
+  // 2. Asignar N correlativo por año.
+  const counterByYear = new Map<number, number>();
+  const updatedList: InvoiceRecord[] = [];
+  let previousChainHash: string | null = null;
+
+  for (const original of sorted) {
+    try {
+      const year = new Date(original.invoiceDate).getFullYear();
+      const currentN = (counterByYear.get(year) ?? 0) + 1;
+      counterByYear.set(year, currentN);
+
+      const prefix = `${INVOICE_SERIES}-${year}-`;
+      const newNumber = `${prefix}${String(currentN).padStart(5, "0")}${computeControlDigits(currentN, year)}${INVOICE_ORIGIN_WEB}`;
+
+      const numberChanged = original.invoiceNumber !== newNumber;
+
+      // Construir copia con el nuevo número (siempre regeneramos hash/cadena).
+      const working: InvoiceRecord = {
+        ...original,
+        invoiceNumber: newNumber,
+        // issuer se re-normaliza al valor actual en loadInvoices(), lo respetamos.
+        updatedAt: new Date(),
+        previousInvoiceChainHash: previousChainHash,
+      };
+
+      const newHash = await generateInvoiceHash(working);
+      working.verifactuHash = newHash;
+      const newChainHash = await chainInvoiceHash(newHash, previousChainHash);
+      working.verifactuChainHash = newChainHash;
+      working.verifactuQR = buildVerifactuQRUrl(working);
+
+      if (numberChanged) {
+        working.auditLog = [
+          ...working.auditLog,
+          {
+            timestamp: new Date(),
+            userId: "system",
+            userName: "Sistema — Migración numeración",
+            action: AuditAction.MIGRADA,
+            detail: `Número migrado de "${original.invoiceNumber}" a "${newNumber}" (formato FAC-YYYY-NNNNNXXXXXE con dígitos de control).`,
+          },
+        ];
+        report.migrated++;
+      } else {
+        report.preserved++;
+      }
+
+      report.rechained++;
+      previousChainHash = newChainHash;
+      updatedList.push(working);
+    } catch (err) {
+      report.errors.push(
+        `Factura ${original.invoiceNumber}: ${err instanceof Error ? err.message : "error desconocido"}`,
+      );
+      // En caso de error, preservamos la original para no perder datos.
+      updatedList.push(original);
+    }
+  }
+
+  if (report.errors.length === 0) {
+    persistInvoices(updatedList);
+    localStorage.setItem(INVOICE_NUMBER_VERSION_KEY, String(INVOICE_NUMBER_VERSION_CURRENT));
+  }
+
+  return report;
+}
+
 // ─── Almacenamiento (localStorage → reemplazar por BD) ───────────────────────
 
 /** Carga todas las facturas del almacenamiento */
@@ -537,8 +775,14 @@ export function loadInvoices(): InvoiceRecord[] {
     const raw = localStorage.getItem(INVOICE_STORAGE_KEY);
     if (!raw) return [];
     const parsed: InvoiceRecord[] = JSON.parse(raw);
-    // Restaura objetos Date serializados como string
-    return parsed.map(deserializeDates);
+    // Normalize issuer to current SITE_CONFIG — legacy invoices stored before
+    // the SITE_CONFIG refactor may have mock issuer data ("Calle Ejemplo").
+    const currentIssuer = buildIssuer();
+    const migrated = parsed.map((inv) => ({
+      ...deserializeDates(inv),
+      issuer: currentIssuer,
+    }));
+    return migrated;
   } catch {
     return [];
   }
@@ -558,6 +802,45 @@ export function saveInvoice(invoice: InvoiceRecord): void {
     } catch {
       // El asiento contable falla silenciosamente — la factura ya está guardada.
       // El autopilot fiscal detectará la discrepancia en la cross-validation.
+    }
+  })();
+
+  // ── Envío automático a VeriFactu (proveedor actual: mock o real) ──
+  // Si VERIFACTU_CONFIG.mode === "off" no se hace NADA: la factura queda
+  // en estado EMITIDA + verifactuStatus PENDIENTE, que es lo correcto mientras
+  // no sea obligatorio o no haya proveedor contratado.
+  // Non-blocking: la factura ya está guardada y contabilizada.
+  void (async () => {
+    try {
+      const { VERIFACTU_CONFIG } = await import("@/config/verifactuConfig");
+      if (VERIFACTU_CONFIG.mode === "off") return;
+      const { getVerifactuProvider } = await import("@/services/verifactuService");
+      const provider = getVerifactuProvider();
+      const response = await provider.sendInvoice(invoice);
+      const updated: InvoiceRecord = {
+        ...invoice,
+        verifactuStatus: response.status,
+        verifactuTimestamp: response.aeatTimestamp ?? new Date(),
+        verifactuError: response.errorMessage ?? null,
+        status: response.success ? InvoiceStatus.ENVIADA_AEAT : invoice.status,
+        updatedAt: new Date(),
+        auditLog: [
+          ...invoice.auditLog,
+          {
+            timestamp: new Date(),
+            userId: "system",
+            userName: "Sistema VeriFactu",
+            action: AuditAction.ENVIADA_VERIFACTU,
+            detail: response.success
+              ? `Enviada a VeriFactu (${response.providerId ?? "mock"}). Estado: ${response.status}.`
+              : `Envío rechazado: ${response.errorMessage ?? "desconocido"}`,
+          },
+        ],
+      };
+      updateInvoice(updated);
+    } catch {
+      // VeriFactu falla silenciosamente — la factura queda en PENDIENTE
+      // y el autopilot la detectará en el próximo escaneo.
     }
   })();
 }
@@ -595,6 +878,10 @@ function persistInvoices(invoices: InvoiceRecord[]): void {
 
   // Actualiza hash de integridad del conjunto
   void updateIntegrityHash(invoices);
+
+  // Canonical event — any admin view (fiscal dashboard, factura list,
+  // kpi counters) that subscribes to `tcga:invoices:updated` refreshes.
+  DataHub.emit("invoices");
 }
 
 async function updateIntegrityHash(invoices: InvoiceRecord[]): Promise<void> {

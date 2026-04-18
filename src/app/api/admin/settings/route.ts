@@ -1,5 +1,7 @@
 import type { NextRequest} from "next/server";
 import { NextResponse } from "next/server";
+import { SITE_CONFIG } from "@/config/siteConfig";
+import { STORES } from "@/data/stores";
 
 export interface AdminSettings {
   adminEmail: string;
@@ -8,16 +10,15 @@ export interface AdminSettings {
   storeEmails: Record<string, string>;
 }
 
+// Los defaults se derivan de la configuración central del sitio y del registro
+// de tiendas — nunca se hardcodean direcciones de correo ni nombres aquí.
 const DEFAULT_SETTINGS: AdminSettings = {
-  adminEmail: process.env.ADMIN_NOTIFICATION_EMAIL ?? "admin@tcgacademy.es",
-  senderName: "TCG Academy",
-  replyToEmail: "hola@tcgacademy.es",
-  storeEmails: {
-    calpe: "tcgacademycalpe@gmail.com",
-    bejar: "bejar@tcgacademy.es",
-    madrid: "madrid@tcgacademy.es",
-    barcelona: "barcelona@tcgacademy.es",
-  },
+  adminEmail: process.env.ADMIN_NOTIFICATION_EMAIL ?? SITE_CONFIG.email,
+  senderName: SITE_CONFIG.name,
+  replyToEmail: SITE_CONFIG.email,
+  storeEmails: Object.fromEntries(
+    Object.values(STORES).map((s) => [s.id, s.email]),
+  ),
 };
 
 // GET /api/admin/settings — Get current admin settings

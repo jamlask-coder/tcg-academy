@@ -3,11 +3,7 @@ import { useState, useMemo } from "react";
 import { Download, Globe, Info } from "lucide-react";
 import { loadInvoices } from "@/services/invoiceService";
 import type { InvoiceRecord, CompanyData } from "@/types/fiscal";
-
-function formatDate(d: Date | string): string {
-  const dt = new Date(d);
-  return `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}`;
-}
+import { formatDateShort as formatDate } from "@/lib/format";
 
 interface EUOperation {
   invoiceId: string;

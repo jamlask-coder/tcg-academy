@@ -13,6 +13,26 @@
 - **Price verification**: `src/lib/priceVerification.ts` — Server-side price + stock validation.
 - **Types**: `LocalProduct` interface in `src/data/products.ts`. Config type in `src/config/siteConfig.ts`.
 
+## DataHub — SSOT Registry (fuente única de verdad)
+
+**Antes de crear una clave, tabla, tipo, evento o servicio nuevo → BUSCAR en el registry.**
+
+### Archivos clave
+- `src/lib/dataHub/registry.ts` — Registro de TODAS las entidades (stable + partial + stub). SSOT de `storageKeys`, `event`, `pii`, `retentionMonths`, `category`, `criticalJson`.
+- `src/lib/dataHub/events.ts` — Eventos canónicos `tcga:<entity>:updated`.
+- `src/lib/dataHub/integrity.ts` — Detección de claves huérfanas (no registradas).
+- `src/lib/dataHub/index.ts` — Fachada pública `DataHub.emit(...)` / `DataHub.on(...)`.
+
+### Reglas
+1. **Escribir** a una entidad → llamar su servicio canónico (adapter en el registry) + `DataHub.emit("<entidad>")`.
+2. **Leer cambios** en componentes → `useEffect(() => DataHub.on("<entidad>", reload), [])`.
+3. **Nueva funcionalidad** → mirar en `listEntities()` si ya existe. Si sí, reutilizar. Si no, añadir entrada al registry antes de crear código.
+4. **No hardcodear** listas de claves en servicios. `backupService.TRACKED_KEYS` y `selfHeal.criticalKeys` se derivan del registry vía `getBackupTrackedKeys()` y `getCriticalJsonKeys()`.
+5. **Claves huérfanas** visibles en `/admin/herramientas` → "Integridad DataHub".
+
+### Panel admin
+- `/admin/herramientas` — estado del registry, claves huérfanas (eliminar con 1 click).
+
 ## Sistema Fiscal VeriFactu
 
 ### Archivos clave

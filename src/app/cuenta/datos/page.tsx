@@ -1,14 +1,13 @@
 "use client";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { CheckCircle, Eye, EyeOff, MapPin, Plus, Pencil, Trash2, Star, AlertCircle } from "lucide-react";
+import { CheckCircle, Eye, EyeOff, MapPin, Plus, Pencil, Trash2, Star, AlertCircle, ShieldCheck } from "lucide-react";
 import type { Address } from "@/types/user";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
+import { validateSpanishNIF } from "@/lib/validations/nif";
 
 const ADDR_EMPTY: Partial<Address> = {
-  label: "Casa",
-  nombre: "",
-  apellidos: "",
+  label: "",
   calle: "",
   numero: "",
   piso: "",
@@ -19,12 +18,17 @@ const ADDR_EMPTY: Partial<Address> = {
 };
 
 export default function DatosPage() {
-  const { user, updateProfile, changePassword } = useAuth();
+  const { user, updateProfile, changePassword, changeEmail } = useAuth();
   const [form, setForm] = useState({
     name: user?.name ?? "",
     lastName: user?.lastName ?? "",
     phone: user?.phone ?? "",
+    nif: user?.nif ?? "",
+    email: user?.email ?? "",
   });
+  const [nifError, setNifError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
   const [pwdForm, setPwdForm] = useState({
     current: "",
     next: "",
@@ -62,8 +66,7 @@ export default function DatosPage() {
   const handleSaveAddr = () => {
     // Validación mínima: campos obligatorios para que la dirección sea usable en checkout
     const required: Array<keyof Address> = [
-      "nombre",
-      "apellidos",
+      "label",
       "calle",
       "numero",
       "cp",
@@ -131,9 +134,38 @@ export default function DatosPage() {
     setAddrError("");
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile(form);
+    setNifError("");
+    setEmailError("");
+    // NIF obligatorio y validado (Art. 6.1.d RD 1619/2012)
+    const nifResult = validateSpanishNIF(form.nif);
+    if (!nifResult.valid) {
+      setNifError(nifResult.error ?? "NIF inválido");
+      return;
+    }
+
+    setSavingProfile(true);
+
+    // Si el email ha cambiado, procesarlo primero (puede fallar por colisión)
+    const nextEmail = form.email.trim().toLowerCase();
+    if (nextEmail !== user.email.toLowerCase()) {
+      const { ok, error } = await changeEmail(nextEmail);
+      if (!ok) {
+        setEmailError(error ?? "No se pudo cambiar el email");
+        setSavingProfile(false);
+        return;
+      }
+    }
+
+    updateProfile({
+      name: form.name,
+      lastName: form.lastName,
+      phone: form.phone,
+      nif: nifResult.normalized,
+      nifType: nifResult.type === "OTHER" ? undefined : nifResult.type,
+    });
+    setSavingProfile(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
@@ -148,41 +180,61 @@ export default function DatosPage() {
         className="space-y-5 rounded-2xl border border-gray-200 bg-white p-6"
       >
         <h2 className="font-bold text-gray-900">Información personal</h2>
+        {!user.nif && (
+          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <ShieldCheck size={18} className="mt-0.5 shrink-0 text-amber-600" />
+            <div>
+              <p className="font-semibold">Falta tu NIF / NIE / CIF</p>
+              <p className="text-xs">
+                Obligatorio para emitir facturas legales (Art. 6.1.d RD
+                1619/2012). No podrás realizar compras hasta completarlo.
+              </p>
+            </div>
+          </div>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           {(
             [
               ["name", "Nombre", form.name],
               ["lastName", "Apellidos", form.lastName],
+              ["nif", "NIF / NIE / CIF *", form.nif],
               ["phone", "Teléfono", form.phone],
-              ["email", "Email", user.email],
+              ["email", "Email", form.email],
             ] as const
           ).map(([key, label, value]) => {
-            const isLocked = key === "email" || key === "name" || key === "lastName";
+            const isNif = key === "nif";
+            const isEmail = key === "email";
             return (
             <div key={key}>
               <label className="mb-1.5 block text-sm font-semibold text-gray-700">
                 {label}
               </label>
               <input
-                type={key === "email" ? "email" : "text"}
+                type={isEmail ? "email" : "text"}
                 value={value}
-                onChange={
-                  !isLocked
-                    ? (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
-                    : undefined
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    [key]: isNif
+                      ? e.target.value.toUpperCase()
+                      : e.target.value,
+                  }))
                 }
-                readOnly={isLocked}
-                className={`h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:outline-none ${
-                  isLocked
-                    ? "cursor-not-allowed bg-gray-50 text-gray-400"
-                    : "focus:border-[#2563eb]"
+                maxLength={isNif ? 9 : isEmail ? 254 : undefined}
+                autoComplete={isNif ? "off" : isEmail ? "email" : undefined}
+                className={`h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${
+                  isNif ? "font-mono uppercase tracking-wider" : ""
                 }`}
               />
-              {isLocked && (
-                <p className="mt-1 text-xs text-gray-400">
-                  {key === "email"
-                    ? "El email no se puede cambiar"
-                    : "Dato fiscal — contacta con soporte para modificar"}
+              {isEmail && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Se usa para iniciar sesión y recibir notificaciones.
+                </p>
+              )}
+              {isNif && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Obligatorio para facturas — DNI, NIE o CIF. Se valida con
+                  letra de control.
                 </p>
               )}
             </div>
@@ -190,6 +242,16 @@ export default function DatosPage() {
           })}
         </div>
 
+        {nifError && (
+          <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle size={16} className="shrink-0" /> {nifError}
+          </div>
+        )}
+        {emailError && (
+          <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle size={16} className="shrink-0" /> {emailError}
+          </div>
+        )}
         {saved && (
           <div className="flex items-center gap-2 text-sm font-semibold text-green-600">
             <CheckCircle size={16} /> Cambios guardados correctamente
@@ -198,9 +260,10 @@ export default function DatosPage() {
 
         <button
           type="submit"
-          className="rounded-xl bg-[#2563eb] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
+          disabled={savingProfile}
+          className="rounded-xl bg-[#2563eb] px-6 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
         >
-          Guardar cambios
+          {savingProfile ? "Guardando..." : "Guardar cambios"}
         </button>
       </form>
 
@@ -340,7 +403,7 @@ export default function DatosPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-700">{addr.nombre} {addr.apellidos}</p>
+                    <p className="text-sm text-gray-700">{(addr.nombre || user.name)} {(addr.apellidos || user.lastName)}</p>
                     <p className="text-sm text-gray-600">{addr.calle} {addr.numero}{addr.piso ? `, ${addr.piso}` : ""}</p>
                     <p className="text-sm text-gray-600">{addr.cp} {addr.ciudad}, {addr.provincia}</p>
                     <p className="text-sm text-gray-500">{addr.pais}</p>
@@ -371,27 +434,21 @@ export default function DatosPage() {
             </h3>
             <div className="grid gap-4 sm:grid-cols-2">
               {([
-                ["label", "Etiqueta", "select"],
-                [null, null, null],
-                ["nombre", "Nombre", "text"],
-                ["apellidos", "Apellidos", "text"],
-                ["calle", "Calle", "text"],
-                ["numero", "Número", "text"],
-                ["piso", "Piso / Puerta (opcional)", "text"],
-                ["cp", "Código postal", "text"],
-                ["ciudad", "Ciudad", "text"],
-                ["provincia", "Provincia", "text"],
-                ["pais", "País", "select"],
-              ] as [keyof Address | null, string | null, string | null][]).map(([key, label, type], i) => {
+                ["label", "Etiqueta", "text", "ej: Casa"],
+                [null, null, null, null],
+                ["calle", "Calle", "text", ""],
+                ["numero", "Número", "text", ""],
+                ["piso", "Piso / Puerta (opcional)", "text", ""],
+                ["cp", "Código postal", "text", ""],
+                ["ciudad", "Ciudad", "text", ""],
+                ["provincia", "Provincia", "text", ""],
+                ["pais", "País", "select", ""],
+              ] as [keyof Address | null, string | null, string | null, string | null][]).map(([key, label, type, placeholder], i) => {
                 if (!key) return <div key={i} />;
                 return (
                   <div key={key}>
                     <label className="mb-1 block text-xs font-semibold text-gray-600">{label}</label>
-                    {type === "select" && key === "label" ? (
-                      <select value={addrForm.label ?? "Casa"} onChange={setAddr("label")} className="h-10 w-full rounded-xl border-2 border-gray-200 px-3 text-sm focus:border-[#2563eb] focus:outline-none">
-                        <option>Casa</option><option>Trabajo</option><option>Otra</option>
-                      </select>
-                    ) : type === "select" && key === "pais" ? (
+                    {type === "select" && key === "pais" ? (
                       <select value={addrForm.pais ?? "ES"} onChange={setAddr("pais")} className="h-10 w-full rounded-xl border-2 border-gray-200 px-3 text-sm focus:border-[#2563eb] focus:outline-none">
                         <option value="ES">España</option>
                         <option value="PT">Portugal</option>
@@ -403,6 +460,8 @@ export default function DatosPage() {
                         type="text"
                         value={(addrForm[key] as string) ?? ""}
                         onChange={setAddr(key)}
+                        placeholder={placeholder ?? ""}
+                        maxLength={key === "label" ? 30 : undefined}
                         className="h-10 w-full rounded-xl border-2 border-gray-200 px-3 text-sm focus:border-[#2563eb] focus:outline-none transition"
                       />
                     )}

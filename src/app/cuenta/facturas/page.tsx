@@ -14,6 +14,8 @@ import { useAuth } from "@/context/AuthContext";
 import { calcVAT } from "@/hooks/usePrice";
 import { printInvoiceWithCSV, type InvoiceData } from "@/utils/invoiceGenerator";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
+import { SITE_CONFIG } from "@/config/siteConfig";
+import { getIssuerAddress } from "@/lib/fiscalAddress";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -39,16 +41,19 @@ function invoiceTotals(inv: Invoice) {
 // ─── Build InvoiceData from mock invoice and open professional PDF ─────────────
 
 function buildInvoiceData(inv: Invoice): InvoiceData {
+  const issuer = getIssuerAddress();
   return {
     invoiceNumber: inv.id,
+    orderId: inv.orderId,
     date: inv.date,
     paymentMethod: "Tarjeta",
-    issuerName: "TCG Academy S.L.",
-    issuerCIF: "B12345678",
-    issuerAddress: "Av. Gabriel Miró 42, Local 3",
-    issuerCity: "03710 Calpe, Alicante",
-    issuerPhone: "+34 965 830 000",
-    issuerEmail: "facturacion@tcgacademy.es",
+    paymentStatus: inv.status === "pagada" ? "paid" : "pending",
+    issuerName: SITE_CONFIG.legalName,
+    issuerCIF: SITE_CONFIG.cif,
+    issuerAddress: issuer.street || SITE_CONFIG.address,
+    issuerCity: issuer.cityLine,
+    issuerPhone: SITE_CONFIG.phone,
+    issuerEmail: SITE_CONFIG.email,
     clientName: inv.clientName ?? "Cliente TCG Academy",
     clientCIF: inv.clientNif,
     clientAddress: inv.clientAddress,
@@ -56,7 +61,7 @@ function buildInvoiceData(inv: Invoice): InvoiceData {
       name: item.description,
       quantity: item.qty,
       unitPriceWithVAT: item.unitPrice,
-      vatRate: item.vatRate ?? 21,
+      vatRate: item.vatRate ?? SITE_CONFIG.vatRate,
     })),
   };
 }

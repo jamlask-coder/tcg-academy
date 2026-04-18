@@ -80,22 +80,23 @@ export default function RecuperarContrasenaPage() {
     // Build the reset link
     const link = `${window.location.origin}/restablecer-contrasena?token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
 
-    // Log "sent email" entry
+    // Log "sent email" entry in the CANONICAL log
+    // (tcgacademy_email_log; duplicate tcgacademy_sent_emails eliminated).
     try {
-      const sentEmails = JSON.parse(
-        localStorage.getItem("tcgacademy_sent_emails") ?? "[]",
+      const emailLog = JSON.parse(
+        localStorage.getItem("tcgacademy_email_log") ?? "[]",
       ) as Array<Record<string, unknown>>;
-      sentEmails.unshift({
+      emailLog.unshift({
         date: new Date().toISOString(),
         to: normalizedEmail,
         subject: "Restablece tu contraseña — TCG Academy",
         body: `Has solicitado restablecer tu contraseña. Usa el siguiente enlace (válido 1 hora): ${link}`,
         status: "enviado",
       });
-      if (sentEmails.length > 100) sentEmails.length = 100;
+      if (emailLog.length > 100) emailLog.length = 100;
       localStorage.setItem(
-        "tcgacademy_sent_emails",
-        JSON.stringify(sentEmails),
+        "tcgacademy_email_log",
+        JSON.stringify(emailLog),
       );
     } catch {
       /* ignore */

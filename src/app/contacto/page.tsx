@@ -20,6 +20,8 @@ function IconWhatsApp() {
 }
 import Link from "next/link";
 import { checkRateLimit } from "@/utils/sanitize";
+import { SITE_CONFIG } from "@/config/siteConfig";
+import { STORES } from "@/data/stores";
 
 const schema = z.object({
   nombre: z.string().min(2, "Mínimo 2 caracteres").max(100),
@@ -31,16 +33,17 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-const STORES_CONTACT = [
-  { name: "Sede (Calpe)", phone: "+34 648 63 57 23", id: "calpe" },
-  { name: "Madrid", phone: "+34 910 000 003", id: "madrid" },
-  { name: "Barcelona", phone: "+34 930 000 004", id: "barcelona" },
-  { name: "Béjar", phone: "+34 923 000 002", id: "bejar" },
-];
+// Lista de contacto por tienda — derivada del registro central (src/data/stores.ts).
+// La tienda `calpe` se marca como "Sede" porque coincide con el domicilio operativo.
+const STORES_CONTACT = Object.values(STORES).map((s) => ({
+  name: s.id === "calpe" ? "Sede (Calpe)" : s.city.split(",")[0]?.trim() ?? s.name,
+  phone: s.phone,
+  id: s.id,
+}));
 
-const WHATSAPP_NUMBER = "34648635723";
-const CONTACT_EMAIL = "tcgacademycalpe@gmail.com";
-const CONTACT_PHONE = "+34 648 63 57 23";
+const WHATSAPP_NUMBER = SITE_CONFIG.phone.replace(/\D/g, "");
+const CONTACT_EMAIL = SITE_CONFIG.email;
+const CONTACT_PHONE = SITE_CONFIG.phone;
 
 export default function ContactoPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -243,7 +246,7 @@ export default function ContactoPage() {
                 <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-[11px] leading-relaxed text-blue-700">
                   <p>
                     <span className="font-semibold">Protección de datos:</span>{" "}
-                    Tus datos serán tratados por TCG Academy S.L. con la
+                    Tus datos serán tratados por TCG HOBBY, S.L. con la
                     finalidad de responder a tu consulta (base legal: interés
                     legítimo, art. 6.1.f RGPD). No se cederán a terceros. Puedes
                     ejercer tus derechos en{" "}

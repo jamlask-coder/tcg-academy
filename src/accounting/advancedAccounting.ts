@@ -25,7 +25,7 @@
 import type { InvoiceRecord } from "@/types/fiscal";
 import { InvoiceStatus, InvoiceType } from "@/types/fiscal";
 import type { JournalEntry } from "@/types/accounting";
-import { safeRead } from "@/lib/safeStorage";
+import { getPaymentStatusMap } from "@/lib/orderAdapter";
 
 function r2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -63,7 +63,8 @@ export interface AgingReport {
  */
 export function generateAgingReport(invoices: InvoiceRecord[]): AgingReport {
   const now = Date.now();
-  const paymentStatus = safeRead<Record<string, string>>("tcgacademy_payment_status", {});
+  // SSOT: leer el estado de cobro desde AdminOrder via orderAdapter (antes: clave paralela).
+  const paymentStatus = getPaymentStatusMap();
 
   // Facturas pendientes de cobro
   const unpaid = invoices.filter((inv) => {

@@ -14,13 +14,11 @@ import {
 } from "lucide-react";
 import {
   ADMIN_ORDERS,
-  ORDER_STORAGE_KEY,
-  MSG_STORAGE_KEY,
-  MOCK_MESSAGES,
   type AdminOrder,
-  type AppMessage,
 } from "@/data/mockData";
+import { readAdminOrdersMerged } from "@/lib/orderAdapter";
 import { loadIncidents } from "@/services/incidentService";
+import { loadMessages as loadAllMessages } from "@/services/messageService";
 import type { Incident } from "@/types/incident";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -145,8 +143,8 @@ function buildAdminNotifications(): AdminNotification[] {
 
   // 1. Pedidos pendientes de envío (acción del cliente, no del admin)
   try {
-    const raw = localStorage.getItem(ORDER_STORAGE_KEY);
-    const orders: AdminOrder[] = raw ? JSON.parse(raw) : ADMIN_ORDERS;
+    // Merge: incluye pedidos del checkout aunque el mirror al inbox fallara.
+    const orders = readAdminOrdersMerged(ADMIN_ORDERS);
     orders
       .filter((o) => o.adminStatus === "pendiente_envio")
       .forEach((o) => {
@@ -228,11 +226,10 @@ function buildAdminNotifications(): AdminNotification[] {
     /* ignore */
   }
 
-  // 4. Mensajes de usuarios al admin (no los que envía el admin)
+  // 4. Mensajes de usuarios al admin (no los que envía el admin).
+  // Fuente única: messageService → evento canónico `tcga:messages:updated`.
   try {
-    const raw = localStorage.getItem(MSG_STORAGE_KEY);
-    const msgs: AppMessage[] = raw ? JSON.parse(raw) : MOCK_MESSAGES;
-    msgs
+    loadAllMessages()
       .filter((m) => m.toUserId === "admin" && !m.read)
       .forEach((m) => {
         notifs.push({

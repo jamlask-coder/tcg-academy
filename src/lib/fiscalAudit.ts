@@ -237,7 +237,11 @@ export function checkCorrelativeNumbering(
       duplicates.push(inv.invoiceNumber);
     }
     seen.add(inv.invoiceNumber);
-    const num = parseInt(inv.invoiceNumber.slice(prefix.length), 10);
+    // Formato nuevo: FAC-YYYY-NNNNNXXXXXE → N son los primeros 5 dígitos
+    // Formato legacy: FAC-YYYY-NNNNN     → N ocupa todo el cuerpo
+    const body = inv.invoiceNumber.slice(prefix.length);
+    const firstFive = body.slice(0, 5);
+    const num = /^\d{1,5}$/.test(firstFive) ? parseInt(firstFive, 10) : NaN;
     if (Number.isFinite(num)) numbers.push(num);
   }
 
@@ -775,9 +779,39 @@ export interface FullAuditReport {
   };
   /** 6. Cuenta de resultados del año */
   cuentaResultados: CuentaResultados;
+  /** 7. Facturas sin NIF del receptor (Art. 6.1.d RD 1619/2012) */
+  missingNIF: {
+    invoiceNumbers: string[];
+    total: number;
+  };
   /** Veredicto final */
   allClear: boolean;
   issues: string[];
+}
+
+/**
+ * Detecta facturas COMPLETAS a clientes españoles sin NIF/NIE/CIF válido.
+ * Incumplimiento directo del Art. 6.1.d RD 1619/2012 — incidencia CRÍTICA.
+ */
+export function checkMissingNIFs(invoices: InvoiceRecord[]): {
+  invoiceNumbers: string[];
+  total: number;
+} {
+  // Import diferido para no romper builds server sin el módulo
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { isValidNIF } =
+    require("@/lib/validations/nif") as typeof import("@/lib/validations/nif");
+  const offenders: string[] = [];
+  for (const inv of invoices) {
+    if (inv.invoiceType !== InvoiceType.COMPLETA) continue;
+    const recipient = inv.recipient as { taxId?: string; countryCode?: string };
+    const country = recipient.countryCode ?? "ES";
+    if (country !== "ES") continue;
+    if (!isValidNIF(recipient.taxId)) {
+      offenders.push(inv.invoiceNumber);
+    }
+  }
+  return { invoiceNumbers: offenders, total: offenders.length };
 }
 
 export async function runFullAudit(year: number): Promise<FullAuditReport> {
@@ -833,6 +867,14 @@ export async function runFullAudit(year: number): Promise<FullAuditReport> {
     `Año ${year}`,
   );
 
+  // 7. NIF del receptor en facturas completas (CRÍTICO — Art. 6.1.d)
+  const missingNIF = checkMissingNIFs(yearInvoices);
+  if (missingNIF.total > 0) {
+    issues.push(
+      `${missingNIF.total} facturas completas SIN NIF/NIE/CIF del receptor (incumplimiento Art. 6.1.d RD 1619/2012)`,
+    );
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     year,
@@ -842,6 +884,7 @@ export async function runFullAudit(year: number): Promise<FullAuditReport> {
     rectificatives,
     crossCheck,
     cuentaResultados,
+    missingNIF,
     allClear: issues.length === 0,
     issues,
   };

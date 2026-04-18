@@ -31,7 +31,8 @@ import { useNotifications } from "@/context/NotificationContext";
 import { useDebounce } from "@/hooks/useDebounce";
 import { MobileDrawer } from "./MobileDrawer";
 import { checkRateLimit } from "@/utils/sanitize";
-import { countPendingOrders } from "@/data/mockData";
+import { countPendingOrdersToShip } from "@/lib/orderAdapter";
+import { DataHub } from "@/lib/dataHub";
 import { countNewIncidents } from "@/services/incidentService";
 
 // ─── Recent search history helpers ────────────────────────────────────────────
@@ -357,18 +358,11 @@ function HeaderInlineAuth() {
               </p>
             </div>
             <Link
-              href="/cuenta"
+              href={user.role === "admin" ? "/admin" : "/cuenta/datos"}
               onClick={() => setMenuOpen(false)}
               className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50"
             >
               <User size={15} className="text-gray-400" /> Mi cuenta
-            </Link>
-            <Link
-              href="/cuenta/pedidos"
-              onClick={() => setMenuOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50"
-            >
-              <Package size={15} className="text-gray-400" /> Mis pedidos
             </Link>
             {user.role === "admin" && (
               <Link
@@ -482,7 +476,7 @@ export function Header() {
   useEffect(() => {
     if (!user || user.role !== "admin") return;
     const calc = () => {
-      setPendingOrders(countPendingOrders());
+      setPendingOrders(countPendingOrdersToShip());
       setPendingNotifs(countNewIncidents());
       try {
         const sols = JSON.parse(localStorage.getItem("tcgacademy_solicitudes") ?? "[]");
@@ -490,8 +484,19 @@ export function Header() {
       } catch { /* ignore */ }
     };
     calc();
-    const id = setInterval(calc, 5000);
-    return () => clearInterval(id);
+    // Canonical: react al evento del DataHub en vez de polling corto.
+    const offOrders = DataHub.on("orders", calc);
+    const offIncidents = DataHub.on("incidents", calc);
+    const onStorage = (e: StorageEvent) => { if (e.key === "tcgacademy_solicitudes") calc(); };
+    window.addEventListener("storage", onStorage);
+    // Fallback poll cada 15s por si algún write legacy no emite evento.
+    const id = setInterval(calc, 15000);
+    return () => {
+      offOrders?.();
+      offIncidents?.();
+      window.removeEventListener("storage", onStorage);
+      clearInterval(id);
+    };
   }, [user]);
 
   const pathname = usePathname();
@@ -709,19 +714,22 @@ export function Header() {
           {user && user.role === "admin" && mounted && (
             <>
               {([
-                { count: pendingOrders, href: "/admin/pedidos", Icon: Package, label: "pedidos pendientes", color: "bg-red-500" },
-                { count: pendingNotifs, href: "/admin/notificaciones", Icon: Bell, label: "incidencias nuevas", color: "bg-red-500" },
-                { count: pendingSolicitudes, href: "/admin/solicitudes", Icon: Inbox, label: "solicitudes nuevas", color: "bg-red-500" },
-              ] as const).filter(({ count }) => count > 0).map(({ count, href, Icon, label, color }) => (
+                { count: pendingOrders, href: "/admin/pedidos", Icon: Package, label: "pedidos pendientes por enviar", color: "bg-red-500", title: "Pedidos pendientes por enviar" },
+                { count: pendingNotifs, href: "/admin/notificaciones", Icon: Bell, label: "incidencias nuevas", color: "bg-red-500", title: "Incidencias nuevas" },
+                { count: pendingSolicitudes, href: "/admin/solicitudes", Icon: Inbox, label: "solicitudes nuevas", color: "bg-red-500", title: "Solicitudes nuevas" },
+              ] as const).filter(({ count }) => count > 0).map(({ count, href, Icon, label, color, title }) => (
                 <Link
                   key={href}
                   href={href}
+                  title={`${title}: ${count}`}
                   className="relative hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10 lg:flex"
                   aria-label={`${count} ${label}`}
                 >
                   <Icon size={18} className="text-white" />
-                  <span className={`absolute top-1 right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full ${color} px-0.5 text-[9px] leading-none font-bold text-white`}>
-                    {count > 9 ? "9+" : count}
+                  {/* Ancho mínimo 18px + padding 1.5 para que 2-3 dígitos
+                      (94, 150, 999+) se vean completos sin recortar. */}
+                  <span className={`absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full ${color} px-1.5 text-[10px] leading-none font-bold text-white whitespace-nowrap`}>
+                    {count > 999 ? "999+" : count}
                   </span>
                 </Link>
               ))}
@@ -745,7 +753,7 @@ export function Header() {
 
           {/* 1. User icon — mobile shows "Identifícate" when not logged in */}
           <Link
-            href={user ? (user.role === "admin" ? "/admin" : "/cuenta") : "/login"}
+            href={user ? (user.role === "admin" ? "/admin" : "/cuenta/datos") : "/login"}
             className="flex items-center justify-center gap-1 rounded-lg p-1 transition hover:bg-white/10 lg:min-h-[44px] lg:gap-1.5 lg:p-2"
             aria-label={user?.role === "admin" ? "Panel de administración" : "Mi cuenta"}
           >

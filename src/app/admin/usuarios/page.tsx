@@ -2,8 +2,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ChevronDown, Users, X, ChevronRight, Clock } from "lucide-react";
-import { MOCK_USERS, type AdminUser } from "@/data/mockData";
+import { MOCK_USERS, ADMIN_ORDERS, type AdminUser } from "@/data/mockData";
 import type { User } from "@/types/user";
+import { readAdminOrdersMerged } from "@/lib/orderAdapter";
+import { loadPoints } from "@/services/pointsService";
 
 const ROLE_COLORS = {
   cliente: "bg-gray-100 text-gray-600",
@@ -30,12 +32,14 @@ export default function AdminUsuariosPage() {
 
   const refreshUsers = () => {
     try {
+      // ── Leer usuarios registrados (seed + real) ──
       const stored = localStorage.getItem("tcgacademy_registered");
-      if (!stored) return;
-      const registered = JSON.parse(stored) as Record<string, { password: string; user: User }>;
-      const mockIds = new Set(MOCK_USERS.map((u) => u.email));
+      const registered = stored
+        ? (JSON.parse(stored) as Record<string, { password: string; user: User }>)
+        : {};
+      const mockEmails = new Set(MOCK_USERS.map((u) => u.email.toLowerCase()));
       const newUsers: AdminUser[] = Object.values(registered)
-        .filter((entry) => !mockIds.has(entry.user.email))
+        .filter((entry) => !mockEmails.has(entry.user.email.toLowerCase()))
         .map((entry) => ({
           id: entry.user.id,
           name: entry.user.name,
@@ -49,15 +53,45 @@ export default function AdminUsuariosPage() {
           active: true,
           phone: entry.user.phone,
         }));
-      if (newUsers.length > 0) {
-        setUsers([...MOCK_USERS, ...newUsers]);
+
+      // ── Cruzar pedidos reales con usuarios para recalcular stats ──
+      const merged = readAdminOrdersMerged(ADMIN_ORDERS);
+      const statsByKey = new Map<string, { orders: number; spent: number }>();
+      for (const o of merged) {
+        const keys = [o.userId, o.userEmail?.toLowerCase()].filter(Boolean) as string[];
+        for (const k of keys) {
+          const prev = statsByKey.get(k) ?? { orders: 0, spent: 0 };
+          prev.orders += 1;
+          prev.spent += Number(o.total) || 0;
+          statsByKey.set(k, prev);
+        }
       }
+      const recomputeUser = (u: AdminUser): AdminUser => {
+        const s = statsByKey.get(u.id) ?? statsByKey.get(u.email.toLowerCase());
+        const livePoints = loadPoints(u.id);
+        return {
+          ...u,
+          totalOrders: s ? s.orders : u.totalOrders,
+          totalSpent: s ? s.spent : u.totalSpent,
+          points: livePoints > 0 ? livePoints : u.points,
+        };
+      };
+
+      const combined = [...MOCK_USERS, ...newUsers].map(recomputeUser);
+      setUsers(combined);
     } catch { /* ignore */ }
   };
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshUsers();
+    const onUpdate = () => refreshUsers();
+    window.addEventListener("tcga:orders:updated", onUpdate);
+    window.addEventListener("storage", onUpdate);
+    return () => {
+      window.removeEventListener("tcga:orders:updated", onUpdate);
+      window.removeEventListener("storage", onUpdate);
+    };
   }, []);
 
   const filtered = useMemo(() => {

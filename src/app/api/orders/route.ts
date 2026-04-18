@@ -7,6 +7,7 @@ import { serverRateLimit } from "@/utils/sanitize";
 import { getDb, type OrderRecord } from "@/lib/db";
 import { sendOrderNotification, getEmailService } from "@/lib/email";
 import { getClientIp } from "@/lib/auth";
+import { validateSpanishNIF } from "@/lib/validations/nif";
 
 interface OrderItem {
   product_id: number;
@@ -21,6 +22,8 @@ interface OrderBody {
   customer: {
     nombre: string;
     apellidos: string;
+    /** NIF / NIE / CIF — OBLIGATORIO para facturación (Art. 6.1.d RD 1619/2012) */
+    nif: string;
     email: string;
     telefono?: string;
     direccion: string;
@@ -74,6 +77,20 @@ export async function POST(req: NextRequest) {
     if (!customer?.email || !customer?.nombre || !customer?.direccion) {
       return NextResponse.json({ error: "Datos del cliente incompletos" }, { status: 400 });
     }
+    // NIF obligatorio (legal — Art. 6.1.d RD 1619/2012)
+    const nifCheck = validateSpanishNIF(customer?.nif ?? "");
+    if (!nifCheck.valid) {
+      return NextResponse.json(
+        {
+          error:
+            nifCheck.error ??
+            "NIF / NIE / CIF del cliente obligatorio para emitir la factura",
+          code: "NIF_REQUIRED",
+          legalBasis: "Art. 6.1.d RD 1619/2012",
+        },
+        { status: 400 },
+      );
+    }
     if (!payment?.method) return NextResponse.json({ error: "Método de pago requerido" }, { status: 400 });
 
     for (const item of items) {
@@ -107,7 +124,12 @@ export async function POST(req: NextRequest) {
     const apiUser = await getApiUser(req);
     const userRole = apiUser?.role ?? "cliente";
 
-    const verification = verifyOrder(items, shipping?.method ?? "estandar", userRole);
+    const verification = verifyOrder(
+      items,
+      shipping?.method ?? "estandar",
+      userRole,
+      apiUser?.id ?? "",
+    );
 
     if (!verification.priceResult.valid) {
       return NextResponse.json({
@@ -120,6 +142,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         error: "Algunos productos no tienen stock suficiente",
         stockIssues: verification.stockResult.issues,
+      }, { status: 409 });
+    }
+
+    if (!verification.limitResult.valid) {
+      return NextResponse.json({
+        error: "Alguno de los productos supera el máximo permitido por usuario",
+        limitIssues: verification.limitResult.issues,
       }, { status: 409 });
     }
 
@@ -143,6 +172,7 @@ export async function POST(req: NextRequest) {
       userId: apiUser?.id,
       customerEmail: customer.email,
       customerName: `${customer.nombre} ${customer.apellidos ?? ""}`.trim(),
+      customerTaxId: nifCheck.normalized,
       customerPhone: customer.telefono,
       items: verification.priceResult.items.map((item) => ({
         productId: item.productId,
@@ -183,12 +213,20 @@ export async function POST(req: NextRequest) {
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://tcgacademy.es";
 
-      // Send confirmation email to customer
-      await sendOrderNotification(orderId, "confirmado", customer.email, {
-        total: total.toFixed(2),
-        customerName: order.customerName,
-        appUrl,
-      });
+      // Send confirmation email to customer (pickup-aware)
+      const isStorePickup = shipping?.method === "tienda";
+      await sendOrderNotification(
+        orderId,
+        "confirmado",
+        customer.email,
+        {
+          total: total.toFixed(2),
+          customerName: order.customerName,
+          appUrl,
+          tiendaNombre: shipping?.tiendaRecogida ?? "",
+        },
+        { isStorePickup },
+      );
 
       // Notify admin
       const adminEmail = await db.getSetting("notification_email") ?? "admin@tcgacademy.es";

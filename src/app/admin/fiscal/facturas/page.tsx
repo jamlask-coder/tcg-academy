@@ -12,11 +12,25 @@ import {
   Shield,
   Search,
   Filter,
+  Info,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 // ChevronDown, ChevronUp used by SortIcon
-import { loadInvoices, createInvoice } from "@/services/invoiceService";
+import {
+  loadInvoices,
+  createInvoice,
+  saveInvoice,
+  verifyInvoiceNumber,
+  migrateInvoiceNumbersIfNeeded,
+  type InvoiceMigrationReport,
+} from "@/services/invoiceService";
+import { TaxIdType } from "@/types/fiscal";
+import { validateSpanishNIF } from "@/lib/validations/nif";
 import { printInvoiceWithCSV } from "@/utils/invoiceGenerator";
 import type { InvoiceData } from "@/utils/invoiceGenerator";
+import { SITE_CONFIG } from "@/config/siteConfig";
+import { getIssuerAddress } from "@/lib/fiscalAddress";
 import type { InvoiceLineItem } from "@/types/fiscal";
 import {
   generateCSVForAdvisor,
@@ -26,7 +40,8 @@ import {
 import type { InvoiceRecord } from "@/types/fiscal";
 import { InvoiceStatus, VerifactuStatus, InvoiceType, PaymentMethod } from "@/types/fiscal";
 import type { Quarter } from "@/types/tax";
-import { ADMIN_ORDERS, ORDER_STORAGE_KEY, type AdminOrder } from "@/data/mockData";
+import { ADMIN_ORDERS, type AdminOrder } from "@/data/mockData";
+import { readAdminOrdersMerged, getPaymentStatusMap } from "@/lib/orderAdapter";
 import {
   downloadLibroFacturas,
   downloadVATDetail,
@@ -49,11 +64,7 @@ import {
   generateModelo347,
   exportModelo347CSV,
 } from "@/accounting/advancedAccounting";
-
-function formatDate(d: Date | string): string {
-  const dt = new Date(d);
-  return `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()}`;
-}
+import { formatDateShort as formatDate } from "@/lib/format";
 
 function statusBadge(status: InvoiceStatus) {
   const map: Record<InvoiceStatus, { label: string; cls: string }> = {
@@ -151,9 +162,12 @@ function mapPaymentMethod(method: string): PaymentMethod {
 }
 
 function buildLineItems(order: AdminOrder): InvoiceLineItem[] {
+  // Usamos el IVA del SITE_CONFIG como fuente única; si cambia el tipo, toda la
+  // aplicación debe cambiar consistentemente sin tocar este cálculo.
+  const vatDivisor = 1 + SITE_CONFIG.vatRate / 100;
   return order.items.map((item, i) => {
     const priceWithVat = item.price * item.qty;
-    const unitWithoutVat = item.price / 1.21;
+    const unitWithoutVat = item.price / vatDivisor;
     const base = unitWithoutVat * item.qty;
     const vat = priceWithVat - base;
     return {
@@ -174,15 +188,24 @@ function buildLineItems(order: AdminOrder): InvoiceLineItem[] {
   });
 }
 
-async function syncPaidOrdersAsInvoices() {
+export interface SyncResult {
+  created: number;
+  skippedNoNif: number;
+  failed: number;
+  errors: string[];
+}
+
+async function syncPaidOrdersAsInvoices(): Promise<SyncResult> {
+  const result: SyncResult = { created: 0, skippedNoNif: 0, failed: 0, errors: [] };
   try {
-    const raw = localStorage.getItem(ORDER_STORAGE_KEY);
-    const orders: AdminOrder[] = raw ? JSON.parse(raw) : ADMIN_ORDERS;
+    // Merge: incluye pedidos del checkout aunque el mirror al inbox fallara.
+    // Así ningún pedido pagado queda sin factura emitida (cumplimiento fiscal).
+    const orders = readAdminOrdersMerged(ADMIN_ORDERS);
     const existingInvoices = loadInvoices();
     const invoicedOrderIds = new Set(existingInvoices.map((inv) => inv.sourceOrderId).filter(Boolean));
 
-    // Payment status
-    const paymentStatus = JSON.parse(localStorage.getItem("tcgacademy_payment_status") ?? "{}");
+    // SSOT: estado de cobro leído desde AdminOrder vía orderAdapter (antes: clave paralela).
+    const paymentStatus = getPaymentStatusMap();
 
     // Only create invoices for paid orders (not cancelled/returned, and payment confirmed)
     const paidOrders = orders.filter((o) => {
@@ -195,30 +218,74 @@ async function syncPaidOrdersAsInvoices() {
     });
 
     for (const order of paidOrders) {
-      await createInvoice({
-        recipient: {
-          name: order.userName,
-          countryCode: "ES",
-          email: order.userEmail,
-          address: { street: order.address, postalCode: "", city: "", province: "", country: "España", countryCode: "ES" },
-        },
-        items: buildLineItems(order),
-        paymentMethod: mapPaymentMethod(order.paymentMethod),
-        sourceOrderId: order.id,
-        invoiceDate: new Date(order.statusHistory[0]?.date ?? order.date),
-      });
+      // Guard: sin NIF válido no se emite factura (Art. 6.1.d RD 1619/2012).
+      if (!order.nif) {
+        result.skippedNoNif++;
+        result.errors.push(`Pedido ${order.id}: sin NIF, factura omitida.`);
+        continue;
+      }
+      const nifCheck = validateSpanishNIF(order.nif);
+      if (!nifCheck.valid) {
+        result.skippedNoNif++;
+        result.errors.push(`Pedido ${order.id}: NIF inválido (${order.nif}), factura omitida.`);
+        continue;
+      }
+      const taxIdType =
+        nifCheck.type === "NIE"
+          ? TaxIdType.NIE
+          : nifCheck.type === "CIF"
+            ? TaxIdType.CIF
+            : TaxIdType.NIF;
+      try {
+        const invoice = await createInvoice({
+          recipient: {
+            name: order.userName,
+            taxId: nifCheck.normalized,
+            taxIdType,
+            countryCode: "ES",
+            email: order.userEmail,
+            address: { street: order.address, postalCode: "", city: "", province: "", country: "España", countryCode: "ES" },
+          },
+          items: buildLineItems(order),
+          paymentMethod: mapPaymentMethod(order.paymentMethod),
+          sourceOrderId: order.id,
+          invoiceDate: new Date(order.statusHistory[0]?.date ?? order.date),
+        });
+        saveInvoice(invoice);
+        result.created++;
+      } catch (err) {
+        result.failed++;
+        result.errors.push(
+          `Pedido ${order.id}: ${err instanceof Error ? err.message : "error desconocido"}`,
+        );
+      }
     }
-  } catch { /* ignore */ }
+  } catch (err) {
+    result.errors.push(err instanceof Error ? err.message : "Error en sync");
+  }
+  return result;
 }
 
 export default function FacturasPage() {
   const [invoices, setInvoices] = useState<InvoiceRecord[]>(() => loadInvoices());
+  const [syncReport, setSyncReport] = useState<SyncResult | null>(null);
+  const [migrationReport, setMigrationReport] = useState<InvoiceMigrationReport | null>(null);
 
   useEffect(() => {
-    syncPaidOrdersAsInvoices().then(() => {
-       
+    (async () => {
+      // 1. Migrar numeración al formato v2 (FAC-YYYY-NNNNNXXXXXE) si procede.
+      //    Idempotente: no-op si ya está al día.
+      const migration = await migrateInvoiceNumbersIfNeeded();
+      if (!migration.alreadyUpToDate && (migration.migrated > 0 || migration.errors.length > 0)) {
+        setMigrationReport(migration);
+      }
+      // 2. Sincronizar pedidos pagados a facturas.
+      const report = await syncPaidOrdersAsInvoices();
       setInvoices(loadInvoices());
-    });
+      if (report.created > 0 || report.skippedNoNif > 0 || report.failed > 0) {
+        setSyncReport(report);
+      }
+    })();
   }, []);
   const [yearFilter, setYearFilter] = useState<number>(
     new Date().getFullYear(),
@@ -291,21 +358,26 @@ export default function FacturasPage() {
   function downloadPDF(inv: InvoiceRecord) {
     const recipient = inv.recipient as { name?: string; taxId?: string; address?: { street?: string; postalCode?: string; city?: string; province?: string; country?: string }; email?: string; phone?: string; isEU?: boolean };
     const addr = recipient.address;
-    const issuer = inv.issuer as { name?: string; taxId?: string; address?: { street?: string; postalCode?: string; city?: string; province?: string; country?: string }; email?: string; phone?: string };
-    const issuerAddr = issuer.address;
+    // Issuer data is ALWAYS sourced from SITE_CONFIG — never from stored records,
+    // which may contain stale / legacy data.
+    const issuer = getIssuerAddress();
+    const issuerAddress = issuer.street || SITE_CONFIG.address;
+    const issuerCity = issuer.cityLine;
     const data: InvoiceData = {
       invoiceNumber: inv.invoiceNumber,
+      orderId: inv.sourceOrderId ?? undefined,
       date: new Date(inv.invoiceDate).toISOString(),
       paymentMethod: inv.paymentMethod,
+      paymentStatus: "paid",
       verifactuHash: inv.verifactuHash ?? undefined,
       verifactuQR: inv.verifactuQR ?? undefined,
       verifactuStatus: inv.verifactuStatus ?? undefined,
-      issuerName: issuer.name ?? "TCG Academy S.L.",
-      issuerCIF: issuer.taxId ?? "B12345678",
-      issuerAddress: issuerAddr?.street ?? "Calle Ejemplo 1, Local 4",
-      issuerCity: issuerAddr ? `${issuerAddr.postalCode ?? ""} ${issuerAddr.city ?? ""}`.trim() : "28001 Madrid, España",
-      issuerPhone: issuer.phone ?? "+34 91 000 00 00",
-      issuerEmail: issuer.email ?? "facturacion@tcgacademy.es",
+      issuerName: SITE_CONFIG.legalName,
+      issuerCIF: SITE_CONFIG.cif,
+      issuerAddress,
+      issuerCity,
+      issuerPhone: SITE_CONFIG.phone,
+      issuerEmail: SITE_CONFIG.email,
       clientName: recipient.name ?? "—",
       clientCIF: recipient.taxId,
       clientAddress: addr?.street,
@@ -377,6 +449,17 @@ export default function FacturasPage() {
 
   const filterLabel = `${yearFilter}${quarterFilter !== "all" ? `_T${quarterFilter}` : ""}`;
 
+  // ── Verificador de numeración ──
+  const [showFormatDocs, setShowFormatDocs] = useState(false);
+  const [verifierInput, setVerifierInput] = useState("");
+  const verifierResult = useMemo(() => {
+    const value = verifierInput.trim().toUpperCase();
+    if (!value) return null;
+    const format = verifyInvoiceNumber(value);
+    const existsInBook = invoices.some((inv) => inv.invoiceNumber === value);
+    return { format, existsInBook, value };
+  }, [verifierInput, invoices]);
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -409,6 +492,72 @@ export default function FacturasPage() {
           </button>
         </div>
       </div>
+
+      {/* Migration banner — solo aparece la primera vez tras re-numeración */}
+      {migrationReport && (
+        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-sm text-blue-900">
+              <strong>Migración de numeración a formato FAC-YYYY-NNNNNXXXXXE:</strong>{" "}
+              <span className="mr-2">✓ {migrationReport.migrated} facturas re-numeradas</span>
+              <span className="mr-2">↻ {migrationReport.rechained} encadenadas</span>
+              {migrationReport.preserved > 0 && (
+                <span className="mr-2 text-gray-600">• {migrationReport.preserved} ya en formato</span>
+              )}
+              {migrationReport.errors.length > 0 && (
+                <span className="text-red-700">✗ {migrationReport.errors.length} errores</span>
+              )}
+              <p className="mt-1 text-xs text-blue-800">
+                Las facturas anteriores se han renumerado con el nuevo sistema y la cadena de hashes VeriFactu
+                se ha regenerado en orden cronológico. Cada cambio queda en el auditLog de la factura.
+              </p>
+            </div>
+            <button
+              onClick={() => setMigrationReport(null)}
+              className="text-blue-700 hover:text-blue-900"
+              aria-label="Cerrar aviso"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sync report banner */}
+      {syncReport && (syncReport.skippedNoNif > 0 || syncReport.failed > 0 || syncReport.created > 0) && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-sm text-amber-900">
+              <strong>Sincronización de facturas:</strong>{" "}
+              {syncReport.created > 0 && <span className="mr-2">✓ {syncReport.created} creadas</span>}
+              {syncReport.skippedNoNif > 0 && (
+                <span className="mr-2 text-red-700">⚠ {syncReport.skippedNoNif} omitidas sin NIF</span>
+              )}
+              {syncReport.failed > 0 && (
+                <span className="text-red-700">✗ {syncReport.failed} con error</span>
+              )}
+              {syncReport.errors.length > 0 && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-semibold">Ver detalles ({syncReport.errors.length})</summary>
+                  <ul className="mt-1 ml-4 list-disc text-xs">
+                    {syncReport.errors.slice(0, 20).map((e, i) => (
+                      <li key={i}>{e}</li>
+                    ))}
+                    {syncReport.errors.length > 20 && <li>…y {syncReport.errors.length - 20} más</li>}
+                  </ul>
+                </details>
+              )}
+            </div>
+            <button
+              onClick={() => setSyncReport(null)}
+              className="text-amber-700 hover:text-amber-900"
+              aria-label="Cerrar aviso"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="mb-6 flex flex-wrap gap-3">
@@ -772,6 +921,178 @@ export default function FacturasPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Documentación del formato + verificador interno ── */}
+      <div className="mt-8 rounded-2xl border border-gray-200 bg-white">
+        <button
+          onClick={() => setShowFormatDocs(!showFormatDocs)}
+          className="flex w-full items-center justify-between gap-3 px-6 py-4 text-left transition hover:bg-gray-50"
+          aria-expanded={showFormatDocs}
+          aria-controls="invoice-format-docs"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+            <Info size={16} className="text-[#2563eb]" />
+            Formato de numeración de facturas + verificador interno
+          </span>
+          <ChevronDown
+            size={16}
+            className={`text-gray-400 transition ${showFormatDocs ? "rotate-180" : ""}`}
+          />
+        </button>
+        {showFormatDocs && (
+          <div id="invoice-format-docs" className="border-t border-gray-100 p-6 text-sm text-gray-700">
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* ── Explicación del formato ── */}
+              <div>
+                <h3 className="mb-3 text-base font-bold text-gray-900">Formato oficial</h3>
+                <div className="rounded-lg bg-gray-50 px-4 py-3 font-mono text-sm text-gray-900">
+                  FAC-YYYY-NNNNNXXXXXE
+                </div>
+                <dl className="mt-4 space-y-2 text-xs">
+                  <div className="flex gap-2">
+                    <dt className="w-20 shrink-0 font-mono font-bold text-[#2563eb]">FAC</dt>
+                    <dd>Serie de facturación. Identifica el libro de ventas general.</dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="w-20 shrink-0 font-mono font-bold text-[#2563eb]">YYYY</dt>
+                    <dd>Año natural de expedición (4 dígitos). La numeración reinicia cada año.</dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="w-20 shrink-0 font-mono font-bold text-[#2563eb]">NNNNN</dt>
+                    <dd>
+                      Número correlativo real, 5 dígitos con ceros a la izquierda (00001, 00002, …).
+                      <strong> Sin saltos ni huecos</strong> — requisito del art. 6 RD 1619/2012.
+                    </dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="w-20 shrink-0 font-mono font-bold text-[#2563eb]">XXXXX</dt>
+                    <dd>
+                      <strong>Dígitos de control</strong> de 5 posiciones. Se derivan de (N, año) mediante
+                      aritmética modular sobre una terna de números primos secretos:
+                      <code className="mx-1 rounded bg-gray-100 px-1 py-0.5 font-mono">
+                        (N · P₁ + año · P₂ + P₃) mod P₄
+                      </code>.
+                      <br />
+                      El resultado es <em>determinista</em> (la misma factura produce siempre los mismos
+                      dígitos) pero <em>impredecible</em> sin conocer los primos: un tercero no puede
+                      fabricar un número de factura válido aunque conozca la serie y el año.
+                    </dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="w-20 shrink-0 font-mono font-bold text-[#2563eb]">E</dt>
+                    <dd>
+                      Letra de origen — <strong>E</strong> = emitida por la web (canal electrónico).
+                      Reservado para futuras series: T = tienda física, B = B2B manual, etc.
+                    </dd>
+                  </div>
+                </dl>
+                <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">
+                  <strong>Ejemplo:</strong> la factura nº 525 del año 2026 tendría la forma
+                  <code className="mx-1 rounded bg-white px-1 py-0.5 font-mono">FAC-2026-00525XXXXXE</code>
+                  donde los XXXXX se calculan automáticamente y son únicos para esa combinación (525, 2026).
+                </div>
+                <div className="mt-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
+                  <strong>Por qué este sistema:</strong> cumple la correlatividad exigida por el RIVA, añade
+                  un chequeo de integridad propio (detectar una factura falsificada mirando solo el número)
+                  y no depende de terceros. El encadenamiento SHA-256 del sistema VeriFactu opera por encima
+                  de este formato y sigue siendo la prueba fiscal principal.
+                </div>
+              </div>
+
+              {/* ── Verificador interno ── */}
+              <div>
+                <h3 className="mb-3 text-base font-bold text-gray-900">Verificador interno</h3>
+                <p className="mb-3 text-xs text-gray-600">
+                  Comprueba si un número de factura cumple el formato y los dígitos de control, y si
+                  corresponde a una factura realmente emitida en este libro.
+                </p>
+                <input
+                  type="text"
+                  placeholder="FAC-2026-00001XXXXXE"
+                  value={verifierInput}
+                  onChange={(e) => setVerifierInput(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-gray-200 px-3 font-mono text-sm uppercase focus:border-[#2563eb] focus:outline-none"
+                  aria-label="Número de factura a verificar"
+                />
+                {verifierResult && (
+                  <div className="mt-4 space-y-2 text-xs">
+                    {/* Formato + dígitos de control */}
+                    <div
+                      className={`flex items-start gap-2 rounded-lg border p-3 ${
+                        verifierResult.format.valid
+                          ? "border-green-200 bg-green-50 text-green-900"
+                          : "border-red-200 bg-red-50 text-red-900"
+                      }`}
+                    >
+                      {verifierResult.format.valid ? (
+                        <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-600" />
+                      ) : (
+                        <XCircle size={16} className="mt-0.5 shrink-0 text-red-600" />
+                      )}
+                      <div>
+                        <div className="font-semibold">
+                          {verifierResult.format.valid
+                            ? verifierResult.format.reason === "legacy"
+                              ? "Formato legacy válido"
+                              : "Formato + dígitos de control correctos"
+                            : "Formato inválido"}
+                        </div>
+                        {verifierResult.format.reason && (
+                          <div className="mt-0.5 opacity-80">Detalle: {verifierResult.format.reason}</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Existencia en el libro */}
+                    <div
+                      className={`flex items-start gap-2 rounded-lg border p-3 ${
+                        verifierResult.existsInBook
+                          ? "border-blue-200 bg-blue-50 text-blue-900"
+                          : "border-gray-200 bg-gray-50 text-gray-700"
+                      }`}
+                    >
+                      {verifierResult.existsInBook ? (
+                        <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-blue-600" />
+                      ) : (
+                        <XCircle size={16} className="mt-0.5 shrink-0 text-gray-400" />
+                      )}
+                      <div>
+                        <div className="font-semibold">
+                          {verifierResult.existsInBook
+                            ? "Factura registrada en el libro"
+                            : "No existe en el libro"}
+                        </div>
+                        <div className="mt-0.5 opacity-80">
+                          {verifierResult.existsInBook
+                            ? "El número aparece en el libro de facturas emitidas."
+                            : "El número puede ser válido en formato pero no ha sido emitido aquí."}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Veredicto combinado */}
+                    <div className="rounded-lg bg-gray-900 p-3 font-mono text-xs text-white">
+                      <div className="text-gray-400">Veredicto:</div>
+                      <div className="mt-1">
+                        {verifierResult.format.valid && verifierResult.existsInBook
+                          ? "AUTÉNTICA — formato OK y registrada"
+                          : verifierResult.format.valid && !verifierResult.existsInBook
+                            ? "SOSPECHOSA — formato OK pero no consta en el libro"
+                            : "INVÁLIDA — no puede ser una factura emitida por nosotros"}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <p className="mt-4 text-[11px] leading-relaxed text-gray-500">
+                  Este verificador es una comprobación interna. La validación oficial ante la AEAT
+                  (una vez VeriFactu esté en producción) se realiza mediante el código QR de cada
+                  factura, que apunta a la sede electrónica.
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -183,7 +183,10 @@ export function getVerifactuProvider(): VerifactuProvider {
     );
   }
 
-  if (VERIFACTU_CONFIG.mode === "mock") {
+  if (VERIFACTU_CONFIG.mode === "off" || VERIFACTU_CONFIG.mode === "mock") {
+    // "off" devuelve igualmente el mock como no-op safe — nadie debería llamarlo
+    // en ese modo (saveInvoice hace short-circuit antes), pero si por alguna
+    // vía alguien lo invoca, que no revente.
     return new MockVerifactuProvider();
   }
   // Pendiente: cuando se contrate proveedor real:

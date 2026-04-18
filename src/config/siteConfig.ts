@@ -5,11 +5,11 @@
 
 export const SITE_CONFIG = {
   name: "TCG Academy",
-  legalName: "TCG Academy S.L.",
-  cif: "B12345678",
-  address: "Av. Gabriel Miró 42, 03710 Calpe, Alicante",
-  email: "hola@tcgacademy.es",
-  phone: "+34 965 83 00 01",
+  legalName: "TCG HOBBY, S.L.",
+  cif: "B26979302",
+  address: "Av. del Norte 40, 2ª planta, puerta B, 03710 Calpe, Alicante",
+  email: "tcgacademycalpe@gmail.com",
+  phone: "+34 648 63 57 23",
 
   // Logistics
   carrier: "GLS",

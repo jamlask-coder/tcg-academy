@@ -36,7 +36,7 @@ export default function VerificarFacturaPage() {
             date: order.date,
             total: order.total,
             clientName: order.userName,
-            status: order.adminStatus === "finalizado" ? "pagada" : "pendiente",
+            status: order.adminStatus === "enviado" ? "pagada" : "pendiente",
           });
           setLoading(false);
           return;

@@ -25,18 +25,29 @@ import {
 } from "lucide-react";
 import {
   ADMIN_ORDERS,
-  MSG_STORAGE_KEY,
   ORDER_STORAGE_KEY,
   type AdminOrder,
   type AdminOrderStatus,
-  type AppMessage,
 } from "@/data/mockData";
+import {
+  readAdminOrdersMerged,
+  isAdminVisibleOrder,
+} from "@/lib/orderAdapter";
+import { sendMessage as sendCanonicalMessage } from "@/services/messageService";
+import { pushUserNotification } from "@/services/notificationService";
+import { renderEmailTemplate, logSentEmail } from "@/services/emailService";
 import {
   buildInvoiceFromOrder,
   printInvoiceWithCSV,
   generateInvoiceNumber,
 } from "@/utils/invoiceGenerator";
 import { logAudit } from "@/services/auditService";
+import { parseFiscalAddress } from "@/lib/fiscalAddress";
+import {
+  ShipModal,
+  buildTrackingUrl,
+  type Carrier,
+} from "@/components/admin/ShipModal";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 50;
@@ -56,12 +67,6 @@ const STATUS_CFG: Record<
     color: "#15803d",
     bg: "#dcfce7",
     border: "#86efac",
-  },
-  finalizado: {
-    label: "Entregado",
-    color: "#166534",
-    bg: "#f0fdf4",
-    border: "#bbf7d0",
   },
   incidencia: {
     label: "Incidencia",
@@ -118,10 +123,7 @@ const INCIDENT_TYPES: Record<string, string> = {
 const STATUS_FLOW: AdminOrderStatus[] = [
   "pendiente_envio",
   "enviado",
-  "finalizado",
 ];
-// Terminal states not in main flow
-const _TERMINAL_STATES: AdminOrderStatus[] = ["cancelado", "devolucion"];
 
 const EMAIL_TEMPLATES = [
   {
@@ -221,24 +223,32 @@ function StatusDropdown({
 }) {
   const cfg = STATUS_CFG[status];
   return (
-    <select
-      value={status}
-      onChange={(e) => onUpdate(e.target.value as AdminOrderStatus)}
-      onClick={(e) => e.stopPropagation()}
-      className="cursor-pointer appearance-none rounded-full border px-2.5 py-0.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-offset-1"
-      style={{
-        color: cfg.color,
-        backgroundColor: cfg.bg,
-        borderColor: cfg.border,
-      }}
-      aria-label={`Estado del pedido: ${cfg.label}`}
-    >
-      {(Object.keys(STATUS_CFG) as AdminOrderStatus[]).map((s) => (
-        <option key={s} value={s}>
-          {STATUS_CFG[s].label}
-        </option>
-      ))}
-    </select>
+    <span className="relative inline-block">
+      <select
+        value={status}
+        onChange={(e) => onUpdate(e.target.value as AdminOrderStatus)}
+        onClick={(e) => e.stopPropagation()}
+        className="cursor-pointer appearance-none rounded-full border pr-7 pl-2.5 py-0.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-offset-1"
+        style={{
+          color: cfg.color,
+          backgroundColor: cfg.bg,
+          borderColor: cfg.border,
+        }}
+        aria-label={`Estado del pedido: ${cfg.label}`}
+      >
+        {(Object.keys(STATUS_CFG) as AdminOrderStatus[]).map((s) => (
+          <option key={s} value={s}>
+            {STATUS_CFG[s].label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown
+        size={12}
+        className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2"
+        style={{ color: cfg.color }}
+        aria-hidden="true"
+      />
+    </span>
   );
 }
 
@@ -254,6 +264,7 @@ function RoleBadge({ role }: { role: "cliente" | "mayorista" | "tienda" }) {
     </span>
   );
 }
+
 
 function Toast({ message, onClose }: { message: string; onClose: () => void }) {
   return (
@@ -384,7 +395,7 @@ function EmailModal({
 
 function printInvoicePDF(order: AdminOrder) {
   const invNum = generateInvoiceNumber(order.id);
-  const addrParts = order.address ? order.address.split(",").map((s) => s.trim()) : [];
+  const parsed = order.address ? parseFiscalAddress(order.address) : null;
   const data = buildInvoiceFromOrder(
     {
       id: order.id,
@@ -397,10 +408,10 @@ function printInvoicePDF(order: AdminOrder) {
       shippingAddress: {
         nombre: order.userName,
         email: order.userEmail,
-        direccion: addrParts[0],
-        cp: addrParts[1]?.match(/\d{5}/)?.[0],
-        ciudad: addrParts[1]?.replace(/\d{5}\s*/, "").trim() || addrParts[2],
-        pais: "España",
+        direccion: parsed?.street,
+        cp: parsed?.postalCode || undefined,
+        ciudad: parsed?.city,
+        pais: parsed?.country ?? "España",
       },
     },
     invNum,
@@ -735,23 +746,6 @@ function OrderPanel({
                     </div>
                   </div>
                   <button
-                    onClick={() => onUpdateStatus(order.id, "finalizado")}
-                    className="flex items-center gap-1.5 rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-green-700"
-                  >
-                    <Check size={14} /> Marcar como finalizado (entregado)
-                  </button>
-                </div>
-              )}
-
-              {order.adminStatus === "finalizado" && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 rounded-xl bg-green-50 p-3">
-                    <Check size={16} className="flex-shrink-0 text-green-600" />
-                    <p className="text-sm font-semibold text-green-700">
-                      Pedido entregado
-                    </p>
-                  </div>
-                  <button
                     onClick={() => onUpdateStatus(order.id, "devolucion")}
                     className="flex items-center gap-1.5 rounded-xl border border-purple-200 bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 transition hover:bg-purple-100"
                   >
@@ -802,7 +796,7 @@ function OrderPanel({
               )}
 
               {/* Cancel button — available for all active (non-terminal) states */}
-              {!["cancelado", "devolucion", "finalizado"].includes(
+              {!["cancelado", "devolucion"].includes(
                 order.adminStatus,
               ) && (
                 <div className="mt-3 border-t border-gray-100 pt-3">
@@ -1076,15 +1070,38 @@ export default function AdminPedidosPage() {
     setShowDemoBanner(false);
   };
 
+  // Merge robusto: lee `tcgacademy_admin_orders` + recupera cualquier pedido
+  // huérfano que el checkout escribió sólo en `tcgacademy_orders`. Así NINGÚN
+  // pedido real puede quedar invisible para el admin, ni aunque falle el
+  // mirror al inbox (ej. quota llena durante el checkout).
+  //
+  // Regla 2026-04-18: los pagos DIFERIDOS sin confirmar cobro (recogida en
+  // tienda, transferencia, contrarreembolso) NO son pedidos — son intenciones
+  // gestionadas por email. Se filtran aquí para que no aparezcan ni en la
+  // tabla ni en los contadores. Si alguna vez alguien marca paymentStatus =
+  // "cobrado" sobre uno de estos (flujo heredado), entonces sí entra.
+  // `isAdminVisibleOrder` vive en orderAdapter.ts y es el SSOT de visibilidad.
+  // Tanto esta tabla como `countPendingOrdersToShip` (badge cabecera/sidebar)
+  // lo usan, así que los contadores no pueden desfasarse.
   const [orders, setOrders] = useState<AdminOrder[]>(() => {
-    if (typeof window === "undefined") return ADMIN_ORDERS;
-    try {
-      const saved = localStorage.getItem(ORDER_STORAGE_KEY);
-      return saved ? (JSON.parse(saved) as AdminOrder[]) : ADMIN_ORDERS;
-    } catch {
-      return ADMIN_ORDERS;
-    }
+    if (typeof window === "undefined") return ADMIN_ORDERS.filter(isAdminVisibleOrder);
+    return readAdminOrdersMerged(ADMIN_ORDERS).filter(isAdminVisibleOrder);
   });
+
+  // Refresca al volver del background (ej. completar un pedido en otra pestaña).
+  useEffect(() => {
+    const onFocus = () =>
+      setOrders(readAdminOrdersMerged(ADMIN_ORDERS).filter(isAdminVisibleOrder));
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("storage", onFocus);
+    window.addEventListener("tcga:orders:updated", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("storage", onFocus);
+      window.removeEventListener("tcga:orders:updated", onFocus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<AdminOrderStatus | "">("");
@@ -1092,10 +1109,14 @@ export default function AdminPedidosPage() {
     "cliente" | "mayorista" | "tienda" | ""
   >("");
   const [urgentOnly, setUrgentOnly] = useState(false);
+  const [timeRange, setTimeRange] = useState<
+    "1d" | "1w" | "1m" | "3m" | "1y" | "all"
+  >("all");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [emailModal, setEmailModal] = useState<AdminOrder | null>(null);
   const [messageModal, setMessageModal] = useState<AdminOrder | null>(null);
+  const [shipModal, setShipModal] = useState<AdminOrder | null>(null);
   const [sortField, setSortField] = useState<"date" | "total" | "status">(
     "date",
   );
@@ -1104,14 +1125,16 @@ export default function AdminPedidosPage() {
 
   // Reset page when any filter changes
   useEffect(() => {
-     
+
     setPage(1);
-  }, [statusFilter, roleFilter, urgentOnly, search]);
+  }, [statusFilter, roleFilter, urgentOnly, search, timeRange]);
 
   const persistOrders = (next: AdminOrder[]) => {
     setOrders(next);
     try {
       localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(next));
+      // Notifica al sidebar/badge/dashboard para que reflejen el cambio sin refrescar.
+      window.dispatchEvent(new Event("tcga:orders:updated"));
     } catch {}
   };
 
@@ -1120,23 +1143,45 @@ export default function AdminPedidosPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // ── Summary counts ──
+  // ── Time-range filter ──
+  // Rango seleccionado por el admin. Los contadores y la lista se filtran
+  // por `date` del pedido (YYYY-MM-DD). "all" = sin filtrar.
+  const timeRangeDays: Record<typeof timeRange, number | null> = {
+    "1d": 1,
+    "1w": 7,
+    "1m": 30,
+    "3m": 90,
+    "1y": 365,
+    all: null,
+  };
+  const ordersInRange = useMemo(() => {
+    const days = timeRangeDays[timeRange];
+    if (days == null) return orders;
+    const cutoff = Date.now() - days * 86_400_000;
+    return orders.filter((o) => {
+      const t = new Date(o.date).getTime();
+      return !Number.isNaN(t) && t >= cutoff;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, timeRange]);
+
+  // ── Summary counts (respetan el time range) ──
   const counts = useMemo(
     () => ({
-      pendientes: orders.filter((o) => o.adminStatus === "pendiente_envio")
+      pendientes: ordersInRange.filter((o) => o.adminStatus === "pendiente_envio")
         .length,
-      enviados: orders.filter((o) => o.adminStatus === "enviado").length,
-      incidencias: orders.filter((o) => o.adminStatus === "incidencia").length,
-      cancelados: orders.filter((o) => o.adminStatus === "cancelado").length,
-      devoluciones: orders.filter((o) => o.adminStatus === "devolucion").length,
-      urgentes: orders.filter(isUrgent).length,
+      enviados: ordersInRange.filter((o) => o.adminStatus === "enviado").length,
+      incidencias: ordersInRange.filter((o) => o.adminStatus === "incidencia").length,
+      cancelados: ordersInRange.filter((o) => o.adminStatus === "cancelado").length,
+      devoluciones: ordersInRange.filter((o) => o.adminStatus === "devolucion").length,
+      urgentes: ordersInRange.filter(isUrgent).length,
     }),
-    [orders],
+    [ordersInRange],
   );
 
   // ── Filtered + sorted ──
   const filtered = useMemo(() => {
-    let list = orders.filter((o) => {
+    let list = ordersInRange.filter((o) => {
       if (statusFilter && o.adminStatus !== statusFilter) return false;
       if (roleFilter && o.userRole !== roleFilter) return false;
       if (urgentOnly && !isUrgent(o)) return false;
@@ -1177,7 +1222,7 @@ export default function AdminPedidosPage() {
     });
     return list;
   }, [
-    orders,
+    ordersInRange,
     search,
     statusFilter,
     roleFilter,
@@ -1195,6 +1240,7 @@ export default function AdminPedidosPage() {
     id: string,
     status: AdminOrderStatus,
     tracking?: string,
+    carrier: Carrier = "GLS",
   ) => {
     const now = new Date().toISOString();
     const previousOrder = orders.find((o) => o.id === id);
@@ -1202,6 +1248,19 @@ export default function AdminPedidosPage() {
 
     // Skip if status hasn't changed
     if (previousStatus === status) return;
+
+    // Build the history note inline so state + note persist in ONE write.
+    // (Llamar a persistOrders dos veces en el mismo handler reutilizaba el
+    // closure stale de `orders` y revertía el cambio de estado — bug 2026-04-18.)
+    const isStockRestoring =
+      status === "cancelado" || status === "devolucion";
+    const historyNote = tracking
+      ? `${carrier} ${tracking}`
+      : status === "cancelado"
+        ? "Stock restaurado por cancelación"
+        : status === "devolucion"
+          ? "Stock restaurado por devolución"
+          : undefined;
 
     persistOrders(
       orders.map((o) => {
@@ -1218,7 +1277,7 @@ export default function AdminPedidosPage() {
               status,
               date: now,
               by: "admin",
-              ...(tracking ? { note: `GLS ${tracking}` } : {}),
+              ...(historyNote ? { note: historyNote } : {}),
             },
           ],
         };
@@ -1250,10 +1309,7 @@ export default function AdminPedidosPage() {
     }
 
     // Restore stock when order is cancelled or returned
-    if (
-      (status === "cancelado" || status === "devolucion") &&
-      previousOrder
-    ) {
+    if (isStockRestoring && previousOrder) {
       try {
         const overrides = JSON.parse(
           localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
@@ -1280,31 +1336,11 @@ export default function AdminPedidosPage() {
       } catch {
         /* ignore */
       }
-
-      // Add stock restoration note to status history
-      const restoreNote =
-        status === "cancelado"
-          ? "Stock restaurado por cancelación"
-          : "Stock restaurado por devolución";
-      persistOrders(
-        orders.map((o) => {
-          if (o.id !== id) return o;
-          // Only add note if we just changed to this status
-          const lastEntry = o.statusHistory[o.statusHistory.length - 1];
-          if (lastEntry?.status === status && !lastEntry.note) {
-            const updated = [...o.statusHistory];
-            updated[updated.length - 1] = { ...lastEntry, note: restoreNote };
-            return { ...o, statusHistory: updated };
-          }
-          return o;
-        }),
-      );
     }
 
     const labels: Record<AdminOrderStatus, string> = {
       pendiente_envio: "Pendiente de envío",
       enviado: "Enviado",
-      finalizado: "Entregado",
       incidencia: "Incidencia",
       cancelado: "Cancelado",
       devolucion: "Devolución",
@@ -1316,13 +1352,11 @@ export default function AdminPedidosPage() {
     // Auto-notify customer on relevant status changes
     const emailSubjects: Partial<Record<AdminOrderStatus, string>> = {
       enviado: `Tu pedido ${id} ha sido enviado`,
-      finalizado: `Tu pedido ${id} ha sido entregado`,
       cancelado: `Tu pedido ${id} ha sido cancelado`,
       incidencia: `Incidencia con tu pedido ${id}`,
     };
     const emailBodies: Partial<Record<AdminOrderStatus, string>> = {
       enviado: `Hola, tu pedido ${id} ha sido enviado.${tracking ? ` Número de seguimiento: ${tracking}` : ""} Gracias por confiar en TCG Academy.`,
-      finalizado: `Hola, tu pedido ${id} ha sido entregado. Esperamos que disfrutes tu compra. Gracias por confiar en TCG Academy.`,
       cancelado: `Hola, tu pedido ${id} ha sido cancelado. Si tienes alguna duda, no dudes en contactarnos.`,
       incidencia: `Hola, hemos registrado una incidencia en tu pedido ${id}. Nuestro equipo se pondrá en contacto contigo para resolverla.`,
     };
@@ -1331,47 +1365,89 @@ export default function AdminPedidosPage() {
     if (subject) {
       const order = orders.find((o) => o.id === id);
       if (order) {
-        // Log email notification
-        try {
-          const sentEmails = JSON.parse(
-            localStorage.getItem("tcgacademy_sent_emails") ?? "[]",
-          ) as Array<Record<string, unknown>>;
-          sentEmails.unshift({
-            date: now,
-            to: order.userEmail,
-            subject,
-            body: emailBodies[status] ?? "",
-            status: "enviado",
-            orderId: id,
+        // Map admin status → template id (si existe). Unifica el formato con
+        // /admin/emails: HTML de plantilla + variables reales. Si no hay
+        // plantilla, cae a un registro simple.
+        const TEMPLATE_BY_STATUS: Partial<Record<AdminOrderStatus, string>> = {
+          enviado: "pedido_enviado",
+        };
+        const templateId = TEMPLATE_BY_STATUS[status];
+        let finalSubject = subject;
+        const preview = emailBodies[status] ?? "";
+
+        if (templateId) {
+          const effectiveTracking = tracking ?? order.trackingNumber ?? "";
+          const rendered = renderEmailTemplate(templateId, {
+            nombre: order.userName.split(" ")[0] ?? order.userName,
+            order_id: id,
+            tracking_number: effectiveTracking,
+            carrier,
+            tracking_url: effectiveTracking
+              ? buildTrackingUrl(carrier, effectiveTracking)
+              : "",
+            unsubscribe_link: "#",
           });
-          if (sentEmails.length > 100) sentEmails.length = 100;
-          localStorage.setItem("tcgacademy_sent_emails", JSON.stringify(sentEmails));
-        } catch {
-          /* ignore */
+          if (rendered) {
+            finalSubject = rendered.subject;
+            // Usar servicio canónico para dejar el log con el mismo shape
+            // que consume /admin/emails.
+            logSentEmail({
+              id: `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+              to: order.userEmail,
+              toName: order.userName,
+              subject: rendered.subject,
+              templateId,
+              sentAt: now,
+              // Dentro de este branch templateId sólo es "pedido_enviado" →
+              // status siempre es "enviado".
+              preview: `Pedido enviado · ${carrier} ${tracking ?? "pendiente"}`,
+            });
+          }
+        } else {
+          // Sin plantilla (cancelado / incidencia) — log mínimo con shape
+          // canónico de SentEmailLog.
+          logSentEmail({
+            id: `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            to: order.userEmail,
+            toName: order.userName,
+            subject,
+            templateId: status === "cancelado" ? "pedido_cancelado" : "pedido_incidencia",
+            sentAt: now,
+            preview,
+          });
         }
 
-        // Create in-app notification
-        try {
-          const notifications = JSON.parse(
-            localStorage.getItem("tcgacademy_notif_dynamic") ?? "[]",
-          ) as Array<Record<string, unknown>>;
-          notifications.unshift({
-            // eslint-disable-next-line react-hooks/purity
-            id: `notif-${Date.now()}-${id}`,
-            userId: order.userId,
-            title: subject,
-            body: emailBodies[status] ?? "",
-            date: now,
-            read: false,
-            orderId: id,
-          });
-          if (notifications.length > 200) notifications.length = 200;
-          localStorage.setItem("tcgacademy_notif_dynamic", JSON.stringify(notifications));
-        } catch {
-          /* ignore */
-        }
+        // Create in-app notification via canonical service
+        // (writes to `tcgacademy_notif_dynamic` as `Record<userId, Notification[]>`
+        //  y emite DataHub("notifications")).
+        pushUserNotification(order.userId, {
+          type: status === "enviado" ? "envio" : "pedido",
+          title: finalSubject,
+          message: preview,
+          date: now,
+          link: `/cuenta/pedidos`,
+        });
       }
     }
+  };
+
+  // Wrapper: cambiar a "enviado" abre el ShipModal (pide tracking + carrier)
+  // salvo que la llamada ya traiga tracking (p. ej. desde el tab de Envío del
+  // panel expandido, donde el admin ya lo tecleó inline). El resto de
+  // transiciones van directas a handleUpdateStatus.
+  const requestStatusChange = (
+    id: string,
+    next: AdminOrderStatus,
+    tracking?: string,
+  ) => {
+    if (next === "enviado" && !tracking) {
+      const order = orders.find((o) => o.id === id);
+      if (order && order.adminStatus !== "enviado") {
+        setShipModal(order);
+        return;
+      }
+    }
+    handleUpdateStatus(id, next, tracking);
   };
 
   const handleSaveNotes = (id: string, notes: string) => {
@@ -1435,22 +1511,18 @@ export default function AdminPedidosPage() {
   };
 
   const handleSendMessage = (order: AdminOrder, body: string) => {
-    const msgs: AppMessage[] = JSON.parse(
-      localStorage.getItem(MSG_STORAGE_KEY) ?? "[]",
-    );
-    const newMsg: AppMessage = {
-      id: `msg-${Date.now()}`,
+    // Escritura canónica: messageService asigna id/date/read y emite
+    // `tcga:messages:updated` para que admin/mensajes, cuenta/mensajes y el
+    // panel de notificaciones se refresquen sin más lógica.
+    sendCanonicalMessage({
       fromUserId: "admin",
       toUserId: order.userId,
       fromName: "TCG Academy",
       toName: order.userName,
       subject: `Re: Pedido ${order.id}`,
       body,
-      date: new Date().toISOString(),
-      read: false,
       orderId: order.id,
-    };
-    localStorage.setItem(MSG_STORAGE_KEY, JSON.stringify([newMsg, ...msgs]));
+    });
     showToast(`Mensaje enviado a ${order.userName}`);
     setMessageModal(null);
   };
@@ -1480,6 +1552,16 @@ export default function AdminPedidosPage() {
           onSend={(b) => handleSendMessage(messageModal, b)}
         />
       )}
+      {shipModal && (
+        <ShipModal
+          order={shipModal}
+          onClose={() => setShipModal(null)}
+          onConfirm={(tracking, carrier) => {
+            handleUpdateStatus(shipModal.id, "enviado", tracking, carrier);
+            setShipModal(null);
+          }}
+        />
+      )}
 
       {showDemoBanner && (
         <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -1505,8 +1587,36 @@ export default function AdminPedidosPage() {
         </p>
       </div>
 
-      {/* Summary bar */}
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      {/* Time range selector */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-gray-500">Periodo:</span>
+        {([
+          { id: "1d", label: "1 día" },
+          { id: "1w", label: "1 semana" },
+          { id: "1m", label: "1 mes" },
+          { id: "3m", label: "3 meses" },
+          { id: "1y", label: "1 año" },
+          { id: "all", label: "Todo" },
+        ] as const).map((r) => {
+          const active = timeRange === r.id;
+          return (
+            <button
+              key={r.id}
+              onClick={() => setTimeRange(r.id)}
+              className={`h-8 rounded-lg border px-3 text-xs font-semibold transition ${
+                active
+                  ? "border-[#2563eb] bg-[#2563eb] text-white"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+              }`}
+            >
+              {r.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Summary bar — sólo estados de ENVÍO (dimensión adminStatus) */}
+      <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {[
           {
             label: "Urgentes (+48h)",
@@ -1514,6 +1624,7 @@ export default function AdminPedidosPage() {
             color: "#dc2626",
             bg: "#fff1f2",
             filter: null,
+            kind: "urgent" as const,
           },
           {
             label: "Pendientes",
@@ -1521,13 +1632,7 @@ export default function AdminPedidosPage() {
             color: "#a16207",
             bg: "#fef9c3",
             filter: "pendiente_envio" as const,
-          },
-          {
-            label: "Enviados",
-            value: counts.enviados,
-            color: "#15803d",
-            bg: "#dcfce7",
-            filter: "enviado" as const,
+            kind: "status" as const,
           },
           {
             label: "Incidencias",
@@ -1550,26 +1655,43 @@ export default function AdminPedidosPage() {
             bg: "#ede9fe",
             filter: "devolucion" as const,
           },
-        ].map(({ label, value, color, bg, filter }) => (
+          {
+            label: "Enviados",
+            value: counts.enviados,
+            color: "#15803d",
+            bg: "#dcfce7",
+            filter: "enviado" as const,
+          },
+        ].map((entry) => {
+          const { label, value, color, bg, filter } = entry;
+          const kind = "kind" in entry ? entry.kind : "status";
+          const isActive =
+            kind === "urgent"
+              ? urgentOnly
+              : filter
+                ? statusFilter === filter
+                : false;
+          return (
           <button
             key={label}
             onClick={() => {
-              if (filter) {
+              if (kind === "urgent") {
+                setUrgentOnly((u) => !u);
+              } else if (filter) {
                 const next = statusFilter === filter ? "" : filter;
                 setStatusFilter(next);
                 if (next) { setSortField("date"); setSortDir("desc"); }
-              } else {
-                setUrgentOnly((u) => !u);
               }
               setPage(1);
             }}
-            className={`rounded-xl border-2 p-3 text-left transition ${(filter ? statusFilter === filter : urgentOnly) ? "border-current" : "border-transparent"}`}
+            className={`rounded-xl border-2 p-3 text-left transition ${isActive ? "border-current" : "border-transparent"}`}
             style={{ backgroundColor: bg, color }}
           >
             <p className="text-2xl font-bold">{value}</p>
             <p className="mt-0.5 text-xs font-semibold">{label}</p>
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {/* Filters */}
@@ -1744,7 +1866,7 @@ export default function AdminPedidosPage() {
                       <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         <StatusDropdown
                           status={order.adminStatus}
-                          onUpdate={(s) => handleUpdateStatus(order.id, s)}
+                          onUpdate={(s) => requestStatusChange(order.id, s)}
                         />
                       </td>
                       <td className="px-3 py-3 text-gray-400">
@@ -1760,7 +1882,7 @@ export default function AdminPedidosPage() {
                         <td colSpan={6} className="p-0">
                           <OrderPanel
                             order={order}
-                            onUpdateStatus={handleUpdateStatus}
+                            onUpdateStatus={requestStatusChange}
                             onSaveNotes={handleSaveNotes}
                             onSendMessage={(o) => setMessageModal(o)}
                             onResolveIncident={handleResolveIncident}

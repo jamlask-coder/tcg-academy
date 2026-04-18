@@ -133,12 +133,6 @@ const STATUS_CFG: Record<
     icon: Package,
   },
   enviado: { label: "Enviado", color: "#7c3aed", bg: "#f5f3ff", icon: Truck },
-  finalizado: {
-    label: "Entregado",
-    color: "#15803d",
-    bg: "#dcfce7",
-    icon: CheckCircle,
-  },
   incidencia: {
     label: "Incidencia",
     color: "#dc2626",
@@ -241,7 +235,6 @@ function AdminDashboard() {
     { key: "todos", label: "Todos" },
     { key: "pendiente_envio", label: "Pendientes" },
     { key: "enviado", label: "Enviados" },
-    { key: "finalizado", label: "Entregados" },
     { key: "incidencia", label: "Incidencias" },
     { key: "cancelado", label: "Cancelados" },
     { key: "devolucion", label: "Devoluciones" },
@@ -262,7 +255,6 @@ function AdminDashboard() {
             "todos",
             "pendiente_envio",
             "enviado",
-            "finalizado",
             "incidencia",
             "cancelado",
             "devolucion",
@@ -487,8 +479,12 @@ function AdminDashboard() {
                       </div>
                     )}
 
-                    {/* Tracking input */}
-                    {order.adminStatus !== "finalizado" && (
+                    {/* Tracking input — se oculta solo para estados terminales
+                        (cancelado/devolucion). "Entregado" se eliminó del
+                        flujo el 2026-04-18; "enviado" es ahora el estado final
+                        pero aún se permite editar el tracking para corregir. */}
+                    {order.adminStatus !== "cancelado" &&
+                      order.adminStatus !== "devolucion" && (
                       <div className="flex items-center gap-2">
                         <input
                           type="text"
@@ -615,13 +611,17 @@ export default function CuentaPage() {
   const roleColor = user.role === "tienda" ? "#7c3aed" : "#2563eb";
 
   const QUICK_LINKS = [
-    {
-      href: "/cuenta/pedidos",
-      label: "Mis pedidos",
-      icon: Package,
-      desc: "Historial de compras",
-      color: "#2563eb",
-    },
+    ...(!isB2B
+      ? [
+          {
+            href: "/cuenta/pedidos",
+            label: "Mis pedidos",
+            icon: Package,
+            desc: "Historial de compras",
+            color: "#2563eb",
+          },
+        ]
+      : []),
     {
       href: "/cuenta/puntos",
       label: "Mis puntos",
@@ -700,8 +700,8 @@ export default function CuentaPage() {
         )}
       </div>
 
-      {/* Last order */}
-      {(() => {
+      {/* Last order — hidden for B2B (mayoristas/tiendas) */}
+      {!isB2B && (() => {
         const lastOrder = MOCK_ORDERS[0];
         if (!lastOrder) return null;
         const statusLabels: Record<string, { label: string; color: string; bg: string }> = {

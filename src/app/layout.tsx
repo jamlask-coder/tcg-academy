@@ -7,6 +7,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { ScrollToTop } from "@/components/layout/ScrollToTop";
 import { CookieConsent } from "@/components/legal/CookieConsent";
+import { FiscalDataGuard } from "@/components/auth/FiscalDataGuard";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
@@ -37,15 +38,17 @@ export default function RootLayout({
       <body className={inter.className}>
         <Providers>
           <ScrollToTop />
-          <div className="flex min-h-screen flex-col">
-            <div className="sticky top-0 z-50">
-              <Header />
-              <Navbar />
+          <FiscalDataGuard>
+            <div className="flex min-h-screen flex-col">
+              <div className="sticky top-0 z-50">
+                <Header />
+                <Navbar />
+              </div>
+              <main className="flex-1 bg-gray-50 pb-16 lg:pb-0">{children}</main>
+              <Footer />
+              <CookieConsent />
             </div>
-            <main className="flex-1 bg-gray-50 pb-16 lg:pb-0">{children}</main>
-            <Footer />
-            <CookieConsent />
-          </div>
+          </FiscalDataGuard>
         </Providers>
       </body>
     </html>

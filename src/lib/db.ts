@@ -14,6 +14,8 @@ export interface OrderRecord {
   userId?: string;
   customerEmail: string;
   customerName: string;
+  /** NIF/NIE/CIF del cliente — obligatorio (Art. 6.1.d RD 1619/2012) */
+  customerTaxId: string;
   customerPhone?: string;
   items: OrderItem[];
   subtotal: number;
@@ -121,6 +123,279 @@ export interface ConsentRecord {
   userAgent?: string;
 }
 
+// ─── Record types — entidades adicionales ───────────────────────────────────
+// Mantienen shape estable independiente de si la persistencia es localStorage
+// o Supabase. Los mappers al final del fichero traducen filas SQL ↔ Record.
+
+export interface ProductRecord {
+  id: number;
+  slug: string;
+  categoryId: string;
+  name: string;
+  shortDescription?: string;
+  description?: string;
+  price: number;
+  salePrice?: number;
+  vatRate: number;
+  stock: number;
+  /** @deprecated fallback genérico — usar los 3 de abajo */
+  maxPerUser?: number;
+  /** Máximo acumulado histórico por comprador con rol "cliente" */
+  maxPerClient?: number;
+  /** Máximo acumulado histórico por comprador con rol "mayorista" */
+  maxPerWholesaler?: number;
+  /** Máximo acumulado histórico por comprador con rol "tienda" */
+  maxPerStore?: number;
+  language?: string;
+  barcode?: string;
+  images: string[];
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+export interface CategoryRecord {
+  id: string;
+  parentId?: string;
+  slug: string;
+  name: string;
+  description?: string;
+  emoji?: string;
+  color?: string;
+  bgColor?: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface CartItemRecord {
+  userId: string;
+  productId: number;
+  quantity: number;
+  addedAt: string;
+}
+
+export interface FavoriteRecord {
+  userId: string;
+  productId: number;
+  createdAt: string;
+}
+
+export interface CouponRecord {
+  id: string;
+  code: string;
+  discountType: "percentage" | "fixed";
+  discountValue: number;
+  minOrder: number;
+  maxUses?: number;
+  maxPerUser: number;
+  usedCount: number;
+  validFrom: string;
+  validUntil?: string;
+  isActive: boolean;
+}
+
+export interface CouponUsageRecord {
+  couponId: string;
+  userId: string;
+  orderId?: string;
+  createdAt: string;
+}
+
+export interface PointsRecord {
+  userId: string;
+  balance: number;
+  totalEarned: number;
+  totalSpent: number;
+}
+
+export interface PointsHistoryEntry {
+  id?: string;
+  userId: string;
+  amount: number;
+  reason: string;
+  refOrder?: string;
+  refOther?: string;
+  createdAt?: string;
+}
+
+export interface IncidentRecord {
+  id: string;
+  orderId: string;
+  userId?: string;
+  status: "abierta" | "en_revision" | "resuelta" | "cerrada";
+  category: string;
+  title: string;
+  body: string;
+  adminNote?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReturnRecord {
+  id: string;
+  rmaNumber: string;
+  orderId: string;
+  userId?: string;
+  status: string;
+  customerNote?: string;
+  adminNote?: string;
+  refundAmount?: number;
+  trackingNumber?: string;
+  rectificativeId?: string;
+  items: Array<{ productId: number; quantity: number; unitPrice: number; reason: string; reasonDetail?: string }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MessageRecord {
+  id: string;
+  fromUserId?: string;
+  toUserId?: string;
+  orderId?: string;
+  subject: string;
+  body: string;
+  isRead: boolean;
+  parentId?: string;
+  createdAt: string;
+}
+
+export interface NotificationRecord {
+  id: string;
+  scope: "user" | "broadcast" | "fiscal";
+  userId?: string;
+  type: string;
+  title: string;
+  message: string;
+  link?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface GroupRecord {
+  id: string;
+  ownerId: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GroupMemberRecord {
+  groupId: string;
+  userId: string;
+  role: "owner" | "member";
+  joinedAt: string;
+  leftAt?: string;
+  cooldownUntil?: string;
+}
+
+export interface GroupInviteRecord {
+  id: string;
+  groupId: string;
+  invitedBy?: string;
+  invitedEmail: string;
+  inviteCode: string;
+  status: "pendiente" | "aceptada" | "rechazada" | "caducada";
+  expiresAt: string;
+  respondedAt?: string;
+  createdAt: string;
+}
+
+export interface ReviewRecord {
+  id: string;
+  userId: string;
+  productId: number;
+  orderId?: string;
+  rating?: number;
+  title?: string;
+  body?: string;
+  isApproved: boolean;
+  createdAt: string;
+}
+
+export interface ComplaintRecord {
+  id: string;
+  userId?: string;
+  orderId?: string;
+  claimantName: string;
+  claimantEmail: string;
+  claimantTaxId?: string;
+  claimantAddress?: string;
+  status: "recibida" | "tramitando" | "resuelta" | "desestimada";
+  facts: string;
+  claim: string;
+  resolution?: string;
+  pdfUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SolicitudRecord {
+  id: string;
+  type: "b2b" | "franquicia" | "vending";
+  companyName: string;
+  cif?: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone?: string;
+  volume?: string;
+  games: string[];
+  message?: string;
+  status: string;
+  adminNote?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailLogRecord {
+  id?: string;
+  toEmail: string;
+  toName?: string;
+  subject: string;
+  templateId?: string;
+  providerId?: string;
+  status: string;
+  errorDetail?: string;
+  userId?: string;
+  createdAt?: string;
+}
+
+export interface AppLogEntry {
+  id?: string;
+  level: "debug" | "info" | "warn" | "error";
+  source?: string;
+  message: string;
+  context?: Record<string, unknown>;
+  userId?: string;
+  createdAt?: string;
+}
+
+export interface AddressRecord {
+  id: string;
+  userId: string;
+  label: string;
+  recipient: string;
+  street: string;
+  floor?: string;
+  postalCode: string;
+  city: string;
+  province: string;
+  country: string;
+  phone?: string;
+  isDefault: boolean;
+}
+
+export interface CompanyProfileRecord {
+  id: string;
+  userId: string;
+  cif: string;
+  legalName: string;
+  fiscalAddress: string;
+  contactPerson: string;
+  companyPhone?: string;
+  billingEmail?: string;
+}
+
 // ─── Adapter interface ──────────────────────────────────────────────────────
 
 export interface DbAdapter {
@@ -167,6 +442,89 @@ export interface DbAdapter {
     performedBy?: string;
     ipAddress?: string;
   }): Promise<void>;
+
+  // ── Products + categories ────────────────────────────────────────────────
+  getProducts(opts?: { categoryId?: string; includeDeleted?: boolean }): Promise<ProductRecord[]>;
+  getProduct(id: number): Promise<ProductRecord | null>;
+  upsertProduct(product: ProductRecord): Promise<ProductRecord>;
+  softDeleteProduct(id: number): Promise<void>;
+  getCategories(): Promise<CategoryRecord[]>;
+  upsertCategory(cat: CategoryRecord): Promise<CategoryRecord>;
+
+  // ── Cart + favorites ─────────────────────────────────────────────────────
+  getCart(userId: string): Promise<CartItemRecord[]>;
+  setCartItem(userId: string, productId: number, quantity: number): Promise<void>;
+  removeCartItem(userId: string, productId: number): Promise<void>;
+  clearCart(userId: string): Promise<void>;
+  getFavorites(userId: string): Promise<FavoriteRecord[]>;
+  addFavorite(userId: string, productId: number): Promise<void>;
+  removeFavorite(userId: string, productId: number): Promise<void>;
+
+  // ── Coupons ──────────────────────────────────────────────────────────────
+  getCoupons(opts?: { activeOnly?: boolean }): Promise<CouponRecord[]>;
+  getCouponByCode(code: string): Promise<CouponRecord | null>;
+  upsertCoupon(coupon: CouponRecord): Promise<CouponRecord>;
+  deleteCoupon(id: string): Promise<void>;
+  recordCouponUsage(usage: CouponUsageRecord): Promise<void>;
+  countCouponUsageByUser(couponId: string, userId: string): Promise<number>;
+
+  // ── Points ───────────────────────────────────────────────────────────────
+  getPoints(userId: string): Promise<PointsRecord | null>;
+  appendPointsHistory(entry: PointsHistoryEntry): Promise<void>;
+  getPointsHistory(userId: string): Promise<PointsHistoryEntry[]>;
+
+  // ── Incidents ────────────────────────────────────────────────────────────
+  getIncidents(opts?: { userId?: string; orderId?: string }): Promise<IncidentRecord[]>;
+  createIncident(incident: Omit<IncidentRecord, "id" | "createdAt" | "updatedAt">): Promise<IncidentRecord>;
+  updateIncident(id: string, data: Partial<IncidentRecord>): Promise<void>;
+
+  // ── Returns (RMA) ────────────────────────────────────────────────────────
+  getReturns(userId?: string): Promise<ReturnRecord[]>;
+  getReturn(id: string): Promise<ReturnRecord | null>;
+  createReturn(ret: Omit<ReturnRecord, "createdAt" | "updatedAt">): Promise<ReturnRecord>;
+  updateReturn(id: string, data: Partial<ReturnRecord>): Promise<void>;
+
+  // ── Messages ─────────────────────────────────────────────────────────────
+  getMessages(userId: string): Promise<MessageRecord[]>;
+  sendMessage(msg: Omit<MessageRecord, "id" | "createdAt" | "isRead">): Promise<MessageRecord>;
+  markMessageRead(id: string): Promise<void>;
+
+  // ── Notifications ────────────────────────────────────────────────────────
+  getNotifications(opts: { userId?: string; scope?: "user" | "broadcast" | "fiscal" }): Promise<NotificationRecord[]>;
+  createNotification(notif: Omit<NotificationRecord, "id" | "createdAt" | "isRead">): Promise<NotificationRecord>;
+  markNotificationRead(id: string): Promise<void>;
+  clearNotifications(userId: string): Promise<void>;
+
+  // ── Groups (associations) ────────────────────────────────────────────────
+  getGroupByUser(userId: string): Promise<{ group: GroupRecord; members: GroupMemberRecord[] } | null>;
+  createGroup(group: Omit<GroupRecord, "createdAt" | "updatedAt">): Promise<GroupRecord>;
+  addGroupMember(member: GroupMemberRecord): Promise<void>;
+  removeGroupMember(groupId: string, userId: string, cooldownUntil?: string): Promise<void>;
+  createGroupInvite(invite: Omit<GroupInviteRecord, "createdAt">): Promise<GroupInviteRecord>;
+  getGroupInviteByCode(code: string): Promise<GroupInviteRecord | null>;
+  updateGroupInvite(id: string, data: Partial<GroupInviteRecord>): Promise<void>;
+
+  // ── Reviews / Complaints / Solicitudes ───────────────────────────────────
+  getReviews(productId?: number): Promise<ReviewRecord[]>;
+  createReview(review: Omit<ReviewRecord, "id" | "createdAt">): Promise<ReviewRecord>;
+  approveReview(id: string): Promise<void>;
+  getComplaints(userId?: string): Promise<ComplaintRecord[]>;
+  createComplaint(c: Omit<ComplaintRecord, "id" | "createdAt" | "updatedAt">): Promise<ComplaintRecord>;
+  updateComplaint(id: string, data: Partial<ComplaintRecord>): Promise<void>;
+  getSolicitudes(type?: SolicitudRecord["type"]): Promise<SolicitudRecord[]>;
+  createSolicitud(s: Omit<SolicitudRecord, "id" | "createdAt" | "updatedAt">): Promise<SolicitudRecord>;
+  updateSolicitud(id: string, data: Partial<SolicitudRecord>): Promise<void>;
+
+  // ── Email log + app logs ─────────────────────────────────────────────────
+  logEmail(entry: EmailLogRecord): Promise<void>;
+  logApp(entry: AppLogEntry): Promise<void>;
+
+  // ── Addresses + company profile ──────────────────────────────────────────
+  getAddresses(userId: string): Promise<AddressRecord[]>;
+  upsertAddress(addr: AddressRecord): Promise<AddressRecord>;
+  deleteAddress(id: string): Promise<void>;
+  getCompanyProfile(userId: string): Promise<CompanyProfileRecord | null>;
+  upsertCompanyProfile(profile: CompanyProfileRecord): Promise<CompanyProfileRecord>;
 }
 
 // ─── localStorage keys ──────────────────────────────────────────────────────
@@ -331,6 +689,87 @@ export class LocalDbAdapter implements DbAdapter {
   async createConsent(_consent: ConsentRecord): Promise<void> { /* handled client-side */ }
   async getConsents(_userId: string): Promise<ConsentRecord[]> { return []; }
   async logAudit(_entry: { entityType: string; entityId: string; action: string }): Promise<void> { /* handled client-side */ }
+
+  // ── Extended entities: en local mode los services ya escriben a localStorage.
+  // ── Estos stubs existen para que el adapter satisfaga la interfaz; no son
+  // ── la ruta canónica de escritura en modo local.
+  async getProducts(): Promise<ProductRecord[]> { return []; }
+  async getProduct(): Promise<ProductRecord | null> { return null; }
+  async upsertProduct(p: ProductRecord): Promise<ProductRecord> { return p; }
+  async softDeleteProduct(): Promise<void> { /* noop */ }
+  async getCategories(): Promise<CategoryRecord[]> { return []; }
+  async upsertCategory(c: CategoryRecord): Promise<CategoryRecord> { return c; }
+  async getCart(): Promise<CartItemRecord[]> { return []; }
+  async setCartItem(): Promise<void> { /* noop */ }
+  async removeCartItem(): Promise<void> { /* noop */ }
+  async clearCart(): Promise<void> { /* noop */ }
+  async getFavorites(): Promise<FavoriteRecord[]> { return []; }
+  async addFavorite(): Promise<void> { /* noop */ }
+  async removeFavorite(): Promise<void> { /* noop */ }
+  async getCoupons(): Promise<CouponRecord[]> { return []; }
+  async getCouponByCode(): Promise<CouponRecord | null> { return null; }
+  async upsertCoupon(c: CouponRecord): Promise<CouponRecord> { return c; }
+  async deleteCoupon(): Promise<void> { /* noop */ }
+  async recordCouponUsage(): Promise<void> { /* noop */ }
+  async countCouponUsageByUser(): Promise<number> { return 0; }
+  async getPoints(): Promise<PointsRecord | null> { return null; }
+  async appendPointsHistory(): Promise<void> { /* noop */ }
+  async getPointsHistory(): Promise<PointsHistoryEntry[]> { return []; }
+  async getIncidents(): Promise<IncidentRecord[]> { return []; }
+  async createIncident(i: Omit<IncidentRecord, "id" | "createdAt" | "updatedAt">): Promise<IncidentRecord> {
+    return { ...i, id: `inc-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  }
+  async updateIncident(): Promise<void> { /* noop */ }
+  async getReturns(): Promise<ReturnRecord[]> { return []; }
+  async getReturn(): Promise<ReturnRecord | null> { return null; }
+  async createReturn(r: Omit<ReturnRecord, "createdAt" | "updatedAt">): Promise<ReturnRecord> {
+    return { ...r, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  }
+  async updateReturn(): Promise<void> { /* noop */ }
+  async getMessages(): Promise<MessageRecord[]> { return []; }
+  async sendMessage(m: Omit<MessageRecord, "id" | "createdAt" | "isRead">): Promise<MessageRecord> {
+    return { ...m, id: `msg-${Date.now()}`, createdAt: new Date().toISOString(), isRead: false };
+  }
+  async markMessageRead(): Promise<void> { /* noop */ }
+  async getNotifications(): Promise<NotificationRecord[]> { return []; }
+  async createNotification(n: Omit<NotificationRecord, "id" | "createdAt" | "isRead">): Promise<NotificationRecord> {
+    return { ...n, id: `ntf-${Date.now()}`, createdAt: new Date().toISOString(), isRead: false };
+  }
+  async markNotificationRead(): Promise<void> { /* noop */ }
+  async clearNotifications(): Promise<void> { /* noop */ }
+  async getGroupByUser(): Promise<{ group: GroupRecord; members: GroupMemberRecord[] } | null> { return null; }
+  async createGroup(g: Omit<GroupRecord, "createdAt" | "updatedAt">): Promise<GroupRecord> {
+    return { ...g, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  }
+  async addGroupMember(): Promise<void> { /* noop */ }
+  async removeGroupMember(): Promise<void> { /* noop */ }
+  async createGroupInvite(i: Omit<GroupInviteRecord, "createdAt">): Promise<GroupInviteRecord> {
+    return { ...i, createdAt: new Date().toISOString() };
+  }
+  async getGroupInviteByCode(): Promise<GroupInviteRecord | null> { return null; }
+  async updateGroupInvite(): Promise<void> { /* noop */ }
+  async getReviews(): Promise<ReviewRecord[]> { return []; }
+  async createReview(r: Omit<ReviewRecord, "id" | "createdAt">): Promise<ReviewRecord> {
+    return { ...r, id: `rv-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async approveReview(): Promise<void> { /* noop */ }
+  async getComplaints(): Promise<ComplaintRecord[]> { return []; }
+  async createComplaint(c: Omit<ComplaintRecord, "id" | "createdAt" | "updatedAt">): Promise<ComplaintRecord> {
+    return { ...c, id: `cp-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  }
+  async updateComplaint(): Promise<void> { /* noop */ }
+  async getSolicitudes(): Promise<SolicitudRecord[]> { return []; }
+  async createSolicitud(s: Omit<SolicitudRecord, "id" | "createdAt" | "updatedAt">): Promise<SolicitudRecord> {
+    return { ...s, id: `sl-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+  }
+  async updateSolicitud(): Promise<void> { /* noop */ }
+  async logEmail(): Promise<void> { /* noop */ }
+  async logApp(): Promise<void> { /* noop */ }
+  async getAddresses(): Promise<AddressRecord[]> { return []; }
+  async upsertAddress(a: AddressRecord): Promise<AddressRecord> { return a; }
+  async deleteAddress(): Promise<void> { /* noop */ }
+  async getCompanyProfile(): Promise<CompanyProfileRecord | null> { return null; }
+  async upsertCompanyProfile(p: CompanyProfileRecord): Promise<CompanyProfileRecord> { return p; }
 }
 
 // ─── Server adapter (Supabase) ─────────────────────────────────────────────
@@ -341,7 +780,10 @@ export class ServerDbAdapter implements DbAdapter {
   // ── Orders ──────────────────────────────────────────────────────────────
 
   async getOrders(userId?: string): Promise<OrderRecord[]> {
-    let query = this.db.from("orders").select("*, order_items(*)").order("created_at", { ascending: false });
+    let query = this.db
+      .from("orders")
+      .select("*, order_items(*), coupons(code)")
+      .order("created_at", { ascending: false });
     if (userId) query = query.eq("user_id", userId);
     const { data, error } = await query;
     if (error) throw error;
@@ -349,32 +791,59 @@ export class ServerDbAdapter implements DbAdapter {
   }
 
   async getOrder(orderId: string): Promise<OrderRecord | null> {
-    const { data, error } = await this.db.from("orders").select("*, order_items(*)").eq("id", orderId).single();
+    const { data, error } = await this.db
+      .from("orders")
+      .select("*, order_items(*), coupons(code)")
+      .eq("id", orderId)
+      .single();
     if (error || !data) return null;
     return mapOrderRow(data);
   }
 
   async createOrder(order: OrderRecord): Promise<OrderRecord> {
     const { items, ...orderData } = order;
+
+    // Resolve coupon_code → coupon_id (FK normalizada).
+    let couponId: string | null = null;
+    if (orderData.couponCode) {
+      const { data: cpn } = await this.db
+        .from("coupons")
+        .select("id")
+        .ilike("code", orderData.couponCode)
+        .single();
+      couponId = (cpn as { id?: string } | null)?.id ?? null;
+    }
+
+    // Customer + shipping van como snapshots JSONB inmutables.
+    const [firstName, ...restName] = (orderData.customerName || "").split(" ");
+    const customerSnapshot = {
+      userId: orderData.userId ?? null,
+      firstName: firstName || "",
+      lastName: restName.join(" "),
+      email: orderData.customerEmail,
+      phone: orderData.customerPhone ?? null,
+      taxId: orderData.customerTaxId,
+    };
+
     const { error: orderError } = await this.db.from("orders").insert({
       id: orderData.id,
       user_id: orderData.userId || null,
-      customer_email: orderData.customerEmail,
-      customer_name: orderData.customerName,
-      customer_phone: orderData.customerPhone || null,
       status: orderData.status,
+      customer_snapshot: customerSnapshot,
+      shipping_snapshot: orderData.shippingAddress ?? null,
       shipping_method: orderData.shippingMethod,
       shipping_cost: orderData.shippingCost,
       payment_method: orderData.paymentMethod,
       payment_status: orderData.paymentStatus,
       payment_intent: orderData.paymentIntent || null,
       subtotal: orderData.subtotal || orderData.total,
-      coupon_code: orderData.couponCode || null,
+      coupon_id: couponId,
       coupon_discount: orderData.couponDiscount || 0,
       points_discount: orderData.pointsDiscount || 0,
       total: orderData.total,
-      shipping_address: orderData.shippingAddress,
-      tienda_recogida: orderData.tiendaRecogida || null,
+      tracking_number: orderData.trackingNumber || null,
+      tracking_url: orderData.trackingUrl || null,
+      notes: orderData.notes || null,
     });
     if (orderError) throw orderError;
 
@@ -430,7 +899,7 @@ export class ServerDbAdapter implements DbAdapter {
       email: user.email.toLowerCase(),
       username: user.username || null,
       password_hash: user.passwordHash,
-      name: user.name,
+      first_name: user.name,
       last_name: user.lastName,
       phone: user.phone || "",
       role: user.role,
@@ -444,7 +913,7 @@ export class ServerDbAdapter implements DbAdapter {
 
   async updateUser(userId: string, data: Partial<UserRecord>): Promise<void> {
     const update: Record<string, unknown> = {};
-    if (data.name !== undefined) update.name = data.name;
+    if (data.name !== undefined) update.first_name = data.name;
     if (data.lastName !== undefined) update.last_name = data.lastName;
     if (data.phone !== undefined) update.phone = data.phone;
     if (data.passwordHash !== undefined) update.password_hash = data.passwordHash;
@@ -470,13 +939,18 @@ export class ServerDbAdapter implements DbAdapter {
   }
 
   async createInvoice(invoice: Omit<InvoiceRecord, "id">): Promise<InvoiceRecord> {
+    const [firstName, ...restName] = (invoice.customerName || "").split(" ");
+    const customerSnapshot = {
+      firstName: firstName || "",
+      lastName: restName.join(" "),
+      email: invoice.customerEmail,
+      taxId: invoice.customerNif ?? null,
+    };
     const { data, error } = await this.db.from("invoices").insert({
       invoice_number: invoice.invoiceNumber,
       order_id: invoice.orderId || null,
       user_id: invoice.userId || null,
-      customer_email: invoice.customerEmail,
-      customer_name: invoice.customerName,
-      customer_nif: invoice.customerNif || null,
+      customer_snapshot: customerSnapshot,
       status: invoice.status,
       subtotal: invoice.subtotal,
       vat_rate: invoice.vatRate,
@@ -484,7 +958,7 @@ export class ServerDbAdapter implements DbAdapter {
       total: invoice.total,
       hash: invoice.hash || null,
       prev_hash: invoice.prevHash || null,
-      data: invoice.data || null,
+      data: invoice.data ?? {},
     }).select().single();
     if (error) throw error;
     return mapInvoiceRow(data);
@@ -595,6 +1069,95 @@ export class ServerDbAdapter implements DbAdapter {
     });
     if (error) throw error;
   }
+
+  // ── Extended entities ──────────────────────────────────────────────────────
+  // NOTE: Implementaciones Supabase pendientes. Los servicios de negocio todavía
+  // leen/escriben a localStorage incluso en modo server. Los stubs siguientes
+  // existen para satisfacer el contrato de DbAdapter y mantener el build.
+  // Cuando se migre cada servicio, reemplazar el stub por la query real.
+
+  async getProducts(): Promise<ProductRecord[]> { return []; }
+  async getProduct(): Promise<ProductRecord | null> { return null; }
+  async upsertProduct(p: ProductRecord): Promise<ProductRecord> { return p; }
+  async softDeleteProduct(): Promise<void> { /* stub */ }
+  async getCategories(): Promise<CategoryRecord[]> { return []; }
+  async upsertCategory(c: CategoryRecord): Promise<CategoryRecord> { return c; }
+  async getCart(): Promise<CartItemRecord[]> { return []; }
+  async setCartItem(): Promise<void> { /* stub */ }
+  async removeCartItem(): Promise<void> { /* stub */ }
+  async clearCart(): Promise<void> { /* stub */ }
+  async getFavorites(): Promise<FavoriteRecord[]> { return []; }
+  async addFavorite(): Promise<void> { /* stub */ }
+  async removeFavorite(): Promise<void> { /* stub */ }
+  async getCoupons(): Promise<CouponRecord[]> { return []; }
+  async getCouponByCode(): Promise<CouponRecord | null> { return null; }
+  async upsertCoupon(c: CouponRecord): Promise<CouponRecord> { return c; }
+  async deleteCoupon(): Promise<void> { /* stub */ }
+  async recordCouponUsage(): Promise<void> { /* stub */ }
+  async countCouponUsageByUser(): Promise<number> { return 0; }
+  async getPoints(): Promise<PointsRecord | null> { return null; }
+  async appendPointsHistory(): Promise<void> { /* stub */ }
+  async getPointsHistory(): Promise<PointsHistoryEntry[]> { return []; }
+  async getIncidents(): Promise<IncidentRecord[]> { return []; }
+  async createIncident(i: Omit<IncidentRecord, "id" | "createdAt" | "updatedAt">): Promise<IncidentRecord> {
+    const now = new Date().toISOString();
+    return { ...i, id: `INC-${Date.now()}`, createdAt: now, updatedAt: now };
+  }
+  async updateIncident(): Promise<void> { /* stub */ }
+  async getReturns(): Promise<ReturnRecord[]> { return []; }
+  async getReturn(): Promise<ReturnRecord | null> { return null; }
+  async createReturn(r: Omit<ReturnRecord, "createdAt" | "updatedAt">): Promise<ReturnRecord> {
+    const now = new Date().toISOString();
+    return { ...r, createdAt: now, updatedAt: now };
+  }
+  async updateReturn(): Promise<void> { /* stub */ }
+  async getMessages(): Promise<MessageRecord[]> { return []; }
+  async sendMessage(m: Omit<MessageRecord, "id" | "createdAt" | "isRead">): Promise<MessageRecord> {
+    return { ...m, id: `MSG-${Date.now()}`, createdAt: new Date().toISOString(), isRead: false };
+  }
+  async markMessageRead(): Promise<void> { /* stub */ }
+  async getNotifications(): Promise<NotificationRecord[]> { return []; }
+  async createNotification(n: Omit<NotificationRecord, "id" | "createdAt" | "isRead">): Promise<NotificationRecord> {
+    return { ...n, id: `NOT-${Date.now()}`, createdAt: new Date().toISOString(), isRead: false };
+  }
+  async markNotificationRead(): Promise<void> { /* stub */ }
+  async clearNotifications(): Promise<void> { /* stub */ }
+  async getGroupByUser(): Promise<{ group: GroupRecord; members: GroupMemberRecord[] } | null> { return null; }
+  async createGroup(g: Omit<GroupRecord, "createdAt" | "updatedAt">): Promise<GroupRecord> {
+    const now = new Date().toISOString();
+    return { ...g, createdAt: now, updatedAt: now };
+  }
+  async addGroupMember(): Promise<void> { /* stub */ }
+  async removeGroupMember(): Promise<void> { /* stub */ }
+  async createGroupInvite(i: Omit<GroupInviteRecord, "createdAt">): Promise<GroupInviteRecord> {
+    return { ...i, createdAt: new Date().toISOString() };
+  }
+  async getGroupInviteByCode(): Promise<GroupInviteRecord | null> { return null; }
+  async updateGroupInvite(): Promise<void> { /* stub */ }
+  async getReviews(): Promise<ReviewRecord[]> { return []; }
+  async createReview(r: Omit<ReviewRecord, "id" | "createdAt">): Promise<ReviewRecord> {
+    return { ...r, id: `REV-${Date.now()}`, createdAt: new Date().toISOString() };
+  }
+  async approveReview(): Promise<void> { /* stub */ }
+  async getComplaints(): Promise<ComplaintRecord[]> { return []; }
+  async createComplaint(c: Omit<ComplaintRecord, "id" | "createdAt" | "updatedAt">): Promise<ComplaintRecord> {
+    const now = new Date().toISOString();
+    return { ...c, id: `CMP-${Date.now()}`, createdAt: now, updatedAt: now };
+  }
+  async updateComplaint(): Promise<void> { /* stub */ }
+  async getSolicitudes(): Promise<SolicitudRecord[]> { return []; }
+  async createSolicitud(s: Omit<SolicitudRecord, "id" | "createdAt" | "updatedAt">): Promise<SolicitudRecord> {
+    const now = new Date().toISOString();
+    return { ...s, id: `SOL-${Date.now()}`, createdAt: now, updatedAt: now };
+  }
+  async updateSolicitud(): Promise<void> { /* stub */ }
+  async logEmail(): Promise<void> { /* stub */ }
+  async logApp(): Promise<void> { /* stub */ }
+  async getAddresses(): Promise<AddressRecord[]> { return []; }
+  async upsertAddress(a: AddressRecord): Promise<AddressRecord> { return a; }
+  async deleteAddress(): Promise<void> { /* stub */ }
+  async getCompanyProfile(): Promise<CompanyProfileRecord | null> { return null; }
+  async upsertCompanyProfile(p: CompanyProfileRecord): Promise<CompanyProfileRecord> { return p; }
 }
 
 // ─── Row mappers ────────────────────────────────────────────────────────────
@@ -617,12 +1180,20 @@ function asOpt<T>(v: unknown): T | undefined {
 
 function mapOrderRow(row: DbRow): OrderRecord {
   const items = Array.isArray(row.order_items) ? (row.order_items as DbRow[]) : [];
+  const snap = (row.customer_snapshot ?? {}) as Record<string, unknown>;
+  const shipSnap = (row.shipping_snapshot ?? null) as OrderRecord["shippingAddress"] | null;
+  const joinedCoupon = row.coupons as { code?: string } | null | undefined;
+  const firstName = asStr(snap.firstName);
+  const lastName = asStr(snap.lastName);
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+
   return {
     id: asStr(row.id),
     userId: asOpt<string>(row.user_id),
-    customerEmail: asStr(row.customer_email),
-    customerName: asStr(row.customer_name),
-    customerPhone: asOpt<string>(row.customer_phone),
+    customerEmail: asStr(snap.email),
+    customerName: fullName,
+    customerTaxId: asStr(snap.taxId),
+    customerPhone: asOpt<string>(snap.phone),
     items: items.map((i) => ({
       productId: Number(i.product_id),
       name: asStr(i.name),
@@ -632,7 +1203,7 @@ function mapOrderRow(row: DbRow): OrderRecord {
     })),
     subtotal: asNum(row.subtotal),
     shippingCost: asNum(row.shipping_cost),
-    couponCode: asOpt<string>(row.coupon_code),
+    couponCode: joinedCoupon?.code ?? undefined,
     couponDiscount: row.coupon_discount ? asNum(row.coupon_discount) : 0,
     pointsDiscount: row.points_discount ? asNum(row.points_discount) : 0,
     total: asNum(row.total),
@@ -644,8 +1215,8 @@ function mapOrderRow(row: DbRow): OrderRecord {
     trackingNumber: asOpt<string>(row.tracking_number),
     trackingUrl: asOpt<string>(row.tracking_url),
     notes: asOpt<string>(row.notes),
-    shippingAddress: row.shipping_address as OrderRecord["shippingAddress"],
-    tiendaRecogida: asOpt<string>(row.tienda_recogida),
+    shippingAddress: (shipSnap ?? ({} as OrderRecord["shippingAddress"])),
+    tiendaRecogida: undefined,
     createdAt: asStr(row.created_at),
     updatedAt: asStr(row.updated_at),
   };
@@ -657,7 +1228,7 @@ function mapUserRow(row: DbRow): UserRecord {
     email: asStr(row.email),
     username: asOpt<string>(row.username),
     passwordHash: asStr(row.password_hash),
-    name: asStr(row.name),
+    name: asStr(row.first_name),
     lastName: asStr(row.last_name),
     phone: asOpt<string>(row.phone),
     role: row.role as UserRecord["role"],
@@ -670,14 +1241,18 @@ function mapUserRow(row: DbRow): UserRecord {
 }
 
 function mapInvoiceRow(row: DbRow): InvoiceRecord {
+  const snap = (row.customer_snapshot ?? {}) as Record<string, unknown>;
+  const firstName = asStr(snap.firstName);
+  const lastName = asStr(snap.lastName);
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   return {
     id: asStr(row.id),
     invoiceNumber: asStr(row.invoice_number),
     orderId: asOpt<string>(row.order_id),
     userId: asOpt<string>(row.user_id),
-    customerEmail: asStr(row.customer_email),
-    customerName: asStr(row.customer_name),
-    customerNif: asOpt<string>(row.customer_nif),
+    customerEmail: asStr(snap.email),
+    customerName: fullName,
+    customerNif: asOpt<string>(snap.taxId),
     status: row.status as InvoiceRecord["status"],
     subtotal: asNum(row.subtotal),
     vatRate: asNum(row.vat_rate),

@@ -102,7 +102,7 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
                     Hola, <span className="text-amber-300">{user.name.split(" ")[0]}</span>
                   </p>
                   <Link
-                    href="/cuenta"
+                    href={user.role === "admin" ? "/admin" : "/cuenta/datos"}
                     onClick={handleClose}
                     className="flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-1.5 text-xs font-bold text-white transition hover:bg-white/25"
                   >

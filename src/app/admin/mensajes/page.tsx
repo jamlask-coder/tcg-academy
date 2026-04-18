@@ -27,6 +27,8 @@ import {
   type BroadcastChannel,
   type BroadcastTarget,
 } from "@/data/mockData";
+import { saveMessages as persistMessages } from "@/services/messageService";
+import { DataHub } from "@/lib/dataHub";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -76,9 +78,9 @@ function loadMessages(): AppMessage[] {
 }
 
 function saveMessages(msgs: AppMessage[]) {
-  try {
-    localStorage.setItem(MSG_STORAGE_KEY, JSON.stringify(msgs));
-  } catch {}
+  // Delegates to messageService so `tcga:messages:updated` is fired and any
+  // other view (cuenta/mensajes, admin/notificaciones, etc.) stays in sync.
+  persistMessages(msgs);
 }
 
 function loadBroadcasts(): Broadcast[] {
@@ -208,8 +210,12 @@ export default function AdminMensajesPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMessages(loadMessages());
-     
+
     setBroadcasts(loadBroadcasts());
+    const unsub = DataHub.on("messages", () => {
+      setMessages(loadMessages());
+    });
+    return unsub;
   }, []);
 
   const showToast = (msg: string) => {

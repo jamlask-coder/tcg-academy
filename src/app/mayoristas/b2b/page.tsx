@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { checkRateLimit } from "@/utils/sanitize";
+import { SITE_CONFIG } from "@/config/siteConfig";
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 const SOLICITUDES_KEY = "tcgacademy_solicitudes";
@@ -831,10 +832,10 @@ export default function B2BPage() {
                       Formulario de contacto
                     </Link>
                     <a
-                      href="mailto:tcgacademycalpe@gmail.com"
+                      href={`mailto:${SITE_CONFIG.email}`}
                       className="block w-full rounded-xl bg-gray-100 py-2.5 text-center text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
                     >
-                      tcgacademycalpe@gmail.com
+                      {SITE_CONFIG.email}
                     </a>
                   </div>
                 </div>

@@ -11,6 +11,8 @@
  * 7. Stock restored
  */
 
+import { DataHub } from "@/lib/dataHub";
+
 const RETURNS_KEY = "tcgacademy_returns";
 const RETURN_WINDOW_DAYS = 14; // Legal return window in Spain
 
@@ -82,6 +84,8 @@ function loadReturns(): ReturnRequest[] {
 function saveReturns(returns: ReturnRequest[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(RETURNS_KEY, JSON.stringify(returns));
+  // Canonical event so admin views refresh after RMA state changes.
+  DataHub.emit("returns");
 }
 
 /**

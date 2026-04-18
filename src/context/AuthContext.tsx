@@ -37,12 +37,13 @@ interface AuthContextValue {
   logout: () => void;
   register: (data: RegisterData) => Promise<{ ok: boolean; error?: string }>;
   updateProfile: (
-    updates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses">>,
+    updates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses" | "nif" | "nifType">>,
   ) => void;
   changePassword: (
     currentPassword: string,
     newPassword: string,
   ) => Promise<{ ok: boolean; error?: string }>;
+  changeEmail: (newEmail: string) => Promise<{ ok: boolean; error?: string }>;
   checkUsernameAvailable: (username: string) => boolean;
   toggleFavorite: (productId: number) => void;
   isFavorite: (productId: number) => boolean;
@@ -55,6 +56,12 @@ const REGISTERED_KEY = "tcgacademy_registered";
 const USERNAMES_KEY = "tcgacademy_usernames"; // username (lowercase) → email
 const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 const REMEMBER_ME_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+/** Persist the registered-users map and notify reactive consumers (admin dashboard). */
+function persistRegistered(registered: Record<string, unknown>): void {
+  try { localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered)); } catch { /* ignore */ }
+  try { window.dispatchEvent(new Event("tcga:users:updated")); } catch { /* non-fatal */ }
+}
 
 /** Normalize username: lowercase, trim */
 function normalizeUsername(u: string): string {
@@ -112,6 +119,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       lastName: "Garcia",
       phone: "+34 666 111 111",
       role: "cliente",
+      nif: "12345678Z",
+      nifType: "DNI",
       addresses: [],
       favorites: [],
       createdAt: new Date().toISOString(),
@@ -127,10 +136,12 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       lastName: "Lopez",
       phone: "+34 666 222 222",
       role: "mayorista",
+      nif: "B12345674",
+      nifType: "CIF",
       addresses: [],
       favorites: [],
       empresa: {
-        cif: "B12345678",
+        cif: "B12345674",
         razonSocial: "Distribuciones TCG S.L.",
         direccionFiscal: "Calle Mayor 10, 28001 Madrid",
         personaContacto: "Carlos Lopez",
@@ -143,12 +154,18 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
   "admin@tcgacademy.es": {
     password: "test123",
     user: {
+      // Cuenta genérica "admin" = el operador fiscal/contable (Luri). El email
+      // admin@ se mantiene por compatibilidad con sesiones antiguas, pero el
+      // display name es el real para que el header y la sidebar muestren
+      // "Luri" en vez del placeholder "Admin TCG".
       id: "demo-admin",
       email: "admin@tcgacademy.es",
-      name: "Admin",
-      lastName: "TCG",
+      name: "Luri",
+      lastName: "",
       phone: "+34 666 000 000",
       role: "admin" as const,
+      nif: "00000001R",
+      nifType: "DNI",
       addresses: [],
       favorites: [],
       createdAt: new Date().toISOString(),
@@ -163,6 +180,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       lastName: "",
       phone: "+34 666 000 001",
       role: "admin" as const,
+      nif: "00000001R",
+      nifType: "DNI",
       addresses: [],
       favorites: [],
       createdAt: new Date().toISOString(),
@@ -177,6 +196,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       lastName: "",
       phone: "+34 666 000 002",
       role: "admin" as const,
+      nif: "00000002W",
+      nifType: "DNI",
       addresses: [],
       favorites: [],
       createdAt: new Date().toISOString(),
@@ -191,10 +212,12 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       lastName: "Martinez",
       phone: "+34 666 333 333",
       role: "tienda",
+      nif: "A12345674",
+      nifType: "CIF",
       addresses: [],
       favorites: [],
       empresa: {
-        cif: "B98765432",
+        cif: "A12345674",
         razonSocial: "La Tienda TCG S.L.",
         direccionFiscal: "Avda. Diagonal 200, 08013 Barcelona",
         personaContacto: "Ana Martinez",
@@ -238,6 +261,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               localStorage.removeItem(STORAGE_KEY);
               return;
             }
+          }
+
+          // One-time migration: el usuario admin@tcgacademy.es antes se
+          // almacenaba como "Admin" / "TCG". Ahora el display correcto es
+          // "Luri" (el admin real). Si detectamos el valor antiguo, lo
+          // reescribimos y regeneramos el hash de integridad.
+          if (
+            parsed.email === "admin@tcgacademy.es" &&
+            parsed.name === "Admin" &&
+            parsed.lastName === "TCG"
+          ) {
+            parsed.name = "Luri";
+            parsed.lastName = "";
+            const next = { ...parsed };
+            const newHash = await sessionHash({
+              ...next,
+              _loginAt: loginAt,
+            });
+            next._hash = newHash;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+          }
+
+          // Migración NIF: sesiones antiguas de demo users guardadas antes de
+          // que DEMO_USERS tuviese NIF. Reescribimos el NIF desde DEMO_USERS
+          // para que el FiscalDataGuard no los atrape en /completar-datos.
+          const demoSeed = DEMO_USERS[parsed.email?.toLowerCase() ?? ""];
+          if (demoSeed && demoSeed.user.nif && !parsed.nif) {
+            parsed.nif = demoSeed.user.nif;
+            parsed.nifType = demoSeed.user.nifType;
+            const migrated = { ...parsed };
+            const newHash = await sessionHash({
+              ...migrated,
+              _loginAt: loginAt,
+            });
+            migrated._hash = newHash;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
           }
 
           setUser(parsed);
@@ -326,7 +385,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (matches) {
             if (entry.password === password) {
               entry.password = hashed;
-              localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered));
+              persistRegistered(registered);
             }
             persist(entry.user, expiresIn);
             return { ok: true };
@@ -399,7 +458,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const randomPw = `${crypto.randomUUID()}${crypto.randomUUID()}`;
         const hashedPw = await hashPassword(randomPw);
         registered[email] = { password: hashedPw, user: newUser };
-        localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered));
+        persistRegistered(registered);
 
         // Record GDPR consents (Art. 7 — proof of consent)
         const consentEntries: Array<{
@@ -487,7 +546,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const hashedPw = await hashPassword(data.password);
         registered[email] = { password: hashedPw, user: newUser };
-        localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered));
+        persistRegistered(registered);
 
         // Register username in the index
         if (username) {
@@ -525,13 +584,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateProfile = useCallback(
-    (updates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses">>) => {
+    (updates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses" | "nif" | "nifType">>) => {
       if (!user) return;
-      const sanitizedUpdates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses">> = {};
+      const sanitizedUpdates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses" | "nif" | "nifType">> = {};
       if (updates.name !== undefined) sanitizedUpdates.name = sanitizeString(updates.name);
       if (updates.lastName !== undefined) sanitizedUpdates.lastName = sanitizeString(updates.lastName);
       if (updates.phone !== undefined) sanitizedUpdates.phone = sanitizeString(updates.phone);
       if (updates.addresses !== undefined) sanitizedUpdates.addresses = updates.addresses;
+      if (updates.nif !== undefined) sanitizedUpdates.nif = sanitizeString(updates.nif).toUpperCase();
+      if (updates.nifType !== undefined) sanitizedUpdates.nifType = updates.nifType;
       const updated = { ...user, ...sanitizedUpdates };
       persist(updated);
       // Also update in registered store if applicable
@@ -541,10 +602,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ) as Record<string, { password: string; user: User }>;
         if (registered[user.email]) {
           registered[user.email].user = updated;
-          localStorage.setItem(
-            "tcgacademy_registered",
-            JSON.stringify(registered),
-          );
+          persistRegistered(registered);
         }
       } catch {
         /* ignore */
@@ -575,7 +633,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ) as Record<string, { password: string; user: User }>;
           const hashedNew = await hashPassword(newPassword);
           registered[email] = { password: hashedNew, user };
-          localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered));
+          persistRegistered(registered);
           return { ok: true };
         } catch {
           return { ok: false, error: "Error al guardar la nueva contraseña" };
@@ -599,13 +657,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const hashedNew = await hashPassword(newPassword);
         entry.password = hashedNew;
-        localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered));
+        persistRegistered(registered);
         return { ok: true };
       } catch {
         return { ok: false, error: "Error al cambiar la contraseña" };
       }
     },
     [user],
+  );
+
+  const changeEmail = useCallback(
+    async (
+      newEmailRaw: string,
+    ): Promise<{ ok: boolean; error?: string }> => {
+      if (!user) return { ok: false, error: "No has iniciado sesión" };
+      const newEmail = sanitizeString(newEmailRaw).toLowerCase().trim();
+
+      // Basic format + length sanity (Zod rules in registro/login)
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail) || newEmail.length > 254) {
+        return { ok: false, error: "Email inválido" };
+      }
+
+      const oldEmail = user.email.toLowerCase();
+      if (newEmail === oldEmail) return { ok: true };
+
+      // Collision con demo users (admin@, luri@, font@, cliente@, etc.)
+      if (DEMO_USERS[newEmail]) {
+        return { ok: false, error: "Este email ya está registrado" };
+      }
+
+      try {
+        const registered = JSON.parse(
+          localStorage.getItem(REGISTERED_KEY) ?? "{}",
+        ) as Record<string, { password: string; user: User }>;
+
+        if (registered[newEmail]) {
+          return { ok: false, error: "Este email ya está registrado" };
+        }
+
+        const updated: User = { ...user, email: newEmail };
+
+        // Mover (o crear) entrada en REGISTERED_KEY bajo el nuevo email
+        if (registered[oldEmail]) {
+          const entry = registered[oldEmail];
+          delete registered[oldEmail];
+          registered[newEmail] = { password: entry.password, user: updated };
+        } else {
+          // Demo user cambiando email → migrar a REGISTERED con el password
+          // demo hasheado para preservar login. DEMO_USERS[oldEmail] no se
+          // puede borrar (es const en memoria), pero el usuario ya no lo usa.
+          const demo = DEMO_USERS[oldEmail];
+          if (demo) {
+            const hashedPw = await hashPassword(demo.password);
+            registered[newEmail] = { password: hashedPw, user: updated };
+          }
+        }
+        persistRegistered(registered);
+
+        // Actualizar índice de usernames si aplica (username → email)
+        if (user.username) {
+          const index = loadUsernameIndex();
+          const key = normalizeUsername(user.username);
+          if (index[key] === oldEmail) {
+            index[key] = newEmail;
+            saveUsernameIndex(index);
+          }
+        }
+
+        // Re-persistir sesión con nuevo email (regenera hash de integridad)
+        persist(updated);
+
+        return { ok: true };
+      } catch {
+        return { ok: false, error: "Error al cambiar el email" };
+      }
+    },
+    [user, persist],
   );
 
   const toggleFavorite = useCallback(
@@ -638,6 +765,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         updateProfile,
         changePassword,
+        changeEmail,
         checkUsernameAvailable,
         toggleFavorite,
         isFavorite,

@@ -15,6 +15,7 @@ export interface Store {
   shortDesc: string;
   longDesc: string;
   hours: StoreHours[];
+  instagram?: string;
 }
 
 export const STORES: Record<string, Store> = {
@@ -22,9 +23,9 @@ export const STORES: Record<string, Store> = {
     id: "calpe",
     name: "TCG Academy Calpe",
     city: "Calpe, Alicante",
-    address: "Av. Gabriel Miró 42, 03710 Calpe",
-    phone: "+34 965 000 001",
-    email: "calpe@tcgacademy.es",
+    address: "Calle Libertad 16, 03710 Calpe",
+    phone: "+34 648 63 57 23",
+    email: "tcgacademycalpe@gmail.com",
     color: "#2563eb",
     bg: "#e8f0f9",
     shortDesc:
@@ -36,6 +37,7 @@ export const STORES: Record<string, Store> = {
       { day: "Sábado", time: "10:00 – 20:00" },
       { day: "Domingo", time: "10:00 – 14:00" },
     ],
+    instagram: "@tcgacademy_calpe",
   },
   bejar: {
     id: "bejar",
@@ -55,6 +57,7 @@ export const STORES: Record<string, Store> = {
       { day: "Sábado", time: "10:00 – 14:00" },
       { day: "Domingo", time: "Cerrado" },
     ],
+    instagram: "@tcgacademy_bejar",
   },
   madrid: {
     id: "madrid",
@@ -73,6 +76,7 @@ export const STORES: Record<string, Store> = {
       { day: "Lunes – Sábado", time: "10:00 – 21:00" },
       { day: "Domingo", time: "11:00 – 19:00" },
     ],
+    instagram: "@tcgacademy_madrid",
   },
   barcelona: {
     id: "barcelona",
@@ -91,5 +95,6 @@ export const STORES: Record<string, Store> = {
       { day: "Lunes – Sábado", time: "10:00 – 21:00" },
       { day: "Domingo", time: "11:00 – 19:00" },
     ],
+    instagram: "@tcgacademy_bcn",
   },
 };

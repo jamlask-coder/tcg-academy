@@ -3,45 +3,12 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { MapPin, ArrowRight, Phone } from "lucide-react";
 import { Container } from "@/components/ui/Container";
+import { STORES } from "@/data/stores";
 
-const STORES = [
-  {
-    id: "calpe",
-    name: "TCG Academy Calpe",
-    city: "Calpe, Alicante",
-    address: "Av. Gabriel Miró 42",
-    phone: "+34 965 83 00 01",
-    instagram: "@tcgacademy_calpe",
-    color: "#2563eb",
-  },
-  {
-    id: "bejar",
-    name: "TCG Academy Béjar",
-    city: "Béjar, Salamanca",
-    address: "C/ Mayor 15",
-    phone: "+34 923 40 00 02",
-    instagram: "@tcgacademy_bejar",
-    color: "#3b82f6",
-  },
-  {
-    id: "madrid",
-    name: "TCG Academy Madrid",
-    city: "Madrid",
-    address: "C/ Gran Vía 28",
-    phone: "+34 910 00 00 03",
-    instagram: "@tcgacademy_madrid",
-    color: "#dc2626",
-  },
-  {
-    id: "barcelona",
-    name: "TCG Academy Barcelona",
-    city: "Barcelona",
-    address: "C/ Pelai 12",
-    phone: "+34 932 00 00 04",
-    instagram: "@tcgacademy_bcn",
-    color: "#7c3aed",
-  },
-];
+/** Se muestra solo la calle (sin CP/ciudad) en el minipreview del menú. */
+function shortAddress(full: string): string {
+  return full.split(",")[0]?.trim() ?? full;
+}
 
 interface Props {
   onClose: () => void;
@@ -70,7 +37,7 @@ export function TiendasMenu({ onClose }: Props) {
           </Link>
         </div>
         <div className="grid grid-cols-4 gap-3">
-          {STORES.map((store) => (
+          {Object.values(STORES).map((store) => (
             <Link
               key={store.id}
               href={`/tiendas/${store.id}`}
@@ -91,16 +58,18 @@ export function TiendasMenu({ onClose }: Props) {
                   {store.city}
                 </p>
                 <p className="mt-0.5 truncate text-[10px] text-gray-400">
-                  {store.address}
+                  {shortAddress(store.address)}
                 </p>
                 <div className="mt-1 flex items-center gap-2">
                   <span className="flex items-center gap-0.5 text-[10px] text-gray-400">
                     <Phone size={9} />
                     {store.phone}
                   </span>
-                  <span className="text-[10px] text-gray-400">
-                    {store.instagram}
-                  </span>
+                  {store.instagram && (
+                    <span className="text-[10px] text-gray-400">
+                      {store.instagram}
+                    </span>
+                  )}
                 </div>
               </div>
             </Link>

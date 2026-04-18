@@ -56,7 +56,7 @@ function LoginForm() {
   }, [lockoutUntil]);
 
   useEffect(() => {
-    if (user) router.push(user.role === "admin" ? "/admin" : "/cuenta");
+    if (user) router.push(user.role === "admin" ? "/admin" : "/cuenta/datos");
   }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -79,17 +79,17 @@ function LoginForm() {
     setLoading(true);
     const { ok, error: err } = await login(email, password, remember);
     setLoading(false);
-    if (ok) {
-      router.push(user?.role === "admin" ? "/admin" : "/cuenta");
-    } else {
+    if (!ok) {
       setError(err ?? "Credenciales incorrectas");
       setShake(true);
       setTimeout(() => setShake(false), 600);
     }
+    // On success, the useEffect above handles the redirect once `user`
+    // state updates (admin → /admin, others → /cuenta/datos).
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-6">
       <div
         className="w-full max-w-md"
         style={{
@@ -98,9 +98,9 @@ function LoginForm() {
           transition: "opacity 0.4s ease, transform 0.4s ease",
         }}
       >
-        <div className="rounded-2xl border border-gray-200 bg-white px-8 pt-7 pb-8 shadow-sm">
-          <h1 className="mb-1 text-2xl font-bold text-gray-900">Inicia sesión</h1>
-          <p className="mb-6 text-sm text-gray-500">Accede a tu cuenta de TCG Academy</p>
+        <div className="rounded-2xl border border-gray-200 bg-white px-7 pt-5 pb-5 shadow-sm">
+          <h1 className="mb-0.5 text-xl font-bold text-gray-900">Inicia sesión</h1>
+          <p className="mb-4 text-xs text-gray-500">Accede a tu cuenta de TCG Academy</p>
 
           {showResetBanner && (
             <div className="mb-5 flex items-center gap-2.5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
@@ -120,7 +120,7 @@ function LoginForm() {
 
           <form
             onSubmit={handleSubmit}
-            className="space-y-5"
+            className="space-y-3"
             style={
               shake
                 ? { animation: "shake 0.5s cubic-bezier(.36,.07,.19,.97) both" }
@@ -145,7 +145,7 @@ function LoginForm() {
                   placeholder="tu@email.com o tu_usuario"
                   maxLength={254}
                   autoComplete="username"
-                  className="h-12 w-full rounded-xl border-2 border-gray-200 pr-4 pl-10 text-base transition-all focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/10 focus:outline-none"
+                  className="h-11 w-full rounded-xl border-2 border-gray-200 pr-4 pl-10 text-base transition-all focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/10 focus:outline-none"
                 />
               </div>
             </div>
@@ -175,7 +175,7 @@ function LoginForm() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Tu contraseña"
                   maxLength={128}
-                  className="h-12 w-full rounded-xl border-2 border-gray-200 pr-10 pl-10 text-base transition-all focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/10 focus:outline-none"
+                  className="h-11 w-full rounded-xl border-2 border-gray-200 pr-10 pl-10 text-base transition-all focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/10 focus:outline-none"
                 />
                 <button
                   type="button"
@@ -244,7 +244,7 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading || countdown > 0}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
             >
               {loading ? (
                 "Accediendo..."
@@ -257,7 +257,7 @@ function LoginForm() {
           </form>
 
           {/* Divider */}
-          <div className="my-6 flex items-center gap-4">
+          <div className="my-3 flex items-center gap-4">
             <div className="h-px flex-1 bg-gray-200" />
             <span className="text-xs text-gray-400">o</span>
             <div className="h-px flex-1 bg-gray-200" />
@@ -269,13 +269,13 @@ function LoginForm() {
           {/* Register CTA */}
           <Link
             href="/registro"
-            className="mt-4 flex h-11 w-full items-center justify-center rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-700 transition hover:border-[#2563eb] hover:text-[#2563eb]"
+            className="mt-3 flex h-10 w-full items-center justify-center rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-700 transition hover:border-[#2563eb] hover:text-[#2563eb]"
           >
             Crear cuenta nueva
           </Link>
 
           {/* Demo credentials */}
-          <div className="mt-8 rounded-xl border border-gray-100 bg-gray-50 p-4">
+          <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-3">
             <p className="mb-2.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
               Cuentas de demo
             </p>

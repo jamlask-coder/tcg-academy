@@ -84,7 +84,7 @@ const SECTIONS: Section[] = [
       },
       {
         heading: "Flujo de estados",
-        text: "Los pedidos siguen el flujo: pendiente → procesando → enviado → entregado. También pueden marcarse como cancelado en cualquier momento.",
+        text: "Los pedidos siguen el flujo: pendiente de envío → enviado (estado final de nuestro lado; la entrega depende del transportista). Pueden marcarse como cancelado, incidencia o devolución en cualquier momento.",
       },
       {
         heading: "Avanzar estado",

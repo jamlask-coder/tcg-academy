@@ -51,6 +51,8 @@ import {
   printInvoice,
   type InvoiceData,
 } from "@/utils/invoiceGenerator";
+import { SITE_CONFIG } from "@/config/siteConfig";
+import { getIssuerAddress } from "@/lib/fiscalAddress";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -337,23 +339,28 @@ function recordToData(inv: InvoiceRecord): InvoiceData {
     name?: string; taxId?: string; email?: string; phone?: string; isEU?: boolean;
     address?: { street?: string; postalCode?: string; city?: string; province?: string; country?: string };
   };
-  const issuer = inv.issuer;
-  const issuerAddr = issuer.address;
   const addr = recipient.address;
+  // Issuer data is ALWAYS sourced from SITE_CONFIG — stored records may contain
+  // legacy / stale company data from earlier versions.
+  const issuer = getIssuerAddress();
+  const issuerAddress = issuer.street || SITE_CONFIG.address;
+  const issuerCity = issuer.cityLine;
 
   return {
     invoiceNumber: inv.invoiceNumber,
+    orderId: inv.sourceOrderId ?? undefined,
     date: new Date(inv.invoiceDate).toISOString(),
     paymentMethod: inv.paymentMethod,
+    paymentStatus: "paid",
     verifactuHash: inv.verifactuHash ?? undefined,
     verifactuQR: inv.verifactuQR ?? undefined,
     verifactuStatus: inv.verifactuStatus ?? undefined,
-    issuerName: issuer.name,
-    issuerCIF: issuer.taxId,
-    issuerAddress: issuerAddr.street,
-    issuerCity: `${issuerAddr.postalCode} ${issuerAddr.city}`.trim(),
-    issuerPhone: issuer.phone,
-    issuerEmail: issuer.email,
+    issuerName: SITE_CONFIG.legalName,
+    issuerCIF: SITE_CONFIG.cif,
+    issuerAddress,
+    issuerCity,
+    issuerPhone: SITE_CONFIG.phone,
+    issuerEmail: SITE_CONFIG.email,
     clientName: recipient.name ?? "—",
     clientCIF: recipient.taxId,
     clientAddress: addr?.street,
@@ -468,7 +475,7 @@ export async function printAuditReportPDF(year: number): Promise<void> {
 <body>
   <h1>Informe de Auditoría Fiscal ${year}</h1>
   <p style="color:#6b7280;font-size:8pt;">
-    TCG Academy S.L. — CIF: B12345678 — Generado: ${new Date().toLocaleString("es-ES")}
+    ${SITE_CONFIG.legalName} — CIF: ${SITE_CONFIG.cif} — Generado: ${new Date().toLocaleString("es-ES")}
   </p>
 
   <div class="summary">

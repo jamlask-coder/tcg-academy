@@ -1,10 +1,6 @@
-import { MOCK_USERS, MOCK_INVOICES, ADMIN_ORDERS } from "@/data/mockData";
-
-export function generateStaticParams() {
-  return MOCK_USERS.map((u) => ({ id: u.id }));
-}
-
-import { notFound } from "next/navigation";
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -18,10 +14,21 @@ import {
   MapPin,
   Star,
 } from "lucide-react";
+import {
+  MOCK_USERS,
+  MOCK_INVOICES,
+  ADMIN_ORDERS,
+  type AdminUser,
+  type AdminOrder,
+} from "@/data/mockData";
+import type { User } from "@/types/user";
+import { readAdminOrdersMerged } from "@/lib/orderAdapter";
+import { loadPoints } from "@/services/pointsService";
 import { B2BCharts } from "@/components/account/B2BCharts";
 import { SendCouponButton } from "@/components/admin/SendCouponModal";
 import { UserRoleManager } from "@/components/admin/UserRoleManager";
 import { VisitChart } from "@/components/account/VisitChart";
+import { UserPersonalDataPanel } from "@/components/admin/UserPersonalDataPanel";
 
 const ROLE_COLORS: Record<string, string> = {
   cliente: "bg-gray-100 text-gray-600",
@@ -30,76 +37,217 @@ const ROLE_COLORS: Record<string, string> = {
   admin: "bg-amber-100 text-amber-700",
 };
 
-
-export default async function AdminUsuarioDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const user = MOCK_USERS.find((u) => u.id === id);
-  if (!user) notFound();
-
-  const userOrders = ADMIN_ORDERS.filter(
-    (o) => o.userEmail === user.email,
-  ).slice(0, 10);
-
-  const userInvoices = MOCK_INVOICES.filter(
-    (inv) =>
-      userOrders.some((o) => o.id === inv.orderId) ||
-      inv.clientName?.toLowerCase().includes(user.name.toLowerCase()),
-  ).slice(0, 5);
-
-  // Monthly spend: last 6 months derived from order dates
-  const MONTH_MAP: Record<string, string> = {
-    "10": "Oct", "11": "Nov", "12": "Dic",
-    "01": "Ene", "02": "Feb", "03": "Mar",
-    "04": "Abr", "05": "May", "06": "Jun",
-    "07": "Jul", "08": "Ago", "09": "Sep",
+function userToAdminUser(u: User): AdminUser {
+  const addr = u.addresses?.[0];
+  return {
+    id: u.id,
+    name: u.name,
+    lastName: u.lastName,
+    email: u.email,
+    role: u.role as AdminUser["role"],
+    registeredAt: u.createdAt.slice(0, 10),
+    totalOrders: 0,
+    totalSpent: 0,
+    points: 0,
+    active: true,
+    phone: u.phone,
+    address: addr
+      ? `${addr.calle} ${addr.numero}${addr.piso ? ", " + addr.piso : ""}, ${addr.cp} ${addr.ciudad}`
+      : undefined,
   };
-  const now = new Date();
-  const last6: { month: string; key: string }[] = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const label = MONTH_MAP[String(d.getMonth() + 1).padStart(2, "0")] ?? key;
-    last6.push({ month: label, key });
-  }
-  const monthlySpend: Record<string, number> = {};
-  for (const { key } of last6) monthlySpend[key] = 0;
-  for (const order of userOrders) {
-    const key = order.date.slice(0, 7);
-    if (key in monthlySpend) monthlySpend[key] += order.total;
-  }
-  const monthlyData = last6.map(({ month, key }) => ({ month, gasto: monthlySpend[key] }));
+}
 
-  // Spend by game: aggregate item totals across all user orders
-  const gameSpend: Record<string, number> = {};
-  for (const order of userOrders) {
-    for (const item of order.items) {
-      if (item.game) {
-        gameSpend[item.game] = (gameSpend[item.game] ?? 0) + item.price * item.qty;
+export default function AdminUsuarioDetailPage() {
+  const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const id = params?.id ?? "";
+  const [resolved, setResolved] = useState<{
+    user: AdminUser;
+    orders: AdminOrder[];
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    try {
+      // 1. Buscar en MOCK_USERS (usuarios hardcodeados)
+      let baseUser: AdminUser | null =
+        MOCK_USERS.find((u) => u.id === id) ?? null;
+
+      // 2. Si no, buscar en tcgacademy_registered (usuarios seeded o reales)
+      if (!baseUser) {
+        const raw = localStorage.getItem("tcgacademy_registered");
+        if (raw) {
+          const registered = JSON.parse(raw) as Record<
+            string,
+            { password: string; user: User }
+          >;
+          const entry = Object.values(registered).find((e) => e.user.id === id);
+          if (entry) baseUser = userToAdminUser(entry.user);
+        }
+      }
+
+      if (!baseUser) {
+        setResolved(null);
+        setLoading(false);
+        return;
+      }
+
+      // 3. Cruzar con pedidos reales (merged) por userId o email
+      const mergedOrders = readAdminOrdersMerged(ADMIN_ORDERS);
+      const emailLower = baseUser.email.toLowerCase();
+      const userOrders = mergedOrders.filter(
+        (o) =>
+          o.userId === baseUser.id ||
+          (o.userEmail && o.userEmail.toLowerCase() === emailLower),
+      );
+
+      // 4. Recalcular stats en vivo
+      const totalOrders = userOrders.length;
+      const totalSpent = userOrders.reduce((s, o) => s + (o.total || 0), 0);
+      const livePoints = loadPoints(baseUser.id);
+
+      setResolved({
+        user: {
+          ...baseUser,
+          totalOrders: totalOrders || baseUser.totalOrders,
+          totalSpent: totalSpent || baseUser.totalSpent,
+          points: livePoints > 0 ? livePoints : baseUser.points,
+        },
+        orders: userOrders,
+      });
+      setLoading(false);
+    } catch {
+      setResolved(null);
+      setLoading(false);
+    }
+  }, [id]);
+
+  // Pre-computed month labels (outside render so it's stable)
+  const MONTH_MAP: Record<string, string> = useMemo(
+    () => ({
+      "01": "Ene", "02": "Feb", "03": "Mar", "04": "Abr",
+      "05": "May", "06": "Jun", "07": "Jul", "08": "Ago",
+      "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dic",
+    }),
+    [],
+  );
+
+  const derived = useMemo(() => {
+    if (!resolved) return null;
+    const { user, orders } = resolved;
+    const now = new Date();
+
+    // Last 6 months spend
+    const last6: { month: string; key: string }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const label = MONTH_MAP[String(d.getMonth() + 1).padStart(2, "0")] ?? key;
+      last6.push({ month: label, key });
+    }
+    const monthlySpend: Record<string, number> = {};
+    for (const { key } of last6) monthlySpend[key] = 0;
+    for (const order of orders) {
+      const key = order.date.slice(0, 7);
+      if (key in monthlySpend) monthlySpend[key] += order.total;
+    }
+    const monthlyData = last6.map(({ month, key }) => ({
+      month,
+      gasto: monthlySpend[key],
+    }));
+
+    // Spend by game
+    const gameSpend: Record<string, number> = {};
+    for (const order of orders) {
+      for (const item of order.items) {
+        if (item.game) {
+          gameSpend[item.game] =
+            (gameSpend[item.game] ?? 0) + item.price * item.qty;
+        }
       }
     }
-  }
-  const gameData = Object.entries(gameSpend)
-    .map(([game, gasto]) => ({ game, gasto }))
-    .sort((a, b) => b.gasto - a.gasto)
-    .slice(0, 6);
+    const gameData = Object.entries(gameSpend)
+      .map(([game, gasto]) => ({ game, gasto }))
+      .sort((a, b) => b.gasto - a.gasto)
+      .slice(0, 6);
 
-  // Simulated visit data based on userId hash (deterministic per user)
-  const seed = user.id.split("").reduce((s, c) => s + c.charCodeAt(0), 0);
-  const visitData: { month: string; visitas: number }[] = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const label = MONTH_MAP[String(d.getMonth() + 1).padStart(2, "0")] ?? String(d.getMonth() + 1);
-    const base = user.role === "mayorista" ? 18 : user.role === "tienda" ? 25 : 8;
-    const visits = Math.max(1, base + ((seed * (i + 3) * 7) % 15) - 5);
-    visitData.push({ month: label, visitas: visits });
+    // Simulated visit data (deterministic per user)
+    const seed = user.id.split("").reduce((s, c) => s + c.charCodeAt(0), 0);
+    const visitData: { month: string; visitas: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label =
+        MONTH_MAP[String(d.getMonth() + 1).padStart(2, "0")] ??
+        String(d.getMonth() + 1);
+      const base =
+        user.role === "mayorista"
+          ? 18
+          : user.role === "tienda"
+            ? 25
+            : 8;
+      const visits = Math.max(1, base + ((seed * (i + 3) * 7) % 15) - 5);
+      visitData.push({ month: label, visitas: visits });
+    }
+    const totalVisits = visitData.reduce((s, d) => s + d.visitas, 0);
+    const avgVisits = Math.round(totalVisits / visitData.length);
+    const pageViews = Math.round(totalVisits * (2.5 + (seed % 30) / 10));
+
+    // Invoices shown (keep original mock lookup logic)
+    const invoices = MOCK_INVOICES.filter(
+      (inv) =>
+        orders.some((o) => o.id === inv.orderId) ||
+        inv.clientName?.toLowerCase().includes(user.name.toLowerCase()),
+    ).slice(0, 5);
+
+    return {
+      monthlyData,
+      gameData,
+      visitData,
+      totalVisits,
+      avgVisits,
+      pageViews,
+      invoices,
+    };
+  }, [resolved, MONTH_MAP]);
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6">
+        <p className="text-sm text-gray-500">Cargando usuario…</p>
+      </div>
+    );
   }
-  const totalVisits = visitData.reduce((s, d) => s + d.visitas, 0);
-  const avgVisits = Math.round(totalVisits / visitData.length);
-  const pageViews = Math.round(totalVisits * (2.5 + (seed % 30) / 10));
+
+  if (!resolved) {
+    return (
+      <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6">
+        <Link
+          href="/admin/usuarios"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-800"
+        >
+          <ArrowLeft size={16} /> Volver a usuarios
+        </Link>
+        <div className="mt-6 rounded-2xl border border-red-100 bg-red-50 p-6 text-sm text-red-800">
+          <p className="font-bold">Usuario no encontrado</p>
+          <p className="mt-1 text-red-600">
+            El usuario con ID <span className="font-mono">{id}</span> no existe
+            en MOCK_USERS ni en localStorage (<code>tcgacademy_registered</code>).
+            Si esperabas verlo tras cargar el simulacro, vuelve a{" "}
+            <button
+              className="underline"
+              onClick={() => router.push("/admin/herramientas")}
+            >
+              /admin/herramientas
+            </button>{" "}
+            y pulsa &ldquo;Cargar simulacro&rdquo;.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const { user, orders: userOrders } = resolved;
+  const { monthlyData, gameData, visitData, totalVisits, avgVisits, pageViews, invoices } = derived!;
 
   const roleColor =
     user.role === "tienda"
@@ -120,21 +268,7 @@ export default async function AdminUsuarioDetailPage({
         </Link>
       </div>
 
-      {/* Actions + Header card */}
-      <div className="mb-6 flex flex-wrap items-center justify-end gap-2">
-        <SendCouponButton
-          userId={user.id}
-          userName={user.name}
-          userLastName={user.lastName}
-          userEmail={user.email}
-        />
-        <Link
-          href="/admin/bonos"
-          className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-700 transition hover:bg-amber-100"
-        >
-          <Star size={14} /> Enviar puntos
-        </Link>
-      </div>
+      {/* Header card con acciones integradas */}
       <div className="mb-6 rounded-2xl bg-gradient-to-br from-[#2563eb] to-[#3b82f6] p-6 text-white">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-2xl font-black">
@@ -152,7 +286,26 @@ export default async function AdminUsuarioDetailPage({
               {user.role}
             </span>
           </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <SendCouponButton
+              userId={user.id}
+              userName={user.name}
+              userLastName={user.lastName}
+              userEmail={user.email}
+            />
+            <Link
+              href="/admin/bonos"
+              className="flex items-center gap-1.5 rounded-xl bg-white/15 px-4 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/25"
+            >
+              <Star size={14} /> Enviar puntos
+            </Link>
+          </div>
         </div>
+      </div>
+
+      {/* Panel de datos personales editables (admin) */}
+      <div className="mb-6">
+        <UserPersonalDataPanel userId={user.id} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -243,7 +396,7 @@ export default async function AdminUsuarioDetailPage({
               </p>
             ) : (
               <div className="divide-y divide-gray-100">
-                {userOrders.map((order) => (
+                {userOrders.slice(0, 10).map((order) => (
                   <Link
                     key={order.id}
                     href={`/admin/pedidos/${order.id}`}
@@ -259,7 +412,7 @@ export default async function AdminUsuarioDetailPage({
           </div>
 
           {/* Recent invoices */}
-          {userInvoices.length > 0 && (
+          {invoices.length > 0 && (
             <div className="rounded-2xl border border-gray-200 bg-white">
               <div className="border-b border-gray-100 px-5 py-4">
                 <h3 className="flex items-center gap-2 font-bold text-gray-900">
@@ -267,7 +420,7 @@ export default async function AdminUsuarioDetailPage({
                 </h3>
               </div>
               <div className="divide-y divide-gray-100">
-                {userInvoices.map((inv) => (
+                {invoices.map((inv) => (
                   <div key={inv.id} className="flex items-center gap-4 px-5 py-3 text-sm">
                     <span className="font-mono font-semibold text-gray-800">{inv.id}</span>
                     <span className="flex-1 text-gray-400">{inv.date}</span>

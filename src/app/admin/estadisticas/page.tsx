@@ -32,7 +32,7 @@ import {
   MOCK_AGE_DISTRIBUTION,
   MOCK_COUNTRY_VISITS,
   MOCK_USERS,
-  ALL_ORDERS,
+  ADMIN_ORDERS,
 } from "@/data/mockData";
 import { getMergedProducts } from "@/lib/productStore";
 import type { LocalProduct } from "@/data/products";
@@ -42,6 +42,7 @@ import {
   pointsToEuros,
   type HistoryEntryType,
 } from "@/services/pointsService";
+import { readAdminOrdersMerged } from "@/lib/orderAdapter";
 
 const BarChart = dynamic(() => import("recharts").then((m) => m.BarChart), { ssr: false });
 const Bar = dynamic(() => import("recharts").then((m) => m.Bar), { ssr: false });
@@ -92,19 +93,25 @@ export default function EstadisticasPage() {
   const [showAllLocations, setShowAllLocations] = useState(false);
   const [trafficChannel, setTrafficChannel] = useState<TrafficChannel>("all");
   const [allProducts, setAllProducts] = useState<LocalProduct[]>(() => getMergedProducts());
+  const [liveOrders, setLiveOrders] = useState(() => readAdminOrdersMerged(ADMIN_ORDERS));
 
   useEffect(() => {
-    const reload = () => setAllProducts(getMergedProducts());
+    const reload = () => {
+      setAllProducts(getMergedProducts());
+      setLiveOrders(readAdminOrdersMerged(ADMIN_ORDERS));
+    };
     window.addEventListener("tcga:products:updated", reload);
+    window.addEventListener("tcga:orders:updated", reload);
     window.addEventListener("storage", reload);
     return () => {
       window.removeEventListener("tcga:products:updated", reload);
+      window.removeEventListener("tcga:orders:updated", reload);
       window.removeEventListener("storage", reload);
     };
   }, []);
 
-  const totalRevenue = ALL_ORDERS.reduce((s, o) => s + o.total, 0);
-  const avgOrderValue = totalRevenue / ALL_ORDERS.length;
+  const totalRevenue = liveOrders.reduce((s, o) => s + o.total, 0);
+  const avgOrderValue = liveOrders.length > 0 ? totalRevenue / liveOrders.length : 0;
   const inStockCount = allProducts.filter((p) => p.inStock).length;
   const outOfStockCount = allProducts.filter((p) => !p.inStock).length;
   const activeUsers = MOCK_USERS.filter((u) => u.active).length;

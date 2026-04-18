@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import { validateSpanishNIF } from "./nif";
 
 // ─── Shared refinements ─────────────────────────────────────────────────────
 
@@ -42,9 +43,18 @@ export const personalSchema = z.object({
     ),
   telefono: z
     .string()
-    .regex(/^(\+34\s?)?[6-9]\d{8}$/, "Introduce un teléfono español válido")
-    .optional()
-    .or(z.literal("")),
+    .regex(/^(\+34\s?)?[6-9]\d{8}$/, "Introduce un teléfono español válido"),
+  /**
+   * NIF / NIE / CIF — OBLIGATORIO para factura (Art. 6.1.d RD 1619/2012).
+   * Validado con algoritmo oficial (mod-23 para DNI/NIE, CIF con dígito/letra de control).
+   */
+  nif: z
+    .string()
+    .min(9, "El NIF / NIE / CIF debe tener 9 caracteres")
+    .max(9, "El NIF / NIE / CIF debe tener 9 caracteres")
+    .refine((v) => validateSpanishNIF(v).valid, {
+      message: "NIF / NIE / CIF español no válido",
+    }),
 });
 
 export type PersonalData = z.infer<typeof personalSchema>;
@@ -103,11 +113,22 @@ export const paymentSchema = z.object({
 export type PaymentData = z.infer<typeof paymentSchema>;
 
 // ─── Combined checkout schema ───────────────────────────────────────────────
+//
+// La dirección es CONDICIONAL: sólo se valida si el método de envío no es
+// recogida en tienda. No tiene sentido exigir dirección de entrega cuando el
+// cliente va a recoger el pedido en uno de nuestros puntos físicos.
+
+const partialAddressSchema = z.object({
+  direccion: z.string().max(200).optional().or(z.literal("")),
+  cp: z.string().max(10).optional().or(z.literal("")),
+  ciudad: z.string().max(100).optional().or(z.literal("")),
+  provincia: z.string().max(100).optional().or(z.literal("")),
+});
 
 export const checkoutSchema = z
   .object({
     personal: personalSchema,
-    address: addressSchema,
+    address: partialAddressSchema,
     shipping: z.object({
       envio: z.enum(["estandar", "express", "tienda"]),
       tiendaRecogida: z.string().optional().or(z.literal("")),
@@ -121,6 +142,19 @@ export const checkoutSchema = z
     {
       message: "Selecciona una tienda de recogida",
       path: ["shipping", "tiendaRecogida"],
+    },
+  )
+  // Si es envío a domicilio, dirección completa obligatoria.
+  .refine(
+    (data) => {
+      if (data.shipping.envio === "tienda") return true;
+      const r = addressSchema.safeParse(data.address);
+      return r.success;
+    },
+    {
+      message:
+        "Para envío a domicilio necesitamos dirección, código postal y ciudad válidos",
+      path: ["address"],
     },
   );
 

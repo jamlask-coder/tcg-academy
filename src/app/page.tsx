@@ -6,282 +6,183 @@ import {
   Shield,
   ShoppingBag,
   Store,
-  Zap,
   Building2,
+  MapPin,
 } from "lucide-react";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { HeroCarousel } from "@/components/home/HeroCarousel";
+import { MEGA_MENU_DATA } from "@/data/megaMenuData";
+
+// ─── Tiendas físicas ─────────────────────────────────────────────────────────
+const STORES: { city: string; province: string; href: string }[] = [
+  { city: "Madrid", province: "Madrid", href: "/tiendas/madrid" },
+  { city: "Barcelona", province: "Barcelona", href: "/tiendas/barcelona" },
+  { city: "Calpe", province: "Alicante", href: "/tiendas/calpe" },
+  { city: "Béjar", province: "Salamanca", href: "/tiendas/bejar" },
+];
 
 export default function HomePage() {
   return (
     <div>
-      {/* Hero carrusel (novedades destacadas) */}
-      <HeroCarousel />
+      {/* ══════════════════════════════════════════════════════════════════
+          FOLD 1 — "Stage" principal:
+          Carrusel promo full-width (50% superior visual) con un grid de
+          juegos TCG que se solapa sobre el borde inferior (mitad inferior
+          visual + encima de las imágenes).
+         ══════════════════════════════════════════════════════════════════ */}
+      <section className="relative bg-[#0a0f1a]">
+        {/* Carrusel promocional */}
+        <HeroCarousel />
 
-      {/* HERO */}
-      <section className="relative flex min-h-[460px] w-full max-w-full items-center overflow-hidden bg-[#0f172a] text-white md:min-h-[580px]">
-        {/* Multi-layer gradient background */}
+        {/* Degradado inferior del carrusel — funde la imagen con el fondo de
+            las tarjetas de juegos, dando profundidad y lectura sin tapar */}
         <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #2563eb 100%)",
-          }}
-        />
-        {/* Ambient glows */}
-        <div className="pointer-events-none absolute inset-0">
-          <div
-            className="absolute top-0 left-0 h-[600px] w-[600px] rounded-full opacity-30 blur-[100px]"
-            style={{
-              background:
-                "radial-gradient(circle, #3b82f6 0%, transparent 70%)",
-            }}
-          />
-          <div
-            className="absolute right-0 bottom-0 h-[500px] w-[500px] rounded-full opacity-20 blur-[80px]"
-            style={{
-              background:
-                "radial-gradient(circle, #a855f7 0%, transparent 70%)",
-            }}
-          />
-          <div
-            className="absolute top-1/2 left-1/3 h-[300px] w-[300px] rounded-full opacity-15 blur-[60px]"
-            style={{
-              background:
-                "radial-gradient(circle, #f59e0b 0%, transparent 70%)",
-            }}
-          />
-        </div>
-        <style>{`
-          @keyframes heroLogoFloat {
-            0%,100% { transform: translateY(0px) rotate(0deg); }
-            35%     { transform: translateY(-18px) rotate(2deg); }
-            70%     { transform: translateY(10px) rotate(-1.2deg); }
-          }
-          @keyframes storeDotPulse {
-            0%,100% { box-shadow: 0 0 6px 2px rgba(147,197,253,0.5); }
-            50%     { box-shadow: 0 0 14px 5px rgba(147,197,253,0.9); }
-          }
-          @keyframes storeLineScan {
-            0%   { background-position: 0% 0%; }
-            100% { background-position: 0% 200%; }
-          }
-        `}</style>
-
-        {/* Subtle grid pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-          }}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent via-[#0a0f1a]/60 to-[#0a0f1a]"
         />
 
-        <div className="relative z-10 mx-auto w-full max-w-[1400px] px-4 py-10 sm:px-6 md:py-24">
-          <div className="flex flex-col items-start gap-8 xl:flex-row xl:justify-between">
-            <div className="w-full max-w-xl flex-1">
-              {/* Headline */}
-              <h1 className="mb-6 text-3xl leading-[1.08] font-black tracking-tight sm:text-5xl md:text-6xl">
-                Tu tienda TCG
-                <br />
-                <span className="bg-gradient-to-r from-yellow-300 via-yellow-400 to-amber-300 bg-clip-text text-transparent">
-                  de confianza
-                </span>
-              </h1>
-
-              {/* Desktop subtitle */}
-              <p className="mb-10 hidden max-w-xl text-lg leading-relaxed text-blue-200/80 md:block md:text-xl">
-                Empezamos con una tienda. Hoy somos cuatro, y no paramos.
-                <br />
-                En plena expansión por toda España.
-              </p>
-
-              {/* Mobile: stores grid + B2B pill */}
-              <div className="mb-10 md:hidden">
-                <p className="mb-3 text-sm font-bold tracking-widest text-white uppercase">Nuestras tiendas</p>
-                <div className="mb-3 grid grid-cols-2 gap-2">
-                  {[
-                    { city: "Madrid", href: "/tiendas/madrid" },
-                    { city: "Barcelona", href: "/tiendas/barcelona" },
-                    { city: "Calpe", href: "/tiendas/calpe" },
-                    { city: "Béjar", href: "/tiendas/bejar" },
-                  ].map(({ city, href }) => (
-                    <Link
-                      key={city}
-                      href={href}
-                      className="flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2.5 transition active:bg-white/20"
-                      style={{ WebkitTapHighlightColor: "transparent" }}
-                    >
-                      <span className="h-2 w-2 flex-shrink-0 rounded-full bg-blue-300" aria-hidden="true" />
-                      <span className="text-sm font-semibold text-white">{city}</span>
-                    </Link>
-                  ))}
-                </div>
-                <Link
-                  href="/mayoristas/b2b"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/20 px-3 py-1.5 text-xs font-bold text-amber-300 transition active:bg-amber-400/30"
-                >
-                  <Store size={11} />
-                  Profesionales B2B — descuentos especiales
-                </Link>
-              </div>
-
-              {/* CTAs */}
-              <div className="mb-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <Link
-                  href="/catalogo"
-                  className="flex items-center justify-center gap-2 rounded-2xl bg-yellow-400 px-7 py-4 font-black text-[#0f172a] shadow-[0_0_40px_rgba(251,191,36,0.25)] transition-all hover:bg-yellow-300 active:scale-[0.98] sm:inline-flex"
-                >
-                  Explorar catálogo <ArrowRight size={18} />
-                </Link>
-                <Link
-                  href="/catalogo?filter=nuevo"
-                  className="flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/8 px-7 py-4 font-semibold text-white transition-all hover:bg-white/14 active:scale-[0.98] sm:inline-flex"
-                >
-                  <Zap size={16} className="text-yellow-400" /> Novedades de la
-                  semana
-                </Link>
-              </div>
-
+        {/* Grid de juegos TCG: se superpone al pie del carrusel */}
+        <div className="relative z-10 -mt-14 pb-14 sm:-mt-20 sm:pb-20 md:-mt-28 md:pb-24">
+          <div className="mx-auto w-full max-w-[1400px] px-4 sm:px-6">
+            {/* Encabezado del portal — sobre las imágenes */}
+            <div className="mb-6 text-center sm:mb-8">
+              <span className="mb-2 inline-block rounded-full bg-yellow-400/15 px-3 py-1 text-[10px] font-bold tracking-[0.2em] text-yellow-300 uppercase backdrop-blur">
+                Tu universo TCG
+              </span>
+              <h2
+                className="text-2xl font-black text-white sm:text-3xl md:text-4xl"
+                style={{ textShadow: "0 2px 20px rgba(0,0,0,0.6)" }}
+              >
+                Elige tu juego
+              </h2>
             </div>
 
-            {/* ── Center column: TCG Academy shield ───────────────────────── */}
-            <div
-              className="hidden flex-shrink-0 items-start justify-center xl:flex"
-              style={{ width: 500, marginLeft: -40 }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/logo-tcg-shield.png"
-                alt="TCG Academy"
-                style={{
-                  width: 700,
-                  height: "auto",
-                  animation: "heroLogoFloat 9s ease-in-out infinite",
-                }}
-              />
-            </div>
+            {/* Grid de logos — cards glass */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 lg:grid-cols-4 xl:grid-cols-8">
+              {MEGA_MENU_DATA.map((game) => (
+                <Link
+                  key={game.slug}
+                  href={game.href}
+                  className="group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/95 px-2 py-3 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-white/30 hover:bg-white hover:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)]"
+                >
+                  {/* Barra de acento superior en el color del juego */}
+                  <div
+                    aria-hidden="true"
+                    className="absolute inset-x-0 top-0 h-[3px]"
+                    style={{ backgroundColor: game.color }}
+                  />
+                  {/* Glow de color al hover */}
+                  <div
+                    aria-hidden="true"
+                    className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+                    style={{
+                      background: `radial-gradient(circle at 50% 100%, ${game.color}22 0%, transparent 70%)`,
+                    }}
+                  />
 
-            {/* ── Right column: only cities, shifted down one slot ─────────── */}
-            <div
-              className="hidden flex-shrink-0 flex-col xl:flex"
-              style={{
-                width: 360,
-                alignSelf: "stretch",
-                justifyContent: "flex-start",
-              }}
-            >
-              <p className="mb-4 text-sm font-bold tracking-widest text-white uppercase">Nuestras tiendas</p>
-              {/* Stores timeline */}
-              <div className="relative pl-10" style={{ paddingTop: 0 }}>
-                {/* vertical glowing line */}
-                <div
-                  style={{
-                    position: "absolute",
-                    left: 12,
-                    top: 6,
-                    bottom: 6,
-                    width: 1,
-                    background:
-                      "linear-gradient(to bottom, transparent 0%, rgba(147,197,253,0.7) 20%, rgba(147,197,253,0.7) 80%, transparent 100%)",
-                  }}
-                />
-
-                {[
-                  {
-                    city: "Madrid",
-                    province: "Madrid",
-                    href: "/tiendas/madrid",
-                  },
-                  {
-                    city: "Barcelona",
-                    province: "Barcelona",
-                    href: "/tiendas/barcelona",
-                  },
-                  {
-                    city: "Calpe",
-                    province: "Alicante",
-                    href: "/tiendas/calpe",
-                  },
-                  {
-                    city: "Béjar",
-                    province: "Salamanca",
-                    href: "/tiendas/bejar",
-                  },
-                ].map(({ city, province, href }, i) => (
-                  <Link
-                    key={city}
-                    href={href}
-                    className="group relative flex items-center gap-3"
-                    style={{ marginBottom: i < 3 ? 22 : 0, display: "flex" }}
-                  >
-                    {/* Pulse dot */}
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: -16,
-                        width: 9,
-                        height: 9,
-                        borderRadius: "50%",
-                        background: "rgba(147,197,253,0.25)",
-                        border: "1.5px solid rgba(147,197,253,0.8)",
-                        animation: `storeDotPulse 2.5s ease-in-out ${i * 0.6}s infinite`,
-                        flexShrink: 0,
-                      }}
+                  <div className="relative flex h-14 w-full items-center justify-center sm:h-16 md:h-20">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={game.logoSrc}
+                      alt={game.label}
+                      loading="lazy"
+                      className="max-h-full max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
                     />
-
-                    {/* Text */}
-                    <div>
-                      <div
-                        className="transition-colors duration-200 group-hover:text-amber-300"
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          letterSpacing: "0.12em",
-                          color: "rgba(147,197,253,0.65)",
-                          textTransform: "uppercase",
-                          marginBottom: 2,
-                        }}
-                      >
-                        TCG Academy · {province}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 26,
-                          fontWeight: 800,
-                          letterSpacing: "-0.01em",
-                        }}
-                      >
-                        <span className="text-white transition-colors duration-200 group-hover:text-amber-300">
-                          {city}
-                        </span>
-                      </div>
-                    </div>
-
-                  </Link>
-                ))}
-              </div>
+                  </div>
+                  <p
+                    className="relative mt-2 text-center text-[11px] font-bold text-gray-700 sm:text-xs"
+                    style={{ color: "#334155" }}
+                  >
+                    {game.label}
+                  </p>
+                </Link>
+              ))}
             </div>
-            {/* ── End right column ──────────────────────────────────────── */}
+
+            {/* CTA explorar todo */}
+            <div className="mt-8 flex justify-center">
+              <Link
+                href="/catalogo"
+                className="inline-flex items-center gap-2 rounded-2xl bg-yellow-400 px-6 py-3 text-sm font-black text-[#0f172a] shadow-[0_8px_30px_rgba(251,191,36,0.35)] transition-all hover:-translate-y-0.5 hover:bg-yellow-300"
+              >
+                Explorar catálogo completo <ArrowRight size={16} />
+              </Link>
+            </div>
           </div>
-          {/* end flex row */}
         </div>
       </section>
 
-      {/* TRUST BAR */}
+      {/* ══════════════════════════════════════════════════════════════════
+          FOLD 2 — Nuestras 4 tiendas físicas
+         ══════════════════════════════════════════════════════════════════ */}
+      <section className="border-y border-gray-100 bg-gradient-to-b from-gray-50 to-white py-12 sm:py-16">
+        <div className="mx-auto max-w-[1400px] px-4 sm:px-6">
+          <div className="mb-8 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
+            <div>
+              <span className="mb-2 inline-block rounded-full bg-[#2563eb]/10 px-3 py-1 text-[10px] font-bold tracking-[0.2em] text-[#2563eb] uppercase">
+                Presencia física
+              </span>
+              <h2 className="text-2xl font-black text-gray-900 sm:text-3xl">
+                4 tiendas en España, y creciendo
+              </h2>
+              <p className="mt-1 text-sm text-gray-500 sm:text-base">
+                Empezamos con una tienda. Hoy somos cuatro y seguimos expandiéndonos.
+              </p>
+            </div>
+            <Link
+              href="/tiendas"
+              className="inline-flex items-center gap-1 text-sm font-bold text-[#2563eb] hover:gap-2 hover:underline"
+            >
+              Ver todas las tiendas <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+            {STORES.map((store) => (
+              <Link
+                key={store.city}
+                href={store.href}
+                className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-[#2563eb]/30 hover:shadow-lg sm:p-5"
+              >
+                {/* Acento azul izquierdo */}
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-[#2563eb] to-[#1e3a8a] opacity-40 transition-opacity group-hover:opacity-100"
+                />
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-[#2563eb]/10 transition-colors group-hover:bg-[#2563eb]/20">
+                  <MapPin size={18} className="text-[#2563eb]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-bold tracking-widest text-gray-400 uppercase">
+                    TCG Academy
+                  </p>
+                  <p className="truncate text-base font-black text-gray-900 transition-colors group-hover:text-[#2563eb] sm:text-lg">
+                    {store.city}
+                  </p>
+                  <p className="truncate text-[11px] text-gray-500">
+                    {store.province}
+                  </p>
+                </div>
+                <ArrowRight
+                  size={14}
+                  className="flex-shrink-0 text-gray-300 transition-all group-hover:translate-x-0.5 group-hover:text-[#2563eb]"
+                />
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          FOLD 3 — Trust bar
+         ══════════════════════════════════════════════════════════════════ */}
       <section className="border-b border-gray-100 bg-white">
         <div className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {[
               [Truck, "Envío gratis", `En pedidos desde ${SITE_CONFIG.shippingThreshold}€`, "#3b82f6"],
               [Shield, "Compra segura", "Pago 100% protegido", "#16a34a"],
-              [
-                Store,
-                "Mayoristas y minoristas",
-                "Precios especiales B2B",
-                "#7c3aed",
-              ],
+              [Store, "Mayoristas y minoristas", "Precios especiales B2B", "#7c3aed"],
             ].map(([Icon, title, sub, color], i) => (
               <div
                 key={i}
@@ -307,7 +208,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* BUSINESS OPPORTUNITIES — 3 columns */}
+      {/* ══════════════════════════════════════════════════════════════════
+          FOLD 4 — Oportunidades de negocio
+         ══════════════════════════════════════════════════════════════════ */}
       <section className="bg-white py-12 sm:py-20">
         <div className="mx-auto max-w-[1400px] px-4 sm:px-6">
           <div className="mb-10 text-center">
@@ -320,7 +223,6 @@ export default function HomePage() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-3">
-            {/* Vending */}
             <Link
               href="/mayoristas/vending"
               className="group relative flex flex-col overflow-hidden rounded-2xl bg-gradient-to-br from-[#2563eb] to-[#3b82f6] p-7 text-white transition-all hover:-translate-y-1 hover:shadow-2xl"
@@ -346,7 +248,6 @@ export default function HomePage() {
               </div>
             </Link>
 
-            {/* Franquicias */}
             <Link
               href="/mayoristas/franquicias"
               className="group relative flex flex-col overflow-hidden rounded-2xl bg-gradient-to-br from-[#0f766e] to-[#0d9488] p-7 text-white transition-all hover:-translate-y-1 hover:shadow-2xl"
@@ -372,7 +273,6 @@ export default function HomePage() {
               </div>
             </Link>
 
-            {/* B2B */}
             <Link
               href="/mayoristas/b2b"
               className="group relative flex flex-col overflow-hidden rounded-2xl bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] p-7 text-white transition-all hover:-translate-y-1 hover:shadow-2xl"

@@ -6,6 +6,7 @@
  */
 
 import { logAudit } from "@/services/auditService";
+import { DataHub } from "@/lib/dataHub";
 
 // ─── Storage keys ───────────────────────────────────────────────────────────
 
@@ -18,7 +19,8 @@ const POINTS_KEY = "tcgacademy_pts";
 const POINTS_HISTORY_KEY = "tcgacademy_pts_history";
 const POINTS_ATTR_KEY = "tcgacademy_pts_attr";
 const MESSAGES_KEY = "tcgacademy_messages";
-const SENT_EMAILS_KEY = "tcgacademy_sent_emails";
+// Canonical email log key. Legacy `tcgacademy_sent_emails` has been merged in.
+const SENT_EMAILS_KEY = "tcgacademy_email_log";
 const NOTIFICATIONS_KEY = "tcgacademy_notif_dynamic";
 
 const ANONYMIZED = "ELIMINADO";
@@ -158,14 +160,14 @@ export function exportUserData(userId: string): UserDataExport {
     (e) => e.to === userEmail || e.recipient === userEmail,
   );
 
-  // Notifications
-  const allNotifications = safeGetJSON<Array<Record<string, unknown>>>(
+  // Notifications — the canonical shape is `Record<userId, Notification[]>`
+  // (written by notificationService.pushUserNotification).
+  const allNotifsDict = safeGetJSON<Record<string, Array<Record<string, unknown>>>>(
     NOTIFICATIONS_KEY,
-    [],
+    {},
   );
-  const userNotifications = allNotifications.filter(
-    (n) => n.userId === userId || n.userId === userEmail,
-  );
+  const userNotifications =
+    allNotifsDict[userId] ?? allNotifsDict[userEmail] ?? [];
 
   return {
     profile,
@@ -332,21 +334,24 @@ export function deleteUserData(
   );
   if (filteredMessages.length < messages.length) {
     safeSetJSON(MESSAGES_KEY, filteredMessages);
+    DataHub.emit("messages");
     deleted.push(
       `${messages.length - filteredMessages.length} mensajes eliminados`,
     );
   }
 
-  // 7. Delete notifications
-  const notifications = safeGetJSON<Array<Record<string, unknown>>>(
+  // 7. Delete notifications (dict shape: Record<userId, Notification[]>)
+  const notifsDict = safeGetJSON<Record<string, Array<Record<string, unknown>>>>(
     NOTIFICATIONS_KEY,
-    [],
+    {},
   );
-  const filteredNotifs = notifications.filter(
-    (n) => n.userId !== userId && n.userId !== userEmail,
-  );
-  if (filteredNotifs.length < notifications.length) {
-    safeSetJSON(NOTIFICATIONS_KEY, filteredNotifs);
+  const hadNotifs =
+    Array.isArray(notifsDict[userId]) || Array.isArray(notifsDict[userEmail]);
+  if (hadNotifs) {
+    delete notifsDict[userId];
+    delete notifsDict[userEmail];
+    safeSetJSON(NOTIFICATIONS_KEY, notifsDict);
+    DataHub.emit("notifications");
     deleted.push("Notificaciones eliminadas");
   }
 

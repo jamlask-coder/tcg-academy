@@ -28,7 +28,7 @@ export default function PrivacidadPage() {
 
           <Section title="1. Responsable del tratamiento">
             <p>
-              <strong>TCG Academy S.L.</strong> (CIF: {SITE_CONFIG.cif}) es el
+              <strong>{SITE_CONFIG.legalName}</strong> (CIF: {SITE_CONFIG.cif}) es el
               responsable del tratamiento de sus datos personales. Puede
               contactar con nosotros a través del correo electrónico{" "}
               <a

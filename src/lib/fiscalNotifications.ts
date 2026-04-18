@@ -16,6 +16,7 @@
 
 import { generateTaxCalendar } from "@/accounting/advancedAccounting";
 import { safeRead, safeWrite } from "@/lib/safeStorage";
+import { DataHub } from "@/lib/dataHub";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -56,6 +57,9 @@ export function loadFiscalNotifications(): FiscalNotification[] {
 
 function saveFiscalNotifications(notifs: FiscalNotification[]): void {
   safeWrite(NOTIF_KEY, notifs);
+  // Canonical DataHub event — any UI listening to the unified `notifications`
+  // entity (sidebar badge, admin panel) refreshes after fiscal changes.
+  DataHub.emit("notifications");
 }
 
 /** Comprobar si el usuario actual es el responsable fiscal */

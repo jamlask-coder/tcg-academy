@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { getMergedProducts, getMergedById } from "@/lib/productStore";
 import { SITE_CONFIG } from "@/config/siteConfig";
+import { getIssuerAddress } from "@/lib/fiscalAddress";
 import { generateInvoiceHTML } from "@/utils/invoiceGenerator";
 import type { InvoiceData } from "@/utils/invoiceGenerator";
 
@@ -175,13 +176,14 @@ function buildPresupuestoData(
   clientName: string,
   lines: DraftLine[],
 ): InvoiceData {
+  const issuer = getIssuerAddress();
   return {
     invoiceNumber: number,
     date,
-    issuerName: "TCG Academy S.L.",
+    issuerName: SITE_CONFIG.legalName,
     issuerCIF: SITE_CONFIG.cif,
-    issuerAddress: "Calle Ejemplo 1, Local 4",
-    issuerCity: "28001 Madrid, España",
+    issuerAddress: issuer.street || SITE_CONFIG.address,
+    issuerCity: issuer.cityLine,
     issuerPhone: SITE_CONFIG.phone,
     issuerEmail: SITE_CONFIG.email,
     clientName: clientName || "Cliente",
@@ -526,7 +528,7 @@ export default function PresupuestoPage() {
             Emisor (precargado)
           </h2>
           <p className="text-sm font-semibold text-gray-700">
-            TCG Academy S.L.
+            {SITE_CONFIG.legalName}
           </p>
           <p className="text-xs text-gray-500">
             CIF: {SITE_CONFIG.cif} · {SITE_CONFIG.email} · {SITE_CONFIG.phone}

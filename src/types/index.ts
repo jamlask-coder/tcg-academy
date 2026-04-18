@@ -1,26 +1,9 @@
 // TCG Academy — Types
-
-export interface Product {
-  id: number;
-  name: string;
-  slug: string;
-  price: string;
-  regular_price: string;
-  sale_price: string;
-  stock_status: "instock" | "outofstock" | "onbackorder";
-  stock_quantity: number | null;
-  images: { id: number; src: string; alt: string }[];
-  categories: { id: number; name: string; slug: string }[];
-  description: string;
-  short_description: string;
-  rating_count: number;
-  average_rating: string;
-  on_sale: boolean;
-  featured: boolean;
-  meta_data: { key: string; value: string }[];
-  // language?: string  — reserved for future multi-language support (EN/ES/JP/FR/DE/IT/KO/PT per game)
-  //                       until promoted: read via meta_data.find(m => m.key === 'language')?.value
-}
+//
+// NOTE: Legacy `Product` (WooCommerce-shape) and `CartItem` interfaces were
+// removed during SSOT cleanup — the canonical types live in
+// `src/data/products.ts` (`LocalProduct`) and `src/context/CartContext.tsx`
+// (`CartItem` exported from the cart context) respectively.
 
 export interface Category {
   id: number;
@@ -30,15 +13,6 @@ export interface Category {
   image: { src: string; alt: string } | null;
   count: number;
   parent: number;
-}
-
-export interface CartItem {
-  key: string;
-  product_id: number;
-  quantity: number;
-  name: string;
-  price: number;
-  image: string;
 }
 
 export interface Store {

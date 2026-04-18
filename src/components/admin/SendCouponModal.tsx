@@ -18,6 +18,7 @@ import {
   type CouponDiscountType,
 } from "@/services/couponService";
 import { sendCouponEmail } from "@/services/emailService";
+import { SITE_CONFIG } from "@/config/siteConfig";
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
@@ -599,10 +600,10 @@ function SendCouponModal({
                 <p
                   style={{ color: "#9ca3af", fontSize: 11, margin: "0 0 2px" }}
                 >
-                  TCG Academy · hola@tcgacademy.es · +34 965 000 001
+                  {SITE_CONFIG.name} · {SITE_CONFIG.email} · {SITE_CONFIG.phone}
                 </p>
                 <p style={{ color: "#d1d5db", fontSize: 10, margin: 0 }}>
-                  Calle Libertad 16, 03710 Calp, Alicante · CIF: B12345678
+                  {SITE_CONFIG.address} · CIF: {SITE_CONFIG.cif}
                 </p>
               </div>
             </div>

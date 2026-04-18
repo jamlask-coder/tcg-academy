@@ -21,18 +21,33 @@ import {
   Printer,
   Receipt,
   RefreshCw,
+  ChevronDown,
 } from "lucide-react";
 import {
   ADMIN_ORDERS,
   ORDER_STORAGE_KEY,
-  MSG_STORAGE_KEY,
-  MOCK_MESSAGES,
   type AdminOrder,
   type AdminOrderStatus,
   type AppMessage,
 } from "@/data/mockData";
+import {
+  readAdminOrdersMerged,
+  getOrderPaymentStatus,
+  setOrderPaymentStatus,
+  isDeferredPayment,
+} from "@/lib/orderAdapter";
+import { regenerateInvoiceForOrder } from "@/lib/invoiceRecovery";
+import { getMessagesForOrder } from "@/services/messageService";
+import { renderEmailTemplate, logSentEmail } from "@/services/emailService";
+import { DataHub } from "@/lib/dataHub";
 import { GAME_CONFIG } from "@/data/products";
 import { getMergedById } from "@/lib/productStore";
+import { PaymentInfo } from "@/components/cuenta/PaymentInfo";
+import {
+  ShipModal,
+  buildTrackingUrl,
+  type Carrier,
+} from "@/components/admin/ShipModal";
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -42,7 +57,6 @@ const STATUS_CFG: Record<
 > = {
   pendiente_envio: { label: "Pendiente de envío", color: "#a16207", bg: "#fef9c3", icon: Clock },
   enviado: { label: "Enviado", color: "#15803d", bg: "#dcfce7", icon: Truck },
-  finalizado: { label: "Entregado", color: "#166534", bg: "#bbf7d0", icon: CheckCircle2 },
   incidencia: { label: "Incidencia", color: "#dc2626", bg: "#fee2e2", icon: AlertTriangle },
   cancelado: { label: "Cancelado", color: "#6b7280", bg: "#f3f4f6", icon: XCircle },
   devolucion: { label: "Devolución", color: "#c2410c", bg: "#ffedd5", icon: AlertTriangle },
@@ -59,8 +73,8 @@ const ROLE_COLORS: Record<string, { color: string; bg: string; label: string }> 
 function loadOrder(id: string): AdminOrder | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(ORDER_STORAGE_KEY);
-    const orders: AdminOrder[] = raw ? JSON.parse(raw) : ADMIN_ORDERS;
+    // Merge robusto: incluye pedidos huérfanos del checkout.
+    const orders = readAdminOrdersMerged(ADMIN_ORDERS);
     return orders.find((o) => o.id === id) ?? null;
   } catch {
     return ADMIN_ORDERS.find((o) => o.id === id) ?? null;
@@ -80,14 +94,11 @@ function loadEmailLog(orderId: string): EmailLogEntry[] {
   }
 }
 
+// Messages for this order now come from the canonical messageService so that
+// any write (sendMessage / markAsRead / etc.) from admin/mensajes or
+// cuenta/mensajes triggers `tcga:messages:updated` and refreshes this view.
 function loadMessages(orderId: string): AppMessage[] {
-  try {
-    const raw = localStorage.getItem(MSG_STORAGE_KEY);
-    const msgs: AppMessage[] = raw ? JSON.parse(raw) : MOCK_MESSAGES;
-    return msgs.filter((m) => m.orderId === orderId);
-  } catch {
-    return [];
-  }
+  return getMessagesForOrder(orderId);
 }
 
 function timeStr(iso: string): string {
@@ -98,28 +109,9 @@ function timeStr(iso: string): string {
   });
 }
 
-const PAYMENT_STATUS_KEY = "tcgacademy_payment_status";
-
 function isManualPayment(method: string): boolean {
   const m = method.toLowerCase();
   return m.includes("transferencia") || m.includes("tienda") || m.includes("recogida");
-}
-
-function loadPaymentStatus(orderId: string, method: string): "cobrado" | "pendiente" {
-  try {
-    const all = JSON.parse(localStorage.getItem(PAYMENT_STATUS_KEY) ?? "{}");
-    if (all[orderId]) return all[orderId];
-    // Manual payments default to "pendiente", others to "cobrado"
-    return isManualPayment(method) ? "pendiente" : "cobrado";
-  } catch { return isManualPayment(method) ? "pendiente" : "cobrado"; }
-}
-
-function savePaymentStatus(orderId: string, status: "cobrado" | "pendiente") {
-  try {
-    const all = JSON.parse(localStorage.getItem(PAYMENT_STATUS_KEY) ?? "{}");
-    all[orderId] = status;
-    localStorage.setItem(PAYMENT_STATUS_KEY, JSON.stringify(all));
-  } catch { /* ignore */ }
 }
 
 interface EmailLogEntry {
@@ -131,7 +123,7 @@ interface EmailLogEntry {
   body?: string;
 }
 
-function buildEmailHTML(type: string, order: AdminOrder): string {
+function buildEmailHTML(type: "confirmacion" | "enviado", order: AdminOrder): string {
   const name = order.userName.split("(")[0].split(" ")[0].trim();
   const itemRows = order.items.map((i) => {
     const gameName = GAME_CONFIG[i.game]?.name ?? i.game;
@@ -183,39 +175,21 @@ function buildEmailHTML(type: string, order: AdminOrder): string {
     </div>`;
   }
 
-  if (type === "enviado") {
-    return `<div style="max-width:600px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb">
-      ${header}
-      <div style="padding:28px 24px">
-        <h2 style="font-size:18px;color:#1e293b;margin:0 0 8px">Tu pedido ha sido enviado</h2>
-        <p style="font-size:14px;color:#64748b;margin:0 0 20px">Tu pedido <strong>${order.id}</strong> está en camino.</p>
-        ${order.trackingNumber ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin-bottom:16px">
-          <p style="font-size:13px;color:#166534;margin:0 0 6px"><strong>Número de seguimiento:</strong> ${order.trackingNumber}</p>
-          <p style="font-size:13px;margin:0"><a href="https://www.gls-spain.es/es/ayuda/seguimiento-envios/?match=${order.trackingNumber}" style="color:#2563eb;font-weight:600">Rastrear envío en GLS →</a></p>
-        </div>` : ""}
-        <div style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:16px;font-size:13px">
-          <p style="margin:0"><strong>Dirección de entrega:</strong> ${order.address}</p>
-        </div>
-        <p style="font-size:14px;color:#64748b;margin:0">Recibirás tu pedido en las próximas 24-48 horas laborables.</p>
-        <p style="font-size:14px;color:#64748b;margin:16px 0 0">Un saludo,<br><strong>Equipo TCG Academy</strong></p>
-      </div>
-      ${footer}
-    </div>`;
-  }
-
-  // entregado
+  // type === "enviado"
   return `<div style="max-width:600px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb">
     ${header}
     <div style="padding:28px 24px">
-      <h2 style="font-size:18px;color:#1e293b;margin:0 0 8px">Tu pedido ha sido entregado</h2>
-      <p style="font-size:14px;color:#64748b;margin:0 0 20px">Tu pedido <strong>${order.id}</strong> ha sido entregado correctamente.</p>
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin-bottom:16px;text-align:center">
-        <p style="font-size:24px;margin:0 0 8px">✅</p>
-        <p style="font-size:14px;font-weight:600;color:#166534;margin:0">Entrega confirmada</p>
+      <h2 style="font-size:18px;color:#1e293b;margin:0 0 8px">Tu pedido ha sido enviado</h2>
+      <p style="font-size:14px;color:#64748b;margin:0 0 20px">Tu pedido <strong>${order.id}</strong> está en camino.</p>
+      ${order.trackingNumber ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px;margin-bottom:16px">
+        <p style="font-size:13px;color:#166534;margin:0 0 6px"><strong>Número de seguimiento:</strong> ${order.trackingNumber}</p>
+        <p style="font-size:13px;margin:0"><a href="https://www.gls-spain.es/es/ayuda/seguimiento-envios/?match=${order.trackingNumber}" style="color:#2563eb;font-weight:600">Rastrear envío en GLS →</a></p>
+      </div>` : ""}
+      <div style="background:#f8fafc;border-radius:12px;padding:16px;margin-bottom:16px;font-size:13px">
+        <p style="margin:0"><strong>Dirección de entrega:</strong> ${order.address}</p>
       </div>
-      <p style="font-size:14px;color:#64748b;margin:0 0 8px">Si tienes algún problema con tu pedido, no dudes en contactarnos:</p>
-      <p style="font-size:13px;margin:0"><a href="mailto:tcgacademycalpe@gmail.com" style="color:#2563eb;font-weight:600">tcgacademycalpe@gmail.com</a></p>
-      <p style="font-size:14px;color:#64748b;margin:20px 0 0">Gracias por confiar en nosotros,<br><strong>Equipo TCG Academy</strong></p>
+      <p style="font-size:14px;color:#64748b;margin:0">Recibirás tu pedido en las próximas 24-48 horas laborables.</p>
+      <p style="font-size:14px;color:#64748b;margin:16px 0 0">Un saludo,<br><strong>Equipo TCG Academy</strong></p>
     </div>
     ${footer}
   </div>`;
@@ -230,11 +204,11 @@ function ensureOrderEmails(order: AdminOrder) {
     const cleaned = log.filter((e) => e.orderId !== order.id);
     const toAdd: EmailLogEntry[] = [];
 
-    // Only 3 emails: confirmación, enviado, entregado
-    const statusEmails: { status: AdminOrderStatus; subject: string; type: string; offset: number }[] = [
+    // 2 emails: confirmación + enviado. "Entregado" se eliminó del flujo
+    // admin el 2026-04-18 (ver memoria/CLAUDE: estado final = "enviado").
+    const statusEmails: { status: AdminOrderStatus; subject: string; type: "confirmacion" | "enviado"; offset: number }[] = [
       { status: "pendiente_envio", subject: `Confirmación de pedido ${order.id}`, type: "confirmacion", offset: 0 },
       { status: "enviado", subject: `Tu pedido ${order.id} ha sido enviado`, type: "enviado", offset: 60000 },
-      { status: "finalizado", subject: `Tu pedido ${order.id} ha sido entregado`, type: "entregado", offset: 120000 },
     ];
 
     for (const { status, subject, type, offset } of statusEmails) {
@@ -390,6 +364,7 @@ export default function PedidoDetailClient() {
   const [emailPreview, setEmailPreview] = useState<EmailLogEntry | null>(null);
   const [notes, setNotes] = useState("");
   const [notesSaved, setNotesSaved] = useState(false);
+  const [shipModal, setShipModal] = useState<AdminOrder | null>(null);
 
   useEffect(() => {
     const o = loadOrder(orderId);
@@ -397,24 +372,127 @@ export default function PedidoDetailClient() {
     setOrder(o);
     setNotes(o.adminNotes ?? "");
     ensureOrderEmails(o);
-    setPaymentStatus(loadPaymentStatus(o.id, o.paymentMethod));
+    const ps = getOrderPaymentStatus(o.id);
+    setPaymentStatus(ps === "cobrado" ? "cobrado" : "pendiente");
   }, [orderId, router]);
 
   const emailLog = useMemo(() => order ? loadEmailLog(order.id) : [], [order]);
-  const messages = useMemo(() => order ? loadMessages(order.id) : [], [order]);
+  const [messages, setMessages] = useState<AppMessage[]>([]);
+  useEffect(() => {
+    if (!order) { setMessages([]); return; }
+    setMessages(loadMessages(order.id));
+    const unsub = DataHub.on("messages", () => setMessages(loadMessages(order.id)));
+    return unsub;
+  }, [order]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(""), 3000);
   }, []);
 
-  const handleMarkPaid = useCallback(() => {
+  const handleMarkPaid = useCallback(async () => {
     if (!order) return;
     const next = paymentStatus === "cobrado" ? "pendiente" : "cobrado";
     setPaymentStatus(next);
-    savePaymentStatus(order.id, next);
+    setOrderPaymentStatus(order.id, next);
+
+    // Regla fiscal: al confirmar cobro en pago diferido (tienda/transferencia),
+    // emitir factura automáticamente si el pedido tiene NIF válido.
+    // Si no hay NIF, el admin verá el aviso y deberá añadirlo antes de facturar.
+    if (next === "cobrado" && isDeferredPayment(order.paymentMethod)) {
+      try {
+        const res = await regenerateInvoiceForOrder(order.id);
+        if (res.ok) {
+          showToast(`Pago cobrado + factura ${res.invoiceNumber} emitida`);
+        } else {
+          showToast(`Pago cobrado. Factura NO emitida: ${res.error ?? "revisar en /admin/fiscal"}`);
+        }
+      } catch {
+        showToast("Pago cobrado. Factura pendiente — revisar en /admin/fiscal.");
+      }
+      return;
+    }
+
     showToast(next === "cobrado" ? "Pago marcado como cobrado" : "Pago marcado como pendiente");
   }, [order, paymentStatus, showToast]);
+
+  const handleStatusChange = useCallback(
+    (next: AdminOrderStatus, tracking?: string, carrier: Carrier = "GLS") => {
+      if (!order) return;
+      if (next === order.adminStatus && !tracking) return;
+      const now = new Date().toISOString();
+      const historyNote = next === "enviado" && tracking
+        ? `Tracking ${tracking} · ${carrier}`
+        : undefined;
+      const updatedOrder: AdminOrder = {
+        ...order,
+        adminStatus: next,
+        trackingNumber: next === "enviado" && tracking ? tracking : order.trackingNumber,
+        statusHistory: [
+          ...order.statusHistory,
+          { status: next, date: now, by: "admin", ...(historyNote ? { note: historyNote } : {}) },
+        ],
+      };
+      try {
+        const raw = localStorage.getItem(ORDER_STORAGE_KEY);
+        const all: AdminOrder[] = raw ? JSON.parse(raw) : ADMIN_ORDERS;
+        const existsInInbox = all.some((o) => o.id === order.id);
+        const nextAll = existsInInbox
+          ? all.map((o) => (o.id === order.id ? updatedOrder : o))
+          : [...all, updatedOrder];
+        localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(nextAll));
+      } catch {
+        /* ignore — UI state seguirá mostrando el cambio */
+      }
+      setOrder(updatedOrder);
+      DataHub.emit("orders");
+      try {
+        window.dispatchEvent(new Event("tcga:orders:updated"));
+      } catch { /* ignore */ }
+
+      // Email "Pedido enviado" al comprador con tracking + carrier
+      if (next === "enviado" && tracking) {
+        const effectiveTracking = tracking;
+        const rendered = renderEmailTemplate("pedido_enviado", {
+          nombre: updatedOrder.userName.split(" ")[0] ?? updatedOrder.userName,
+          order_id: updatedOrder.id,
+          tracking_number: effectiveTracking,
+          carrier,
+          tracking_url: buildTrackingUrl(carrier, effectiveTracking),
+          unsubscribe_link: "#",
+        });
+        if (rendered) {
+          logSentEmail({
+            id: `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            to: updatedOrder.userEmail,
+            toName: updatedOrder.userName,
+            subject: rendered.subject,
+            templateId: "pedido_enviado",
+            sentAt: now,
+            preview: `Pedido enviado · ${carrier} ${effectiveTracking}`,
+          });
+        }
+        showToast(`Pedido enviado. Email enviado al comprador (${carrier} ${effectiveTracking})`);
+      } else {
+        showToast(`Estado actualizado → ${STATUS_CFG[next].label}`);
+      }
+    },
+    [order, showToast],
+  );
+
+  // Wrapper: cambiar a "enviado" abre el ShipModal (pide tracking + carrier)
+  // antes de persistir y enviar el email "Pedido enviado" al comprador.
+  const requestStatusChange = useCallback(
+    (next: AdminOrderStatus) => {
+      if (!order) return;
+      if (next === "enviado" && order.adminStatus !== "enviado") {
+        setShipModal(order);
+        return;
+      }
+      handleStatusChange(next);
+    },
+    [order, handleStatusChange],
+  );
 
   const handleSaveNotes = useCallback(() => {
     if (!order) return;
@@ -459,11 +537,34 @@ export default function PedidoDetailClient() {
         </Link>
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-bold text-gray-900">{order.id}</h1>
-          <span
-            className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
-            style={{ backgroundColor: status.bg, color: status.color }}
-          >
-            <StatusIcon size={13} /> {status.label}
+          <span className="relative inline-flex items-center">
+            <StatusIcon
+              size={13}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
+              style={{ color: status.color }}
+              aria-hidden="true"
+            />
+            <select
+              value={order.adminStatus}
+              onChange={(e) =>
+                requestStatusChange(e.target.value as AdminOrderStatus)
+              }
+              className="cursor-pointer appearance-none rounded-full pr-8 pl-7 py-1 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-offset-1"
+              style={{ backgroundColor: status.bg, color: status.color }}
+              aria-label={`Estado del pedido: ${status.label}`}
+            >
+              {(Object.keys(STATUS_CFG) as AdminOrderStatus[]).map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_CFG[s].label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              size={12}
+              className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2"
+              style={{ color: status.color }}
+              aria-hidden="true"
+            />
           </span>
           {isUrgent && (
             <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-600">
@@ -891,9 +992,16 @@ export default function PedidoDetailClient() {
                     } />
                   )}
                   <InfoRow label="Envío" value={order.shipping === 0 ? "Gratuito" : `${order.shipping.toFixed(2)}€`} />
-                  <InfoRow label="Método pago" value={order.paymentMethod} />
+                  <InfoRow
+                    label="Pago"
+                    value={
+                      <PaymentInfo
+                        method={order.paymentMethod}
+                        status={isPaid ? "paid" : "failed"}
+                      />
+                    }
+                  />
                   <InfoRow label="Total" value={<span className="font-bold text-gray-900">{order.total.toFixed(2)}€</span>} />
-                  <InfoRow label="Estado pago" value={isPaid ? <span className="font-bold text-green-600">Cobrado</span> : <span className="font-bold text-amber-600">Pendiente de cobro</span>} />
                   {order.couponCode && (
                     <InfoRow label="Cupón" value={<span className="font-mono font-bold text-green-600">{order.couponCode} (-{order.couponDiscount?.toFixed(2)}€)</span>} />
                   )}
@@ -924,6 +1032,17 @@ export default function PedidoDetailClient() {
 
         </div>
       </div>
+
+      {shipModal && (
+        <ShipModal
+          order={shipModal}
+          onClose={() => setShipModal(null)}
+          onConfirm={(tracking, carrier) => {
+            handleStatusChange("enviado", tracking, carrier);
+            setShipModal(null);
+          }}
+        />
+      )}
     </div>
   );
 }

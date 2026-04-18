@@ -301,6 +301,7 @@ export enum AuditAction {
   RECTIFICADA = "rectificada",
   ANULADA = "anulada",
   EXPORTADA = "exportada",
+  MIGRADA = "migrada",
 }
 
 // ─── Respuestas del proveedor VeriFactu ──────────────────────────────────────

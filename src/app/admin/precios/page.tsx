@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   Search,
   ChevronUp,
@@ -14,6 +14,7 @@ import {
   ChevronRight,
   AlertTriangle,
   Percent,
+  Eye,
 } from "lucide-react";
 import {
   GAME_CONFIG,
@@ -22,6 +23,12 @@ import {
 } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
 import Link from "next/link";
+import CompetitorPricesModal from "@/components/admin/CompetitorPricesModal";
+import {
+  getCachedSnapshot,
+  deriveRange,
+  subscribeCompetitorPrices,
+} from "@/services/competitorPriceService";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -157,18 +164,30 @@ function DateCell({
   const soon = expiry && isExpiringSoon(value);
 
   return (
-    <input
-      type="date"
-      value={value ?? ""}
-      onChange={(e) => onChange(e.target.value || undefined)}
-      className={`w-full rounded border px-1 py-0.5 text-[11px] focus:border-[#2563eb] focus:outline-none ${
-        expired
-          ? "border-red-400 bg-red-50 text-red-600"
-          : soon
-            ? "border-orange-400 bg-orange-50 text-orange-600"
-            : "border-gray-200"
-      }`}
-    />
+    <>
+      <style>{`
+        .precios-date::-webkit-calendar-picker-indicator {
+          display: none;
+          -webkit-appearance: none;
+        }
+        .precios-date::-webkit-inner-spin-button,
+        .precios-date::-webkit-clear-button {
+          display: none;
+        }
+      `}</style>
+      <input
+        type="date"
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || undefined)}
+        className={`precios-date w-full rounded border px-1 py-0.5 text-[11px] focus:border-[#2563eb] focus:outline-none ${
+          expired
+            ? "border-red-400 bg-red-50 text-red-600"
+            : soon
+              ? "border-orange-400 bg-orange-50 text-orange-600"
+              : "border-gray-200"
+        }`}
+      />
+    </>
   );
 }
 
@@ -270,6 +289,13 @@ export default function PreciosPage() {
     "discount" | "raise" | "lower" | "remove" | null
   >(null);
   const [bulkPct, setBulkPct] = useState("");
+
+  // Competencia
+  const [competitorProduct, setCompetitorProduct] = useState<PriceRow | null>(null);
+  // Tick para forzar re-render cuando el cache de competencia cambia
+  // (guardar/refresh dispara el evento y refleja el rango en la columna).
+  const [compTick, setCompTick] = useState(0);
+  useEffect(() => subscribeCompetitorPrices(() => setCompTick((t) => t + 1)), []);
 
   // ── Update helper ──────────────────────────────────────────────────────────
 
@@ -608,10 +634,21 @@ export default function PreciosPage() {
       {/* ── Table ── */}
       <div className="mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full table-fixed text-xs">
+            <colgroup>
+              <col className="w-10" />
+              <col />
+              <col className="w-[86px]" />
+              <col className="w-[86px]" />
+              <col className="w-[80px]" />
+              <col className="w-[80px]" />
+              <col className="w-[60px]" />
+              <col className="w-[104px]" />
+              <col className="w-[150px]" />
+            </colgroup>
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="w-8 px-3 py-2.5">
+                <th className="px-2 py-2.5">
                   <button
                     onClick={toggleAll}
                     className="text-gray-400 hover:text-[#2563eb]"
@@ -623,7 +660,7 @@ export default function PreciosPage() {
                     )}
                   </button>
                 </th>
-                <th className="px-3 py-2.5 text-left">
+                <th className="px-2 py-2.5 text-left">
                   <button
                     className="flex items-center gap-1 font-semibold text-gray-600 hover:text-[#2563eb]"
                     onClick={() => setSort("name")}
@@ -636,9 +673,9 @@ export default function PreciosPage() {
                     />
                   </button>
                 </th>
-                <th className="px-2 py-2.5 text-right">
+                <th className="px-1 py-2.5 text-right">
                   <button
-                    className="ml-auto flex items-center gap-1 font-semibold text-gray-600 hover:text-[#2563eb]"
+                    className="ml-auto flex items-center gap-0.5 font-semibold text-gray-600 hover:text-[#2563eb]"
                     onClick={() => setSort("price")}
                   >
                     PV Público{" "}
@@ -649,18 +686,18 @@ export default function PreciosPage() {
                     />
                   </button>
                 </th>
-                <th className="max-w-[80px] px-2 py-2.5 text-right font-semibold leading-tight text-gray-600">
+                <th className="px-1 py-2.5 text-right font-semibold leading-tight text-gray-600">
                   PV Mayorista
                 </th>
-                <th className="max-w-[72px] px-2 py-2.5 text-right font-semibold leading-tight text-gray-600">
+                <th className="px-1 py-2.5 text-right font-semibold leading-tight text-gray-600">
                   PV Tiendas
                 </th>
-                <th className="max-w-[72px] px-2 py-2.5 text-right font-semibold leading-tight text-purple-600">
-                  Precio Adquisición
+                <th className="px-1 py-2.5 text-right font-semibold leading-tight text-purple-600">
+                  P Adquisición
                 </th>
-                <th className="px-2 py-2.5 text-right">
+                <th className="px-1 py-2.5 text-right">
                   <button
-                    className="ml-auto flex items-center gap-1 font-semibold text-gray-600 hover:text-[#2563eb]"
+                    className="ml-auto flex items-center gap-0.5 font-semibold text-gray-600 hover:text-[#2563eb]"
                     onClick={() => setSort("discount")}
                   >
                     Dto%{" "}
@@ -671,9 +708,9 @@ export default function PreciosPage() {
                     />
                   </button>
                 </th>
-                <th className="px-2 py-2.5 text-left">
+                <th className="px-1 py-2.5 text-left">
                   <button
-                    className="flex items-center gap-1 font-semibold text-gray-600 hover:text-[#2563eb]"
+                    className="flex items-center gap-0.5 font-semibold text-gray-600 hover:text-[#2563eb]"
                     onClick={() => setSort("discountEnd")}
                   >
                     Fin dto{" "}
@@ -683,6 +720,9 @@ export default function PreciosPage() {
                       sortDir={sortDir}
                     />
                   </button>
+                </th>
+                <th className="px-1 py-2.5 text-right font-semibold leading-tight text-gray-600">
+                  Competencia
                 </th>
               </tr>
             </thead>
@@ -704,7 +744,7 @@ export default function PreciosPage() {
                           : "hover:bg-gray-50/60"
                     }`}
                   >
-                    <td className="px-3 py-1.5">
+                    <td className="px-2 py-1.5">
                       <button
                         onClick={() => toggleRow(row.id)}
                         className="text-gray-400 hover:text-[#2563eb]"
@@ -716,8 +756,8 @@ export default function PreciosPage() {
                         )}
                       </button>
                     </td>
-                    <td className="px-3 py-1.5">
-                      <div className="flex max-w-[360px] min-w-[220px] items-center gap-2">
+                    <td className="px-2 py-1.5">
+                      <div className="flex items-center gap-2">
                         {row.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -734,56 +774,57 @@ export default function PreciosPage() {
                             {GAME_CONFIG[row.game]?.emoji ?? "🃏"}
                           </div>
                         )}
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <Link
                             href={`/${row.game}/${row.category}/${row.slug}`}
                             target="_blank"
-                            className="truncate leading-tight font-medium text-gray-800 hover:text-[#2563eb] hover:underline"
+                            title={row.name}
+                            className="block truncate leading-tight font-medium text-gray-800 hover:text-[#2563eb] hover:underline"
                           >
                             {row.name}
                           </Link>
-                          <p className="text-[10px] text-gray-400">
+                          <p className="truncate text-[10px] text-gray-400">
                             {GAME_CONFIG[row.game]?.name ?? row.game}
                           </p>
                         </div>
                       </div>
                     </td>
-                    <td className="min-w-[80px] px-2 py-1.5">
+                    <td className="px-1 py-1.5">
                       <NumCell
                         value={row.price}
                         onChange={(v) => update(row.id, { price: v })}
                         dirty={isDirty}
                       />
                     </td>
-                    <td className="min-w-[80px] px-2 py-1.5">
+                    <td className="px-1 py-1.5">
                       <NumCell
                         value={row.wholesalePrice}
                         onChange={(v) => update(row.id, { wholesalePrice: v })}
                         dirty={isDirty}
                       />
                     </td>
-                    <td className="min-w-[80px] px-2 py-1.5">
+                    <td className="px-1 py-1.5">
                       <NumCell
                         value={row.storePrice}
                         onChange={(v) => update(row.id, { storePrice: v })}
                         dirty={isDirty}
                       />
                     </td>
-                    <td className="min-w-[76px] px-2 py-1.5">
+                    <td className="px-1 py-1.5">
                       <NumCell
                         value={row.costPrice ?? 0}
                         onChange={(v) => update(row.id, { costPrice: v })}
                         dirty={isDirty}
                       />
                     </td>
-                    <td className="min-w-[64px] px-2 py-1.5">
+                    <td className="px-1 py-1.5">
                       <DiscountPctCell
                         value={pct}
                         onChange={(v) => updateDiscount(row.id, v)}
                         dirty={isDirty}
                       />
                     </td>
-                    <td className="min-w-[110px] px-2 py-1.5">
+                    <td className="px-1 py-1.5">
                       {row.comparePrice !== undefined && (
                         <DateCell
                           value={row.discountEnd}
@@ -792,13 +833,20 @@ export default function PreciosPage() {
                         />
                       )}
                     </td>
+                    <td className="px-1 py-1.5">
+                      <CompetitorRangeCell
+                        row={row}
+                        onOpen={() => setCompetitorProduct(row)}
+                        tick={compTick}
+                      />
+                    </td>
                   </tr>
                 );
               })}
               {pageRows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     className="px-4 py-12 text-center text-sm text-gray-400"
                   >
                     No se encontraron productos con los filtros aplicados.
@@ -933,6 +981,17 @@ export default function PreciosPage() {
         </Modal>
       )}
 
+      {competitorProduct && (
+        <CompetitorPricesModal
+          productId={competitorProduct.id}
+          productName={competitorProduct.name}
+          productImage={competitorProduct.image}
+          productGame={competitorProduct.game}
+          ourPrice={competitorProduct.price}
+          onClose={() => setCompetitorProduct(null)}
+        />
+      )}
+
       {bulkAction && (
         <Modal
           title={
@@ -1049,5 +1108,65 @@ function DiscountPctCell({
     >
       {value > 0 ? `-${value}%` : "—"}
     </button>
+  );
+}
+
+// ─── Competitor range cell ────────────────────────────────────────────────────
+// Muestra en compacto el rango de precios del mismo producto en otras tiendas
+// (leído del cache 24h de `competitorPriceService`) + botón "Ver" que abre el
+// modal con detalle por tienda. Si el cache está vacío → placeholder + Ver.
+
+function CompetitorRangeCell({
+  row,
+  onOpen,
+  tick: _tick,
+}: {
+  row: PriceRow;
+  onOpen: () => void;
+  /** Se usa sólo para forzar re-render tras refresh del servicio. */
+  tick: number;
+}) {
+  // Leer cache fresco en cada render (cambia con el tick del subscribe)
+  const snapshot = getCachedSnapshot(row.id);
+  const range = deriveRange(snapshot);
+
+  const rangeLabel = (() => {
+    if (!snapshot) return "— · —";
+    if (range.hits === 0) return "Sin datos";
+    if (range.min === range.max)
+      return `${range.min!.toFixed(2)}€`;
+    return `${range.min!.toFixed(2)}€ – ${range.max!.toFixed(2)}€`;
+  })();
+
+  const cheaperThanUs =
+    range.min !== null && row.price > 0 && range.min < row.price;
+
+  return (
+    <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+      <span
+        className={`font-mono text-[10.5px] ${
+          snapshot
+            ? cheaperThanUs
+              ? "font-semibold text-red-600"
+              : "text-gray-600"
+            : "text-gray-300"
+        }`}
+        title={
+          snapshot
+            ? `${range.hits}/${range.total} tiendas con datos`
+            : "Aún sin consultar"
+        }
+      >
+        {rangeLabel}
+      </span>
+      <button
+        onClick={onOpen}
+        className="inline-flex items-center rounded-md border border-gray-200 px-1 py-0.5 text-[10px] font-semibold text-[#2563eb] transition hover:bg-blue-50"
+        aria-label={`Ver precios en otras tiendas para ${row.name}`}
+        title="Ver precios en otras tiendas"
+      >
+        <Eye size={10} />
+      </button>
+    </div>
   );
 }

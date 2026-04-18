@@ -28,12 +28,15 @@ import {
   Settings,
   Euro,
   Boxes,
+  ShieldCheck,
 } from "lucide-react";
 
 const SOLICITUDES_KEY = "tcgacademy_solicitudes";
-import { countPendingOrders } from "@/data/mockData";
+import { countPendingOrdersToShip } from "@/lib/orderAdapter";
 import { countNewIncidents } from "@/services/incidentService";
+import { DataHub } from "@/lib/dataHub";
 import { AdminFiscalGuard } from "@/components/AdminFiscalGuard";
+import { runAutoBackupIfDue } from "@/lib/backupScheduler";
 
 interface NavItem {
   href: string;
@@ -69,6 +72,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/admin/emails", label: "Emails automáticos", icon: Mail },
   { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart2 },
   { href: "/admin/herramientas", label: "Herramientas", icon: Wrench },
+  { href: "/admin/copias", label: "Copias de seguridad", icon: ShieldCheck },
   { href: "/admin/ajustes", label: "Ajustes", icon: Settings },
   { href: "/cuenta/datos", label: "Mis datos", icon: UserCircle },
 ];
@@ -86,7 +90,7 @@ function useSidebarBadges() {
   useEffect(() => {
     const calc = () => {
       try {
-        setNewOrders(countPendingOrders());
+        setNewOrders(countPendingOrdersToShip());
         const sols = JSON.parse(localStorage.getItem(SOLICITUDES_KEY) ?? "[]");
         setNewSolicitudes(
           (sols as { estado: string }[]).filter((s) => s.estado === "nueva")
@@ -96,8 +100,18 @@ function useSidebarBadges() {
       } catch {}
     };
     calc();
-    const id = setInterval(calc, 5000);
-    return () => clearInterval(id);
+    // Reacción event-driven via DataHub (canónico). Fallback poll cada 15s por seguridad.
+    const offOrders = DataHub.on("orders", calc);
+    const offIncidents = DataHub.on("incidents", calc);
+    const onStorage = (e: StorageEvent) => { if (e.key === SOLICITUDES_KEY) calc(); };
+    window.addEventListener("storage", onStorage);
+    const id = setInterval(calc, 15000);
+    return () => {
+      offOrders?.();
+      offIncidents?.();
+      window.removeEventListener("storage", onStorage);
+      clearInterval(id);
+    };
   }, []);
 
   return { newOrders, newSolicitudes, newIncidents };
@@ -181,18 +195,17 @@ function SidebarContent({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Admin badge */}
+      {/* Admin badge — el "ADMIN" pill está alineado con la línea del nombre,
+          no con todo el bloque; el relleno es ámbar con texto negro para que
+          coincida con el pill del header. */}
       <div className="mb-4 flex-shrink-0 rounded-2xl bg-[#2563eb] p-4 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="mb-1 text-xs text-blue-300">
-              Panel de administración
-            </p>
-            <p className="font-bold">
-              {user.name} {user.lastName}
-            </p>
-          </div>
-          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-white uppercase">
+        <p className="mb-1 text-xs text-blue-300">Panel de administración</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="truncate font-bold">
+            {user.name}
+            {user.lastName ? ` ${user.lastName}` : ""}
+          </p>
+          <span className="flex-shrink-0 rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-gray-900 uppercase">
             Admin
           </span>
         </div>
@@ -312,6 +325,15 @@ export default function AdminLayout({
     if (isLoading) return;
     if (!user || user.role !== "admin") router.push("/login");
   }, [user, isLoading, router]);
+
+  // Auto-snapshot diario: al cargar el layout admin, el scheduler comprueba
+  // si toca y crea uno si han pasado >= 24h. Silencioso (no bloquea UI).
+  useEffect(() => {
+    if (isLoading || !user || user.role !== "admin") return;
+    runAutoBackupIfDue().catch(() => {
+      /* el scheduler ya registra el error internamente */
+    });
+  }, [isLoading, user]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

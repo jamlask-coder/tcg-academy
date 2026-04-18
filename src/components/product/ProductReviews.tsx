@@ -10,17 +10,10 @@ import {
   hasUserReviewed,
 } from "@/lib/reviewService";
 import type { ProductReview } from "@/types/reviews";
+import { formatDate } from "@/lib/format";
 
 interface Props {
   productId: number;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("es-ES", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
 }
 
 export function ProductReviews({ productId }: Props) {

@@ -3,6 +3,8 @@
 // Variables are wrapped in {{double_braces}} for replacement at send time.
 // No backend yet — these are ready for use with any email service (Resend, SendGrid, etc.)
 
+import { SITE_CONFIG } from "@/config/siteConfig";
+
 export interface EmailTemplate {
   id: string;
   name: string;
@@ -80,15 +82,15 @@ const FOOTER_HTML = `
         <svg width="14" height="14" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
       </a>
     </div>
-    <p><strong>TCG Academy</strong> · <a href="mailto:hola@tcgacademy.es">hola@tcgacademy.es</a> · <a href="tel:+34965000001">+34 965 000 001</a></p>
-    <p>Calle Libertad 16, 03710 Calp, Alicante, España</p>
+    <p><strong>${SITE_CONFIG.name}</strong> · <a href="mailto:${SITE_CONFIG.email}">${SITE_CONFIG.email}</a> · <a href="tel:${SITE_CONFIG.phone.replace(/\s+/g, "")}">${SITE_CONFIG.phone}</a></p>
+    <p>${SITE_CONFIG.address}</p>
     <p style="margin-top:12px; font-size:11px; color:#d1d5db;">
-      Has recibido este email porque tienes una cuenta en TCG Academy.
+      Has recibido este email porque tienes una cuenta en ${SITE_CONFIG.name}.
       <a href="{{unsubscribe_link}}">Cancelar suscripción</a> ·
       <a href="https://tcgacademy.es/politica-privacidad">Política de privacidad</a>
     </p>
     <p style="margin-top:8px; font-size:10px; color:#d1d5db; line-height:1.5;">
-      TCG Academy es una marca de TCG Academy S.L., con domicilio social en Calle Libertad 16, 03710 Calp, Alicante (España). CIF: B12345678. ©2026 TCG Academy S.L. Todos los derechos reservados. Los formularios de queja están disponibles a petición del consumidor.
+      ${SITE_CONFIG.name} es una marca de ${SITE_CONFIG.legalName}, con domicilio social en ${SITE_CONFIG.address}. CIF: ${SITE_CONFIG.cif}. ©${new Date().getFullYear()} ${SITE_CONFIG.legalName}. Todos los derechos reservados. Los formularios de queja están disponibles a petición del consumidor.
     </p>
   </div>
 `;
@@ -139,8 +141,8 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
           <br/>
           <a href="https://tcgacademy.es/cuenta" class="btn-secondary" style="margin-top:12px;">Ver mi cuenta</a>
         </p>
-        <p>Si tienes cualquier duda, estamos aquí para ayudarte en <a href="mailto:hola@tcgacademy.es">hola@tcgacademy.es</a>.</p>
-        <p>¡Buenas partidas! 🎴<br/><strong>El equipo de TCG Academy</strong></p>
+        <p>Si tienes cualquier duda, estamos aquí para ayudarte en <a href="mailto:${SITE_CONFIG.email}">${SITE_CONFIG.email}</a>.</p>
+        <p>¡Buenas partidas! 🎴<br/><strong>El equipo de ${SITE_CONFIG.name}</strong></p>
       </div>
     `),
   },
@@ -218,7 +220,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
         <div class="legal-box">
           <p>Este email confirma la recepción de tu pedido. El contrato de compraventa se perfecciona en el momento del pago. TCG Academy se reserva el derecho de cancelar pedidos en caso de error de precio o falta de stock.</p>
           <p>De conformidad con el art. 102 TRLGDCU, dispones de 14 días naturales para ejercer tu derecho de desistimiento desde la recepción del pedido, salvo productos precintados de contenido digital.</p>
-          <p>TCG Academy es una marca de TCG Academy S.L. · CIF: B12345678 · Calle Libertad 16, 03710 Calp, Alicante (España)</p>
+          <p>${SITE_CONFIG.name} es una marca de ${SITE_CONFIG.legalName} · CIF: ${SITE_CONFIG.cif} · ${SITE_CONFIG.address} (España)</p>
         </div>
       </div>
     `),
@@ -233,7 +235,6 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       "order_id",
       "tracking_number",
       "carrier",
-      "estimated_date",
       "tracking_url",
       "unsubscribe_link",
     ],
@@ -245,7 +246,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       </div>
       <div class="hero" style="background: linear-gradient(135deg, #059669, #10b981);">
         <h1>¡Tu pedido está en camino! 🚚</h1>
-        <p>Pronto llegará a tus manos</p>
+        <p>Lo recibirás en las próximas 48 horas</p>
       </div>
       <div class="progress">
         <div class="progress-track">
@@ -261,88 +262,26 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
           <div class="prog-line pending"></div>
           <div class="prog-step">
             <div class="prog-dot pending"></div>
-            <div class="prog-label">Entregado</div>
+            <div class="prog-label">En tus manos</div>
           </div>
         </div>
       </div>
       <div class="content">
         <p>Hola {{nombre}},</p>
-        <p>¡Buenas noticias! Tu pedido <strong>#{{order_id}}</strong> ha salido de nuestro almacén y está en camino.</p>
+        <p>¡Buenas noticias! Tu pedido <strong>#{{order_id}}</strong> ha salido de nuestro almacén y está en camino. Lo recibirás en las <strong>próximas 48 horas</strong>.</p>
         <div class="tracking-box">
-          <p style="margin:0 0 8px; font-size:12px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em;">Número de seguimiento GLS</p>
+          <p style="margin:0 0 8px; font-size:12px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em;">Número de seguimiento {{carrier}}</p>
           <div class="tracking-num">{{tracking_number}}</div>
-          <p style="margin:12px 0 0; font-size:13px; color:#374151;"><strong>Transportista:</strong> {{carrier}} · <strong>Entrega estimada:</strong> {{estimated_date}}</p>
+          <p style="margin:12px 0 0; font-size:13px; color:#374151;"><strong>Transportista:</strong> {{carrier}}</p>
           <p style="margin:16px 0 0;">
-            <a href="https://www.gls-spain.es/es/seguimiento-envios/?match={{tracking_number}}" class="btn" style="font-size:13px; padding:10px 24px;">Seguir mi envío en GLS</a>
+            <a href="{{tracking_url}}" class="btn" style="font-size:13px; padding:10px 24px;">Seguir mi envío en {{carrier}}</a>
           </p>
         </div>
         <p>Si tienes algún problema con la entrega, contacta con nosotros en <a href="mailto:pedidos@tcgacademy.es">pedidos@tcgacademy.es</a>.</p>
         <p><strong>El equipo de TCG Academy</strong></p>
         <div class="legal-box">
-          <p>El plazo de entrega es orientativo y puede variar por causas ajenas a TCG Academy. En caso de incidencia con el transportista, abriremos una reclamación en un plazo máximo de 24 h hábiles.</p>
-          <p>TCG Academy es una marca de TCG Academy S.L. · CIF: B12345678 · Calle Libertad 16, 03710 Calp, Alicante (España)</p>
-        </div>
-      </div>
-    `),
-  },
-  {
-    id: "pedido_entregado",
-    name: "Pedido entregado",
-    subject: "¡Tu pedido #{{order_id}} ha llegado! ¿Cómo ha ido? 🎴",
-    description: "Se envía cuando el pedido es marcado como entregado.",
-    variables: [
-      "nombre",
-      "order_id",
-      "points_earned",
-      "current_balance",
-      "review_url",
-      "unsubscribe_link",
-    ],
-    html: wrapEmail(`
-      <div class="top-btns">
-        <a href="https://tcgacademy.es/cuenta/pedidos">Mis pedidos</a>
-        <a href="https://tcgacademy.es/cuenta">Mi cuenta</a>
-        <a href="https://tcgacademy.es/catalogo">Volver a comprar</a>
-      </div>
-      <div class="hero" style="background: linear-gradient(135deg, #7c3aed, #9333ea);">
-        <h1>¡Pedido entregado! 📦</h1>
-        <p>Esperamos que disfrutes de tu compra</p>
-      </div>
-      <div class="progress">
-        <div class="progress-track">
-          <div class="prog-step">
-            <div class="prog-dot done"></div>
-            <div class="prog-label done">Pedido</div>
-          </div>
-          <div class="prog-line done"></div>
-          <div class="prog-step">
-            <div class="prog-dot done"></div>
-            <div class="prog-label done">Enviado</div>
-          </div>
-          <div class="prog-line done"></div>
-          <div class="prog-step">
-            <div class="prog-dot done"></div>
-            <div class="prog-label done">Entregado</div>
-          </div>
-        </div>
-      </div>
-      <div class="content">
-        <p>Hola {{nombre}},</p>
-        <p>Tu pedido <strong>#{{order_id}}</strong> ha sido entregado. ¡Esperamos que estés disfrutando de tus nuevas cartas!</p>
-        <div class="points-box">
-          <div class="points-number">+{{points_earned}}</div>
-          <p style="color:#92400e; font-weight:600; margin:8px 0 0;">puntos añadidos a tu cuenta</p>
-          <p style="color:#b45309; font-size:13px; margin:4px 0 0;">Saldo total: <strong>{{current_balance}} puntos</strong></p>
-        </div>
-        <p style="text-align:center;">
-          <a href="{{review_url}}" class="btn">Dejar una reseña</a>
-        </p>
-        <p style="font-size:13px; color:#6b7280; text-align:center;">Tu opinión nos ayuda a mejorar y a otros compradores a elegir.</p>
-        <p>¡Hasta la próxima partida!<br/><strong>El equipo de TCG Academy</strong></p>
-        <div class="legal-box">
-          <p>Recuerda que dispones de 14 días naturales desde la recepción para ejercer tu derecho de desistimiento (art. 102 TRLGDCU). Para devoluciones, accede a tu área de cliente o escríbenos a <a href="mailto:pedidos@tcgacademy.es" style="color:#9ca3af;">pedidos@tcgacademy.es</a>.</p>
-          <p>Los formularios de queja están disponibles a petición del consumidor en nuestras tiendas físicas y por email.</p>
-          <p>TCG Academy es una marca de TCG Academy S.L. · CIF: B12345678 · Calle Libertad 16, 03710 Calp, Alicante (España) · ©2026 Todos los derechos reservados.</p>
+          <p>El plazo de 48 horas es orientativo y puede variar por causas ajenas a TCG Academy. En caso de incidencia con el transportista, abriremos una reclamación en un plazo máximo de 24 h hábiles.</p>
+          <p>${SITE_CONFIG.name} es una marca de ${SITE_CONFIG.legalName} · CIF: ${SITE_CONFIG.cif} · ${SITE_CONFIG.address} (España)</p>
         </div>
       </div>
     `),

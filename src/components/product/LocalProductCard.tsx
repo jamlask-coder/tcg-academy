@@ -408,11 +408,21 @@ function LocalProductCardInner({ product }: Props) {
               )}
             </div>
           </div>
-          {typeof product.maxPerUser === "number" && (
-            <span className="text-[10px] text-gray-400">
-              Máx. {product.maxPerUser} uds/persona
-            </span>
-          )}
+          {(() => {
+            const who = user?.role === "mayorista" ? "mayorista" : user?.role === "tienda" ? "tienda" : "cliente";
+            const roleLimit =
+              user?.role === "mayorista"
+                ? product.maxPerWholesaler
+                : user?.role === "tienda"
+                  ? product.maxPerStore
+                  : product.maxPerClient;
+            const effectiveLimit = typeof roleLimit === "number" ? roleLimit : product.maxPerUser;
+            return typeof effectiveLimit === "number" ? (
+              <span className="text-[10px] text-gray-400">
+                Máx. {effectiveLimit} uds/{who}
+              </span>
+            ) : null;
+          })()}
           {limitMsg && (
             <span className="text-[10px] font-semibold text-red-500">
               {limitMsg}

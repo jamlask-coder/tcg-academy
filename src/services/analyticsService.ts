@@ -5,11 +5,13 @@
  */
 
 import { getMergedProducts } from "@/lib/productStore";
+import { readAdminOrdersMerged } from "@/lib/orderAdapter";
 
 // ─── Storage keys ───────────────────────────────────────────────────────────
 
 const ORDERS_KEY = "tcgacademy_orders";
 const ADMIN_ORDERS_KEY = "tcgacademy_admin_orders";
+const REGISTERED_KEY = "tcgacademy_registered";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -87,13 +89,11 @@ export interface DailyRevenueEntry {
 function loadOrders(): OrderRecord[] {
   if (typeof window === "undefined") return [];
   try {
-    // Prefer admin orders (more complete data)
-    const adminRaw = localStorage.getItem(ADMIN_ORDERS_KEY);
-    if (adminRaw) {
-      const parsed = JSON.parse(adminRaw) as OrderRecord[];
-      if (parsed.length > 0) return parsed;
-    }
-    // Fall back to client orders
+    // Fuente unificada: merge admin + orphan recovery desde checkout.
+    // Así todos los paneles leen lo mismo — no hay contadores aislados.
+    const merged = readAdminOrdersMerged([]);
+    if (merged.length > 0) return merged as unknown as OrderRecord[];
+    // Fallback adicional (ambos vacíos)
     const raw = localStorage.getItem(ORDERS_KEY);
     if (!raw) return [];
     return JSON.parse(raw) as OrderRecord[];
@@ -101,6 +101,10 @@ function loadOrders(): OrderRecord[] {
     return [];
   }
 }
+
+// Silencia warnings de imports no usados tras refactor (se dejan por si otros
+// callers leen directo las claves en el futuro).
+void ADMIN_ORDERS_KEY;
 
 function isInRange(
   dateStr: string,
@@ -359,4 +363,212 @@ export function getDailyRevenue(days = 30): DailyRevenueEntry[] {
   }
 
   return result;
+}
+
+// ─── Live user & alert counters (unificados con el resto del admin) ────────
+
+export interface LiveUserStats {
+  total: number;
+  active: number;
+  newInPeriod: (days: number) => number;
+}
+
+/**
+ * Combina `tcgacademy_registered` (seed + registros reales) en un único conjunto
+ * deduplicado por email. Es la MISMA fuente que usa /admin/usuarios.
+ */
+interface RegisteredUser {
+  id?: string;
+  email?: string;
+  active?: boolean;
+  createdAt?: string;
+}
+
+export function getLiveUsers(): RegisteredUser[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(REGISTERED_KEY);
+    if (!raw) return [];
+    const obj = JSON.parse(raw) as Record<string, { user?: RegisteredUser }>;
+    return Object.values(obj)
+      .map((entry) => entry.user)
+      .filter((u): u is RegisteredUser => Boolean(u));
+  } catch {
+    return [];
+  }
+}
+
+export function getLiveUserStats(): LiveUserStats {
+  const users = getLiveUsers();
+  return {
+    total: users.length,
+    active: users.filter((u) => u.active !== false).length,
+    newInPeriod: (days: number) => {
+      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+      return users.filter((u) => {
+        if (!u.createdAt) return false;
+        const t = new Date(u.createdAt).getTime();
+        return Number.isFinite(t) && t >= cutoff;
+      }).length;
+    },
+  };
+}
+
+/**
+ * Cuenta pedidos que requieren atención del admin.
+ * MISMA definición que el badge de /admin/pedidos — evita contadores que no cuadran.
+ */
+export function countPendingAdminOrders(): number {
+  const orders = loadOrders();
+  return orders.filter(
+    (o) => o.adminStatus === "pendiente_envio" || o.status === "pendiente_envio",
+  ).length;
+}
+
+// ─── Time-series builders (sustituyen a MOCK_SALES_*, MOCK_USERS_*, MOCK_PRODUCTS_*) ─
+
+export type PeriodKey = "7d" | "30d" | "3m" | "1a" | "todo";
+
+const PERIOD_DAYS: Record<PeriodKey, number> = {
+  "7d": 7,
+  "30d": 30,
+  "3m": 90,
+  "1a": 365,
+  "todo": 365 * 3, // cap "todo" a 3 años para UI sensata
+};
+
+const DOW_SHORT = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+
+function formatDayLabel(d: Date, period: PeriodKey): string {
+  if (period === "7d") return DOW_SHORT[d.getDay()];
+  if (period === "30d") {
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `${dd}/${mm}`;
+  }
+  if (period === "3m" || period === "1a") {
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yy = String(d.getFullYear()).slice(2);
+    return `${mm}/${yy}`;
+  }
+  return String(d.getFullYear());
+}
+
+function bucketize<T>(
+  dates: Date[],
+  period: PeriodKey,
+  aggregator: (bucketStart: Date, bucketEnd: Date) => T,
+): Array<T & { day: string }> {
+  const result: Array<T & { day: string }> = [];
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+  void dates;
+
+  if (period === "7d") {
+    for (let i = 6; i >= 0; i--) {
+      const day = new Date(end);
+      day.setDate(end.getDate() - i);
+      day.setHours(0, 0, 0, 0);
+      const next = new Date(day);
+      next.setDate(day.getDate() + 1);
+      const agg = aggregator(day, next);
+      result.push({ ...agg, day: formatDayLabel(day, period) });
+    }
+  } else if (period === "30d") {
+    for (let i = 29; i >= 0; i--) {
+      const day = new Date(end);
+      day.setDate(end.getDate() - i);
+      day.setHours(0, 0, 0, 0);
+      const next = new Date(day);
+      next.setDate(day.getDate() + 1);
+      const agg = aggregator(day, next);
+      result.push({ ...agg, day: formatDayLabel(day, period) });
+    }
+  } else if (period === "3m") {
+    // 12 buckets semanales
+    for (let i = 11; i >= 0; i--) {
+      const day = new Date(end);
+      day.setDate(end.getDate() - i * 7);
+      day.setHours(0, 0, 0, 0);
+      const next = new Date(day);
+      next.setDate(day.getDate() + 7);
+      const agg = aggregator(day, next);
+      result.push({ ...agg, day: formatDayLabel(day, period) });
+    }
+  } else if (period === "1a") {
+    // 12 buckets mensuales
+    for (let i = 11; i >= 0; i--) {
+      const day = new Date(end.getFullYear(), end.getMonth() - i, 1);
+      const next = new Date(day.getFullYear(), day.getMonth() + 1, 1);
+      const agg = aggregator(day, next);
+      result.push({ ...agg, day: formatDayLabel(day, period) });
+    }
+  } else {
+    // "todo": 1 bucket por año, máx 3 años
+    const startYear = end.getFullYear() - 2;
+    for (let y = startYear; y <= end.getFullYear(); y++) {
+      const day = new Date(y, 0, 1);
+      const next = new Date(y + 1, 0, 1);
+      const agg = aggregator(day, next);
+      result.push({ ...agg, day: formatDayLabel(day, period) });
+    }
+  }
+  return result;
+}
+
+export interface SalesPoint { day: string; sales: number; orders: number }
+export interface UsersPoint { day: string; newUsers: number; totalUsers: number }
+export interface ProductsPoint { day: string; newProducts: number; totalProducts: number }
+
+/** Serie de ventas real (€ + nº de pedidos) agregada por bucket del periodo. */
+export function buildSalesSeries(period: PeriodKey): SalesPoint[] {
+  const orders = loadOrders();
+  return bucketize([], period, (start, end) => {
+    const sales = orders
+      .filter((o) => {
+        const t = new Date(o.date).getTime();
+        return t >= start.getTime() && t < end.getTime();
+      })
+      .reduce((s, o) => s + (Number(o.total) || 0), 0);
+    const count = orders.filter((o) => {
+      const t = new Date(o.date).getTime();
+      return t >= start.getTime() && t < end.getTime();
+    }).length;
+    return { sales: Math.round(sales * 100) / 100, orders: count };
+  });
+}
+
+/** Serie de usuarios real — totales acumulados + altas nuevas por bucket. */
+export function buildUsersSeries(period: PeriodKey): UsersPoint[] {
+  const users = getLiveUsers();
+  const parsed = users
+    .map((u) => (u.createdAt ? new Date(u.createdAt).getTime() : NaN))
+    .filter((t) => Number.isFinite(t))
+    .sort((a, b) => a - b);
+
+  return bucketize([], period, (start, end) => {
+    const newUsers = parsed.filter((t) => t >= start.getTime() && t < end.getTime()).length;
+    const totalUsers = parsed.filter((t) => t < end.getTime()).length;
+    return { newUsers, totalUsers };
+  });
+}
+
+/** Serie de productos — total catálogo + altas nuevas (usa createdAt). */
+export function buildProductsSeries(period: PeriodKey): ProductsPoint[] {
+  const products = getMergedProducts();
+  const created = products
+    .map((p) => (p.createdAt ? new Date(p.createdAt).getTime() : NaN))
+    .filter((t) => Number.isFinite(t))
+    .sort((a, b) => a - b);
+  const totalNow = products.length;
+
+  return bucketize([], period, (start, end) => {
+    const newProducts = created.filter(
+      (t) => t >= start.getTime() && t < end.getTime(),
+    ).length;
+    const countedUpToEnd = created.filter((t) => t < end.getTime()).length;
+    // Si no hay createdAt fiable para todos, usamos catálogo total como tope.
+    const totalProducts = Math.max(countedUpToEnd, Math.min(totalNow, countedUpToEnd || totalNow));
+    return { newProducts, totalProducts };
+  });
 }

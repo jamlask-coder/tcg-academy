@@ -68,8 +68,9 @@ export function estimateRemainingQuota(): number {
         totalUsed += key.length + (localStorage.getItem(key)?.length ?? 0);
       }
     }
-    // Assume 5MB limit (conservative). Each char = 2 bytes in JS.
-    const LIMIT = 5 * 1024 * 1024;
+    // Modern browsers allow ~10MB per origin. Use 9MB as conservative cap.
+    // Each char = 2 bytes in JS (UTF-16).
+    const LIMIT = 9 * 1024 * 1024;
     return Math.max(0, LIMIT - totalUsed * 2);
   } catch {
     return 0;
@@ -209,13 +210,29 @@ export function safeUpdate<T>(
 
 // ── Emergency cleanup ───────────────────────────────────────────────────────
 
-/** Keys that can be safely trimmed when quota is critical */
+/** Keys that can be safely trimmed when quota is critical (level 1 — gentle) */
 const TRIMMABLE_KEYS = [
   "tcgacademy_email_log",
   "tcgacademy_coupon_usage",
   "tcgacademy_pts_history",
-  "tcgacademy_sent_emails",
   "tcgacademy_notif_dynamic",
+  "tcgacademy_autopilot_log",
+  "tcgacademy_fiscal_audit_log",
+  "tcgacademy_audit_log",
+  "tcgacademy_storage_errors",
+  "tcgacademy_recent_views",
+  "tcgacademy_search_history",
+];
+
+/** Keys that can be FULLY purged in aggressive cleanup (level 2) */
+const PURGEABLE_KEYS = [
+  "tcgacademy_autopilot_log",
+  "tcgacademy_fiscal_audit_log",
+  "tcgacademy_storage_errors",
+  "tcgacademy_recent_views",
+  "tcgacademy_search_history",
+  "tcgacademy_notif_dynamic",
+  "tcgacademy_email_log",
 ];
 
 /**
@@ -242,4 +259,34 @@ export function emergencyTrimStorage(): number {
     }
   }
   return freed;
+}
+
+/**
+ * AGGRESSIVE quota recovery: wipes purgeable keys entirely.
+ * Use only when `emergencyTrimStorage()` was not enough (critical write still fails).
+ */
+export function aggressiveCleanup(): number {
+  let freed = 0;
+  for (const key of PURGEABLE_KEYS) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) freed += raw.length * 2;
+      localStorage.removeItem(key);
+    } catch {
+      // Skip
+    }
+  }
+  return freed;
+}
+
+/**
+ * Robust write: tries write → trim → retry → aggressive cleanup → retry.
+ * Guaranteed to make a best-effort attempt before returning false.
+ */
+export function robustWrite(key: string, data: unknown): boolean {
+  if (safeWrite(key, data)) return true;
+  emergencyTrimStorage();
+  if (safeWrite(key, data)) return true;
+  aggressiveCleanup();
+  return safeWrite(key, data);
 }

@@ -4,7 +4,10 @@
 // Storage: localStorage["tcgacademy_user_coupons"]
 // Replace localStorage calls with API calls when backend is ready.
 
-import { MOCK_ADMIN_COUPONS } from "@/data/mockData";
+import { MOCK_ADMIN_COUPONS, type AdminCoupon } from "@/data/mockData";
+
+// Re-export para que consumidores no tengan que importar de mockData.
+export type { AdminCoupon };
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -123,9 +126,9 @@ export function validateCoupon(
     }
   }
 
-  // 2. General admin coupons
+  // 2. General admin coupons (SSOT: loadAdminCoupons con fallback seed)
   const today = new Date().toISOString().slice(0, 10);
-  const admin = MOCK_ADMIN_COUPONS.find(
+  const admin = loadAdminCoupons().find(
     (c) =>
       c.code.toUpperCase() === upper && c.active && c.endsAt >= today,
   );
@@ -259,4 +262,66 @@ export function getCouponUsageCount(
     (r) =>
       r.couponCode === upper && (userId === undefined || r.userId === userId),
   ).length;
+}
+
+// ── Admin coupon store (SSOT) ─────────────────────────────────────────────────
+// Antes: los cupones vivían solo en `MOCK_ADMIN_COUPONS` (constante en RAM) y
+// la página /admin/cupones los guardaba en `useState`, por lo que cualquier
+// mutación se perdía al recargar. Ahora hay una fuente única persistente.
+//
+// Evento canónico: "tcga:coupons:updated" — cualquier vista suscrita se refresca.
+
+const ADMIN_COUPONS_KEY = "tcgacademy_admin_coupons";
+
+/**
+ * Read the persisted admin coupon list.
+ * On first call (empty key) seeds from MOCK_ADMIN_COUPONS so demo data is available.
+ */
+export function loadAdminCoupons(): AdminCoupon[] {
+  if (typeof window === "undefined") return MOCK_ADMIN_COUPONS.slice();
+  try {
+    const raw = localStorage.getItem(ADMIN_COUPONS_KEY);
+    if (raw) return JSON.parse(raw) as AdminCoupon[];
+    // Primera vez: sembrar con los mocks.
+    localStorage.setItem(ADMIN_COUPONS_KEY, JSON.stringify(MOCK_ADMIN_COUPONS));
+    return MOCK_ADMIN_COUPONS.slice();
+  } catch {
+    return MOCK_ADMIN_COUPONS.slice();
+  }
+}
+
+/**
+ * Persist a whole admin coupon list (replaces previous).
+ * Dispatches `tcga:coupons:updated` for reactive consumers.
+ */
+export function saveAdminCoupons(coupons: AdminCoupon[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(ADMIN_COUPONS_KEY, JSON.stringify(coupons));
+    window.dispatchEvent(new Event("tcga:coupons:updated"));
+  } catch { /* non-fatal */ }
+}
+
+/**
+ * Upsert a single admin coupon by code.
+ * Returns the updated list.
+ */
+export function upsertAdminCoupon(coupon: AdminCoupon): AdminCoupon[] {
+  const all = loadAdminCoupons();
+  const idx = all.findIndex((c) => c.code.toUpperCase() === coupon.code.toUpperCase());
+  if (idx >= 0) all[idx] = coupon;
+  else all.unshift(coupon);
+  saveAdminCoupons(all);
+  return all;
+}
+
+/**
+ * Delete an admin coupon by code.
+ * Returns the updated list.
+ */
+export function deleteAdminCoupon(code: string): AdminCoupon[] {
+  const upper = code.toUpperCase();
+  const filtered = loadAdminCoupons().filter((c) => c.code.toUpperCase() !== upper);
+  saveAdminCoupons(filtered);
+  return filtered;
 }

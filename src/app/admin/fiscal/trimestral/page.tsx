@@ -9,10 +9,7 @@ import {
 } from "@/services/taxService";
 import type { InvoiceRecord } from "@/types/fiscal";
 import type { TaxSummary, Quarter } from "@/types/tax";
-
-function formatDate(d: Date): string {
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-}
+import { formatDateShort as formatDate } from "@/lib/format";
 
 export default function TrimestralPage() {
   const [invoices] = useState<InvoiceRecord[]>(() => loadInvoices());

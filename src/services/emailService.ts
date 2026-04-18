@@ -139,7 +139,9 @@ export function openHtmlInNewTab(html: string): void {
 
 // ── Sent email log ─────────────────────────────────────────────────────────────
 
-const SENT_EMAILS_KEY = "tcgacademy_sent_emails";
+// Canonical key: `tcgacademy_email_log` (see dataHub/registry.ts, "logs").
+// Consolidates the previous duplicate `tcgacademy_sent_emails`.
+const SENT_EMAILS_KEY = "tcgacademy_email_log";
 const MAX_LOG = 200;
 
 export interface SentEmailLog {

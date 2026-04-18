@@ -15,6 +15,8 @@ import {
   MSG_STORAGE_KEY,
   type AppMessage,
 } from "@/data/mockData";
+import { DataHub } from "@/lib/dataHub";
+import { SITE_CONFIG } from "@/config/siteConfig";
 
 /**
  * Asuntos predefinidos para mensajes B2B (mayoristas y tiendas).
@@ -66,6 +68,9 @@ function loadMessages(userId: string): AppMessage[] {
 }
 
 function saveMessages(msgs: AppMessage[]) {
+  // Merge-write: preserve messages from other users not in the current scope,
+  // then emit the canonical `tcga:messages:updated` event via DataHub so admin
+  // views and notifications stay in sync.
   try {
     const all: AppMessage[] = JSON.parse(
       localStorage.getItem(MSG_STORAGE_KEY) ?? "[]",
@@ -73,6 +78,7 @@ function saveMessages(msgs: AppMessage[]) {
     const ids = new Set(msgs.map((m) => m.id));
     const rest = all.filter((m) => !ids.has(m.id));
     localStorage.setItem(MSG_STORAGE_KEY, JSON.stringify([...msgs, ...rest]));
+    DataHub.emit("messages");
   } catch {}
 }
 
@@ -91,6 +97,10 @@ export default function MensajesPage() {
     if (!user) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMessages(loadMessages(user.id));
+    const unsub = DataHub.on("messages", () => {
+      setMessages(loadMessages(user.id));
+    });
+    return unsub;
   }, [user]);
 
   if (!user) return null;
@@ -110,10 +120,10 @@ export default function MensajesPage() {
           <p className="mt-1 text-sm text-amber-600">
             Si necesitas ayuda, escríbenos a{" "}
             <a
-              href="mailto:hola@tcgacademy.es"
+              href={`mailto:${SITE_CONFIG.email}`}
               className="font-semibold underline"
             >
-              hola@tcgacademy.es
+              {SITE_CONFIG.email}
             </a>
             .
           </p>

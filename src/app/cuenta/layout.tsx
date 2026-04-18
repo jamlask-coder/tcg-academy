@@ -53,7 +53,6 @@ const RECOMPENSAS_PATHS = [
 const NAV_ITEMS_BASE = [
   { href: "/cuenta", label: "Resumen", icon: UserIcon, exact: true },
   { href: "/cuenta/pedidos", label: "Mis pedidos", icon: Package, matchPaths: PEDIDOS_PATHS },
-  { href: "/cuenta/datos", label: "Mis datos", icon: UserIcon, matchPaths: PERFIL_PATHS },
   { href: "/cuenta/puntos", label: "Mis recompensas", icon: Trophy, matchPaths: RECOMPENSAS_PATHS, clientOnly: true },
   { href: "/cuenta/cupones", label: "Mis recompensas", icon: Gift, matchPaths: RECOMPENSAS_PATHS, b2bOnly: true },
   { href: "/cuenta/favoritos", label: "Favoritos", icon: Heart },
@@ -64,6 +63,7 @@ const NAV_ITEMS_BASE = [
     badge: true,
   },
   { href: "/cuenta/mensajes", label: "Mensajes", icon: MessageSquare, b2bOnly: true },
+  { href: "/cuenta/datos", label: "Mis datos", icon: UserIcon, matchPaths: PERFIL_PATHS },
 ];
 
 const ADMIN_NAV_ITEMS = [
@@ -84,6 +84,7 @@ const ADMIN_NAV_ITEMS = [
   { href: "/admin/incidencias", label: "Incidencias", icon: AlertTriangle },
   { href: "/admin/herramientas", label: "Herramientas", icon: Wrench },
   { href: "/admin/manual", label: "Manual", icon: BookOpen },
+  { href: "/cuenta/datos", label: "Mis datos", icon: UserIcon, matchPaths: PERFIL_PATHS },
 ];
 
 function NavItem({

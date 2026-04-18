@@ -9,6 +9,7 @@ import {
 } from "react";
 import { MOCK_NOTIFICATIONS, type Notification } from "@/data/mockData";
 import { loadUserNotifications } from "@/services/notificationService";
+import { DataHub } from "@/lib/dataHub";
 
 /** Read-IDs are stored globally (covers both mock and dynamic notifications). */
 const STORAGE_KEY = "tcgacademy_notifications";
@@ -69,15 +70,21 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setNotifications(buildList(uid, rids));
   }, []);
 
-  // Refresh when another tab/component pushes a new notification
+  // Refresh when another tab/component pushes a new notification.
+  // Subscribe to the canonical DataHub event `tcga:notifications:updated` and
+  // keep the legacy `tcga:notification:new` listener as a fallback.
   useEffect(() => {
     const handler = () => {
       const rids = loadReadIds();
       setReadIds(rids);
       rebuild(currentUserId, rids);
     };
+    const unsub = DataHub.on("notifications", handler);
     window.addEventListener("tcga:notification:new", handler);
-    return () => window.removeEventListener("tcga:notification:new", handler);
+    return () => {
+      unsub();
+      window.removeEventListener("tcga:notification:new", handler);
+    };
   }, [currentUserId, rebuild]);
 
   const setUserId = useCallback(

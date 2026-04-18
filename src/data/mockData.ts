@@ -14,6 +14,8 @@ export interface OrderItem {
   game: string;
 }
 
+export type PaymentStatus = "paid" | "refunded" | "failed";
+
 export interface Order {
   id: string;
   userId: string;
@@ -26,6 +28,7 @@ export interface Order {
   trackingNumber?: string;
   address: string;
   paymentMethod: string;
+  paymentStatus?: PaymentStatus;
 }
 
 export const MOCK_ORDERS: Order[] = [
@@ -945,8 +948,7 @@ export const MOCK_SALES_7D = [
 
 export type AdminOrderStatus =
   | "pendiente_envio" // pending shipment (initial state after payment)
-  | "enviado" // shipped with tracking
-  | "finalizado" // delivered
+  | "enviado" // shipped with tracking — ESTADO FINAL (no hay "entregado")
   | "incidencia" // incident open
   | "cancelado" // order cancelled
   | "devolucion"; // return in progress
@@ -973,6 +975,17 @@ export interface OrderIncident {
   messages: IncidentMsg[];
 }
 
+/**
+ * Estado de cobro canónico del pedido. SSOT: vive en AdminOrder.paymentStatus.
+ * Prohibido mantener un mapa paralelo (clave `tcgacademy_payment_status` queda deprecada).
+ */
+export type AdminPaymentStatus =
+  | "pendiente"      // pago diferido aún no confirmado (tienda, transferencia, recogida)
+  | "cobrado"        // pago confirmado (tarjeta/bizum/paypal, o transferencia marcada)
+  | "reembolsado"    // devolución total
+  | "cancelado"      // pedido anulado sin cobro
+  | "fallido";       // intento de pago rechazado
+
 export interface AdminOrder {
   id: string;
   userId: string;
@@ -987,13 +1000,26 @@ export interface AdminOrder {
   total: number;
   couponCode?: string;
   couponDiscount?: number; // amount subtracted (positive number)
+  /** Descuento aplicado por canje de puntos (euros). Propagado desde el checkout. */
+  pointsDiscount?: number;
   trackingNumber?: string;
   address: string;
   paymentMethod: string;
+  /**
+   * Estado de cobro — SSOT.
+   * Opcional en el modelo para compatibilidad con pedidos antiguos, pero CONSULTAR SIEMPRE
+   * vía `getOrderPaymentStatus(orderId)` en orderAdapter, que deriva el valor canónico
+   * (campo explícito si está, si no se infiere de paymentMethod + adminStatus).
+   * Se escribe vía `setOrderPaymentStatus` (nunca directo; dispara tcga:orders:updated).
+   */
+  paymentStatus?: AdminPaymentStatus;
   pickupStore?: string; // nombre tienda si es recogida en tienda
   incident?: OrderIncident;
   adminNotes?: string;
   statusHistory: StatusEntry[];
+  /** NIF/NIE/CIF del comprador — obligatorio para emitir factura (Art. 6.1.d RD 1619/2012). */
+  nif?: string;
+  nifType?: "DNI" | "NIE" | "CIF";
 }
 
 const _DT = (d: string, t = "10:00") => `${d}T${t}:00`;
@@ -1007,7 +1033,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     userName: "Francisco Vidal (Magic Corner Valencia)",
     userEmail: "magic.corner@email.com",
     date: "2026-03-01",
-    adminStatus: "finalizado",
+    adminStatus: "enviado",
     trackingNumber: "7824561220",
     items: [
       {
@@ -1043,7 +1069,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
         note: "GLS 7824561220",
       },
       {
-        status: "finalizado",
+        status: "enviado",
         date: _DT("2026-03-03", "14:20"),
         by: "admin",
         note: "GLS confirmó entrega",
@@ -1058,7 +1084,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     userName: "Sofía Ibáñez (Iberian Cards S.L.)",
     userEmail: "iberian@email.com",
     date: "2026-03-05",
-    adminStatus: "finalizado",
+    adminStatus: "enviado",
     trackingNumber: "7824561221",
     items: [
       {
@@ -1099,7 +1125,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
         note: "GLS 7824561221",
       },
       {
-        status: "finalizado",
+        status: "enviado",
         date: _DT("2026-03-07", "16:00"),
         by: "admin",
         note: "Entregado según GLS",
@@ -1114,7 +1140,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     userName: "Javier Ruiz Martínez",
     userEmail: "javier.ruiz@email.com",
     date: "2026-03-08",
-    adminStatus: "finalizado",
+    adminStatus: "enviado",
     trackingNumber: "7824561222",
     items: [
       {
@@ -1157,7 +1183,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
         note: "GLS 7824561222",
       },
       {
-        status: "finalizado",
+        status: "enviado",
         date: _DT("2026-03-10", "12:30"),
         by: "admin",
         note: "Cliente confirmó recepción",
@@ -1752,7 +1778,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
         by: "admin",
         note: "GLS ES2026031200099",
       },
-      { status: "finalizado", date: _DT("2026-03-15", "11:00"), by: "sistema" },
+      { status: "enviado", date: _DT("2026-03-15", "11:00"), by: "sistema" },
       {
         status: "devolucion",
         date: _DT("2026-03-22", "09:30"),
@@ -1864,19 +1890,9 @@ export const MOCK_MESSAGES: AppMessage[] = [
 export const MSG_STORAGE_KEY = "tcgacademy_messages";
 export const ORDER_STORAGE_KEY = "tcgacademy_admin_orders";
 
-/** Returns the number of orders with adminStatus === "pendiente_envio". */
-export function countPendingOrders(): number {
-  if (typeof window === "undefined") return 0;
-  try {
-    const raw = localStorage.getItem(ORDER_STORAGE_KEY);
-    const orders = (raw ? JSON.parse(raw) : null) ?? ADMIN_ORDERS;
-    return (orders as { adminStatus: string }[]).filter(
-      (o) => o.adminStatus === "pendiente_envio",
-    ).length;
-  } catch {
-    return 0;
-  }
-}
+// countPendingOrders eliminado — migrado a `countPendingOrdersToShip` en
+// `@/lib/orderAdapter`, que usa `readAdminOrdersMerged` (SSOT canónico que
+// une admin_orders + checkout orders). Ver DataHub registry entidad "orders".
 
 // ─── Broadcast messaging ──────────────────────────────────────────────────────
 

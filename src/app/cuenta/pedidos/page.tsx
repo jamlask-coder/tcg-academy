@@ -21,6 +21,14 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
+import { PaymentInfo, type PaymentStatus } from "@/components/cuenta/PaymentInfo";
+import { useToast } from "@/context/ToastContext";
+import {
+  printInvoiceWithCSV,
+  buildInvoiceFromOrder,
+  generateInvoiceNumber,
+} from "@/utils/invoiceGenerator";
+import { formatDate } from "@/lib/format";
 
 type OrderStatus =
   | "pedido"
@@ -56,6 +64,7 @@ interface StoredOrder {
   };
   address?: string;
   paymentMethod?: string;
+  paymentStatus?: PaymentStatus;
   pago?: string;
   trackingNumber?: string;
   envio?: string;
@@ -114,6 +123,7 @@ const MOCK_ORDERS: Order[] = [
     trackingNumber: "ES2025012800001",
     address: "Calle Mayor 15, 2ºB, 28001 Madrid",
     paymentMethod: "Tarjeta Visa ****4242",
+    paymentStatus: "paid",
     envio: "estandar",
     items: [
       {
@@ -139,6 +149,7 @@ const MOCK_ORDERS: Order[] = [
     trackingNumber: "ES2025011500002",
     address: "Calle Mayor 15, 2ºB, 28001 Madrid",
     paymentMethod: "PayPal",
+    paymentStatus: "paid",
     envio: "estandar",
     items: [
       {
@@ -159,6 +170,7 @@ const MOCK_ORDERS: Order[] = [
     trackingNumber: "ES2024123000003",
     address: "Calle Mayor 15, 2ºB, 28001 Madrid",
     paymentMethod: "Bizum",
+    paymentStatus: "refunded",
     envio: "estandar",
     items: [
       {
@@ -177,6 +189,7 @@ const MOCK_ORDERS: Order[] = [
     total: 104.9,
     address: "Calle Mayor 15, 2ºB, 28001 Madrid",
     paymentMethod: "Tarjeta Visa ****4242",
+    paymentStatus: "failed",
     envio: "estandar",
     items: [
       {
@@ -206,18 +219,6 @@ const GAME_EMOJI: Record<string, string> = {
   topps: "⚽",
   "dragon-ball": "🐉",
 };
-
-function formatDate(isoString: string): string {
-  try {
-    return new Date(isoString).toLocaleDateString("es-ES", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  } catch {
-    return isoString;
-  }
-}
 
 function normalizeStatus(s: string): OrderStatus {
   const map: Record<string, OrderStatus> = {
@@ -347,7 +348,7 @@ export default function PedidosPage() {
   });
   const [expanded, setExpanded] = useState<string | null>(null);
   const [incidentModal, setIncidentModal] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const handleIncidentSubmit = (
     orderId: string,
@@ -360,40 +361,32 @@ export default function PedidosPage() {
       ),
     );
     setIncidentModal(null);
-    setSuccessMsg(
+    showToast(
       `Incidencia registrada para el pedido ${orderId}. Nos pondremos en contacto contigo en menos de 24h.`,
+      "success",
     );
-    setTimeout(() => setSuccessMsg(null), 6000);
     void type;
   };
 
-  const downloadFakturame = (order: Order) => {
-    const lines = order.items
-      .map((item) => {
-        const qty = item.qty ?? item.quantity ?? 1;
-        return `${qty}x ${item.name} — ${(item.price * qty).toFixed(2)}€`;
-      })
-      .join("\n");
-    const content = [
-      "FACTURA SIMPLIFICADA",
-      "====================",
-      `Pedido: ${order.id}`,
-      `Fecha: ${order.dateFormatted}`,
-      "",
-      "PRODUCTOS:",
-      lines,
-      "",
-      `TOTAL: ${order.total.toFixed(2)}€`,
-      "",
-      "TCG Academy — www.tcgacademy.es",
-    ].join("\n");
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `factura-${order.id}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const downloadFakturame = async (order: Order) => {
+    const invoiceNumber = generateInvoiceNumber(order.id);
+    const data = buildInvoiceFromOrder(
+      {
+        id: order.id,
+        date: order.date,
+        items: order.items.map((i) => ({
+          name: i.name,
+          quantity: i.qty ?? i.quantity ?? 1,
+          price: i.price,
+        })),
+        total: order.total,
+        shippingAddress: order.shippingAddress,
+        pago: order.pago,
+        paymentMethod: order.paymentMethod,
+      },
+      invoiceNumber,
+    );
+    await printInvoiceWithCSV(data);
   };
 
   return (
@@ -405,12 +398,6 @@ export default function PedidosPage() {
           onClose={() => setIncidentModal(null)}
           onSubmit={handleIncidentSubmit}
         />
-      )}
-
-      {successMsg && (
-        <div className="fixed right-6 bottom-6 z-50 max-w-sm rounded-2xl bg-[#2563eb] px-5 py-3 text-sm font-medium text-white shadow-xl">
-          {successMsg}
-        </div>
       )}
 
       {showDemoBanner && (
@@ -672,13 +659,14 @@ export default function PedidosPage() {
                           size={13}
                           className="mt-0.5 flex-shrink-0 text-gray-400"
                         />
-                        <div>
-                          <p className="mb-0.5 font-semibold text-gray-700">
+                        <div className="min-w-0 flex-1">
+                          <p className="mb-1 font-semibold text-gray-700">
                             Pago
                           </p>
-                          <p className="text-gray-500">
-                            {order.paymentMethod ?? order.pago ?? "—"}
-                          </p>
+                          <PaymentInfo
+                            method={order.paymentMethod ?? order.pago}
+                            status={order.paymentStatus ?? "paid"}
+                          />
                         </div>
                       </div>
                       {order.trackingNumber && (

@@ -27,7 +27,10 @@
 export const POINTS_PER_EURO = 100;          // 100 pts por €1 gastado en productos puros
 export const POINTS_PER_EURO_REDEMPTION = 10000; // 10.000 pts = €1 de descuento
 
-export const POINTS_MAX_DISCOUNT_PCT    = 0.5; // los puntos no pueden descontar más del 50% del subtotal de productos
+// Regla de negocio (aprobada 2026-04-17): los puntos son 1% de cashback
+// y el cliente puede canjearlos SIEMPRE, sin mínimo de pedido y hasta
+// el 100% del subtotal de productos (el envío no entra, se paga aparte).
+export const POINTS_MAX_DISCOUNT_PCT    = 1.0; // sin restricción: descuento hasta el total de productos
 export const MAX_ASSOCIATIONS           = 4;   // máximo de asociados en el grupo
 export const REFERRAL_WELCOME_BONUS     = 10000; // pts al registrarse con código (= €1 de bienvenida)
 // Asociados: 0,50€ por cada 100€ del comprador (adaptado a escala 10.000 pts=€1)
@@ -62,6 +65,18 @@ function saveMap(key: string, data: Record<string, unknown>): boolean {
   try {
     const json = JSON.stringify(data);
     localStorage.setItem(key, json);
+    // Canonical event: any view watching "points" (account card, admin KPIs)
+    // gets notified after points/history/attribution/association writes.
+    if (
+      key === POINTS_KEY ||
+      key === HISTORY_KEY ||
+      key === ATTR_KEY ||
+      key === ASSOC_KEY
+    ) {
+      try {
+        window.dispatchEvent(new Event("tcga:points:updated"));
+      } catch { /* non-fatal */ }
+    }
     return true;
   } catch (err) {
     // Dispatch error event so UI can react

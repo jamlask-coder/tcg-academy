@@ -25,6 +25,7 @@ import { loadInvoices, saveInvoice, createInvoice } from "@/services/invoiceServ
 import { tripleCheckInvoice } from "@/lib/fiscalAudit";
 import { getDeadLetterQueue, resolveDeadLetter } from "@/lib/circuitBreaker";
 import { safeRead, safeWrite } from "@/lib/safeStorage";
+import { getPaymentStatusMap, getOrderPaymentStatus } from "@/lib/orderAdapter";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -162,11 +163,12 @@ export function detectAllIssues(): FiscalIssue[] {
   );
   const invoiceOrderIds = new Set(invoices.map((i) => i.sourceOrderId).filter(Boolean));
 
+  // SSOT: estado de cobro leído desde AdminOrder vía orderAdapter (antes: clave paralela).
+  const paymentStatus = getPaymentStatusMap();
   for (const order of orders) {
     if (order.invoiceId) continue; // Tiene factura vinculada
     if (invoiceOrderIds.has(order.id)) continue; // Factura existe por sourceOrderId
     // Excluir pedidos con pago pendiente (tienda/transferencia sin cobrar)
-    const paymentStatus = safeRead<Record<string, string>>("tcgacademy_payment_status", {});
     if ((order.pago === "tienda" || order.pago === "transferencia") && paymentStatus[order.id] !== "cobrado") {
       continue; // Pago pendiente — factura se emite al cobrar
     }
@@ -414,16 +416,56 @@ export async function regenerateInvoiceForOrder(
       pago?: string;
       couponDiscount?: number;
       pointsDiscount?: number;
+      nif?: string;
+      nifType?: "DNI" | "NIE" | "CIF";
     } | undefined;
 
     if (!order) return { ok: false, error: `Pedido ${orderId} no encontrado` };
 
+    // Regla fiscal: sólo se emite factura tras cobro confirmado.
+    // Los métodos diferidos (tienda, transferencia) requieren paymentStatus=cobrado.
+    const pago = (order.pago ?? "").toLowerCase();
+    const isDeferred = pago === "tienda" || pago === "transferencia" || pago === "recogida";
+    if (isDeferred) {
+      // SSOT: estado leído vía orderAdapter (antes: clave paralela `tcgacademy_payment_status`).
+      if (getOrderPaymentStatus(orderId) !== "cobrado") {
+        return {
+          ok: false,
+          error: `Pedido ${orderId} pendiente de cobro (pago=${pago}). No se emite factura hasta marcarlo como cobrado.`,
+        };
+      }
+    }
+
     const { buildLineItem } = await import("@/services/invoiceService");
-    const { PaymentMethod } = await import("@/types/fiscal");
+    const { PaymentMethod, TaxIdType } = await import("@/types/fiscal");
+    const { validateSpanishNIF } = await import("@/lib/validations/nif");
+
+    // Guard fiscal: sin NIF válido no se puede emitir factura (Art. 6.1.d RD 1619/2012).
+    if (!order.nif) {
+      return {
+        ok: false,
+        error: `Pedido ${orderId}: NIF/NIE/CIF ausente. Factura NO emitida (Art. 6.1.d RD 1619/2012).`,
+      };
+    }
+    const nifCheck = validateSpanishNIF(order.nif);
+    if (!nifCheck.valid) {
+      return {
+        ok: false,
+        error: `Pedido ${orderId}: NIF/NIE/CIF inválido (${order.nif}). ${nifCheck.error ?? "Factura NO emitida."}`,
+      };
+    }
+    const taxIdType =
+      nifCheck.type === "NIE"
+        ? TaxIdType.NIE
+        : nifCheck.type === "CIF"
+          ? TaxIdType.CIF
+          : TaxIdType.NIF;
 
     const addr = order.shippingAddress ?? {};
     const recipient = {
       name: `${addr.nombre ?? ""} ${addr.apellidos ?? ""}`.trim() || "Cliente",
+      taxId: nifCheck.normalized,
+      taxIdType,
       email: addr.email,
       phone: addr.telefono,
       countryCode: addr.pais || "ES",

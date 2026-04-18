@@ -18,10 +18,17 @@
  * - Wolters Kluwer (https://www.wolterskluwer.es) — integrado con A3 y otros ERP
  */
 
-export type VerifactuMode = "mock" | "sandbox" | "production";
+export type VerifactuMode = "off" | "mock" | "sandbox" | "production";
 
 export interface VerifactuConfig {
-  /** Modo de operación. "mock" para desarrollo, "sandbox" para pruebas, "production" para real */
+  /**
+   * Modo de operación.
+   * - "off": sistema apagado, no se envía nada a ningún proveedor ni se simula envío.
+   *   La factura queda en estado EMITIDA y su verifactuStatus en PENDIENTE.
+   * - "mock": simula respuestas de un proveedor VeriFactu (desarrollo).
+   * - "sandbox": proveedor real en modo pruebas.
+   * - "production": proveedor real enviando a la AEAT.
+   */
   mode: VerifactuMode;
   /** URL base de la API del proveedor (dejar vacío en modo mock) */
   apiUrl: string;
@@ -46,7 +53,9 @@ export interface VerifactuConfig {
  * El resto del sistema se adapta automáticamente sin más cambios.
  */
 export const VERIFACTU_CONFIG: VerifactuConfig = {
-  mode: "mock",
+  // Apagado: VeriFactu no es obligatorio todavía para esta empresa.
+  // Cuando toque, cambiar a "sandbox" o "production" tras contratar proveedor.
+  mode: "off",
   apiUrl: "", // Pendiente: URL del proveedor contratado (ej: https://api.seres.es/verifactu/v1)
   apiKey: "", // Pendiente: API key del proveedor (guardar en .env.local como VERIFACTU_API_KEY)
   companyId: "", // Pendiente: ID de la empresa en el proveedor
@@ -68,9 +77,17 @@ export const INVOICE_STORAGE_KEY = "tcgacademy_invoices";
 export const INVOICE_INTEGRITY_KEY = "tcgacademy_invoices_hash";
 
 /**
- * Formato del número de factura.
- * FAC-YYYY-NNNNN donde YYYY es el año y NNNNN es el número correlativo.
- * VeriFactu requiere numeración correlativa sin saltos dentro de cada serie.
+ * Formato del número de factura: FAC-YYYY-NNNNNXXXXXE
+ *   FAC    = serie
+ *   YYYY   = año
+ *   NNNNN  = correlativo 5 dígitos (requisito art. 6 RD 1619/2012)
+ *   XXXXX  = dígitos de control deterministas (aritmética modular sobre primos)
+ *   E      = origen "Electrónica / web"
+ *
+ * Implementación y verificación: `src/services/invoiceService.ts`
+ *   - generateInvoiceNumber()
+ *   - computeControlDigits(n, year)
+ *   - verifyInvoiceNumber(str)
  */
 export const INVOICE_NUMBER_FORMAT = "FAC";
 
