@@ -73,8 +73,8 @@ export default function HomePage() {
                     key={game.slug}
                     href={`/${game.slug}`}
                     aria-label={game.label}
-                    className="group relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/30 px-2 py-2 backdrop-blur-md transition-all duration-200 active:scale-[0.97]"
-                    style={{ WebkitTapHighlightColor: "transparent" }}
+                    className="group relative flex items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/30 px-2 py-1 backdrop-blur-md transition-all duration-200 active:scale-[0.97]"
+                    style={{ WebkitTapHighlightColor: "transparent", minHeight: 46 }}
                   >
                     {/* Capa del color del fondo (#0a0f1a) por encima del blanco
                         para apagarlo y que case con el resto de la página.

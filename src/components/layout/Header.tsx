@@ -276,7 +276,6 @@ function MobileTrustBar() {
 const HEADER_TAGLINES = [
   "4 tiendas en España",
   "Madrid · Barcelona · Calpe · Béjar",
-  "Envío en 24h garantizado",
 ];
 
 function HeaderTagline() {
@@ -294,8 +293,8 @@ function HeaderTagline() {
         aria-hidden="true"
         className="relative flex h-1.5 w-1.5 shrink-0"
       >
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
-        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300 opacity-70" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-300 shadow-[0_0_6px_rgba(252,211,77,0.85)]" />
       </span>
       <span
         key={idx}
