@@ -67,7 +67,36 @@ export default function HomePage() {
                   href={game.href}
                   aria-label={game.label}
                   className="group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-xl border border-white/20 bg-white/10 px-1 py-1.5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-white/40 hover:bg-white/20 hover:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] sm:rounded-2xl sm:border-white/15 sm:bg-white/95 sm:px-2 sm:py-3 sm:backdrop-blur-md sm:hover:border-white/30 sm:hover:bg-white"
+                  style={{
+                    backgroundImage: `radial-gradient(circle at 30% 20%, ${game.color}33 0%, transparent 55%), radial-gradient(circle at 75% 85%, ${game.color}22 0%, transparent 60%)`,
+                  }}
                 >
+                  {/* Patrón temático del juego — solo móvil, muy sutil.
+                      Iconos dispersos que representan el universo del juego
+                      (Topps→deporte, Pokémon→rayos, One Piece→pirata). */}
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 overflow-hidden sm:hidden"
+                  >
+                    <span
+                      className="absolute -top-1 -left-1 text-2xl opacity-[0.14]"
+                      style={{ transform: "rotate(-15deg)" }}
+                    >
+                      {game.themeIcons[0]}
+                    </span>
+                    <span
+                      className="absolute top-1/2 -right-2 -translate-y-1/2 text-[28px] opacity-[0.12]"
+                      style={{ transform: "translateY(-50%) rotate(15deg)" }}
+                    >
+                      {game.themeIcons[1] ?? game.themeIcons[0]}
+                    </span>
+                    <span
+                      className="absolute -bottom-1 left-1/3 text-xl opacity-[0.14]"
+                      style={{ transform: "rotate(8deg)" }}
+                    >
+                      {game.themeIcons[2] ?? game.themeIcons[0]}
+                    </span>
+                  </div>
                   {/* Barra de acento superior en el color del juego */}
                   <div
                     aria-hidden="true"
