@@ -12,6 +12,11 @@ import {
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { HeroCarousel } from "@/components/home/HeroCarousel";
 import { MEGA_MENU_DATA } from "@/data/megaMenuData";
+import {
+  MOBILE_GAMES,
+  MOBILE_GAMES_SPRITE_SRC,
+  MOBILE_GAMES_SPRITE_H,
+} from "@/data/mobileGames";
 
 // ─── Tiendas físicas ─────────────────────────────────────────────────────────
 const STORES: { city: string; province: string; href: string }[] = [
@@ -41,69 +46,107 @@ export default function HomePage() {
           className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent via-[#0a0f1a]/60 to-[#0a0f1a]"
         />
 
-        {/* Grid de juegos TCG: pegado al pie del carrusel */}
-        <div className="relative z-10 -mt-4 pb-6 sm:-mt-20 sm:pb-20 md:-mt-28 md:pb-24">
+        {/* Grid de juegos TCG — MÓVIL (12 juegos, 3 cols, mismos logos que drawer) */}
+        <div className="relative z-10 pt-4 pb-6 sm:hidden">
+          <div className="relative mx-auto w-full max-w-[1400px] px-3">
+            {/* "Elige tu juego" — mismo ámbar que "Academy" del header, con estilo display */}
+            <div className="mb-4 text-center">
+              <h2
+                className="font-serif text-2xl font-black text-amber-300 italic"
+                style={{
+                  letterSpacing: "-0.01em",
+                  textShadow:
+                    "0 2px 20px rgba(251,191,36,0.35), 0 1px 2px rgba(0,0,0,0.5)",
+                }}
+              >
+                Elige tu juego
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {MOBILE_GAMES.map((game) => {
+                const spriteScale = game.sprite
+                  ? 44 / MOBILE_GAMES_SPRITE_H
+                  : 1;
+                const spriteW = game.sprite
+                  ? game.sprite.origW * spriteScale
+                  : 0;
+                const spriteX = game.sprite
+                  ? game.sprite.origX * spriteScale
+                  : 0;
+                return (
+                  <Link
+                    key={game.slug}
+                    href={`/${game.slug}`}
+                    aria-label={game.label}
+                    className="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-white px-2 py-2 shadow-sm transition-all duration-200 active:scale-[0.97]"
+                    style={{ WebkitTapHighlightColor: "transparent" }}
+                  >
+                    {game.sprite ? (
+                      <div
+                        role="img"
+                        aria-label={game.label}
+                        style={{
+                          width: spriteW,
+                          height: 44,
+                          maxWidth: "90%",
+                          backgroundImage: `url(${MOBILE_GAMES_SPRITE_SRC})`,
+                          backgroundSize: `auto 44px`,
+                          backgroundPosition: `-${spriteX}px 0`,
+                          backgroundRepeat: "no-repeat",
+                          filter: game.sprite.filter ?? undefined,
+                        }}
+                      />
+                    ) : (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={game.logo}
+                        alt={game.label}
+                        loading="lazy"
+                        className="w-auto object-contain"
+                        style={{
+                          maxHeight: game.maxH ?? 44,
+                          maxWidth: "90%",
+                          filter: game.filter ?? undefined,
+                          mixBlendMode: game.blend ? "multiply" : undefined,
+                        }}
+                      />
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Grid de juegos TCG — DESKTOP (sin cambios, solapado sobre el carrusel) */}
+        <div className="relative z-10 hidden sm:-mt-20 sm:block sm:pb-20 md:-mt-28 md:pb-24">
           <div className="relative mx-auto w-full max-w-[1400px] px-4 sm:px-6">
-            {/* Encabezado del portal — en móvil: solo "Elige tu juego" compacto */}
-            <div className="mb-3 text-center sm:mb-8">
-              {/* Badge "Tu universo TCG" — oculto en móvil */}
-              <span className="mb-2 hidden rounded-full bg-yellow-400/15 px-3 py-1 text-[10px] font-bold tracking-[0.2em] text-yellow-300 uppercase backdrop-blur sm:inline-block">
+            <div className="mb-8 text-center">
+              <span className="mb-2 inline-block rounded-full bg-yellow-400/15 px-3 py-1 text-[10px] font-bold tracking-[0.2em] text-yellow-300 uppercase backdrop-blur">
                 Tu universo TCG
               </span>
               <h2
-                className="text-sm font-bold text-white/90 sm:text-3xl sm:font-black sm:text-white md:text-4xl"
+                className="text-3xl font-black text-white md:text-4xl"
                 style={{ textShadow: "0 2px 20px rgba(0,0,0,0.6)" }}
               >
                 Elige tu juego
               </h2>
             </div>
 
-            {/* Grid de logos — cards glass. Móvil: 3 cols compactas sin
-                nombres y con fondo cristal. Tablet+: layout original. */}
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-4 lg:grid-cols-4 xl:grid-cols-8">
+            <div className="grid grid-cols-4 gap-4 xl:grid-cols-8">
               {MEGA_MENU_DATA.map((game) => (
                 <Link
                   key={game.slug}
                   href={game.href}
                   aria-label={game.label}
-                  className="group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-xl border border-white/20 bg-white/10 px-1 py-1.5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-white/40 hover:bg-white/20 hover:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] sm:rounded-2xl sm:border-white/15 sm:bg-white/95 sm:px-2 sm:py-3 sm:backdrop-blur-md sm:hover:border-white/30 sm:hover:bg-white"
-                  style={{
-                    backgroundImage: `radial-gradient(circle at 30% 20%, ${game.color}33 0%, transparent 55%), radial-gradient(circle at 75% 85%, ${game.color}22 0%, transparent 60%)`,
-                  }}
+                  className="group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/95 px-2 py-3 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-white/30 hover:bg-white hover:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)]"
                 >
-                  {/* Patrón temático del juego — solo móvil, muy sutil.
-                      Iconos dispersos que representan el universo del juego
-                      (Topps→deporte, Pokémon→rayos, One Piece→pirata). */}
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 overflow-hidden sm:hidden"
-                  >
-                    <span
-                      className="absolute -top-1 -left-1 text-2xl opacity-[0.14]"
-                      style={{ transform: "rotate(-15deg)" }}
-                    >
-                      {game.themeIcons[0]}
-                    </span>
-                    <span
-                      className="absolute top-1/2 -right-2 -translate-y-1/2 text-[28px] opacity-[0.12]"
-                      style={{ transform: "translateY(-50%) rotate(15deg)" }}
-                    >
-                      {game.themeIcons[1] ?? game.themeIcons[0]}
-                    </span>
-                    <span
-                      className="absolute -bottom-1 left-1/3 text-xl opacity-[0.14]"
-                      style={{ transform: "rotate(8deg)" }}
-                    >
-                      {game.themeIcons[2] ?? game.themeIcons[0]}
-                    </span>
-                  </div>
-                  {/* Barra de acento superior en el color del juego */}
                   <div
                     aria-hidden="true"
                     className="absolute inset-x-0 top-0 h-[3px]"
                     style={{ backgroundColor: game.color }}
                   />
-                  {/* Glow de color al hover */}
                   <div
                     aria-hidden="true"
                     className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
@@ -111,19 +154,17 @@ export default function HomePage() {
                       background: `radial-gradient(circle at 50% 100%, ${game.color}22 0%, transparent 70%)`,
                     }}
                   />
-
-                  <div className="relative flex h-full w-full items-center justify-center sm:h-16 sm:w-full md:h-20">
+                  <div className="relative flex h-16 w-full items-center justify-center md:h-20">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={game.logoSrc}
                       alt={game.label}
                       loading="lazy"
-                      className="max-h-full max-w-[85%] object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)] transition-transform duration-300 group-hover:scale-105 sm:drop-shadow-none"
+                      className="max-h-full max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
                     />
                   </div>
-                  {/* Nombre — oculto en móvil, visible desde sm */}
                   <p
-                    className="relative mt-2 hidden text-center text-[11px] font-bold text-gray-700 sm:block sm:text-xs"
+                    className="relative mt-2 text-center text-xs font-bold"
                     style={{ color: "#334155" }}
                   >
                     {game.label}
@@ -132,8 +173,7 @@ export default function HomePage() {
               ))}
             </div>
 
-            {/* CTA explorar todo — oculto en móvil */}
-            <div className="mt-8 hidden justify-center sm:flex">
+            <div className="mt-8 flex justify-center">
               <Link
                 href="/catalogo"
                 className="inline-flex items-center gap-2 rounded-2xl bg-yellow-400 px-6 py-3 text-sm font-black text-[#0f172a] shadow-[0_8px_30px_rgba(251,191,36,0.35)] transition-all hover:-translate-y-0.5 hover:bg-yellow-300"

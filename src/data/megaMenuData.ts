@@ -12,13 +12,6 @@ export interface MegaMenuGame {
   abbrev: string;
   /** Path to the real logo once available, e.g. "/images/logos/magic.png" */
   logoSrc: string;
-  /**
-   * Iconos temáticos del juego (emojis) — se usan como patrón translúcido
-   * detrás del logo en la versión móvil de la home. Representan el universo
-   * visual del juego: Pokémon→rayo, Topps→deporte, etc. Elegidos para combinar
-   * con el color principal y no tapar el logo.
-   */
-  themeIcons: string[];
   columns: MegaMenuColumn[];
 }
 
@@ -36,7 +29,6 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     color: "#f59e0b",
     abbrev: "PKM",
     logoSrc: "/images/logos/pokemon.svg",
-    themeIcons: ["⚡", "🔴", "⚡"],
     columns: [
       {
         title: "Producto Sellado",
@@ -66,7 +58,6 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     color: "#dc2626",
     abbrev: "MTG",
     logoSrc: "/images/logos/magic-clean.png",
-    themeIcons: ["🔮", "⚔️", "🐲"],
     columns: [
       {
         title: "Producto Sellado",
@@ -105,7 +96,6 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     color: "#1d4ed8",
     abbrev: "OP",
     logoSrc: "/images/logos/onepiece.png",
-    themeIcons: ["🏴‍☠️", "⚓", "🌊"],
     columns: [
       {
         title: "Producto Sellado",
@@ -126,7 +116,6 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     color: "#ea580c",
     abbrev: "RB",
     logoSrc: "/images/logos/riftbound-clean.png?v=3",
-    themeIcons: ["⚔️", "🛡️", "🏰"],
     columns: [
       {
         title: "Producto Sellado",
@@ -146,7 +135,6 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     color: "#b45309",
     abbrev: "YGO",
     logoSrc: "/images/logos/yugioh.png",
-    themeIcons: ["🔺", "🎴", "👁️"],
     columns: [
       {
         title: "Producto Sellado",
@@ -166,7 +154,6 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     color: "#0ea5e9",
     abbrev: "TPP",
     logoSrc: "/images/logos/topps.svg",
-    themeIcons: ["⚽", "⚾", "🏆"],
     columns: [
       {
         title: "Colecciones",
@@ -184,7 +171,6 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     color: "#d97706",
     abbrev: "DBS",
     logoSrc: "/images/logos/dragonball-clean.png?v=2",
-    themeIcons: ["🐉", "🟠", "✨"],
     columns: [
       {
         title: "Producto Sellado",
@@ -212,7 +198,6 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     color: "#ea580c",
     abbrev: "NAR",
     logoSrc: "/images/logos/naruto.svg",
-    themeIcons: ["🍥", "🥷", "🌀"],
     columns: [
       {
         title: "Producto Sellado",

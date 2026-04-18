@@ -3,6 +3,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { X, User, LogOut, ChevronDown } from "lucide-react";
 import { CATEGORY_LABELS, getAllCategories } from "@/data/products";
+import {
+  MOBILE_GAMES as DRAWER_GAMES,
+  MOBILE_GAMES_SPRITE_SRC as SPRITE_SRC,
+  MOBILE_GAMES_SPRITE_H as SPRITE_H,
+} from "@/data/mobileGames";
 
 interface UserData {
   name: string;
@@ -17,33 +22,6 @@ interface Props {
   logout: () => void;
   pathname: string;
 }
-
-// Each game with best logo + background that makes it look great
-const BG = "#e8edf5";
-
-// Sprite sheet for logos that don't have good individual files
-const SPRITE_SRC = "/images/ssGamesBig.png";
-const SPRITE_H = 140; // original sprite height
-
-// Use the SAME logos as the desktop navbar / OtrosMenu
-const DRAWER_GAMES: {
-  slug: string; label: string; bg: string;
-  logo?: string; filter?: string; blend?: boolean; maxH?: number;
-  sprite?: { origW: number; origX: number; filter?: string };
-}[] = [
-  { slug: "pokemon", label: "Pokémon", bg: BG, sprite: { origW: 273, origX: 1228 } },
-  { slug: "magic", label: "Magic", bg: BG, logo: "/images/logos/magic-clean.png" },
-  { slug: "one-piece", label: "One Piece", bg: BG, logo: "/images/logos/onepiece.png", blend: true },
-  { slug: "riftbound", label: "Riftbound", bg: BG, logo: "/images/logos/riftbound-clean.png?v=3", blend: true },
-  { slug: "yugioh", label: "Yu-Gi-Oh!", bg: BG, sprite: { origW: 392, origX: 696 } },
-  { slug: "topps", label: "Topps", bg: BG, logo: "/images/logos/topps.svg" },
-  { slug: "dragon-ball", label: "Dragon Ball", bg: BG, logo: "/images/logos/dragonball-clean.png?v=2" },
-  { slug: "naruto", label: "Naruto", bg: BG, logo: "/images/logos/naruto-official.png" },
-  { slug: "lorcana", label: "Lorcana", bg: BG, logo: "/images/logos/lorcana.png" },
-  { slug: "digimon", label: "Digimon", bg: BG, logo: "/images/logos/digimon-official.png" },
-  { slug: "cyberpunk", label: "Cyberpunk", bg: BG, logo: "/images/logos/cyberpunk.png" },
-  { slug: "panini", label: "Panini", bg: BG, logo: "/images/logos/panini.png" },
-];
 
 export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
   const [expandedGame, setExpandedGame] = useState<string | null>(null);
