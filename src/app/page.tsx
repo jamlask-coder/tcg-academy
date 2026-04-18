@@ -39,6 +39,27 @@ export default function HomePage() {
         {/* Carrusel promocional */}
         <HeroCarousel />
 
+        {/* Degradado top-left — sólo móvil. Funde la esquina superior izquierda
+            de las imágenes con el fondo de la página (#0a0f1a). Encima va el
+            escudo de TCG Academy (mismo del footer). */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute top-0 left-0 z-10 h-[60%] w-[55%] sm:hidden"
+          style={{
+            background:
+              "radial-gradient(ellipse at top left, #0a0f1a 0%, #0a0f1a 25%, rgba(10,15,26,0.85) 45%, rgba(10,15,26,0.45) 65%, transparent 85%)",
+          }}
+        />
+        {/* Escudo — encima del degradado, sólo móvil */}
+        <div className="pointer-events-none absolute top-2 left-2 z-10 sm:hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/logo-tcg-shield.png"
+            alt="TCG Academy"
+            className="h-14 w-auto drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+          />
+        </div>
+
         {/* Degradado inferior del carrusel — funde la imagen con el fondo de
             las tarjetas de juegos, dando profundidad y lectura sin tapar */}
         <div

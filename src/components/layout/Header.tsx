@@ -281,11 +281,9 @@ const HEADER_TAGLINES = [
 function HeaderTagline() {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
-    // Intervalo corto (2.2s) para que no haya sensación de hueco vacío entre
-    // rotaciones: apenas acaba la animación de entrada y empieza la siguiente.
     const id = setInterval(
       () => setIdx((i) => (i + 1) % HEADER_TAGLINES.length),
-      2200,
+      2800,
     );
     return () => clearInterval(id);
   }, []);
@@ -298,14 +296,23 @@ function HeaderTagline() {
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300 opacity-70" />
         <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-amber-300 shadow-[0_0_6px_rgba(252,211,77,0.85)]" />
       </span>
-      <span
-        key={idx}
-        className="inline-block text-white/85"
-        style={{
-          animation: "taglineSlideIn 0.5s cubic-bezier(0.2,0.9,0.3,1)",
-        }}
-      >
-        {HEADER_TAGLINES[idx]}
+      {/* Crossfade: todos los mensajes siempre en el DOM, apilados. El activo
+          tiene opacity:1, los demás 0. No hay momento sin texto visible. */}
+      <span className="relative flex-1">
+        {HEADER_TAGLINES.map((msg, i) => (
+          <span
+            key={i}
+            className="absolute inset-0 inline-block text-white/85 transition-opacity duration-500"
+            style={{ opacity: i === idx ? 1 : 0 }}
+          >
+            {msg}
+          </span>
+        ))}
+        {/* Spacer invisible para que el contenedor tome la altura/ancho
+            del mensaje más largo y el layout no salte. */}
+        <span className="invisible inline-block" aria-hidden="true">
+          {HEADER_TAGLINES.reduce((a, b) => (a.length > b.length ? a : b))}
+        </span>
       </span>
     </span>
   );
