@@ -367,6 +367,7 @@ export default function EditorFacturaPage() {
 
   // Load stored template on mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga de plantilla persistida
     setTpl(loadInvoiceTemplate());
   }, []);
 

@@ -32,6 +32,7 @@ import {
   generateAnnualReport,
 } from "@/services/taxService";
 import { loadInvoices, verifyIntegrity } from "@/services/invoiceService";
+import { isValidNIF } from "@/lib/validations/nif";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECCIÓN 1: REDONDEO Y ARITMÉTICA DE PRECISIÓN
@@ -797,10 +798,6 @@ export function checkMissingNIFs(invoices: InvoiceRecord[]): {
   invoiceNumbers: string[];
   total: number;
 } {
-  // Import diferido para no romper builds server sin el módulo
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { isValidNIF } =
-    require("@/lib/validations/nif") as typeof import("@/lib/validations/nif");
   const offenders: string[] = [];
   for (const inv of invoices) {
     if (inv.invoiceType !== InvoiceType.COMPLETA) continue;

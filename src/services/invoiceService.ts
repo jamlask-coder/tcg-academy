@@ -42,6 +42,7 @@ import {
 } from "@/services/taxService";
 import { buildVerifactuQRUrl } from "@/services/verifactuService";
 import { DataHub } from "@/lib/dataHub";
+import { validateSpanishNIF } from "@/lib/validations/nif";
 
 // ─── Datos del emisor (TCG Academy) ──────────────────────────────────────────
 
@@ -600,10 +601,6 @@ export function validateInvoice(invoice: InvoiceRecord): ValidationResult {
       // Validación estructural para clientes españoles
       const country = recipient.countryCode ?? "ES";
       if (country === "ES") {
-        // Import perezoso para evitar ciclos
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { validateSpanishNIF } =
-          require("@/lib/validations/nif") as typeof import("@/lib/validations/nif");
         const v = validateSpanishNIF(recipient.taxId);
         if (!v.valid) {
           errors.push(

@@ -39,12 +39,8 @@ const nextConfig: NextConfig = {
           { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
         ],
       },
-      {
-        source: "/_next/static/(.*)",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-        ],
-      },
+      // NOTA: no sobrescribimos Cache-Control en /_next/static — Next.js ya establece
+      // "public, max-age=31536000, immutable" y hacerlo puede romper el dev server (Next 16).
       {
         source: "/images/(.*)",
         headers: [

@@ -67,6 +67,7 @@ export default function AdminUsuarioDetailPage() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- resolución síncrona de datos admin desde varias fuentes */
   useEffect(() => {
     try {
       // 1. Buscar en MOCK_USERS (usuarios hardcodeados)
@@ -121,6 +122,7 @@ export default function AdminUsuarioDetailPage() {
       setLoading(false);
     }
   }, [id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Pre-computed month labels (outside render so it's stable)
   const MONTH_MAP: Record<string, string> = useMemo(

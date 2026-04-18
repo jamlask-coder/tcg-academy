@@ -104,6 +104,7 @@ export function UserPersonalDataPanel({ userId }: UserPersonalDataPanelProps) {
   const [invoiceCount, setInvoiceCount] = useState(0);
 
   // Carga inicial / refresh cuando cambia userId o al entrar en edit mode
+  /* eslint-disable react-hooks/set-state-in-effect -- sync con localStorage (carga bajo demanda, pattern aceptado) */
   useEffect(() => {
     const user = loadFullUser(userId);
     if (user) {
@@ -113,19 +114,21 @@ export function UserPersonalDataPanel({ userId }: UserPersonalDataPanelProps) {
     setChangelog(loadUserChangelog(userId));
 
     // Cuenta de facturas asociadas — para avisar de inmutabilidad
+    let count = 0;
     try {
       const all = loadInvoices();
-      const count = all.filter((inv) => {
+      count = all.filter((inv) => {
         const r = inv.recipient as { email?: string; taxId?: string };
         if (user?.email && r.email && r.email.toLowerCase() === user.email.toLowerCase()) return true;
         if (user?.nif && r.taxId && r.taxId.toUpperCase() === user.nif.toUpperCase()) return true;
         return false;
       }).length;
-      setInvoiceCount(count);
     } catch {
-      setInvoiceCount(0);
+      count = 0;
     }
+    setInvoiceCount(count);
   }, [userId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const hasChanges = useMemo(() => {
     if (!baseUser || !draft) return false;

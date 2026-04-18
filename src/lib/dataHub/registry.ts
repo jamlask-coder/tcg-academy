@@ -357,6 +357,19 @@ const PARTIAL: EntityRegistryEntry[] = [
     maturity: "partial",
     category: "usuarios",
   },
+  {
+    key: "pendingCheckout",
+    description: "Checkout pendiente (carrito + dirección) para reanudar compra",
+    storageKeys: ["tcgacademy_pending_checkout"],
+    event: "tcga:pending_checkout:updated" as DataHubEventName,
+    pii: true,
+    retentionMonths: 1,
+    adapter: null,
+    maturity: "partial",
+    category: "pedidos",
+    dependsOn: ["cart", "users"],
+    notes: "Persistencia de checkout parcial. Se limpia al confirmar pedido. No crítico.",
+  },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════

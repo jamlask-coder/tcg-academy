@@ -429,14 +429,6 @@ export function countPendingAdminOrders(): number {
 
 export type PeriodKey = "7d" | "30d" | "3m" | "1a" | "todo";
 
-const PERIOD_DAYS: Record<PeriodKey, number> = {
-  "7d": 7,
-  "30d": 30,
-  "3m": 90,
-  "1a": 365,
-  "todo": 365 * 3, // cap "todo" a 3 años para UI sensata
-};
-
 const DOW_SHORT = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
 function formatDayLabel(d: Date, period: PeriodKey): string {

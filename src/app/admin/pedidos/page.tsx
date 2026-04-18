@@ -1100,7 +1100,6 @@ export default function AdminPedidosPage() {
       window.removeEventListener("storage", onFocus);
       window.removeEventListener("tcga:orders:updated", onFocus);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [search, setSearch] = useState("");

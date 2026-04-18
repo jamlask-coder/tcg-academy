@@ -12,7 +12,6 @@ import {
   Receipt,
   Search,
   ChevronDown,
-  CheckCircle,
   Truck,
   AlertTriangle,
   Ban,

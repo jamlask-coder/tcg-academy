@@ -12,10 +12,7 @@ import {
   Store,
   Package2,
 } from "lucide-react";
-import {
-  ADMIN_ORDERS,
-  type AdminOrder,
-} from "@/data/mockData";
+import { ADMIN_ORDERS } from "@/data/mockData";
 import { readAdminOrdersMerged } from "@/lib/orderAdapter";
 import { loadIncidents } from "@/services/incidentService";
 import { loadMessages as loadAllMessages } from "@/services/messageService";

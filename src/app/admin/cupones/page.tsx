@@ -50,6 +50,7 @@ export default function AdminCuponesPage() {
   const [coupons, setCoupons] = useState<AdminCoupon[]>([]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync con localStorage SSOT
     setCoupons(loadAdminCoupons());
     const reload = () => setCoupons(loadAdminCoupons());
     window.addEventListener("tcga:coupons:updated", reload);

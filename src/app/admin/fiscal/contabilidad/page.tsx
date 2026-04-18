@@ -22,6 +22,7 @@ export default function AdminContabilidadPage() {
   const [journal, setJournal] = useState<JournalEntry[]>([]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync con libro diario persistente
     setJournal(loadJournal());
   }, []);
 
