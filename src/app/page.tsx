@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import {
   ArrowRight,
   Truck,
@@ -8,6 +10,7 @@ import {
   Store,
   Building2,
   MapPin,
+  Search,
 } from "lucide-react";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { HeroCarousel } from "@/components/home/HeroCarousel";
@@ -22,6 +25,16 @@ const STORES: { city: string; province: string; href: string }[] = [
 ];
 
 export default function HomePage() {
+  const router = useRouter();
+  const [homeQuery, setHomeQuery] = useState("");
+
+  const handleHomeSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = homeQuery.trim();
+    if (!q) return;
+    router.push(`/catalogo?q=${encodeURIComponent(q)}`);
+  };
+
   return (
     <div>
       {/* ══════════════════════════════════════════════════════════════════
@@ -43,7 +56,43 @@ export default function HomePage() {
 
         {/* Grid de juegos TCG: se superpone al pie del carrusel */}
         <div className="relative z-10 -mt-14 pb-14 sm:-mt-20 sm:pb-20 md:-mt-28 md:pb-24">
-          <div className="mx-auto w-full max-w-[1400px] px-4 sm:px-6">
+          {/* Escudo TCG de fondo — solo móvil, grande y sutil */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 flex items-center justify-center sm:hidden"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/logo-tcg-shield.svg"
+              alt=""
+              className="w-[85%] max-w-[340px] opacity-[0.08]"
+            />
+          </div>
+
+          <div className="relative mx-auto w-full max-w-[1400px] px-4 sm:px-6">
+            {/* Buscador — solo móvil (desktop ya lo tiene en el Header) */}
+            <form
+              onSubmit={handleHomeSearch}
+              className="mb-5 sm:hidden"
+              role="search"
+            >
+              <div className="relative">
+                <Search
+                  size={16}
+                  className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-white/70"
+                />
+                <input
+                  type="search"
+                  value={homeQuery}
+                  onChange={(e) => setHomeQuery(e.target.value)}
+                  placeholder="Buscar cartas, sobres, colecciones..."
+                  aria-label="Buscar productos"
+                  className="h-11 w-full rounded-2xl border border-white/20 bg-white/10 pr-4 pl-10 text-sm text-white backdrop-blur-xl placeholder:text-white/60 focus:border-yellow-300/60 focus:bg-white/15 focus:outline-none"
+                  autoComplete="off"
+                />
+              </div>
+            </form>
+
             {/* Encabezado del portal — sobre las imágenes */}
             <div className="mb-6 text-center sm:mb-8">
               <span className="mb-2 inline-block rounded-full bg-yellow-400/15 px-3 py-1 text-[10px] font-bold tracking-[0.2em] text-yellow-300 uppercase backdrop-blur">
@@ -57,13 +106,15 @@ export default function HomePage() {
               </h2>
             </div>
 
-            {/* Grid de logos — cards glass */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 lg:grid-cols-4 xl:grid-cols-8">
+            {/* Grid de logos — cards glass. Móvil: 4 cols compactas sin
+                nombres y con fondo cristal. Tablet+: layout original. */}
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-4 sm:gap-4 lg:grid-cols-4 xl:grid-cols-8">
               {MEGA_MENU_DATA.map((game) => (
                 <Link
                   key={game.slug}
                   href={game.href}
-                  className="group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-2xl border border-white/15 bg-white/95 px-2 py-3 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-white/30 hover:bg-white hover:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)]"
+                  aria-label={game.label}
+                  className="group relative flex aspect-square flex-col items-center justify-center overflow-hidden rounded-xl border border-white/20 bg-white/10 px-1 py-1.5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-white/40 hover:bg-white/20 hover:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.5)] sm:rounded-2xl sm:border-white/15 sm:bg-white/95 sm:px-2 sm:py-3 sm:backdrop-blur-md sm:hover:border-white/30 sm:hover:bg-white"
                 >
                   {/* Barra de acento superior en el color del juego */}
                   <div
@@ -80,17 +131,18 @@ export default function HomePage() {
                     }}
                   />
 
-                  <div className="relative flex h-14 w-full items-center justify-center sm:h-16 md:h-20">
+                  <div className="relative flex h-full w-full items-center justify-center sm:h-16 sm:w-full md:h-20">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={game.logoSrc}
                       alt={game.label}
                       loading="lazy"
-                      className="max-h-full max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
+                      className="max-h-full max-w-[85%] object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)] transition-transform duration-300 group-hover:scale-105 sm:drop-shadow-none"
                     />
                   </div>
+                  {/* Nombre — oculto en móvil, visible desde sm */}
                   <p
-                    className="relative mt-2 text-center text-[11px] font-bold text-gray-700 sm:text-xs"
+                    className="relative mt-2 hidden text-center text-[11px] font-bold text-gray-700 sm:block sm:text-xs"
                     style={{ color: "#334155" }}
                   >
                     {game.label}
