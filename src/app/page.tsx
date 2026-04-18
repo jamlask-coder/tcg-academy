@@ -73,14 +73,15 @@ export default function HomePage() {
                     key={game.slug}
                     href={`/${game.slug}`}
                     aria-label={game.label}
-                    className="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/70 px-2 py-2 backdrop-blur-md transition-all duration-200 active:scale-[0.97]"
+                    className="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/30 px-2 py-2 backdrop-blur-md transition-all duration-200 active:scale-[0.97]"
                     style={{ WebkitTapHighlightColor: "transparent" }}
                   >
-                    {/* Capa sutil con el color del fondo (#0a0f1a) para suavizar
-                        el blanco y que case con el resto de la página. */}
+                    {/* Capa del color del fondo (#0a0f1a) por encima del blanco
+                        para apagarlo y que case con el resto de la página.
+                        Más oscuro = más integración visual. */}
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute inset-0 bg-[#0a0f1a]/15"
+                      className="pointer-events-none absolute inset-0 bg-[#0a0f1a]/40"
                     />
                     {game.sprite ? (
                       <div

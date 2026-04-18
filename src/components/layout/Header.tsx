@@ -507,6 +507,16 @@ export function Header() {
   const [desktopDropdownOpen, setDesktopDropdownOpen] = useState(false);
   const desktopSearchRef = useRef<HTMLDivElement>(null);
 
+  const [mobileQuery, setMobileQuery] = useState("");
+  const debouncedMobileQuery = useDebounce(mobileQuery, 300);
+  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
+  const mobileSearchRef = useRef<HTMLDivElement>(null);
+
+  // El buscador móvil aparece en todas las páginas EXCEPTO la home, donde
+  // la propia portada ya comunica el catálogo de forma visual. El usuario
+  // lo pidió así explícitamente.
+  const showMobileSearch = pathname !== "/";
+
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       if (
@@ -514,10 +524,16 @@ export function Header() {
         !desktopSearchRef.current.contains(e.target as Node)
       )
         setDesktopDropdownOpen(false);
+      if (
+        mobileSearchRef.current &&
+        !mobileSearchRef.current.contains(e.target as Node)
+      )
+        setMobileDropdownOpen(false);
     }
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setDesktopDropdownOpen(false);
+        setMobileDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", onDocClick);
@@ -535,6 +551,8 @@ export function Header() {
       router.push(`/busqueda?q=${encodeURIComponent(q.trim())}`);
       setDesktopDropdownOpen(false);
       setDesktopQuery("");
+      setMobileDropdownOpen(false);
+      setMobileQuery("");
     },
     [router],
   );
@@ -547,9 +565,22 @@ export function Header() {
     [desktopQuery, submitSearch],
   );
 
+  const handleMobileSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      submitSearch(mobileQuery);
+    },
+    [mobileQuery, submitSearch],
+  );
+
   const closeDesktopSearch = useCallback(() => {
     setDesktopDropdownOpen(false);
     setDesktopQuery("");
+  }, []);
+
+  const closeMobileSearch = useCallback(() => {
+    setMobileDropdownOpen(false);
+    setMobileQuery("");
   }, []);
 
   return (
@@ -771,6 +802,48 @@ export function Header() {
 
         </div>
       </Container>
+
+      {/* Mobile search bar — en todas las páginas EXCEPTO home */}
+      {showMobileSearch && (
+        <div
+          className="border-t border-white/10 px-4 pt-1 pb-1.5 lg:hidden"
+          ref={mobileSearchRef}
+        >
+          <form onSubmit={handleMobileSubmit} className="relative">
+            <input
+              type="search"
+              value={mobileQuery}
+              onChange={(e) => {
+                setMobileQuery(e.target.value);
+                setMobileDropdownOpen(true);
+              }}
+              onFocus={() => setMobileDropdownOpen(true)}
+              placeholder="Buscar cartas, sobres..."
+              className="h-9 w-full rounded-xl border-0 bg-white/15 pr-10 pl-4 text-sm text-white placeholder:text-white/60 focus:bg-white/25 focus:outline-none"
+              autoComplete="off"
+            />
+            <button
+              type="submit"
+              className="absolute top-1/2 right-3 -translate-y-1/2 text-white/70 hover:text-white"
+              aria-label="Buscar"
+            >
+              <Search size={18} />
+            </button>
+          </form>
+          {mobileDropdownOpen && (
+            <div className="mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
+              <SearchDropdown
+                query={debouncedMobileQuery}
+                onSelect={() => {
+                  saveRecentSearch(mobileQuery);
+                  closeMobileSearch();
+                }}
+                onHistorySearch={(q) => submitSearch(q)}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Mobile full-screen drawer */}
       <MobileDrawer
