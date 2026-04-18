@@ -270,6 +270,46 @@ function MobileTrustBar() {
   );
 }
 
+// ─── Rotating tagline (debajo de "TCG Academy", sólo móvil) ──────────────────
+// Ciclo de frases cortas que cambian cada 3.5s con fade + slide sutil.
+// Además un dot verde pulsante estilo "live" para transmitir actividad.
+const HEADER_TAGLINES = [
+  "4 tiendas en España",
+  "Madrid · Barcelona · Calpe · Béjar",
+  "Envío en 24h garantizado",
+];
+
+function HeaderTagline() {
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const id = setInterval(
+      () => setIdx((i) => (i + 1) % HEADER_TAGLINES.length),
+      3500,
+    );
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <span className="mt-0.5 flex h-3 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[10px] font-semibold tracking-wide lg:hidden">
+      <span
+        aria-hidden="true"
+        className="relative flex h-1.5 w-1.5 shrink-0"
+      >
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-70" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+      </span>
+      <span
+        key={idx}
+        className="inline-block text-white/80"
+        style={{
+          animation: "taglineSlideIn 0.55s cubic-bezier(0.2,0.9,0.3,1)",
+        }}
+      >
+        {HEADER_TAGLINES[idx]}
+      </span>
+    </span>
+  );
+}
+
 // ─── Inline login form / logged-in greeting (desktop only) ───────────────────
 
 function HeaderInlineAuth() {
@@ -647,10 +687,15 @@ export function Header() {
           >
             <Menu size={24} />
           </button>
-          <Link href="/" className="flex items-center">
+          <Link
+            href="/"
+            className="flex flex-col items-start leading-none lg:flex-row lg:items-center"
+          >
             <span className="text-[1.7rem] font-black tracking-tight text-white lg:text-2xl">
               TCG <span className="text-amber-300">Academy</span>
             </span>
+            {/* Tagline rotativa — sólo móvil, efecto fade+slide + dot "live" */}
+            <HeaderTagline />
           </Link>
         </div>
 
@@ -899,6 +944,11 @@ export function Header() {
           65%  { transform: scale(1.3) rotate(8deg); }
           100% { transform: scale(1) rotate(0deg); opacity: 1; }
         }
+        @keyframes taglineSlideIn {
+          0%   { opacity: 0; transform: translateY(8px); }
+          60%  { opacity: 1; }
+          100% { opacity: 1; transform: translateY(0); }
+        }
         .badge-ping-wrap {
           animation: badgePulse 2.4s ease-in-out infinite;
         }
@@ -906,6 +956,7 @@ export function Header() {
           .trust-item::after { animation: none; }
           .trust-icon { animation: none; }
           [style*="mobileIconPop"] { animation: none !important; }
+          [style*="taglineSlideIn"] { animation: none !important; }
           .animate-badge-blink { animation: none; }
         }
       `}</style>

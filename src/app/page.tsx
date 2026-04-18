@@ -47,11 +47,11 @@ export default function HomePage() {
         />
 
         {/* Grid de juegos TCG — MÓVIL (12 juegos, 3 cols, mismos logos que drawer) */}
-        <div className="relative z-10 pt-4 pb-6 sm:hidden">
+        <div className="relative z-10 pt-2 pb-5 sm:hidden">
           <div className="relative mx-auto w-full max-w-[1400px] px-3">
             {/* "Elige tu juego" — misma tipografía que "TCG Academy" del header
                 (sans, font-black, tracking-tight), color ámbar, más pequeño. */}
-            <div className="mb-3 text-center">
+            <div className="mb-2 text-center">
               <h2 className="text-base font-black tracking-tight text-amber-300">
                 Elige tu juego
               </h2>
@@ -60,7 +60,7 @@ export default function HomePage() {
             <div className="grid grid-cols-3 gap-2">
               {MOBILE_GAMES.map((game) => {
                 const spriteScale = game.sprite
-                  ? 44 / MOBILE_GAMES_SPRITE_H
+                  ? 36 / MOBILE_GAMES_SPRITE_H
                   : 1;
                 const spriteW = game.sprite
                   ? game.sprite.origW * spriteScale
@@ -73,7 +73,7 @@ export default function HomePage() {
                     key={game.slug}
                     href={`/${game.slug}`}
                     aria-label={game.label}
-                    className="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/30 px-2 py-2 backdrop-blur-md transition-all duration-200 active:scale-[0.97]"
+                    className="group relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/30 px-2 py-2 backdrop-blur-md transition-all duration-200 active:scale-[0.97]"
                     style={{ WebkitTapHighlightColor: "transparent" }}
                   >
                     {/* Capa del color del fondo (#0a0f1a) por encima del blanco
@@ -90,10 +90,10 @@ export default function HomePage() {
                         className="relative"
                         style={{
                           width: spriteW,
-                          height: 44,
+                          height: 36,
                           maxWidth: "90%",
                           backgroundImage: `url(${MOBILE_GAMES_SPRITE_SRC})`,
-                          backgroundSize: `auto 44px`,
+                          backgroundSize: `auto 36px`,
                           backgroundPosition: `-${spriteX}px 0`,
                           backgroundRepeat: "no-repeat",
                           filter: game.sprite.filter ?? undefined,
@@ -107,7 +107,7 @@ export default function HomePage() {
                         loading="lazy"
                         className="relative w-auto object-contain"
                         style={{
-                          maxHeight: game.maxH ?? 44,
+                          maxHeight: 36,
                           maxWidth: "90%",
                           filter: game.filter ?? undefined,
                           mixBlendMode: game.blend ? "multiply" : undefined,
