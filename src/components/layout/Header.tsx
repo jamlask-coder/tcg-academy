@@ -207,36 +207,9 @@ function SearchDropdown({
 
 // ─── Trust bar ────────────────────────────────────────────────────────────────
 
-const TRUST_MESSAGES = [
-  {
-    icon: Package,
-    text: `Envío gratis desde ${SITE_CONFIG.shippingThreshold}€`,
-    highlight: `${SITE_CONFIG.shippingThreshold}€`,
-  },
-  {
-    icon: Zap,
-    text: `Envío en ${SITE_CONFIG.dispatchHours}h`,
-    highlight: `${SITE_CONFIG.dispatchHours}h`,
-  },
-  { icon: ShieldCheck, text: "Pago 100% seguro", highlight: "100%" },
-];
-
 function MobileTrustBar() {
-  const [idx, setIdx] = useState(0);
-  const [visible, setVisible] = useState(true);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setVisible(false);
-      setTimeout(() => {
-        setIdx((i) => (i + 1) % TRUST_MESSAGES.length);
-        setVisible(true);
-      }, 350);
-    }, 3500);
-    return () => clearInterval(id);
-  }, []);
-
-  const { icon: Icon, text } = TRUST_MESSAGES[idx];
+  // Mensaje fijo en móvil: "Envío gratis desde X€" siempre visible, sin
+  // rotación. Decisión del usuario — el threshold se lee de SITE_CONFIG.
   return (
     <div
       className="px-4 py-1 text-center text-xs text-white lg:hidden"
@@ -245,26 +218,12 @@ function MobileTrustBar() {
           "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #2563eb 100%)",
       }}
     >
-      <span
-        className="inline-flex items-center gap-1.5 font-medium"
-        style={{
-          opacity: visible ? 1 : 0,
-          transform: visible ? "translateY(0)" : "translateY(5px)",
-          transition: "opacity 0.32s ease, transform 0.32s ease",
-        }}
-      >
-        <span
-          className="text-amber-300"
-          style={{
-            display: "inline-flex",
-            animation: visible
-              ? "mobileIconPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both"
-              : "none",
-          }}
-        >
-          <Icon size={12} />
+      <span className="inline-flex items-center gap-1.5 font-medium">
+        <span className="inline-flex text-amber-300">
+          <Package size={12} />
         </span>
-        {text}
+        Envío gratis desde{" "}
+        <strong className="text-amber-300">{SITE_CONFIG.shippingThreshold}€</strong>
       </span>
     </div>
   );
@@ -288,7 +247,7 @@ function HeaderTagline() {
     return () => clearInterval(id);
   }, []);
   return (
-    <span className="mt-0.5 flex h-[14px] items-center gap-1.5 overflow-hidden whitespace-nowrap text-[11px] font-semibold tracking-wide lg:hidden">
+    <span className="mt-0.5 ml-2 flex h-[14px] items-center gap-2 whitespace-nowrap text-[11px] font-semibold tracking-wide lg:hidden">
       <span
         aria-hidden="true"
         className="relative flex h-[7px] w-[7px] shrink-0"
@@ -298,7 +257,7 @@ function HeaderTagline() {
       </span>
       {/* Crossfade: todos los mensajes siempre en el DOM, apilados. El activo
           tiene opacity:1, los demás 0. No hay momento sin texto visible. */}
-      <span className="relative flex-1">
+      <span className="relative flex-1 overflow-hidden">
         {HEADER_TAGLINES.map((msg, i) => (
           <span
             key={i}
@@ -684,9 +643,14 @@ export function Header() {
       <MobileTrustBar />
 
       {/* ── Main bar: logo LEFT · search FILL · icons RIGHT ──── */}
-      <Container className="flex h-12 items-center justify-between gap-3 lg:h-20 lg:justify-center">
+      {/* En móvil usamos items-start para que el hamburger y los iconos de la
+          derecha queden alineados con el borde superior de "TCG Academy"
+          (no con el centro del bloque logo+tagline). pt y pb simétricos para
+          que el tagline tenga el mismo aire arriba (hacia TCG Academy) que
+          abajo (hacia la imagen). */}
+      <Container className="flex h-14 items-start justify-between gap-3 py-[6px] lg:h-20 lg:items-center lg:justify-center lg:py-0">
         {/* Hamburger + Logo */}
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-start gap-2 lg:items-center">
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
@@ -755,8 +719,9 @@ export function Header() {
         </div>
         {/* Fin zona central */}
 
-        {/* Iconos — siempre a la derecha, con margen para el badge */}
-        <div className="flex shrink-0 items-center gap-0.5 pr-2">
+        {/* Iconos — siempre a la derecha, con margen para el badge.
+            En móvil alineados al top para cuadrar con "TCG Academy". */}
+        <div className="flex shrink-0 items-start gap-0.5 pr-2 lg:items-center">
           {/* Admin shortcut (sm, not desktop where panel admin is in greeting menu) */}
           {user?.role === "admin" && (
             <Link
@@ -812,7 +777,7 @@ export function Header() {
           {/* 1. User icon — mobile shows "Identifícate" when not logged in */}
           <Link
             href={user ? (user.role === "admin" ? "/admin" : "/cuenta/datos") : "/login"}
-            className="flex items-center justify-center gap-1 rounded-lg p-1 transition hover:bg-white/10 lg:min-h-[44px] lg:gap-1.5 lg:p-2"
+            className="mr-6 flex items-center justify-center gap-1 rounded-lg p-1 transition hover:bg-white/10 lg:mr-0 lg:min-h-[44px] lg:gap-1.5 lg:p-2"
             aria-label={user?.role === "admin" ? "Panel de administración" : "Mi cuenta"}
           >
             {!user && <span className="text-sm font-semibold text-white lg:hidden">Identifícate</span>}

@@ -17,15 +17,18 @@ export interface MobileGame {
   filter?: string;
   blend?: boolean;
   maxH?: number;
-  sprite?: { origW: number; origX: number; filter?: string };
+  /** `renderH` permite reducir la altura renderizada para sprites anchos
+   *  (Pokémon, Yu-Gi-Oh!) que, a altura 48, se cortarían por los laterales
+   *  de la tarjeta en móvil. */
+  sprite?: { origW: number; origX: number; filter?: string; renderH?: number };
 }
 
 export const MOBILE_GAMES: MobileGame[] = [
-  { slug: "pokemon", label: "Pokémon", bg: MOBILE_GAMES_BG, sprite: { origW: 273, origX: 1228 } },
+  { slug: "pokemon", label: "Pokémon", bg: MOBILE_GAMES_BG, sprite: { origW: 273, origX: 1228, renderH: 40 } },
   { slug: "magic", label: "Magic", bg: MOBILE_GAMES_BG, logo: "/images/logos/magic-clean.png" },
   { slug: "one-piece", label: "One Piece", bg: MOBILE_GAMES_BG, logo: "/images/logos/onepiece.png", blend: true },
   { slug: "riftbound", label: "Riftbound", bg: MOBILE_GAMES_BG, logo: "/images/logos/riftbound-clean.png?v=3", blend: true },
-  { slug: "yugioh", label: "Yu-Gi-Oh!", bg: MOBILE_GAMES_BG, sprite: { origW: 392, origX: 696 } },
+  { slug: "yugioh", label: "Yu-Gi-Oh!", bg: MOBILE_GAMES_BG, sprite: { origW: 392, origX: 696, renderH: 34 } },
   { slug: "topps", label: "Topps", bg: MOBILE_GAMES_BG, logo: "/images/logos/topps.svg" },
   { slug: "dragon-ball", label: "Dragon Ball", bg: MOBILE_GAMES_BG, logo: "/images/logos/dragonball-clean.png?v=2" },
   { slug: "naruto", label: "Naruto", bg: MOBILE_GAMES_BG, logo: "/images/logos/naruto-official.png" },

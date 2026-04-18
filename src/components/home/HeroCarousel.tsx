@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
+import { DataHub } from "@/lib/dataHub";
+import { getHeroImages } from "@/services/heroImageService";
 
 type Slide = {
   src: string;
@@ -9,7 +11,8 @@ type Slide = {
   href?: string;
 };
 
-const SLIDES: Slide[] = [
+// Defaults cuando no hay imágenes subidas por el admin.
+const DEFAULT_SLIDES: Slide[] = [
   { src: "/images/hero/slide-1.png", alt: "Magic: The Gathering x Teenage Mutant Ninja Turtles", href: "/catalogo?game=magic" },
   { src: "/images/hero/slide-2.png", alt: "Secrets of Strixhaven", href: "/catalogo?game=magic" },
 ];
@@ -18,20 +21,46 @@ const AUTOPLAY_MS = 5500;
 const FADE_MS = 700;
 
 export function HeroCarousel() {
+  const [slides, setSlides] = useState<Slide[]>(DEFAULT_SLIDES);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
 
-  const goTo = useCallback((i: number) => {
-    setIndex(((i % SLIDES.length) + SLIDES.length) % SLIDES.length);
+  // Carga slides del servicio (admin uploads). Si no hay, usa DEFAULT_SLIDES.
+  useEffect(() => {
+    const load = () => {
+      const imgs = getHeroImages();
+      if (imgs.length === 0) {
+        setSlides(DEFAULT_SLIDES);
+      } else {
+        setSlides(
+          imgs.map((img) => ({
+            src: img.dataUrl,
+            alt: img.alt,
+            href: img.href,
+          })),
+        );
+      }
+      setIndex(0);
+    };
+    load();
+    return DataHub.on("heroImages", load);
   }, []);
 
+  const goTo = useCallback(
+    (i: number) => {
+      const len = slides.length || 1;
+      setIndex(((i % len) + len) % len);
+    },
+    [slides.length],
+  );
+
   useEffect(() => {
-    if (paused) return;
+    if (paused || slides.length <= 1) return;
     const id = setInterval(() => {
-      setIndex((prev) => (prev + 1) % SLIDES.length);
+      setIndex((prev) => (prev + 1) % slides.length);
     }, AUTOPLAY_MS);
     return () => clearInterval(id);
-  }, [paused]);
+  }, [paused, slides.length]);
 
   return (
     <section
@@ -41,8 +70,16 @@ export function HeroCarousel() {
       aria-roledescription="carousel"
       aria-label="Novedades destacadas"
     >
-      <div className="relative mx-auto aspect-[1133/529] w-full max-w-[1400px]">
-        {SLIDES.map((slide, i) => {
+      {/* Aspect ratio FIJA — se aplica siempre, independientemente del
+          tamaño del archivo que suba el admin. object-cover recorta cualquier
+          imagen al marco fijo para que el visual sea consistente.
+          · Móvil: 16/9 (1.78:1) — formato estándar, cabe bien en pantallas
+            estrechas sin recortar demasiado.
+          · Desktop: 1133/529 (~2.14:1) — panorámico original.
+          Resolución mínima recomendada al subir: 1600×900 px (móvil)
+          / 1600×750 px (desktop). object-position: center centra el crop. */}
+      <div className="relative mx-auto aspect-[16/9] w-full max-w-[1400px] sm:aspect-[1133/529]">
+        {slides.map((slide, i) => {
           const active = i === index;
           const content = (
             <Image
@@ -51,12 +88,13 @@ export function HeroCarousel() {
               fill
               priority={i === 0}
               sizes="(max-width: 1400px) 100vw, 1400px"
-              className="object-cover"
+              className="object-cover object-center"
+              unoptimized={slide.src.startsWith("data:")}
             />
           );
           return (
             <div
-              key={slide.src}
+              key={`${slide.src}-${i}`}
               className="absolute inset-0"
               style={{
                 opacity: active ? 1 : 0,
@@ -76,22 +114,29 @@ export function HeroCarousel() {
           );
         })}
 
-        {/* Dots */}
-        <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 gap-2 sm:bottom-5">
-          {SLIDES.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => goTo(i)}
-              aria-label={`Ir a slide ${i + 1}`}
-              aria-current={i === index}
-              className="h-2 rounded-full bg-white/50 transition-all hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              style={{
-                width: i === index ? 28 : 10,
-                backgroundColor: i === index ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.45)",
-              }}
-            />
-          ))}
+        {/* Dots — móvil: 2 puntos iguales abajo-derecha pegados a la esquina.
+            Desktop: centrados, pill ancho para el activo. */}
+        <div className="absolute right-2 bottom-2 z-10 flex gap-1.5 sm:right-auto sm:bottom-5 sm:left-1/2 sm:-translate-x-1/2 sm:gap-2">
+          {slides.map((_, i) => {
+            const active = i === index;
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => goTo(i)}
+                aria-label={`Ir a slide ${i + 1}`}
+                aria-current={active}
+                className={`h-2 rounded-full transition-all hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white ${
+                  active ? "w-2 sm:w-7" : "w-2 sm:w-2.5"
+                }`}
+                style={{
+                  backgroundColor: active
+                    ? "rgba(255,255,255,0.95)"
+                    : "rgba(255,255,255,0.5)",
+                }}
+              />
+            );
+          })}
         </div>
       </div>
     </section>

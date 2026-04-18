@@ -269,7 +269,7 @@ function LoginForm() {
           {/* Register CTA */}
           <Link
             href="/registro"
-            className="mt-3 flex h-10 w-full items-center justify-center rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-700 transition hover:border-[#2563eb] hover:text-[#2563eb]"
+            className="mt-3 flex h-10 w-full items-center justify-center rounded-xl bg-amber-400 text-sm font-bold text-gray-900 transition hover:bg-amber-300"
           >
             Crear cuenta nueva
           </Link>

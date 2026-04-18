@@ -370,6 +370,18 @@ const PARTIAL: EntityRegistryEntry[] = [
     dependsOn: ["cart", "users"],
     notes: "Persistencia de checkout parcial. Se limpia al confirmar pedido. No crítico.",
   },
+  {
+    key: "heroImages",
+    description: "Imágenes del carrusel principal de la home",
+    storageKeys: ["tcgacademy_hero_images"],
+    event: DataHubEvents.HERO_IMAGES_UPDATED,
+    pii: false,
+    retentionMonths: 120,
+    adapter: null,
+    maturity: "partial",
+    category: "catalogo",
+    notes: "Imágenes como base64 dataURL. Admin las gestiona desde /admin/herramientas.",
+  },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════

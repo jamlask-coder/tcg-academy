@@ -26,6 +26,7 @@ import {
   removeOrphanKey,
   type IntegrityReport,
 } from "@/lib/dataHub";
+import { HeroImagesManager } from "@/components/admin/HeroImagesManager";
 
 // ─── CSV export helpers ───────────────────────────────────────────────────────
 
@@ -628,6 +629,9 @@ export default function AdminHerramientasPage() {
           </div>
         </div>
       </div>
+
+      {/* Hero carousel images */}
+      <HeroImagesManager onToast={showToast} />
 
       {/* System status */}
       <div>
