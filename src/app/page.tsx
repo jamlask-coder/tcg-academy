@@ -49,16 +49,10 @@ export default function HomePage() {
         {/* Grid de juegos TCG — MÓVIL (12 juegos, 3 cols, mismos logos que drawer) */}
         <div className="relative z-10 pt-4 pb-6 sm:hidden">
           <div className="relative mx-auto w-full max-w-[1400px] px-3">
-            {/* "Elige tu juego" — mismo ámbar que "Academy" del header, con estilo display */}
-            <div className="mb-4 text-center">
-              <h2
-                className="font-serif text-2xl font-black text-amber-300 italic"
-                style={{
-                  letterSpacing: "-0.01em",
-                  textShadow:
-                    "0 2px 20px rgba(251,191,36,0.35), 0 1px 2px rgba(0,0,0,0.5)",
-                }}
-              >
+            {/* "Elige tu juego" — misma tipografía que "TCG Academy" del header
+                (sans, font-black, tracking-tight), color ámbar, más pequeño. */}
+            <div className="mb-3 text-center">
+              <h2 className="text-base font-black tracking-tight text-amber-300">
                 Elige tu juego
               </h2>
             </div>
@@ -79,13 +73,20 @@ export default function HomePage() {
                     key={game.slug}
                     href={`/${game.slug}`}
                     aria-label={game.label}
-                    className="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-white px-2 py-2 shadow-sm transition-all duration-200 active:scale-[0.97]"
+                    className="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/70 px-2 py-2 backdrop-blur-md transition-all duration-200 active:scale-[0.97]"
                     style={{ WebkitTapHighlightColor: "transparent" }}
                   >
+                    {/* Capa sutil con el color del fondo (#0a0f1a) para suavizar
+                        el blanco y que case con el resto de la página. */}
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 bg-[#0a0f1a]/15"
+                    />
                     {game.sprite ? (
                       <div
                         role="img"
                         aria-label={game.label}
+                        className="relative"
                         style={{
                           width: spriteW,
                           height: 44,
@@ -103,7 +104,7 @@ export default function HomePage() {
                         src={game.logo}
                         alt={game.label}
                         loading="lazy"
-                        className="w-auto object-contain"
+                        className="relative w-auto object-contain"
                         style={{
                           maxHeight: game.maxH ?? 44,
                           maxWidth: "90%",
