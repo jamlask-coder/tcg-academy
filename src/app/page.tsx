@@ -1,7 +1,5 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 import {
   ArrowRight,
   Truck,
@@ -10,7 +8,6 @@ import {
   Store,
   Building2,
   MapPin,
-  Search,
 } from "lucide-react";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { HeroCarousel } from "@/components/home/HeroCarousel";
@@ -25,16 +22,6 @@ const STORES: { city: string; province: string; href: string }[] = [
 ];
 
 export default function HomePage() {
-  const router = useRouter();
-  const [homeQuery, setHomeQuery] = useState("");
-
-  const handleHomeSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = homeQuery.trim();
-    if (!q) return;
-    router.push(`/catalogo?q=${encodeURIComponent(q)}`);
-  };
-
   return (
     <div>
       {/* ══════════════════════════════════════════════════════════════════
@@ -54,61 +41,26 @@ export default function HomePage() {
           className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent via-[#0a0f1a]/60 to-[#0a0f1a]"
         />
 
-        {/* Grid de juegos TCG: se superpone al pie del carrusel */}
-        <div className="relative z-10 -mt-14 pb-14 sm:-mt-20 sm:pb-20 md:-mt-28 md:pb-24">
-          {/* Escudo TCG de fondo — solo móvil, grande y sutil */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 flex items-center justify-center sm:hidden"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/logo-tcg-shield.svg"
-              alt=""
-              className="w-[85%] max-w-[340px] opacity-[0.08]"
-            />
-          </div>
-
+        {/* Grid de juegos TCG: pegado al pie del carrusel */}
+        <div className="relative z-10 -mt-4 pb-6 sm:-mt-20 sm:pb-20 md:-mt-28 md:pb-24">
           <div className="relative mx-auto w-full max-w-[1400px] px-4 sm:px-6">
-            {/* Buscador — solo móvil (desktop ya lo tiene en el Header) */}
-            <form
-              onSubmit={handleHomeSearch}
-              className="mb-5 sm:hidden"
-              role="search"
-            >
-              <div className="relative">
-                <Search
-                  size={16}
-                  className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-white/70"
-                />
-                <input
-                  type="search"
-                  value={homeQuery}
-                  onChange={(e) => setHomeQuery(e.target.value)}
-                  placeholder="Buscar cartas, sobres, colecciones..."
-                  aria-label="Buscar productos"
-                  className="h-11 w-full rounded-2xl border border-white/20 bg-white/10 pr-4 pl-10 text-sm text-white backdrop-blur-xl placeholder:text-white/60 focus:border-yellow-300/60 focus:bg-white/15 focus:outline-none"
-                  autoComplete="off"
-                />
-              </div>
-            </form>
-
-            {/* Encabezado del portal — sobre las imágenes */}
-            <div className="mb-6 text-center sm:mb-8">
-              <span className="mb-2 inline-block rounded-full bg-yellow-400/15 px-3 py-1 text-[10px] font-bold tracking-[0.2em] text-yellow-300 uppercase backdrop-blur">
+            {/* Encabezado del portal — en móvil: solo "Elige tu juego" compacto */}
+            <div className="mb-3 text-center sm:mb-8">
+              {/* Badge "Tu universo TCG" — oculto en móvil */}
+              <span className="mb-2 hidden rounded-full bg-yellow-400/15 px-3 py-1 text-[10px] font-bold tracking-[0.2em] text-yellow-300 uppercase backdrop-blur sm:inline-block">
                 Tu universo TCG
               </span>
               <h2
-                className="text-2xl font-black text-white sm:text-3xl md:text-4xl"
+                className="text-sm font-bold text-white/90 sm:text-3xl sm:font-black sm:text-white md:text-4xl"
                 style={{ textShadow: "0 2px 20px rgba(0,0,0,0.6)" }}
               >
                 Elige tu juego
               </h2>
             </div>
 
-            {/* Grid de logos — cards glass. Móvil: 4 cols compactas sin
+            {/* Grid de logos — cards glass. Móvil: 3 cols compactas sin
                 nombres y con fondo cristal. Tablet+: layout original. */}
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-4 sm:gap-4 lg:grid-cols-4 xl:grid-cols-8">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-4 lg:grid-cols-4 xl:grid-cols-8">
               {MEGA_MENU_DATA.map((game) => (
                 <Link
                   key={game.slug}
@@ -151,8 +103,8 @@ export default function HomePage() {
               ))}
             </div>
 
-            {/* CTA explorar todo */}
-            <div className="mt-8 flex justify-center">
+            {/* CTA explorar todo — oculto en móvil */}
+            <div className="mt-8 hidden justify-center sm:flex">
               <Link
                 href="/catalogo"
                 className="inline-flex items-center gap-2 rounded-2xl bg-yellow-400 px-6 py-3 text-sm font-black text-[#0f172a] shadow-[0_8px_30px_rgba(251,191,36,0.35)] transition-all hover:-translate-y-0.5 hover:bg-yellow-300"
