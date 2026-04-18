@@ -49,10 +49,11 @@ export default function HomePage() {
         {/* Grid de juegos TCG — MÓVIL (12 juegos, 3 cols, mismos logos que drawer) */}
         <div className="relative z-10 pt-2 pb-5 sm:hidden">
           <div className="relative mx-auto w-full max-w-[1400px] px-3">
-            {/* "Elige tu juego" — misma tipografía que "TCG Academy" del header
-                (sans, font-black, tracking-tight), color ámbar, más pequeño. */}
+            {/* "Elige tu juego" — misma tipografía que 'TCG Academy' del header
+                con efecto shimmer dorado atravesando el texto cada pocos
+                segundos (clásico estilo foil/premium). */}
             <div className="mb-2 text-center">
-              <h2 className="text-base font-black tracking-tight text-amber-300">
+              <h2 className="home-shimmer inline-block text-lg font-black tracking-tight text-amber-300">
                 Elige tu juego
               </h2>
             </div>
@@ -60,7 +61,7 @@ export default function HomePage() {
             <div className="grid grid-cols-3 gap-2">
               {MOBILE_GAMES.map((game) => {
                 const spriteScale = game.sprite
-                  ? 36 / MOBILE_GAMES_SPRITE_H
+                  ? 48 / MOBILE_GAMES_SPRITE_H
                   : 1;
                 const spriteW = game.sprite
                   ? game.sprite.origW * spriteScale
@@ -73,27 +74,23 @@ export default function HomePage() {
                     key={game.slug}
                     href={`/${game.slug}`}
                     aria-label={game.label}
-                    className="group relative flex items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/30 px-2 py-1 backdrop-blur-md transition-all duration-200 active:scale-[0.97]"
-                    style={{ WebkitTapHighlightColor: "transparent", minHeight: 46 }}
+                    className="group relative flex items-center justify-center overflow-hidden rounded-xl px-2 py-2 shadow-sm transition-all duration-200 active:scale-[0.97]"
+                    style={{
+                      WebkitTapHighlightColor: "transparent",
+                      background: game.bg,
+                      minHeight: 64,
+                    }}
                   >
-                    {/* Capa del color del fondo (#0a0f1a) por encima del blanco
-                        para apagarlo y que case con el resto de la página.
-                        Más oscuro = más integración visual. */}
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-0 bg-[#0a0f1a]/40"
-                    />
                     {game.sprite ? (
                       <div
                         role="img"
                         aria-label={game.label}
-                        className="relative"
                         style={{
                           width: spriteW,
-                          height: 36,
-                          maxWidth: "90%",
+                          height: 48,
+                          maxWidth: "92%",
                           backgroundImage: `url(${MOBILE_GAMES_SPRITE_SRC})`,
-                          backgroundSize: `auto 36px`,
+                          backgroundSize: `auto 48px`,
                           backgroundPosition: `-${spriteX}px 0`,
                           backgroundRepeat: "no-repeat",
                           filter: game.sprite.filter ?? undefined,
@@ -105,10 +102,10 @@ export default function HomePage() {
                         src={game.logo}
                         alt={game.label}
                         loading="lazy"
-                        className="relative w-auto object-contain"
+                        className="w-auto object-contain"
                         style={{
-                          maxHeight: 36,
-                          maxWidth: "90%",
+                          maxHeight: 48,
+                          maxWidth: "92%",
                           filter: game.filter ?? undefined,
                           mixBlendMode: game.blend ? "multiply" : undefined,
                         }}
@@ -119,6 +116,35 @@ export default function HomePage() {
               })}
             </div>
           </div>
+
+          {/* Shimmer "foil" atravesando 'Elige tu juego' cada 4s.
+              Uso una máscara: el gradiente sólo afecta al texto. */}
+          <style>{`
+            .home-shimmer {
+              background: linear-gradient(
+                100deg,
+                #fcd34d 0%,
+                #fcd34d 40%,
+                #fff7d6 50%,
+                #fcd34d 60%,
+                #fcd34d 100%
+              );
+              background-size: 220% 100%;
+              background-position: 100% 0;
+              -webkit-background-clip: text;
+              background-clip: text;
+              -webkit-text-fill-color: transparent;
+              animation: homeShimmer 4s ease-in-out infinite;
+            }
+            @keyframes homeShimmer {
+              0%   { background-position: 200% 0; }
+              60%  { background-position: -100% 0; }
+              100% { background-position: -100% 0; }
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .home-shimmer { animation: none; background: none; -webkit-text-fill-color: currentColor; }
+            }
+          `}</style>
         </div>
 
         {/* Grid de juegos TCG — DESKTOP (sin cambios, solapado sobre el carrusel) */}

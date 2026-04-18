@@ -3,7 +3,9 @@
 // principal pueda renderizar los MISMOS logos (requisito del usuario).
 // Incluye los 12 juegos: 8 principales + Lorcana/Digimon/Cyberpunk/Panini.
 
-export const MOBILE_GAMES_BG = "#ffffff";
+// Mismo fondo que usaba el drawer originalmente: gris azulado muy claro.
+// Se ve en las tarjetas de juegos tanto del drawer como de la home móvil.
+export const MOBILE_GAMES_BG = "#e8edf5";
 export const MOBILE_GAMES_SPRITE_SRC = "/images/ssGamesBig.png";
 export const MOBILE_GAMES_SPRITE_H = 140;
 

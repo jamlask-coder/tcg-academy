@@ -281,26 +281,28 @@ const HEADER_TAGLINES = [
 function HeaderTagline() {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
+    // Intervalo corto (2.2s) para que no haya sensación de hueco vacío entre
+    // rotaciones: apenas acaba la animación de entrada y empieza la siguiente.
     const id = setInterval(
       () => setIdx((i) => (i + 1) % HEADER_TAGLINES.length),
-      3500,
+      2200,
     );
     return () => clearInterval(id);
   }, []);
   return (
-    <span className="mt-0.5 flex h-3 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[10px] font-semibold tracking-wide lg:hidden">
+    <span className="mt-0.5 flex h-[14px] items-center gap-1.5 overflow-hidden whitespace-nowrap text-[11px] font-semibold tracking-wide lg:hidden">
       <span
         aria-hidden="true"
-        className="relative flex h-1.5 w-1.5 shrink-0"
+        className="relative flex h-[7px] w-[7px] shrink-0"
       >
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300 opacity-70" />
-        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-300 shadow-[0_0_6px_rgba(252,211,77,0.85)]" />
+        <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-amber-300 shadow-[0_0_6px_rgba(252,211,77,0.85)]" />
       </span>
       <span
         key={idx}
-        className="inline-block text-white/80"
+        className="inline-block text-white/85"
         style={{
-          animation: "taglineSlideIn 0.55s cubic-bezier(0.2,0.9,0.3,1)",
+          animation: "taglineSlideIn 0.5s cubic-bezier(0.2,0.9,0.3,1)",
         }}
       >
         {HEADER_TAGLINES[idx]}
