@@ -68,7 +68,8 @@ export async function getTopCards(
   limit = 8,
 ): Promise<TcgCsvProduct[]> {
   const cacheKey = `${categoryId}:${groupId}`;
-  if (resultCache.has(cacheKey)) return resultCache.get(cacheKey)!.slice(0, limit);
+  const cached = resultCache.get(cacheKey);
+  if (cached) return cached.slice(0, limit);
 
   const [prodsData, pricesData] = await Promise.all([
     fetchJson<{ results: RawProduct[] }>(`${BASE}/${categoryId}/${groupId}/products`),

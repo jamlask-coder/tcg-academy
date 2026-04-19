@@ -487,6 +487,9 @@ export async function rectifyInvoice(
     correctionData: CorrectionData;
   },
 ): Promise<InvoiceRecord> {
+  if (!corrections.correctionData) {
+    throw new Error("rectifyInvoice: correctionData es obligatorio (Art. 15 RD 1619/2012)");
+  }
   const invoices = loadInvoices();
   const original = invoices.find((inv) => inv.invoiceId === originalId);
   if (!original) throw new Error(`Factura ${originalId} no encontrada`);

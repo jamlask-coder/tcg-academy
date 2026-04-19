@@ -180,7 +180,7 @@ function PriceDisplay({
   const effectiveHasDiscount =
     effectiveComparePrice !== undefined && effectiveComparePrice > displayPrice;
   const effectiveDiscountPct = effectiveHasDiscount
-    ? Math.round((1 - displayPrice / effectiveComparePrice!) * 100)
+    ? Math.round((1 - displayPrice / (effectiveComparePrice ?? 1)) * 100)
     : origDiscountPct;
 
   if (isAdmin) {
@@ -203,7 +203,7 @@ function PriceDisplay({
           </span>
           {effectiveHasDiscount && (
             <span className="mb-1 text-base text-gray-400 line-through">
-              {effectiveComparePrice!.toFixed(2)}€
+              {(effectiveComparePrice ?? 0).toFixed(2)}€
             </span>
           )}
           <span className="mb-1">
@@ -252,7 +252,7 @@ function PriceDisplay({
         {effectiveHasDiscount && !isB2B && (
           <>
             <span className="mb-0.5 text-base text-gray-400 line-through">
-              {effectiveComparePrice!.toFixed(2)}€
+              {(effectiveComparePrice ?? 0).toFixed(2)}€
             </span>
             <span
               className="mb-0.5 rounded-lg px-1.5 py-0.5 text-xs font-bold"

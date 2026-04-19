@@ -1134,8 +1134,8 @@ function CompetitorRangeCell({
     if (!snapshot) return "— · —";
     if (range.hits === 0) return "Sin datos";
     if (range.min === range.max)
-      return `${range.min!.toFixed(2)}€`;
-    return `${range.min!.toFixed(2)}€ – ${range.max!.toFixed(2)}€`;
+      return `${(range.min ?? 0).toFixed(2)}€`;
+    return `${(range.min ?? 0).toFixed(2)}€ – ${(range.max ?? 0).toFixed(2)}€`;
   })();
 
   const cheaperThanUs =

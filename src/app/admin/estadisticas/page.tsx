@@ -543,8 +543,8 @@ export default function EstadisticasPage() {
             · Madrid y Barcelona concentran el{" "}
             <strong>
               {Math.round(
-                ((MOCK_PROVINCE_VISITS.find((p) => p.province === "Madrid")!.visits +
-                  MOCK_PROVINCE_VISITS.find((p) => p.province === "Barcelona")!.visits) /
+                (((MOCK_PROVINCE_VISITS.find((p) => p.province === "Madrid")?.visits ?? 0) +
+                  (MOCK_PROVINCE_VISITS.find((p) => p.province === "Barcelona")?.visits ?? 0)) /
                   totalVisits) * 100,
               )}%
             </strong>{" "}

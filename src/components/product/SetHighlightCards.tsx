@@ -1010,10 +1010,15 @@ export function SetHighlightCards({ product }: Props) {
     if (!detected) { setLoading(false); return; }
 
     setDetectedGame(detected.game);
-    fetchHighlights(detected.game, detected.setKey, detected.lang).then((result) => {
-      setCards(result.filter((c) => c.imageUrl));
-      setLoading(false);
-    });
+    fetchHighlights(detected.game, detected.setKey, detected.lang)
+      .then((result) => {
+        setCards(result.filter((c) => c.imageUrl));
+        setLoading(false);
+      })
+      .catch(() => {
+        setCards([]);
+        setLoading(false);
+      });
 
     // Fetch full collection from TCGDex (Pokemon only for now)
     if (detected.game === "pokemon") {

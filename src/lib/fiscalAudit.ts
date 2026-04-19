@@ -360,12 +360,13 @@ export function checkRectificatives(
       orphanRectificatives.push(rect.invoiceNumber);
       continue;
     }
+    const correctionData = rect.correctionData;
     const original = invoices.find(
-      (inv) => inv.invoiceId === rect.correctionData!.originalInvoiceId,
+      (inv) => inv.invoiceId === correctionData.originalInvoiceId,
     );
     if (!original) {
       issues.push(
-        `${rect.invoiceNumber}: referencia a original inexistente (${rect.correctionData.originalInvoiceNumber})`,
+        `${rect.invoiceNumber}: referencia a original inexistente (${correctionData.originalInvoiceNumber})`,
       );
       orphanRectificatives.push(rect.invoiceNumber);
     }
