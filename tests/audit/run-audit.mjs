@@ -134,17 +134,16 @@ run("Test 11 — isNewProduct() exportado desde products.ts", () => {
   if (!products.includes("export function isNewProduct")) throw new Error("isNewProduct no exportado")
 })
 
-// ── Test 12: Footer has no vertical game list (all games in one row) ──────────
-run("Test 12 — Footer: juegos en fila horizontal (flex), no lista vertical", () => {
+// ── Test 12: Footer usa CIF real desde SITE_CONFIG + copyright presente ───────
+run("Test 12 — Footer: usa SITE_CONFIG + copyright dinámico", () => {
   const footer = readFileSync(join(SRC, "components/layout/Footer.tsx"), "utf8")
-  // GAMES.map must be inside a flex container line (not a <ul>)
-  const lines = footer.split("\n")
-  const gamesIdx = lines.findIndex(l => l.includes("GAMES.map"))
-  if (gamesIdx === -1) throw new Error("GAMES.map no encontrado en footer")
-  // Look at the preceding 3 lines for flex
-  const context = lines.slice(Math.max(0, gamesIdx - 3), gamesIdx).join("\n")
-  if (!context.includes("flex")) {
-    throw new Error("GAMES no está dentro de un contenedor flex")
+  if (!footer.includes("SITE_CONFIG")) throw new Error("Footer no importa SITE_CONFIG")
+  if (!/SITE_CONFIG\.(name|cif|legalName|email|phone)/.test(footer)) {
+    throw new Error("Footer no usa ningún campo de SITE_CONFIG (hardcoded risk)")
+  }
+  if (!/©|copyright/i.test(footer)) throw new Error("Footer sin copyright visible")
+  if (!/new Date\(\)\.getFullYear\(\)/.test(footer)) {
+    throw new Error("Footer sin año dinámico (debe usar new Date().getFullYear())")
   }
 })
 

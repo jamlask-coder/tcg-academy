@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Container } from "@/components/ui/Container";
 import { CookieSettingsButton } from "@/components/legal/CookieConsent";
+import { SITE_CONFIG } from "@/config/siteConfig";
 
 // ─── Social icons (official brand SVGs, monochrome white) ─────────────────────
 
@@ -194,7 +195,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="border-t border-white/8 pt-4 text-center">
           <p className="text-xs text-slate-500">
-            © 2026 TCG Academy. Todos los derechos reservados.
+            © {new Date().getFullYear()} {SITE_CONFIG.name}. Todos los derechos reservados.
           </p>
         </div>
       </Container>

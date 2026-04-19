@@ -33,25 +33,13 @@ function isDomainKey(k: string): boolean {
 }
 
 /**
- * Keys conocidas que NO están en el registry pero son legítimas (infra, locks, UI).
- * No son entidades con semántica de datos sino estado transitorio/telemetría.
- * Mantener esta lista corta; si crece, probablemente falta un registry entry.
+ * Keys conocidas que NO están en el registry pero son legítimas (infra, UI transitoria).
+ * Mantener esta lista MÍNIMA: si una key entra aquí regularmente, probablemente falta un
+ * registry entry. Post-Phase 1 la mayoría migraron al registry (systemOps, backups,
+ * userActivity, users, settings, invoices) — aquí solo queda estado puramente transitorio
+ * de UI/sesión anónima con prefijo tcga_ (no PII persistente).
  */
 const KNOWN_INFRA_KEYS: ReadonlySet<string> = new Set([
-  "tcgacademy_backup_index",
-  "tcgacademy_checkout_lock",
-  "tcgacademy_recent_order_ids",
-  "tcgacademy_anomalies",
-  "tcgacademy_circuits",
-  "tcgacademy_dlq",
-  "tcgacademy_reset_tokens",
-  "tcgacademy_backup_scheduler_last",
-  "tcgacademy_invoice_count_watermark",
-  "tcgacademy_last_known_time",
-  "tcgacademy_storage_errors",
-  "tcgacademy_pending_checkout",
-  "tcgacademy_demo_pedidos_dismissed",
-  "tcgacademy_demo_fiscal_dismissed",
   "tcga_cookie_consent",
   "tcga_recent_searches",
   "tcga_session",

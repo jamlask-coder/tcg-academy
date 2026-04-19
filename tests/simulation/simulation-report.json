@@ -1,17 +1,17 @@
 {
-  "timestamp": "2026-04-16T10:22:30.468Z",
+  "timestamp": "2026-04-19T20:52:08.960Z",
   "summary": {
-    "total": 321,
-    "passed": 318,
+    "total": 288,
+    "passed": 285,
     "failed": 0,
     "warnings": 3,
-    "ordersGenerated": 287,
-    "invoicesGenerated": 287,
+    "ordersGenerated": 256,
+    "invoicesGenerated": 256,
     "usersGenerated": 100,
-    "emailsLogged": 382,
+    "emailsLogged": 351,
     "incidentsCreated": 10,
     "returnsProcessed": 10,
-    "executionTimeMs": 111
+    "executionTimeMs": 607
   },
   "bugs": [],
   "security": [
@@ -32,12 +32,6 @@
       "title": "Client-side only rate limiting",
       "detail": "checkRateLimit() in utils/sanitize.ts uses sessionStorage and can be bypassed by clearing storage or using a different browser. Need server-side rate limiting for production.",
       "occurrences": 1
-    },
-    {
-      "risk": "MEDIUM",
-      "title": "No maximum quantity limit",
-      "detail": "2 orders placed with 100+ units of a single product. No server-side limit enforced.",
-      "occurrences": 1
     }
   ],
   "missingFeatures": [
@@ -48,14 +42,6 @@
     {
       "title": "SQL injection pattern detection",
       "detail": "Add SQL keyword detection to sanitizeString() for defense-in-depth before backend migration"
-    },
-    {
-      "title": "Server-side quantity limits",
-      "detail": "Add a global maximum quantity per order line (e.g., 99 units) to prevent abuse and inventory errors"
-    },
-    {
-      "title": "Numeric stock for all products",
-      "detail": "All products should have a numeric stock value instead of relying on boolean inStock flag"
     },
     {
       "title": "Order cancellation workflow",
@@ -98,355 +84,352 @@
       "detail": "All prices hardcoded in EUR. No currency conversion for international customers."
     }
   ],
-  "dataQuality": [
-    {
-      "title": "Products without stock count",
-      "detail": "198 of 283 products have inStock=true but no numeric stock count. This prevents stock management and overselling detection."
-    }
-  ],
+  "dataQuality": [],
   "analytics": {
     "revenue": {
-      "total": 330295.83,
+      "total": 197785.92,
       "byGame": {
-        "panini": 3196.05,
-        "one-piece": 11759.13,
-        "naruto": 2732.61,
-        "magic": 247782.35,
-        "pokemon": 27648.23,
-        "riftbound": 3998.27,
-        "lorcana": 7701.44,
-        "topps": 8329.77,
-        "yugioh": 12438.76,
-        "dragon-ball": 8783.58,
-        "digimon": 876.85
+        "magic": 130302.8,
+        "topps": 7965.31,
+        "yugioh": 12464.88,
+        "naruto": 3145.76,
+        "digimon": 2127.74,
+        "panini": 3331.62,
+        "pokemon": 24347.22,
+        "riftbound": 3843.61,
+        "lorcana": 5295.82,
+        "one-piece": 7340.35,
+        "dragon-ball": 5564.25
       },
       "byCategory": {
-        "cajas": 2329.37,
-        "sobres": 527,
-        "playmats": 1674.99,
-        "singles": 219621.5,
-        "carpetas": 716.67,
-        "booster-box": 63816.19,
-        "commander": 9133.33,
-        "etb": 3925.9,
-        "sleeves": 1494.66,
-        "starter": 7165.67,
-        "dados": 186.54,
-        "futbol": 5803.65,
-        "enchanted": 2755.79,
-        "blisters": 114.77,
-        "albumes": 135.67,
-        "latas": 2225.05,
-        "toploaders": 92.95,
-        "gift-sets": 334.52,
-        "wwe": 1169.35,
-        "deckboxes": 304.96,
-        "especiales": 1487.43,
-        "structure-decks": 278.51,
-        "nba": 1209.51,
-        "scr": 3799.04,
-        "tins": 406.62,
-        "starlight": 1949.28,
-        "trove": 287.21,
-        "bundles": 1554.78,
-        "double-packs": 230.71,
-        "f1": 515.42
+        "commander": 5814.04,
+        "booster-box": 58797.82,
+        "albumes": 119.35,
+        "singles": 106587.81,
+        "latas": 2106.32,
+        "starter": 1965.44,
+        "futbol": 4545.24,
+        "etb": 3110.12,
+        "sobres": 459.24,
+        "structure-decks": 271.78,
+        "sleeves": 1329.96,
+        "playmats": 1411.08,
+        "blisters": 114.76,
+        "gift-sets": 643.94,
+        "carpetas": 369.27,
+        "deckboxes": 176.41,
+        "enchanted": 1264.19,
+        "tins": 434.78,
+        "toploaders": 118.69,
+        "f1": 645.09,
+        "especiales": 1183.43,
+        "nba": 1019.54,
+        "starlight": 3783.25,
+        "bundles": 1463.01,
+        "double-packs": 90.62,
+        "trove": 349.65,
+        "scr": 2722.59,
+        "wwe": 1529.16,
+        "dados": 164.09,
+        "cajas": 2259.3,
+        "star-wars": 879.39
       },
       "byRole": {
-        "cliente": 285458.65,
-        "mayorista": 39347.97,
-        "tienda": 5489.21
+        "cliente": 166456.72,
+        "mayorista": 29883.97,
+        "tienda": 1445.23
       }
     },
-    "averageOrderValue": 1214.32,
+    "averageOrderValue": 820.69,
     "topProducts": [
       {
         "id": "20001",
         "name": "[DEMO] Black Lotus (Unlimited Edition)",
-        "totalQty": 16,
-        "totalRevenue": 195500.01
-      },
-      {
-        "id": "20007",
-        "name": "[DEMO] Tarmogoyf (Modern Masters 2015)",
-        "totalQty": 416,
-        "totalRevenue": 8535.24
-      },
-      {
-        "id": "20042",
-        "name": "[DEMO] One Piece Card Game ST-17 Starter Deck — Blue Marines",
-        "totalQty": 473,
-        "totalRevenue": 5048.29
-      },
-      {
-        "id": "10001",
-        "name": "[DEMO] Bloomburrow Draft Booster Display (36 sobres)",
-        "totalQty": 40,
-        "totalRevenue": 3947.89
+        "totalQty": 8,
+        "totalRevenue": 95500.01
       },
       {
         "id": "10002",
         "name": "[DEMO] Bloomburrow Collector Booster Display (12 sobres)",
-        "totalQty": 16,
-        "totalRevenue": 3936.72
+        "totalQty": 20,
+        "totalRevenue": 4864.04
       },
       {
-        "id": "20015",
-        "name": "[DEMO] Duskmourn: House of Horror Collector Booster Display (12 sobres)",
+        "id": "10115",
+        "name": "[DEMO] Maxx C — Starlight Rare",
         "totalQty": 13,
-        "totalRevenue": 3249.35
+        "totalRevenue": 3683.35
       },
       {
-        "id": "3199",
-        "name": "Secretos de Strixhaven — Commander Case (5 mazos)",
-        "totalQty": 15,
-        "totalRevenue": 3149.2
+        "id": "3128",
+        "name": "Collector Booster Box — Tortugas Ninja",
+        "totalQty": 6,
+        "totalRevenue": 2525.68
       },
       {
         "id": "20067",
         "name": "[DEMO] Goku Ultra Instinct SCR — Fusion World FB-03",
-        "totalQty": 10,
-        "totalRevenue": 2499.5
+        "totalQty": 9,
+        "totalRevenue": 2249.55
+      },
+      {
+        "id": "20071",
+        "name": "[DEMO] Yu-Gi-Oh! Terminal Universe Booster Box (24 sobres)",
+        "totalQty": 25,
+        "totalRevenue": 1912.27
       },
       {
         "id": "10066",
         "name": "[DEMO] Topps UEFA Champions League 2024-25 Hobby Box",
-        "totalQty": 26,
-        "totalRevenue": 2338.7
+        "totalQty": 21,
+        "totalRevenue": 1821.48
       },
       {
-        "id": "20013",
-        "name": "[DEMO] Aetherdrift Draft Booster Display (36 sobres)",
-        "totalQty": 19,
-        "totalRevenue": 1863.03
+        "id": "10001",
+        "name": "[DEMO] Bloomburrow Draft Booster Display (36 sobres)",
+        "totalQty": 18,
+        "totalRevenue": 1724.09
+      },
+      {
+        "id": "10067",
+        "name": "[DEMO] Topps Chrome UEFA Champions League 2024-25",
+        "totalQty": 14,
+        "totalRevenue": 1571.33
+      },
+      {
+        "id": "20052",
+        "name": "[DEMO] Topps WWE Chrome 2024 Hobby Box",
+        "totalQty": 17,
+        "totalRevenue": 1529.16
       }
     ],
     "topCustomers": [
       {
-        "userId": "sim_1776334950481_1yjz40n6u",
-        "name": "Marina Sanchez Molina",
-        "totalSpent": 38378.36
+        "userId": "sim_1776631928977_d8dbserun",
+        "name": "Guillermo Jimenez Rodriguez",
+        "totalSpent": 39797.36
       },
       {
-        "userId": "sim_1776334950482_fmn6qq01d",
-        "name": "Paula Munoz Diaz",
-        "totalSpent": 37979.59
+        "userId": "sim_1776631928977_5acce2v1p",
+        "name": "Sergio Munoz Rodriguez",
+        "totalSpent": 31966.04
       },
       {
-        "userId": "sim_1776334950481_q0cyud9zz",
-        "name": "Marta Torres Ortega",
-        "totalSpent": 28636.27
+        "userId": "sim_1776631928978_gfa2rbbsy",
+        "name": "David Hernandez Molina",
+        "totalSpent": 21200.37
       },
       {
-        "userId": "sim_1776334950482_37rv1x7r7",
-        "name": "Fernando Ramirez Romero",
-        "totalSpent": 27563.83
+        "userId": "sim_1776631928977_jpehh8o3d",
+        "name": "Adrian Perez Hernandez",
+        "totalSpent": 4382.39
       },
       {
-        "userId": "sim_1776334950482_uct1i52hj",
-        "name": "Rafael Romero Perez",
-        "totalSpent": 21675.22
+        "userId": "sim_1776631928976_1pnz2hrzv",
+        "name": "Marcos Hernandez Gomez",
+        "totalSpent": 3880.03
       },
       {
-        "userId": "sim_1776334950482_ek24oexa1",
-        "name": "Juan Torres Rubio",
-        "totalSpent": 20799.01
+        "userId": "sim_1776631928977_m8gvkt15d",
+        "name": "Raquel Reyes Perez",
+        "totalSpent": 3874.73
       },
       {
-        "userId": "sim_1776334950481_ot0h2qguz",
-        "name": "Olga Blanco Gonzalez",
-        "totalSpent": 16732.7
+        "userId": "sim_1776631928977_uejujm5mm",
+        "name": "Angela Alvarez Torres",
+        "totalSpent": 3861.67
       },
       {
-        "userId": "sim_1776334950482_8lysfnqjj",
-        "name": "Olga Navarro Diaz",
-        "totalSpent": 14349.54
+        "userId": "sim_1776631928977_etk8ow4i9",
+        "name": "Beatriz Castro Sanchez",
+        "totalSpent": 3536.37
       },
       {
-        "userId": "sim_1776334950482_nf0g846fn",
-        "name": "Diego Navarro Ramirez",
-        "totalSpent": 8286.75
+        "userId": "sim_1776631928977_opj8qluu2",
+        "name": "Natalia Flores Torres",
+        "totalSpent": 3519.49
       },
       {
-        "userId": "sim_1776334950481_qr100l9e8",
-        "name": "Isabel Rodriguez Castro",
-        "totalSpent": 6142.71
+        "userId": "sim_1776631928977_sulsl8o4s",
+        "name": "Irene Rubio Ortega",
+        "totalSpent": 3507.74
       }
     ],
     "geographicDistribution": {
-      "Cordoba": 14,
-      "Vizcaya": 17,
-      "Tarragona": 17,
-      "Barcelona": 8,
-      "Navarra": 15,
+      "Sevilla": 30,
+      "Leon": 12,
+      "Malaga": 19,
+      "Salamanca": 13,
+      "Alicante": 17,
       "Pontevedra": 10,
-      "Zaragoza": 11,
-      "Murcia": 19,
-      "Cantabria": 20,
-      "Alicante": 16,
-      "Salamanca": 20,
-      "Malaga": 17,
-      "Leon": 15,
-      "Badajoz": 17,
+      "Cordoba": 10,
+      "Navarra": 13,
+      "Asturias": 3,
+      "Madrid": 24,
+      "Badajoz": 27,
+      "Zaragoza": 5,
+      "Valencia": 13,
+      "Barcelona": 4,
       "Granada": 18,
-      "Asturias": 13,
-      "Cadiz": 12,
-      "Sevilla": 12,
-      "Valencia": 1
+      "Tarragona": 4,
+      "Cadiz": 5,
+      "Murcia": 2,
+      "Vizcaya": 5,
+      "Cantabria": 7
     },
     "paymentMethodDistribution": {
-      "tarjeta": 63,
-      "bizum": 43,
-      "paypal": 46,
-      "transferencia": 72,
-      "contra_reembolso": 48
+      "paypal": 42,
+      "bizum": 48,
+      "tarjeta": 55,
+      "transferencia": 38,
+      "contra_reembolso": 58
     },
     "shippingTypeDistribution": {
-      "standard": 246,
-      "tienda": 16,
-      "express": 10
+      "standard": 216,
+      "tienda": 13,
+      "express": 12
     },
-    "returnRate": "3.68%",
-    "incidentRate": "3.68%",
+    "returnRate": "4.15%",
+    "incidentRate": "4.15%",
     "stockAlerts": [
+      {
+        "id": 10001,
+        "name": "[DEMO] Bloomburrow Draft Booster Display (36 sobres)",
+        "remaining": 2,
+        "game": "magic"
+      },
+      {
+        "id": 10002,
+        "name": "[DEMO] Bloomburrow Collector Booster Display (12 sobres)",
+        "remaining": 0,
+        "game": "magic"
+      },
+      {
+        "id": 10003,
+        "name": "[DEMO] Duskmourn: House of Horror Draft Booster Display",
+        "remaining": 8,
+        "game": "magic"
+      },
+      {
+        "id": 10004,
+        "name": "[DEMO] Foundations Booster Display (36 sobres)",
+        "remaining": 7,
+        "game": "magic"
+      },
+      {
+        "id": 10005,
+        "name": "[DEMO] Modern Horizons 3 Draft Booster Display",
+        "remaining": 0,
+        "game": "magic"
+      },
+      {
+        "id": 10007,
+        "name": "[DEMO] Commander Deck Bloomburrow — Peace Offering",
+        "remaining": 8,
+        "game": "magic"
+      },
+      {
+        "id": 10008,
+        "name": "[DEMO] Commander Deck Bloomburrow — Squirreled Away",
+        "remaining": 7,
+        "game": "magic"
+      },
+      {
+        "id": 10010,
+        "name": "[DEMO] Orcish Bowmasters — Borderless (LTR)",
+        "remaining": 8,
+        "game": "magic"
+      },
+      {
+        "id": 10023,
+        "name": "[DEMO] Pokémon Scarlet & Violet 151 Booster Display",
+        "remaining": 0,
+        "game": "pokemon"
+      },
       {
         "id": 10033,
         "name": "[DEMO] Pokémon Escarlata y Púrpura 151 Caja de Sobres",
-        "remaining": 1,
+        "remaining": 2,
         "game": "pokemon"
       },
       {
-        "id": 20103,
-        "name": "[DEMO] Riftbound: Spiritforged Booster Box (24 sobres)",
-        "remaining": 10,
+        "id": 10024,
+        "name": "[DEMO] Pokémon Prismatic Evolutions Elite Trainer Box",
+        "remaining": 8,
+        "game": "pokemon"
+      },
+      {
+        "id": 10029,
+        "name": "[DEMO] Charizard ex SAR — Prismatic Evolutions",
+        "remaining": 7,
+        "game": "pokemon"
+      },
+      {
+        "id": 10030,
+        "name": "[DEMO] Eevee ex SAR — Prismatic Evolutions",
+        "remaining": 0,
+        "game": "pokemon"
+      },
+      {
+        "id": 10031,
+        "name": "[DEMO] Mew ex SAR — Scarlet & Violet 151",
+        "remaining": 0,
+        "game": "pokemon"
+      },
+      {
+        "id": 10042,
+        "name": "[DEMO] One Piece Card Game OP-08 — Two Legends Booster Box",
+        "remaining": 9,
+        "game": "one-piece"
+      },
+      {
+        "id": 10043,
+        "name": "[DEMO] One Piece Card Game OP-10 — Royal Blood Booster Box",
+        "remaining": 0,
+        "game": "one-piece"
+      },
+      {
+        "id": 10046,
+        "name": "[DEMO] Gear 5 Luffy — OP-05 Secret Rare",
+        "remaining": 0,
+        "game": "one-piece"
+      },
+      {
+        "id": 10057,
+        "name": "[DEMO] Riftbound: Noxus Rising Booster Box (24 sobres)",
+        "remaining": 0,
         "game": "riftbound"
       },
       {
-        "id": 3199,
-        "name": "Secretos de Strixhaven — Commander Case (5 mazos)",
-        "remaining": 4,
-        "game": "magic"
+        "id": 10059,
+        "name": "[DEMO] Riftbound Starter Deck — Lux & Garen",
+        "remaining": 7,
+        "game": "riftbound"
       },
       {
-        "id": 3128,
-        "name": "Collector Booster Box — Tortugas Ninja",
-        "remaining": 3,
-        "game": "magic"
-      },
-      {
-        "id": 3132,
-        "name": "Tortugas Ninja — Special Bundle Pizza (Reserva)",
-        "remaining": 6,
-        "game": "magic"
-      },
-      {
-        "id": 3134,
-        "name": "Tortugas Ninja — Draft Night",
-        "remaining": 0,
-        "game": "magic"
-      },
-      {
-        "id": 3136,
-        "name": "Tortugas Ninja — Caja Team Up",
-        "remaining": 1,
-        "game": "magic"
-      },
-      {
-        "id": 3251,
-        "name": "Edge of Eternities — Counter Intelligence Commander Deck",
-        "remaining": 0,
-        "game": "magic"
-      },
-      {
-        "id": 3258,
-        "name": "Edge of Eternities — Creative Energy Commander Deck",
-        "remaining": 0,
-        "game": "magic"
-      },
-      {
-        "id": 3260,
-        "name": "Edge of Eternities — Graveyard Overdrive Commander Deck",
-        "remaining": 0,
-        "game": "magic"
-      },
-      {
-        "id": 3262,
-        "name": "Tarkir Dragonstorm — Abzan Armor Commander Deck",
-        "remaining": 0,
-        "game": "magic"
-      },
-      {
-        "id": 3265,
-        "name": "Tarkir Dragonstorm — Jeksai Striker Commander Deck",
-        "remaining": 1,
-        "game": "magic"
-      },
-      {
-        "id": 3456,
-        "name": "Lorwyn Eclipsed — Danza Elemental Commander Deck",
-        "remaining": 4,
-        "game": "magic"
-      },
-      {
-        "id": 3458,
-        "name": "Lorwyn Eclipsed — Maldicion Perjudicadora Commander Deck",
-        "remaining": 1,
-        "game": "magic"
-      },
-      {
-        "id": 3443,
-        "name": "Caja de Sobres de Juego — Bloomburrow",
-        "remaining": 0,
-        "game": "magic"
-      },
-      {
-        "id": 3245,
-        "name": "Caja de Sobres de Juego — Final Fantasy",
-        "remaining": 0,
-        "game": "magic"
-      },
-      {
-        "id": 3563,
-        "name": "Final Fantasy — Mazo Commander Pase de Contadores (Tidus)",
-        "remaining": 6,
-        "game": "magic"
-      },
-      {
-        "id": 3565,
-        "name": "Final Fantasy — Mazo Commander Vastagos y Hechiceria (Y'shtola)",
-        "remaining": 9,
-        "game": "magic"
-      },
-      {
-        "id": 3567,
-        "name": "Final Fantasy — Mazo Commander Trance del Resurgir (Terra)",
-        "remaining": 1,
-        "game": "magic"
-      },
-      {
-        "id": 3308,
-        "name": "Heroes Ascendentes — Blister 3 sobres Charmander",
-        "remaining": 1,
-        "game": "pokemon"
+        "id": 10060,
+        "name": "[DEMO] Jinx — Secret Rare (Foundations)",
+        "remaining": 2,
+        "game": "riftbound"
       }
     ],
     "orderStatusBreakdown": {
-      "pedido": 222,
+      "pedido": 191,
       "enviado": 20,
       "entregado": 30,
       "cancelado": 15,
       "rejected": 0
     },
     "invoiceStats": {
-      "total": 287,
-      "totalTaxableBase": 284162.95,
-      "totalVAT": 59674,
-      "totalInvoiced": 338903.15
+      "total": 256,
+      "totalTaxableBase": 174836.63,
+      "totalVAT": 36715.63,
+      "totalInvoiced": 203354.83
     },
-    "emailsSent": 382,
+    "emailsSent": 351,
     "pointsStats": {
-      "totalPointsAwarded": 325171,
-      "usersWithPoints": 85
+      "totalPointsAwarded": 192123,
+      "usersWithPoints": 79
     }
   },
   "recommendations": [
