@@ -5,17 +5,14 @@
 // / INFO) y filas simples con icono + texto. Reinterpretado con la paleta
 // TCG Academy: azul profundo + blanco + acentos ámbar.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  X,
+  Menu,
   User,
   LogOut,
   ChevronRight,
-  Search,
-  Sparkles,
-  LayoutGrid,
-  Calendar,
+  ChevronDown,
   Gift,
   Package,
   Heart,
@@ -25,12 +22,9 @@ import {
   Briefcase,
   Building2,
   ShoppingBag,
-  RotateCcw,
-  HelpCircle,
   MapPin,
   Phone,
-  Truck,
-  Home,
+  MoreHorizontal,
 } from "lucide-react";
 import {
   MOBILE_GAMES as DRAWER_GAMES,
@@ -61,27 +55,41 @@ type NavItem = {
   label: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   badge?: string;
+  /** Si se provee, se usa este nodo como icono en lugar del componente Lucide.
+   *  Útil para filas con logo PNG (ej. B2B tintado ámbar). */
+  customIcon?: React.ReactNode;
 };
 
-const EXPLORE_ITEMS: NavItem[] = [
-  { href: "/novedades", label: "Novedades", icon: Sparkles },
-  { href: "/catalogo", label: "Catálogo", icon: LayoutGrid },
-  { href: "/eventos", label: "Eventos", icon: Calendar },
-  { href: "/puntos", label: "Puntos TCG", icon: Gift, badge: "×1.5" },
-];
-
+// Profesionales — orden acordado con el usuario: B2B → Vending → Franquicia
+// B2B trae icono custom (logo real ámbar) porque el Briefcase no transmite
+// el mismo concepto y el usuario quiere el símbolo específico B2B↻.
 const PRO_ITEMS: NavItem[] = [
-  { href: "/mayoristas/b2b", label: "Zona B2B", icon: Briefcase },
-  { href: "/mayoristas/franquicias", label: "Franquicias", icon: Building2 },
+  {
+    href: "/mayoristas/b2b",
+    label: "B2B",
+    icon: Briefcase,
+    customIcon: (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src="/images/logos/b2b-amber.png"
+        alt=""
+        className="h-[22px] w-[22px] object-contain"
+      />
+    ),
+  },
   { href: "/mayoristas/vending", label: "Vending", icon: ShoppingBag },
+  { href: "/mayoristas/franquicias", label: "Franquicia", icon: Building2 },
 ];
 
+// Info y ayuda — reducido a lo esencial (Nuestras tiendas + Contacto)
 const HELP_ITEMS: NavItem[] = [
   { href: "/tiendas", label: "Nuestras tiendas", icon: MapPin },
   { href: "/contacto", label: "Contacto", icon: Mail },
-  { href: "/devoluciones", label: "Devoluciones", icon: RotateCcw },
-  { href: "/condiciones-puntos", label: "Ayuda puntos", icon: HelpCircle },
 ];
+
+// Slugs de juegos que aparecen bajo "Otros" (colapsado por defecto).
+// El resto de DRAWER_GAMES aparece directamente en "Inicio".
+const OTROS_SLUGS = new Set(["yugioh", "panini", "digimon", "lorcana", "naruto"]);
 
 const ACCOUNT_ITEMS: NavItem[] = [
   { href: "/cuenta/pedidos", label: "Mis pedidos", icon: Package },
@@ -91,14 +99,11 @@ const ACCOUNT_ITEMS: NavItem[] = [
   { href: "/cuenta/mensajes", label: "Mensajes", icon: MessageCircle },
 ];
 
-// Juegos principales vs otros TCG (división visual como en el reference).
-const PRIMARY_SLUGS = new Set(["pokemon", "magic", "one-piece", "riftbound"]);
-
 // ─── Componentes auxiliares ────────────────────────────────────────────────
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div className="px-5 pt-6 pb-3">
+    <div className="px-5 pt-3 pb-1">
       <span className="text-[11px] font-black tracking-[0.22em] text-amber-400 uppercase">
         {children}
       </span>
@@ -149,53 +154,278 @@ function DarkRow({
   );
 }
 
-/** Thumbnail circular para un juego — usa sprite/logo a tamaño reducido. */
-function GameThumb({ game }: { game: MobileGame }) {
-  const renderH = 26;
-  const sprite = game.sprite;
-  const spriteScale = sprite ? renderH / SPRITE_H : 1;
-  const spriteW = sprite ? sprite.origW * spriteScale : 0;
-  const spriteX = sprite ? sprite.origX * spriteScale : 0;
+/** Icono a la IZQUIERDA del título de cada juego. Para los juegos con
+ *  símbolo icónico (Pokeball, Riftbound, Magic) usamos SVG. Para el resto,
+ *  usamos el logo oficial ya presente en el proyecto (sprite o imagen). */
+function GameIcon({ game }: { game: MobileGame }) {
+  const { slug, logo, sprite, filter, blend } = game;
+  const box = "flex h-6 w-6 shrink-0 items-center justify-center";
 
-  return (
-    <span
-      className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-white/95 shadow-sm ring-1 ring-white/20"
-      aria-hidden="true"
-    >
-      {sprite ? (
+  // Pokeball — imagen real que pasó el usuario, procesada (fondo recortado).
+  if (slug === "pokemon") {
+    return (
+      <span className={box} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logos/pokeball.png"
+          alt=""
+          className="h-[22px] w-[22px] object-contain"
+        />
+      </span>
+    );
+  }
+
+  // Riftbound — vórtice naranja (imagen real del usuario, fondo negro quitado
+  // por umbral de calidez/luminancia).
+  if (slug === "riftbound") {
+    return (
+      <span className={box} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logos/riftbound-vortex.png"
+          alt=""
+          className="h-[22px] w-[22px] object-contain"
+        />
+      </span>
+    );
+  }
+
+  // Magic — símbolo Planeswalker (imagen real que pasó el usuario, con
+  // fondo oscuro eliminado por umbral de color).
+  if (slug === "magic") {
+    return (
+      <span className={box} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logos/magic-planeswalker.png"
+          alt=""
+          className="h-[22px] w-[22px] object-contain"
+        />
+      </span>
+    );
+  }
+
+  // Dragon Ball — bola naranja 4 estrellas (imagen real del usuario, fondo
+  // marrón oscuro quitado por flood fill por luminancia). ?v=2 = cache-buster
+  // porque navegadores móviles tienden a cachear agresivamente los PNG.
+  if (slug === "dragon-ball") {
+    return (
+      <span className={box} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logos/dragonball-4stars.png?v=3"
+          alt=""
+          className="h-[22px] w-[22px] object-contain"
+        />
+      </span>
+    );
+  }
+
+  // Yu-Gi-Oh — triángulo rojo con letras (imagen real del usuario, fondo
+  // negro quitado por umbral de luminancia).
+  if (slug === "yugioh") {
+    return (
+      <span className={box} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logos/yugioh-triangle.png"
+          alt=""
+          className="h-[22px] w-[22px] object-contain"
+        />
+      </span>
+    );
+  }
+
+  // One Piece — calavera Straw Hat (imagen real del usuario, fondo blanco
+  // quitado por flood fill desde los bordes — el cráneo interior queda intacto).
+  if (slug === "one-piece") {
+    return (
+      <span className={box} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logos/onepiece-strawhat.png"
+          alt=""
+          className="h-[22px] w-[22px] object-contain"
+        />
+      </span>
+    );
+  }
+
+  // Topps — wordmark rojo con contorno blanco (imagen real del usuario,
+  // fondo negro quitado por umbral de luminancia). ?v=2 = cache-buster tras
+  // cambiar el logo del círculo deportivo al nuevo wordmark.
+  if (slug === "topps") {
+    return (
+      <span className={box} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logos/topps-sports.png?v=2"
+          alt=""
+          className="h-[22px] w-[22px] object-contain"
+        />
+      </span>
+    );
+  }
+
+  // Naruto — sol con espiral naranja (imagen real del usuario, fondo blanco
+  // quitado por flood fill).
+  if (slug === "naruto") {
+    return (
+      <span className={box} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logos/naruto-sun.png"
+          alt=""
+          className="h-[22px] w-[22px] object-contain"
+        />
+      </span>
+    );
+  }
+
+  // Lorcana — estrella dorada con adornos (imagen real del usuario, fondo
+  // navy quitado por umbral de luminancia).
+  if (slug === "lorcana") {
+    return (
+      <span className={box} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logos/lorcana-star.png"
+          alt=""
+          className="h-[22px] w-[22px] object-contain"
+        />
+      </span>
+    );
+  }
+
+  // Digimon — Digivice amarillo (imagen real del usuario, fondo claro
+  // quitado + chispitas decorativas eliminadas por keep-largest-component).
+  if (slug === "digimon") {
+    return (
+      <span className={box} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logos/digimon-digivice.png"
+          alt=""
+          className="h-[22px] w-[22px] object-contain"
+        />
+      </span>
+    );
+  }
+
+  // Cyberpunk — rayo amarillo/verde (imagen real del usuario, fondo negro
+  // quitado por flood-fill desde los bordes con umbral de luminancia).
+  if (slug === "cyberpunk") {
+    return (
+      <span className={box} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logos/cyberpunk-bolt.png"
+          alt=""
+          className="h-[22px] w-[22px] object-contain"
+        />
+      </span>
+    );
+  }
+
+  // Panini — "P" roja con contorno negro (imagen real del usuario, fondo
+  // amarillo eliminado; el hueco interior de la P se limpia por pasada global
+  // porque el flood-fill desde bordes no alcanza áreas cerradas).
+  if (slug === "panini") {
+    return (
+      <span className={box} aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logos/panini-p.png"
+          alt=""
+          className="h-[22px] w-[22px] object-contain"
+        />
+      </span>
+    );
+  }
+
+  // Resto: usar el logo oficial ya presente en el proyecto (sprite o imagen),
+  // sobre fondo circular claro para que contraste con el drawer oscuro.
+  if (sprite) {
+    const renderH = 22;
+    const scale = renderH / SPRITE_H;
+    const w = sprite.origW * scale;
+    const x = sprite.origX * scale;
+    return (
+      <span
+        className={`${box} overflow-hidden rounded-full bg-white/95 p-0.5 ring-1 ring-white/20`}
+        aria-hidden="true"
+      >
         <span
           style={{
             display: "block",
-            width: Math.min(spriteW, 24),
+            width: Math.min(w, 20),
             height: renderH,
             backgroundImage: `url(${SPRITE_SRC})`,
             backgroundSize: `auto ${renderH}px`,
-            backgroundPosition: `-${spriteX}px 0`,
+            backgroundPosition: `-${x}px 0`,
             backgroundRepeat: "no-repeat",
             filter: sprite.filter ?? undefined,
           }}
         />
-      ) : (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
-          src={game.logo}
-          alt=""
-          className="max-h-5 max-w-5 object-contain"
-          style={{
-            filter: game.filter ?? undefined,
-            mixBlendMode: game.blend ? "multiply" : undefined,
-          }}
-        />
-      )}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={`${box} overflow-hidden rounded-full bg-white/95 p-0.5 ring-1 ring-white/20`}
+      aria-hidden="true"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={logo}
+        alt=""
+        className="max-h-4 max-w-4 object-contain"
+        style={{
+          filter: filter ?? undefined,
+          mixBlendMode: blend ? "multiply" : undefined,
+        }}
+      />
     </span>
+  );
+}
+
+/** Fila de juego: icono IZQUIERDA + label + chevron derecha. Altura reducida. */
+function GameRow({
+  game,
+  active,
+  onClick,
+}: {
+  game: MobileGame;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Link
+      href={`/${game.slug}`}
+      onClick={onClick}
+      className={`flex min-h-[42px] items-center gap-3 px-5 py-2 text-white transition-colors active:bg-white/10 ${
+        active ? "bg-white/5" : "hover:bg-white/[0.04]"
+      }`}
+    >
+      <GameIcon game={game} />
+      <span
+        className={`flex-1 text-[13px] font-black tracking-[0.05em] uppercase ${
+          active ? "text-amber-300" : "text-white"
+        }`}
+      >
+        {game.label}
+      </span>
+      <ChevronRight size={15} className="shrink-0 text-white/30" />
+    </Link>
   );
 }
 
 // ─── Drawer principal ──────────────────────────────────────────────────────
 
 export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
-  const [query, setQuery] = useState("");
-  const formRef = useRef<HTMLFormElement>(null);
+  // Estado del panel "Otros" (juegos secundarios). Cerrado por defecto.
+  const [otrosOpen, setOtrosOpen] = useState(false);
 
   // Bloquear scroll del body al abrir
   useEffect(() => {
@@ -216,28 +446,12 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  const handleClose = () => {
-    setQuery("");
-    onClose();
-  };
+  const handleClose = () => onClose();
 
   const go = () => handleClose();
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = query.trim();
-    if (!q) return;
-    handleClose();
-    setTimeout(() => {
-      window.location.href = `/busqueda?q=${encodeURIComponent(q)}`;
-    }, 150);
-  };
-
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
-
-  const primaryGames = DRAWER_GAMES.filter((g) => PRIMARY_SLUGS.has(g.slug));
-  const otherGames = DRAWER_GAMES.filter((g) => !PRIMARY_SLUGS.has(g.slug));
 
   return (
     <div
@@ -257,60 +471,52 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
 
       {/* Drawer — full dark */}
       <div
-        className="absolute top-0 left-0 flex h-full w-[90vw] max-w-[400px] flex-col shadow-2xl transition-transform duration-300 ease-out"
+        className="absolute top-0 left-0 flex h-full w-[76vw] max-w-[305px] flex-col shadow-2xl transition-transform duration-300 ease-out"
         style={{
           transform: open ? "translateX(0)" : "translateX(-100%)",
           background:
-            "linear-gradient(180deg, #050912 0%, #0a1024 45%, #0a0f1a 100%)",
+            "linear-gradient(180deg, #0a1432 0%, #0a1024 55%, #070e1f 100%)",
         }}
       >
         {/* ═══ HEADER ═══════════════════════════════════════════════════════ */}
-        <div className="relative flex-shrink-0 border-b border-white/10 pb-4">
-          {/* Cerrar */}
+        <div className="relative flex-shrink-0 border-b border-white/10 pb-2">
+          {/* Cerrar con las 3 rayas — mismo Y que el Menu del Header (trust bar
+              24 + container pt 6 - mt 3 = 27px), para que al abrir/cerrar el
+              drawer el icono no "salte". Centro del icono ≈ centro del texto. */}
           <button
             onClick={handleClose}
-            className="absolute top-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+            className="absolute top-[27px] left-4 z-10 flex items-center justify-center rounded-lg p-1 text-white transition hover:bg-white/10"
             aria-label="Cerrar menú"
           >
-            <X size={17} />
+            <Menu size={24} />
           </button>
 
-          <div className="flex items-center gap-3 px-5 pt-5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/logo-tcg-shield-trimmed.png"
-              alt="TCG Academy"
-              className="h-14 w-auto shrink-0 drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black tracking-[0.22em] text-amber-400 uppercase">
-                TCG Academy
-              </p>
-              <p className="mt-0.5 truncate text-base leading-tight font-black text-white">
-                {user ? (
-                  <>
-                    Hola,{" "}
-                    <span className="text-amber-300">
-                      {user.name.split(" ")[0]}
-                    </span>
-                  </>
-                ) : (
-                  "Bienvenido"
-                )}
-              </p>
-            </div>
+          {/* Texto — pt-[30px] para que TCG Academy aparezca en la misma
+              coordenada Y que en el Header cerrado (trust bar 24 + 6). */}
+          <div className="pt-[30px] pr-4 pl-14">
+            <span className="block text-[1.7rem] leading-none font-black tracking-tight whitespace-nowrap text-white">
+              TCG <span className="text-amber-300">Academy</span>
+            </span>
+            {user && (
+              <span className="mt-1 block truncate text-[13px] leading-none font-semibold text-white/70">
+                Hola,{" "}
+                <span className="font-black text-amber-300">
+                  {user.name.split(" ")[0]}
+                </span>
+              </span>
+            )}
           </div>
 
-          {/* CTAs auth */}
-          <div className="mt-4 flex gap-2 px-5">
+          {/* CTAs auth — compactos, pegados al texto */}
+          <div className="mt-2 flex gap-2 px-4">
             {user ? (
               <>
                 <Link
                   href={user.role === "admin" ? "/admin" : "/cuenta/datos"}
                   onClick={go}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-amber-400 px-3 py-2.5 text-sm font-black text-gray-900 shadow-md transition active:scale-[0.97]"
+                  className="flex flex-1 items-center justify-center gap-1 rounded-md bg-amber-400 px-2 py-1.5 text-xs font-black text-gray-900 shadow-sm transition active:scale-[0.97]"
                 >
-                  <User size={15} />
+                  <User size={13} />
                   {user.role === "admin" ? "Panel Admin" : "Mi cuenta"}
                 </Link>
                 <button
@@ -318,10 +524,10 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
                     logout();
                     handleClose();
                   }}
-                  className="flex items-center justify-center gap-1.5 rounded-lg border border-white/20 px-3 py-2.5 text-xs font-semibold text-white/90 transition hover:bg-white/10 active:scale-[0.97]"
+                  className="flex items-center justify-center gap-1 rounded-md border border-white/20 px-2 py-1.5 text-xs font-semibold text-white/90 transition hover:bg-white/10 active:scale-[0.97]"
                   aria-label="Cerrar sesión"
                 >
-                  <LogOut size={14} />
+                  <LogOut size={12} />
                   Salir
                 </button>
               </>
@@ -330,14 +536,14 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
                 <Link
                   href="/login"
                   onClick={go}
-                  className="flex flex-1 items-center justify-center rounded-lg bg-amber-400 px-3 py-2.5 text-sm font-black text-gray-900 shadow-md transition hover:bg-amber-300 active:scale-[0.97]"
+                  className="flex flex-1 items-center justify-center rounded-md bg-amber-400 px-2 py-1.5 text-xs font-black text-gray-900 shadow-sm transition hover:bg-amber-300 active:scale-[0.97]"
                 >
                   Iniciar sesión
                 </Link>
                 <Link
                   href="/registro"
                   onClick={go}
-                  className="flex flex-1 items-center justify-center rounded-lg border-2 border-white/25 px-3 py-2.5 text-sm font-bold text-white transition hover:border-white/50 hover:bg-white/10 active:scale-[0.97]"
+                  className="flex flex-1 items-center justify-center rounded-md border border-white/25 px-2 py-1.5 text-xs font-bold text-white transition hover:border-white/50 hover:bg-white/10 active:scale-[0.97]"
                 >
                   Crear cuenta
                 </Link>
@@ -345,92 +551,111 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
             )}
           </div>
 
-          {/* Barra envío */}
-          <div className="mt-3 mx-5 flex items-center gap-2 rounded-md bg-white/[0.06] px-3 py-1.5 text-[11px]">
-            <Truck size={12} className="text-amber-300" />
-            <span className="text-white/80">
-              Envío gratis desde{" "}
-              <strong className="text-amber-300">
-                {SITE_CONFIG.shippingThreshold}€
-              </strong>
-            </span>
-          </div>
         </div>
 
-        {/* ═══ CONTENIDO SCROLL ═════════════════════════════════════════════ */}
-        <div className="flex-1 overflow-y-auto overscroll-contain">
-          {/* BUSCADOR */}
-          <div className="px-5 pt-4 pb-2">
-            <form ref={formRef} onSubmit={handleSearchSubmit} className="relative">
-              <Search
-                size={14}
-                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-white/40"
-              />
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar cartas, sobres, juegos…"
-                className="h-10 w-full rounded-lg border border-white/10 bg-white/[0.05] pr-4 pl-9 text-sm text-white placeholder:text-white/40 focus:border-amber-400/50 focus:bg-white/[0.08] focus:outline-none"
-                autoComplete="off"
-              />
-            </form>
-          </div>
-
-          {/* ═══ INICIO ═════════════════════════════════════════════════════ */}
+        {/* ═══ CONTENIDO SCROLL ═════════════════════════════════════════════
+            Wrapper relativo para colocar el escudo como marca de agua detrás
+            de los títulos del menú. Queda fijo mientras el contenido hace
+            scroll por encima. Muy baja opacidad + ajustado a los laterales. */}
+        <div className="relative flex-1 overflow-hidden">
+          {/* Altura FIJA (h-[240px]) para que la banda "TCG ACADEMY" del
+              escudo caiga siempre en el mismo Y (≈195px desde el top del
+              scroll: justo en el divisor entre Game 4 y Game 5). Con
+              object-contain se preserva la proporción aunque cambie el ancho
+              del drawer. inset-x-2 mantiene la sensación "ajustado a los
+              laterales" sin violar la proporción del escudo. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/logo-tcg-shield-trimmed.png"
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-2 top-[55px] h-[240px] w-[calc(100%-16px)] select-none object-contain opacity-[0.08]"
+          />
+          <div className="relative h-full overflow-y-auto overscroll-contain">
+          {/* ═══ INICIO (juegos principales, excluyendo "Otros") ════════════ */}
           <SectionTitle>Inicio</SectionTitle>
           <div className="divide-y divide-white/[0.06]">
+            {DRAWER_GAMES.filter((g) => !OTROS_SLUGS.has(g.slug)).map((game) => (
+              <GameRow
+                key={game.slug}
+                game={game}
+                active={isActive(`/${game.slug}`)}
+                onClick={go}
+              />
+            ))}
+
+            {/* ─── Botón "Otros" — despliega los juegos secundarios con una
+                transición suave (grid-rows trick: 0fr → 1fr). */}
+            <button
+              type="button"
+              onClick={() => setOtrosOpen((v) => !v)}
+              aria-expanded={otrosOpen}
+              aria-controls="drawer-otros-panel"
+              className={`flex min-h-[42px] w-full items-center gap-3 px-5 py-2 text-white transition-colors active:bg-white/10 ${
+                otrosOpen ? "bg-white/5" : "hover:bg-white/[0.04]"
+              }`}
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                <MoreHorizontal size={18} className="text-amber-400" />
+              </span>
+              <span
+                className={`flex-1 text-left text-[13px] font-black tracking-[0.05em] uppercase ${
+                  otrosOpen ? "text-amber-300" : "text-white"
+                }`}
+              >
+                Otros
+              </span>
+              <ChevronDown
+                size={15}
+                className={`shrink-0 text-white/40 transition-transform duration-300 ${
+                  otrosOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Panel "Otros" — transición de altura via grid-rows + opacidad.
+              Sin layout shift brusco: pasa de 0fr a 1fr de forma animada. */}
+          <div
+            id="drawer-otros-panel"
+            className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-300 ease-out ${
+              otrosOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+            }`}
+            aria-hidden={!otrosOpen}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <div className="divide-y divide-white/[0.06] border-t border-white/[0.06] bg-white/[0.02]">
+                {DRAWER_GAMES.filter((g) => OTROS_SLUGS.has(g.slug)).map((game) => (
+                  <GameRow
+                    key={game.slug}
+                    game={game}
+                    active={isActive(`/${game.slug}`)}
+                    onClick={go}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ═══ SERVICIOS — Compramos tus cartas ═══════════════════════════ */}
+          <SectionTitle>Servicios</SectionTitle>
+          <div className="divide-y divide-white/[0.06]">
             <DarkRow
-              href="/"
+              href="/compramos-tus-cartas"
               onClick={go}
-              icon={<Home size={18} className="text-amber-400" />}
-              label="Home"
-              active={pathname === "/"}
-            />
-            {primaryGames.map((game) => (
-              <DarkRow
-                key={game.slug}
-                href={`/${game.slug}`}
-                onClick={go}
-                icon={<GameThumb game={game} />}
-                label={game.label}
-                active={isActive(`/${game.slug}`)}
-              />
-            ))}
-          </div>
-
-          {/* ═══ OTROS TCG ══════════════════════════════════════════════════ */}
-          <SectionTitle>Otros TCG</SectionTitle>
-          <div className="divide-y divide-white/[0.06]">
-            {otherGames.map((game) => (
-              <DarkRow
-                key={game.slug}
-                href={`/${game.slug}`}
-                onClick={go}
-                icon={<GameThumb game={game} />}
-                label={game.label}
-                active={isActive(`/${game.slug}`)}
-              />
-            ))}
-          </div>
-
-          {/* ═══ EXPLORAR ═══════════════════════════════════════════════════ */}
-          <SectionTitle>Explorar</SectionTitle>
-          <div className="divide-y divide-white/[0.06]">
-            {EXPLORE_ITEMS.map((item) => {
-              const Icon = item.icon;
-              return (
-                <DarkRow
-                  key={item.href}
-                  href={item.href}
-                  onClick={go}
-                  icon={<Icon size={18} className="text-amber-400" />}
-                  label={item.label}
-                  badge={item.badge}
-                  active={isActive(item.href)}
+              icon={
+                // Moneda naranja con € blanco (imagen real del usuario, fondo
+                // checkerboard quitado por flood-fill neutro desde los bordes).
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src="/images/logos/euro-coin.png"
+                  alt=""
+                  className="h-[22px] w-[22px] object-contain"
                 />
-              );
-            })}
+              }
+              label="Compramos tus cartas"
+              active={isActive("/compramos-tus-cartas")}
+            />
           </div>
 
           {/* ═══ MI CUENTA — solo logeado no-admin ══════════════════════════ */}
@@ -465,7 +690,11 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
                   key={item.href}
                   href={item.href}
                   onClick={go}
-                  icon={<Icon size={18} className="text-amber-400" />}
+                  icon={
+                    item.customIcon ?? (
+                      <Icon size={18} className="text-amber-400" />
+                    )
+                  }
                   label={item.label}
                   active={isActive(item.href)}
                 />
@@ -519,6 +748,7 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
 
           {/* Espacio para notch/gesture bar */}
           <div className="h-6" />
+          </div>
         </div>
       </div>
     </div>
