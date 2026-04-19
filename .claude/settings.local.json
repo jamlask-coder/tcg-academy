@@ -17,7 +17,10 @@
       "WebFetch(domain:api.tcgdex.net)",
       "WebFetch(domain:assets.tcgdex.net)",
       "WebFetch(domain:www.pricecharting.com)",
-      "WebFetch(domain:localhost)"
+      "WebFetch(domain:localhost)",
+      "WebFetch(domain:pokemillon.es)",
+      "WebFetch(domain:www.pokemillon.com)",
+      "WebFetch(domain:battledeck.es)"
     ]
   }
 }

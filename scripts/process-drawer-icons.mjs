@@ -482,24 +482,30 @@ async function processNaruto(inputPath, outputPath) {
   console.log(`✓ ${outputPath}`);
 }
 
-// ── Topps: wordmark "topps" rojo con contorno blanco sobre fondo negro ────
-// El nuevo screenshot es el logotipo de texto, no el círculo deportivo. Fondo
-// casi negro → flood-fill por luminancia baja. El contorno blanco del texto
-// y el relleno rojo quedan intactos (ambos con lum alta).
+// ── Topps: 3 pelotas deportivas (fútbol, basket, tenis) sobre checkerboard
+// El usuario quiere los colores ORIGINALES (blanco+gris fútbol, naranja
+// basket, amarillo tenis), NO tinte ámbar. Solo quitamos el checkerboard.
+// Problema: el checkerboard es neutro y claro, pero el balón de fútbol
+// TAMBIÉN tiene zonas blancas. Los contornos negros del balón encierran
+// el interior, así que flood-fill desde bordes mata el exterior pero no
+// puede entrar a los gajos blancos interiores. No hay pasada global aquí
+// porque perderíamos el blanco del fútbol.
 async function processTopps(inputPath, outputPath) {
   const img = sharp(inputPath).ensureAlpha();
   const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
   const { width, height, channels } = info;
 
   const out = Buffer.from(data);
-  // BG = casi negro. Rojo saturado y blanco puro del contorno están muy por
-  // encima del umbral.
+  // BG checkerboard: neutro (spread muy bajo) y muy claro. Umbral estricto
+  // para no tocar los grises medios (hexágonos oscuros del fútbol) ni las
+  // sombras claras.
   floodFillFromEdges(out, width, height, channels, (idx) => {
     const r = out[idx];
     const g = out[idx + 1];
     const b = out[idx + 2];
     const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-    return lum < 40;
+    const spread = Math.max(r, g, b) - Math.min(r, g, b);
+    return spread < 15 && lum > 190;
   });
 
   await sharp(out, { raw: { width, height, channels } })
@@ -580,6 +586,211 @@ async function processDigimon(inputPath, outputPath) {
 
   // Quitar chispitas flotantes (componentes conexos pequeños)
   keepLargestOpaqueComponent(out, width, height, channels);
+
+  await sharp(out, { raw: { width, height, channels } })
+    .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 1 })
+    .resize(256, 256, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png({ compressionLevel: 9 })
+    .toFile(outputPath);
+  console.log(`✓ ${outputPath}`);
+}
+
+// ── Seal: sello "QUALITY SATISFACTION GUARANTEED" azul marino → ámbar ────
+// Sello con textura vintage (navy oscuro sobre blanco con granulado). Tiene
+// texto BLANCO interior (QUALITY, SATISFACTION, GUARANTEED) encerrado por
+// el navy. Estrategia: flood-fill blanco desde bordes + pasada global para
+// limpiar el blanco interior + recolor navy → ámbar con alpha por oscuridad.
+async function processSeal(inputPath, outputPath) {
+  const img = sharp(inputPath).ensureAlpha();
+  const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+
+  const out = Buffer.from(data);
+  const isLightBg = (idx) => {
+    const r = out[idx];
+    const g = out[idx + 1];
+    const b = out[idx + 2];
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    const spread = Math.max(r, g, b) - Math.min(r, g, b);
+    return spread < 30 && lum > 170;
+  };
+  floodFillFromEdges(out, width, height, channels, isLightBg);
+
+  // Huecos interiores (texto blanco dentro del sello, granulado claro)
+  const total = width * height;
+  for (let i = 0; i < total; i++) {
+    const idx = i * channels;
+    if (out[idx + 3] === 0) continue;
+    if (isLightBg(idx)) out[idx + 3] = 0;
+  }
+
+  // Recolor navy → ámbar. alpha proporcional a la oscuridad original para
+  // preservar la textura vintage del sello (píxeles grises intermedios
+  // aparecen como ámbar medio-transparente, dando el mismo "look").
+  const AMBER_R = 251, AMBER_G = 191, AMBER_B = 36;
+  for (let i = 0; i < total; i++) {
+    const idx = i * channels;
+    if (out[idx + 3] === 0) continue;
+    const r = out[idx];
+    const g = out[idx + 1];
+    const b = out[idx + 2];
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    out[idx] = AMBER_R;
+    out[idx + 1] = AMBER_G;
+    out[idx + 2] = AMBER_B;
+    out[idx + 3] = Math.min(out[idx + 3], Math.max(0, Math.min(255, Math.round(255 - lum))));
+  }
+
+  await sharp(out, { raw: { width, height, channels } })
+    .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 1 })
+    .resize(256, 256, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png({ compressionLevel: 9 })
+    .toFile(outputPath);
+  console.log(`✓ ${outputPath}`);
+}
+
+// ── Money: fajo de billetes blanco sobre fondo negro → ámbar ─────────────
+// Invertimos la lógica de B2B: aquí el sujeto es CLARO y el fondo OSCURO.
+// Flood-fill por luminancia baja quita el negro; luego recoloreamos a ámbar
+// con alpha proporcional al BRILLO original (píxeles más blancos = más
+// opacos) para que los detalles (el pliegue de los billetes, los óvalos)
+// queden limpios.
+async function processMoney(inputPath, outputPath) {
+  const img = sharp(inputPath).ensureAlpha();
+  const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+
+  const out = Buffer.from(data);
+
+  floodFillFromEdges(out, width, height, channels, (idx) => {
+    const r = out[idx];
+    const g = out[idx + 1];
+    const b = out[idx + 2];
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    return lum < 40;
+  });
+
+  const total = width * height;
+  const AMBER_R = 251, AMBER_G = 191, AMBER_B = 36;
+  for (let i = 0; i < total; i++) {
+    const idx = i * channels;
+    if (out[idx + 3] === 0) continue;
+    const r = out[idx];
+    const g = out[idx + 1];
+    const b = out[idx + 2];
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    out[idx] = AMBER_R;
+    out[idx + 1] = AMBER_G;
+    out[idx + 2] = AMBER_B;
+    out[idx + 3] = Math.min(out[idx + 3], Math.max(0, Math.min(255, Math.round(lum))));
+  }
+
+  await sharp(out, { raw: { width, height, channels } })
+    .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 1 })
+    .resize(256, 256, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png({ compressionLevel: 9 })
+    .toFile(outputPath);
+  console.log(`✓ ${outputPath}`);
+}
+
+// ── Franquicias: 3 tienditas negras con líneas sobre checkerboard → ámbar ─
+// Misma lógica que B2B (negro sobre claro): flood-fill neutro desde bordes
+// quita el checkerboard + pasada global para huecos interiores (los huecos
+// de las tiendas que están cerrados por los trazos negros). Recolor negro
+// → ámbar con alpha por oscuridad.
+async function processFranchises(inputPath, outputPath) {
+  const img = sharp(inputPath).ensureAlpha();
+  const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+
+  const out = Buffer.from(data);
+  const isLightNeutral = (idx) => {
+    const r = out[idx];
+    const g = out[idx + 1];
+    const b = out[idx + 2];
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    const spread = Math.max(r, g, b) - Math.min(r, g, b);
+    return spread < 25 && lum > 130;
+  };
+  floodFillFromEdges(out, width, height, channels, isLightNeutral);
+
+  // Huecos internos cerrados (entrada de tienda, toldos): limpiar global.
+  const total = width * height;
+  for (let i = 0; i < total; i++) {
+    const idx = i * channels;
+    if (out[idx + 3] === 0) continue;
+    if (isLightNeutral(idx)) out[idx + 3] = 0;
+  }
+
+  const AMBER_R = 251, AMBER_G = 191, AMBER_B = 36;
+  for (let i = 0; i < total; i++) {
+    const idx = i * channels;
+    if (out[idx + 3] === 0) continue;
+    const r = out[idx];
+    const g = out[idx + 1];
+    const b = out[idx + 2];
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    out[idx] = AMBER_R;
+    out[idx + 1] = AMBER_G;
+    out[idx + 2] = AMBER_B;
+    out[idx + 3] = Math.min(out[idx + 3], Math.max(0, Math.min(255, Math.round(255 - lum))));
+  }
+
+  await sharp(out, { raw: { width, height, channels } })
+    .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 1 })
+    .resize(256, 256, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png({ compressionLevel: 9 })
+    .toFile(outputPath);
+  console.log(`✓ ${outputPath}`);
+}
+
+// ── Cart: carrito con 4 cajas amarillas y contorno negro sobre checkerboard
+// El sujeto es bicolor (amarillo + negro). Estrategia:
+//   1) Flood-fill neutro-claro desde bordes → transparente (mata checkerboard).
+//      El amarillo es saturado (spread grande) → no matchea. El negro interno
+//      sobrevive porque está encerrado por el amarillo.
+//   2) Recolor uniforme a ámbar: toda forma queda en color ámbar, preservando
+//      la silueta del carrito (cajas + ruedas + tirador).
+async function processCart(inputPath, outputPath) {
+  const img = sharp(inputPath).ensureAlpha();
+  const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+
+  const out = Buffer.from(data);
+  floodFillFromEdges(out, width, height, channels, (idx) => {
+    const r = out[idx];
+    const g = out[idx + 1];
+    const b = out[idx + 2];
+    const spread = Math.max(r, g, b) - Math.min(r, g, b);
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    // Checkerboard: neutro (spread < 25) y claro (lum > 130).
+    return spread < 25 && lum > 130;
+  });
+
+  const total = width * height;
+  // Paleta dos-tonos para preservar la estructura del carrito:
+  //   - Relleno (píxeles originalmente amarillos, lum alta) → amber-200 claro
+  //   - Contornos (píxeles originalmente negros, lum baja) → amber-400 vivo
+  // Ambos con alpha original → antialiasing suave en los bordes.
+  const AMBER_400_R = 251, AMBER_400_G = 191, AMBER_400_B = 36; // #fbbf24
+  const AMBER_200_R = 253, AMBER_200_G = 230, AMBER_200_B = 138; // #fde68a
+  for (let i = 0; i < total; i++) {
+    const idx = i * channels;
+    if (out[idx + 3] === 0) continue;
+    const r = out[idx];
+    const g = out[idx + 1];
+    const b = out[idx + 2];
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (lum > 130) {
+      out[idx] = AMBER_200_R;
+      out[idx + 1] = AMBER_200_G;
+      out[idx + 2] = AMBER_200_B;
+    } else {
+      out[idx] = AMBER_400_R;
+      out[idx + 1] = AMBER_400_G;
+      out[idx + 2] = AMBER_400_B;
+    }
+  }
 
   await sharp(out, { raw: { width, height, channels } })
     .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 1 })
@@ -725,6 +936,59 @@ async function processPanini(inputPath, outputPath) {
   console.log(`✓ ${outputPath}`);
 }
 
+// ── Vending: máquina expendedora gris sobre fondo claro → ámbar ──────────
+// BG claro neutro se quita por flood-fill; los grises oscuros del chasis se
+// recolorean a ámbar con alpha proporcional a la oscuridad (look consistente
+// con seal/money). Pasada global después para limpiar huecos interiores
+// neutros claros (los estantes internos) que el flood-fill no alcanza.
+async function processVending(inputPath, outputPath) {
+  const img = sharp(inputPath).ensureAlpha();
+  const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+
+  const out = Buffer.from(data);
+  const isLightBg = (idx) => {
+    const r = out[idx];
+    const g = out[idx + 1];
+    const b = out[idx + 2];
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    const spread = Math.max(r, g, b) - Math.min(r, g, b);
+    return spread < 25 && lum > 200;
+  };
+  floodFillFromEdges(out, width, height, channels, isLightBg);
+
+  // Pasada global: limpiar cualquier claro neutro residual (no hay colores
+  // saturados en la imagen, así que es seguro).
+  const total = width * height;
+  for (let i = 0; i < total; i++) {
+    const idx = i * channels;
+    if (out[idx + 3] === 0) continue;
+    if (isLightBg(idx)) out[idx + 3] = 0;
+  }
+
+  // Recolor gris → ámbar. alpha por oscuridad (más oscuro = más opaco).
+  const AMBER_R = 251, AMBER_G = 191, AMBER_B = 36;
+  for (let i = 0; i < total; i++) {
+    const idx = i * channels;
+    if (out[idx + 3] === 0) continue;
+    const r = out[idx];
+    const g = out[idx + 1];
+    const b = out[idx + 2];
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    out[idx] = AMBER_R;
+    out[idx + 1] = AMBER_G;
+    out[idx + 2] = AMBER_B;
+    out[idx + 3] = Math.min(out[idx + 3], Math.max(0, Math.min(255, Math.round(255 - lum))));
+  }
+
+  await sharp(out, { raw: { width, height, channels } })
+    .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 1 })
+    .resize(256, 256, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png({ compressionLevel: 9 })
+    .toFile(outputPath);
+  console.log(`✓ ${outputPath}`);
+}
+
 await processPokeball(
   path.join(SRC_DIR, "Captura de pantalla 2026-04-19 175504.png"),
   path.join(DST_DIR, "pokeball.png"),
@@ -761,7 +1025,7 @@ await processNaruto(
 );
 
 await processTopps(
-  path.join(SRC_DIR, "Captura de pantalla 2026-04-19 185836.png"),
+  path.join(SRC_DIR, "Captura de pantalla 2026-04-19 205038.png"),
   path.join(DST_DIR, "topps-sports.png"),
 );
 
@@ -793,6 +1057,31 @@ await processEuroCoin(
 await processB2B(
   path.join(SRC_DIR, "Captura de pantalla 2026-04-19 191732.png"),
   path.join(DST_DIR, "b2b-amber.png"),
+);
+
+await processMoney(
+  path.join(SRC_DIR, "Captura de pantalla 2026-04-19 204630.png"),
+  path.join(DST_DIR, "money-amber.png"),
+);
+
+await processFranchises(
+  path.join(SRC_DIR, "Captura de pantalla 2026-04-19 204539.png"),
+  path.join(DST_DIR, "franquicias-amber.png"),
+);
+
+await processCart(
+  path.join(SRC_DIR, "Captura de pantalla 2026-04-19 204509.png"),
+  path.join(DST_DIR, "b2b-cart-amber.png"),
+);
+
+await processSeal(
+  path.join(SRC_DIR, "Captura de pantalla 2026-04-19 205837.png"),
+  path.join(DST_DIR, "quality-seal-amber.png"),
+);
+
+await processVending(
+  path.join(SRC_DIR, "Captura de pantalla 2026-04-19 210324.png"),
+  path.join(DST_DIR, "vending-amber.png"),
 );
 
 console.log("\nListo.");

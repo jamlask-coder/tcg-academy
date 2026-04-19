@@ -23,7 +23,6 @@ import {
   Building2,
   ShoppingBag,
   MapPin,
-  Phone,
   MoreHorizontal,
 } from "lucide-react";
 import {
@@ -61,24 +60,53 @@ type NavItem = {
 };
 
 // Profesionales — orden acordado con el usuario: B2B → Vending → Franquicia
-// B2B trae icono custom (logo real ámbar) porque el Briefcase no transmite
-// el mismo concepto y el usuario quiere el símbolo específico B2B↻.
+// Los 3 llevan icono custom (PNG procesado a ámbar) porque los Lucide no
+// transmiten tan bien el concepto.
 const PRO_ITEMS: NavItem[] = [
   {
     href: "/mayoristas/b2b",
     label: "B2B",
     icon: Briefcase,
     customIcon: (
+      // 3 tienditas conectadas con arcos — concepto de red B2B / red de
+      // comercios conectados (silueta ámbar).
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src="/images/logos/b2b-amber.png"
+        src="/images/logos/franquicias-amber.png"
         alt=""
         className="h-[22px] w-[22px] object-contain"
       />
     ),
   },
-  { href: "/mayoristas/vending", label: "Vending", icon: ShoppingBag },
-  { href: "/mayoristas/franquicias", label: "Franquicia", icon: Building2 },
+  {
+    href: "/mayoristas/vending",
+    label: "Vending",
+    icon: ShoppingBag,
+    customIcon: (
+      // Máquina expendedora tintada en ámbar — concepto de vending directo.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src="/images/logos/vending-amber.png"
+        alt=""
+        className="h-[22px] w-[22px] object-contain"
+      />
+    ),
+  },
+  {
+    href: "/mayoristas/franquicias",
+    label: "Franquicia",
+    icon: Building2,
+    customIcon: (
+      // Sello "QUALITY SATISFACTION GUARANTEED" — concepto de marca certificada
+      // / franquicia de calidad. Tinte ámbar con textura vintage preservada.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src="/images/logos/quality-seal-amber.png"
+        alt=""
+        className="h-[22px] w-[22px] object-contain"
+      />
+    ),
+  },
 ];
 
 // Info y ayuda — reducido a lo esencial (Nuestras tiendas + Contacto)
@@ -104,7 +132,7 @@ const ACCOUNT_ITEMS: NavItem[] = [
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <div className="px-5 pt-3 pb-1">
-      <span className="text-[11px] font-black tracking-[0.22em] text-amber-400 uppercase">
+      <span className="text-[11px] font-black tracking-[0.22em] text-amber-300 uppercase">
         {children}
       </span>
     </div>
@@ -145,7 +173,7 @@ function DarkRow({
         {label}
       </span>
       {badge && (
-        <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-gray-900">
+        <span className="rounded-full bg-amber-300 px-2 py-0.5 text-[10px] font-black text-gray-900">
           {badge}
         </span>
       )}
@@ -259,7 +287,7 @@ function GameIcon({ game }: { game: MobileGame }) {
       <span className={box} aria-hidden="true">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/images/logos/topps-sports.png?v=2"
+          src="/images/logos/topps-sports.png?v=4"
           alt=""
           className="h-[22px] w-[22px] object-contain"
         />
@@ -514,7 +542,7 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
                 <Link
                   href={user.role === "admin" ? "/admin" : "/cuenta/datos"}
                   onClick={go}
-                  className="flex flex-1 items-center justify-center gap-1 rounded-md bg-amber-400 px-2 py-1.5 text-xs font-black text-gray-900 shadow-sm transition active:scale-[0.97]"
+                  className="flex flex-1 items-center justify-center gap-1 rounded-md bg-amber-300 px-2 py-1.5 text-xs font-black text-gray-900 shadow-sm transition hover:bg-amber-200 active:scale-[0.97]"
                 >
                   <User size={13} />
                   {user.role === "admin" ? "Panel Admin" : "Mi cuenta"}
@@ -536,7 +564,7 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
                 <Link
                   href="/login"
                   onClick={go}
-                  className="flex flex-1 items-center justify-center rounded-md bg-amber-400 px-2 py-1.5 text-xs font-black text-gray-900 shadow-sm transition hover:bg-amber-300 active:scale-[0.97]"
+                  className="flex flex-1 items-center justify-center rounded-md bg-amber-300 px-2 py-1.5 text-xs font-black text-gray-900 shadow-sm transition hover:bg-amber-200 active:scale-[0.97]"
                 >
                   Iniciar sesión
                 </Link>
@@ -573,7 +601,7 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
           />
           <div className="relative h-full overflow-y-auto overscroll-contain">
           {/* ═══ INICIO (juegos principales, excluyendo "Otros") ════════════ */}
-          <SectionTitle>Inicio</SectionTitle>
+          <SectionTitle>Juegos TCG</SectionTitle>
           <div className="divide-y divide-white/[0.06]">
             {DRAWER_GAMES.filter((g) => !OTROS_SLUGS.has(g.slug)).map((game) => (
               <GameRow
@@ -596,14 +624,14 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
               }`}
             >
               <span className="flex h-6 w-6 shrink-0 items-center justify-center">
-                <MoreHorizontal size={18} className="text-amber-400" />
+                <MoreHorizontal size={18} className="text-amber-300" />
               </span>
               <span
                 className={`flex-1 text-left text-[13px] font-black tracking-[0.05em] uppercase ${
                   otrosOpen ? "text-amber-300" : "text-white"
                 }`}
               >
-                Otros
+                OTROS TCG
               </span>
               <ChevronDown
                 size={15}
@@ -644,11 +672,12 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
               href="/compramos-tus-cartas"
               onClick={go}
               icon={
-                // Moneda naranja con € blanco (imagen real del usuario, fondo
-                // checkerboard quitado por flood-fill neutro desde los bordes).
+                // Fajo de billetes (blanco → ámbar por tint + alpha según
+                // brillo original; fondo negro quitado por flood-fill por
+                // luminancia).
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src="/images/logos/euro-coin.png"
+                  src="/images/logos/money-amber.png"
                   alt=""
                   className="h-[22px] w-[22px] object-contain"
                 />
@@ -670,7 +699,7 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
                       key={item.href}
                       href={item.href}
                       onClick={go}
-                      icon={<Icon size={18} className="text-amber-400" />}
+                      icon={<Icon size={18} className="text-amber-300" />}
                       label={item.label}
                       active={isActive(item.href)}
                     />
@@ -692,7 +721,7 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
                   onClick={go}
                   icon={
                     item.customIcon ?? (
-                      <Icon size={18} className="text-amber-400" />
+                      <Icon size={18} className="text-amber-300" />
                     )
                   }
                   label={item.label}
@@ -712,7 +741,7 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
                   key={item.href}
                   href={item.href}
                   onClick={go}
-                  icon={<Icon size={18} className="text-amber-400" />}
+                  icon={<Icon size={18} className="text-amber-300" />}
                   label={item.label}
                   active={isActive(item.href)}
                 />
@@ -722,27 +751,14 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
 
           {/* ═══ FOOTER ═════════════════════════════════════════════════════ */}
           <div className="mt-6 border-t border-white/10 px-5 py-5">
-            <div className="grid grid-cols-2 gap-2">
-              <a
-                href={`mailto:${SITE_CONFIG.email}`}
-                className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 text-xs font-bold text-white/80 transition hover:border-amber-400/40 hover:text-amber-300"
-              >
-                <Mail size={14} className="text-amber-400" />
-                Email
-              </a>
-              <a
-                href={`tel:${SITE_CONFIG.phone.replace(/\s/g, "")}`}
-                className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5 text-xs font-bold text-white/80 transition hover:border-amber-400/40 hover:text-amber-300"
-              >
-                <Phone size={14} className="text-amber-400" />
-                Llamar
-              </a>
-            </div>
-            <p className="mt-4 text-[11px] text-white/40">
+            <p className="text-center text-[11px] text-white/40">
               4 tiendas · Madrid · Barcelona · Calpe · Béjar
             </p>
-            <p className="mt-1 text-[10px] text-white/30">
-              © {new Date().getFullYear()} TCG Academy · {SITE_CONFIG.cif}
+            <p className="mt-3 text-center text-[10px] font-semibold tracking-wide text-white/50">
+              CIF {SITE_CONFIG.cif}
+            </p>
+            <p className="mt-0.5 text-center text-[10px] text-white/30">
+              © {new Date().getFullYear()} TCG Academy
             </p>
           </div>
 

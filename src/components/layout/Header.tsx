@@ -18,7 +18,6 @@ import {
   LogOut,
   LayoutDashboard,
   Inbox,
-  ChevronRight,
   Menu,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
@@ -215,7 +214,7 @@ function MobileTrustBar() {
       className="px-4 py-1 text-center text-xs text-white lg:hidden"
       style={{
         background:
-          "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #2563eb 100%)",
+          "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #1d4ed8 100%)",
       }}
     >
       <span className="inline-flex items-center gap-1.5 font-medium">
@@ -596,7 +595,7 @@ export function Header() {
       className="sticky top-0 z-50 overflow-visible border-b border-white/10"
       style={{
         background:
-          "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #2563eb 100%)",
+          "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #1d4ed8 100%)",
       }}
     >
       {/* Topbar — desktop */}
@@ -604,7 +603,7 @@ export function Header() {
         className="hidden py-2.5 text-xs text-white lg:block"
         style={{
           background:
-            "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #2563eb 100%)",
+            "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #1d4ed8 100%)",
         }}
       >
         <Container className="flex items-center justify-center gap-8">
@@ -671,8 +670,43 @@ export function Header() {
           </Link>
         </div>
 
-        {/* Middle zone: search + auth — ancho fijo, sin separar */}
+        {/* Middle zone: search + auth — ancho fijo, sin separar.
+            En móvil solo se muestra la píldora de login (estilo YouTube):
+            con `justify-between` en el contenedor padre, esta zona central
+            queda automáticamente centrada en el hueco entre TCG Academy y
+            los iconos de la derecha. */}
         <div className="flex items-center gap-3">
+          {/* Mobile: perfil + carrito como pareja compacta (reemplaza la píldora
+              "Iniciar sesión"). El carrito ya funciona sin estar identificado —
+              el usuario puede llenarlo antes de hacer login. */}
+          <div className="flex items-center gap-1 lg:hidden">
+            <Link
+              href={
+                user
+                  ? user.role === "admin"
+                    ? "/admin"
+                    : "/cuenta/datos"
+                  : "/login"
+              }
+              className="flex items-center justify-center rounded-lg p-1.5 transition active:scale-[0.95] hover:bg-white/10"
+              aria-label={user ? "Mi cuenta" : "Iniciar sesión"}
+            >
+              <User size={24} className="text-white" />
+            </Link>
+            <Link
+              href="/carrito"
+              className="relative flex items-center justify-center rounded-lg p-1.5 transition active:scale-[0.95] hover:bg-white/10"
+              aria-label={mounted ? `Carrito (${count} artículos)` : "Carrito"}
+            >
+              <ShoppingCart size={24} className="text-white" />
+              {mounted && count > 0 && (
+                <span className="absolute top-0 right-0 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                  {count > 99 ? "99+" : count}
+                </span>
+              )}
+            </Link>
+          </div>
+
           {/* Desktop search — ancho fijo */}
           <div
             className={`relative hidden lg:block ${mounted && user ? "w-[600px]" : "w-[380px]"}`}
@@ -774,16 +808,14 @@ export function Header() {
             </Link>
           )}
 
-          {/* 1. User icon — mobile shows "Identifícate" when not logged in */}
+          {/* 1. User icon — solo desktop. En móvil el login/cuenta vive en
+              la píldora estilo YouTube del centro (middle zone). */}
           <Link
             href={user ? (user.role === "admin" ? "/admin" : "/cuenta/datos") : "/login"}
-            className="mr-6 flex items-center justify-center gap-1 rounded-lg p-1 transition hover:bg-white/10 lg:mr-0 lg:min-h-[44px] lg:gap-1.5 lg:p-2"
+            className="hidden items-center justify-center gap-1.5 rounded-lg p-2 transition hover:bg-white/10 lg:flex lg:min-h-[44px]"
             aria-label={user?.role === "admin" ? "Panel de administración" : "Mi cuenta"}
           >
-            {!user && <span className="text-sm font-semibold text-white lg:hidden">Identifícate</span>}
-            {user && <span className="text-sm font-semibold text-white lg:hidden">{user.name?.split(" ")[0] ?? "Mi cuenta"}</span>}
-            {mounted && <ChevronRight size={14} className="text-white/60 lg:hidden" />}
-            <User size={24} className="text-white lg:h-[22px] lg:w-[22px]" />
+            <User size={22} className="text-white" />
           </Link>
 
           {/* 2. Favorites — desktop only */}
@@ -802,14 +834,15 @@ export function Header() {
             </Link>
           )}
 
-          {/* 3. Cart */}
+          {/* 3. Cart — desktop only (en móvil el carrito va junto al icono de
+              perfil en la zona central, justo a la derecha de TCG Academy). */}
           {user?.role !== "admin" && (
             <Link
               href="/carrito"
-              className="relative flex items-center justify-center overflow-visible rounded-lg p-1 transition hover:bg-white/10 lg:min-h-[44px] lg:min-w-[44px] lg:p-2"
+              className="relative hidden items-center justify-center overflow-visible rounded-lg transition hover:bg-white/10 lg:flex lg:min-h-[44px] lg:min-w-[44px] lg:p-2"
               aria-label={mounted ? `Carrito (${count} artículos)` : "Carrito"}
             >
-              <ShoppingCart size={24} className="text-white lg:h-[22px] lg:w-[22px]" />
+              <ShoppingCart size={22} className="text-white" />
               {mounted && count > 0 && (
                 <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
                   {count > 99 ? "99+" : count}
