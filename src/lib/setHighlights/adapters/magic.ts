@@ -5,6 +5,7 @@ import { dedup } from "../cache";
 import { getJson } from "../fetcher";
 import { bestFuzzyMatch, enrichForMatch } from "../matching";
 import { MAGIC_SET_MAP, SCRYFALL_LANG, isHoloRarity } from "../setMaps";
+import { resolveFromTag } from "../tagOverride";
 
 interface ScryfallSet {
   code: string;
@@ -60,6 +61,11 @@ async function resolveMagic(
   errors: string[],
 ): Promise<ResolveResult | null> {
   const searchIn = [product.name, product.description, ...(product.tags ?? [])].join(" ");
+
+  // S0 tag-explicit-set ("set:blb") — override manual
+  strategyTried.push("tag-explicit-set");
+  const tagOverride = resolveFromTag(product);
+  if (tagOverride) return tagOverride;
 
   // S1 hardcoded-map
   strategyTried.push("hardcoded-map");

@@ -101,7 +101,7 @@ describe("setHighlights — hardcoded maps", () => {
     const r = await resolveHighlights(p);
     expect(r.resolved?.setId).toBe("blb");
     expect(r.resolved?.provenance).toBe("hardcoded-map");
-    expect(r.strategyTried[0]).toBe("hardcoded-map");
+    expect(r.strategyTried).toContain("hardcoded-map");
   });
 
   it("POKEMON_SET_MAP resuelve 'Prismatic Evolutions' → sv8pt5 sin red", async () => {
@@ -112,5 +112,39 @@ describe("setHighlights — hardcoded maps", () => {
     const r = await resolveHighlights(p);
     expect(r.resolved?.setId).toBe("sv8pt5");
     expect(r.resolved?.provenance).toBe("hardcoded-map");
+  });
+
+  it("tag-explicit-set override funciona en pokemon (tag 'set:sv10')", async () => {
+    const p = makeProduct({
+      game: "pokemon",
+      name: "Producto Ficticio Demo",
+      tags: ["demo", "set:sv10"],
+    });
+    const r = await resolveHighlights(p);
+    expect(r.resolved?.setId).toBe("sv10");
+    expect(r.resolved?.provenance).toBe("tag-explicit-set");
+  });
+
+  it("tag-explicit-set override funciona en magic (tag 'set:blb')", async () => {
+    const p = makeProduct({
+      game: "magic",
+      name: "Producto Magic Ficticio",
+      tags: ["set:blb"],
+    });
+    const r = await resolveHighlights(p);
+    expect(r.resolved?.setId).toBe("blb");
+    expect(r.resolved?.provenance).toBe("tag-explicit-set");
+  });
+
+  it("tag-explicit-set tiene prioridad sobre hardcoded-map", async () => {
+    // Nombre matchea 'Bloomburrow' (blb), pero tag fuerza 'dsk'.
+    const p = makeProduct({
+      game: "magic",
+      name: "Bloomburrow Booster Box",
+      tags: ["set:dsk"],
+    });
+    const r = await resolveHighlights(p);
+    expect(r.resolved?.setId).toBe("dsk");
+    expect(r.resolved?.provenance).toBe("tag-explicit-set");
   });
 });

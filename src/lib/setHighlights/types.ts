@@ -4,12 +4,14 @@
 import type { LocalProduct } from "@/data/products";
 
 export type Provenance =
+  | "tag-explicit-set"
   | "hardcoded-map"
   | "product-setcode"
   | "fuzzy-sets-en"
   | "fuzzy-sets-localized"
   | "synonym-expansion"
   | "hardcoded-fallback"
+  | "game-latest-fallback"
   | "none";
 
 export interface HighlightCard {

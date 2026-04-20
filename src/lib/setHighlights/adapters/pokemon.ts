@@ -12,6 +12,7 @@ import {
   tcgdexImageUrl,
 } from "../setMaps";
 import { POKEMON_TOP_CARDS } from "../data/pokemonTopCards";
+import { resolveFromTag } from "../tagOverride";
 
 interface PokemonSet {
   id: string;
@@ -51,6 +52,11 @@ async function resolvePokemon(
   errors: string[],
 ): Promise<ResolveResult | null> {
   const searchIn = [product.name, product.description, ...(product.tags ?? [])].join(" ");
+
+  // S0 tag-explicit-set ("set:sv10") — override manual desde tags
+  strategyTried.push("tag-explicit-set");
+  const tagOverride = resolveFromTag(product);
+  if (tagOverride) return tagOverride;
 
   // S1 hardcoded-map
   strategyTried.push("hardcoded-map");
