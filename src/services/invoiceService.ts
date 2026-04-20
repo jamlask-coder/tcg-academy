@@ -372,8 +372,32 @@ export async function createInvoice(
 
   const invoiceNumber = generateInvoiceNumber();
   const invoiceId = generateId();
-  const taxBreakdown = calculateTaxBreakdown(items);
-  const totals = calculateTotals(items);
+
+  // Recargo de equivalencia — si el receptor está en ese régimen especial
+  // (minoristas), cada línea lleva un recargo sobre la base imponible
+  // (21%→5.2%, 10%→1.4%, 4%→0.5%). GAP-014.
+  const needsSurcharge = Boolean(
+    (recipient as { recargoEquivalencia?: boolean }).recargoEquivalencia,
+  );
+  const finalItems: InvoiceLineItem[] =
+    needsSurcharge && items.some((i) => i.surchargeRate === 0)
+      ? items.map((i) =>
+          buildLineItem({
+            lineNumber: i.lineNumber,
+            productId: i.productId,
+            description: i.description,
+            quantity: i.quantity,
+            // unitPriceWithVAT reconstruido a partir de los campos normalizados
+            unitPriceWithVAT: i.quantity > 0 ? i.totalLine / i.quantity : 0,
+            vatRate: i.vatRate,
+            discount: i.discount,
+            applySurcharge: true,
+          }),
+        )
+      : items;
+
+  const taxBreakdown = calculateTaxBreakdown(finalItems);
+  const totals = calculateTotals(finalItems);
 
   const invoice: InvoiceRecord = {
     invoiceId,
@@ -383,7 +407,7 @@ export async function createInvoice(
     invoiceType,
     issuer: buildIssuer(),
     recipient,
-    items,
+    items: finalItems,
     taxBreakdown,
     totals,
     paymentMethod,

@@ -106,6 +106,12 @@ export interface CompanyData {
   isEU: boolean;
   /** Código ISO 3166-1 alpha-2 */
   countryCode: string;
+  /**
+   * Receptor en régimen especial de recargo de equivalencia (RE).
+   * Obliga a añadir recargo a cada línea: 21%→5.2% / 10%→1.4% / 4%→0.5%.
+   * Normalmente minoristas personas físicas o comunidades de bienes.
+   */
+  recargoEquivalencia?: boolean;
 }
 
 /** Datos de cliente particular (sin NIF obligatorio) */
@@ -118,6 +124,8 @@ export interface CustomerData {
   email?: string;
   phone?: string;
   countryCode: string;
+  /** Ver {@link CompanyData.recargoEquivalencia}. */
+  recargoEquivalencia?: boolean;
 }
 
 // ─── Líneas de factura ───────────────────────────────────────────────────────
