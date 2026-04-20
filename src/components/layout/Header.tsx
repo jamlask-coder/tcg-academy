@@ -609,7 +609,9 @@ export function Header() {
   }, []);
 
   // Al cambiar de ruta, vaciar el buscador para que no quede la búsqueda previa.
+  // Sincroniza estado UI con el sistema externo (router): imposible sin setState en effect.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync con router (cambio de ruta → limpiar buscador)
     setDesktopQuery("");
     setDesktopDropdownOpen(false);
     setMobileQuery("");

@@ -19,6 +19,14 @@ export function SystemGuard() {
     if (hasRun.current) return;
     hasRun.current = true;
 
+    // 0. Captura de errores runtime (se instala lo antes posible)
+    void (async () => {
+      try {
+        const { installErrorCapture } = await import("@/lib/errorReporter");
+        installErrorCapture();
+      } catch { /* non-critical */ }
+    })();
+
     // Run asynchronously to not block rendering
     void (async () => {
       try {

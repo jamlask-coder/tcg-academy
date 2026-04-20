@@ -22,7 +22,16 @@
     "check:all": "npm run lint && npm run format && npm run typecheck && npm run build && npm run audit",
     "test:layout": "playwright test tests/visual/",
     "test:overlap": "playwright test tests/visual/overlap-detection.spec.ts",
-    "test:overflow": "npx ts-node --project tsconfig.json tests/visual/check-overflow.ts"
+    "test:overflow": "npx ts-node --project tsconfig.json tests/visual/check-overflow.ts",
+    "prepare": "husky",
+    "warnings:count": "node scripts/count-warnings.mjs",
+    "warnings:baseline": "node scripts/count-warnings.mjs --baseline",
+    "quality:gate": "npm run lint && npm run typecheck && npm run warnings:count"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "eslint --no-warn-ignored"
+    ]
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

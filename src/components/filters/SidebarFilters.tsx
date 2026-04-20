@@ -108,7 +108,7 @@ function FilterContent({
   availableLanguages,
   minPrice,
   maxPrice,
-  color,
+  color: _color,
   filteredCount,
 }: {
   availableLanguages: string[];
