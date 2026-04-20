@@ -239,7 +239,10 @@ export function getOrderMetrics(): OrderMetrics {
 /**
  * Top-selling products by quantity and revenue.
  */
-export function getTopProducts(limit = 10): TopProduct[] {
+export function getTopProducts(
+  limit = 10,
+  sortBy: "revenue" | "qty" = "revenue",
+): TopProduct[] {
   const orders = loadOrders();
   const productMap = new Map<number, TopProduct>();
 
@@ -260,9 +263,12 @@ export function getTopProducts(limit = 10): TopProduct[] {
     }
   }
 
-  return Array.from(productMap.values())
-    .sort((a, b) => b.totalRevenue - a.totalRevenue)
-    .slice(0, limit);
+  const sorter =
+    sortBy === "qty"
+      ? (a: TopProduct, b: TopProduct) => b.totalQty - a.totalQty
+      : (a: TopProduct, b: TopProduct) => b.totalRevenue - a.totalRevenue;
+
+  return Array.from(productMap.values()).sort(sorter).slice(0, limit);
 }
 
 /**

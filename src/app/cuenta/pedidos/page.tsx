@@ -30,10 +30,13 @@ import {
 } from "@/utils/invoiceGenerator";
 import { formatDate } from "@/lib/format";
 
+// Estados customer (2026-04-20). Flujo lineal: pedido → pagado → pendiente_envio → enviado.
+// "entregado" eliminado (depende del transportista). Admin tiene su propio set.
 type OrderStatus =
   | "pedido"
+  | "pagado"
+  | "pendiente_envio"
   | "enviado"
-  | "entregado"
   | "incidencia"
   | "cancelado"
   | "devolucion";
@@ -76,22 +79,35 @@ interface Order extends StoredOrder {
   dateFormatted: string;
 }
 
+// Flujo normal: un único azul (#2563eb, el del menú principal) para los 4
+// estados. Excepciones (incidencia/cancelado/devolucion) mantienen semántica.
 const STATUS_CONFIG: Record<
   OrderStatus,
   { label: string; color: string; bg: string; icon: typeof Clock }
 > = {
   pedido: {
+    label: "Pedido",
+    color: "#2563eb",
+    bg: "#dbeafe",
+    icon: Package,
+  },
+  pagado: {
+    label: "Pagado",
+    color: "#2563eb",
+    bg: "#dbeafe",
+    icon: CheckCircle,
+  },
+  pendiente_envio: {
     label: "Pendiente de envío",
-    color: "#c2410c",
-    bg: "#fff7ed",
+    color: "#2563eb",
+    bg: "#dbeafe",
     icon: Clock,
   },
-  enviado: { label: "Enviado", color: "#7c3aed", bg: "#ede9fe", icon: Truck },
-  entregado: {
-    label: "Entregado",
-    color: "#16a34a",
-    bg: "#dcfce7",
-    icon: CheckCircle,
+  enviado: {
+    label: "Enviado",
+    color: "#2563eb",
+    bg: "#dbeafe",
+    icon: Truck,
   },
   incidencia: {
     label: "Incidencia",
@@ -144,7 +160,7 @@ const MOCK_ORDERS: Order[] = [
     id: "TCG-20250115-002",
     date: "2025-01-15",
     dateFormatted: "15 enero 2025",
-    status: "entregado",
+    status: "enviado",
     total: 174.9,
     trackingNumber: "ES2025011500002",
     address: "Calle Mayor 15, 2ºB, 28001 Madrid",
@@ -165,7 +181,7 @@ const MOCK_ORDERS: Order[] = [
     id: "TCG-20241230-003",
     date: "2024-12-30",
     dateFormatted: "30 diciembre 2024",
-    status: "entregado",
+    status: "enviado",
     total: 109.9,
     trackingNumber: "ES2024123000003",
     address: "Calle Mayor 15, 2ºB, 28001 Madrid",
@@ -185,7 +201,7 @@ const MOCK_ORDERS: Order[] = [
     id: "TCG-20241201-004",
     date: "2024-12-01",
     dateFormatted: "01 diciembre 2024",
-    status: "entregado",
+    status: "enviado",
     total: 104.9,
     address: "Calle Mayor 15, 2ºB, 28001 Madrid",
     paymentMethod: "Tarjeta Visa ****4242",
@@ -220,21 +236,44 @@ const GAME_EMOJI: Record<string, string> = {
   "dragon-ball": "🐉",
 };
 
+// Regla de negocio: "sin pago no hay pedido" → cualquier pedido existente
+// arranca mínimo en "pagado". "pedido"/"pendiente" legacy colapsan a "pagado".
 function normalizeStatus(s: string): OrderStatus {
   const map: Record<string, OrderStatus> = {
-    pedido: "pedido",
-    pendiente: "pedido",
-    procesando: "pedido",
+    pedido: "pagado",
+    pendiente: "pagado",
+    pagado: "pagado",
+    procesando: "pendiente_envio",
+    pendiente_envio: "pendiente_envio",
+    preparado: "pendiente_envio",
     enviado: "enviado",
-    entregado: "entregado",
-    cancelado: "incidencia",
+    entregado: "enviado", // legacy → el flujo actual termina en "enviado"
     incidencia: "incidencia",
+    cancelado: "cancelado",
+    devuelto: "devolucion",
+    devolucion: "devolucion",
   };
-  return map[s.toLowerCase()] ?? "pedido";
+  return map[s.toLowerCase()] ?? "pagado";
 }
 
-// Simple timeline steps
-const TIMELINE: OrderStatus[] = ["pedido", "enviado", "entregado"];
+// Timeline del flujo normal — 4 pasos progresivos.
+const TIMELINE: OrderStatus[] = [
+  "pedido",
+  "pagado",
+  "pendiente_envio",
+  "enviado",
+];
+
+// Labels compactos para móvil (no caben en 4 pasos).
+const TIMELINE_LABELS_SHORT: Record<OrderStatus, string> = {
+  pedido: "Pedido",
+  pagado: "Pagado",
+  pendiente_envio: "Preparando",
+  enviado: "Enviado",
+  incidencia: "Incidencia",
+  cancelado: "Cancelado",
+  devolucion: "Devolución",
+};
 
 interface IncidentModalProps {
   orderId: string;
@@ -390,7 +429,7 @@ export default function PedidosPage() {
   };
 
   return (
-    <div>
+    <div className="overflow-x-hidden">
       <AccountTabs group="pedidos" />
       {incidentModal && (
         <IncidentModal
@@ -516,8 +555,15 @@ export default function PedidosPage() {
                 {/* Expanded content */}
                 {isOpen && (
                   <div className="border-t border-gray-100 px-5 pb-5">
-                    {/* Progress timeline — not for incidencia */}
-                    {order.status !== "incidencia" && (
+                    {/* Progress timeline — sólo para estados del flujo normal */}
+                    {(
+                      [
+                        "pedido",
+                        "pagado",
+                        "pendiente_envio",
+                        "enviado",
+                      ] as OrderStatus[]
+                    ).includes(order.status) && (
                       <div className="my-5 flex items-center gap-0">
                         {TIMELINE.map((step, i) => {
                           const cfg = STATUS_CONFIG[step];
@@ -525,9 +571,9 @@ export default function PedidosPage() {
                           return (
                             <div
                               key={step}
-                              className="flex flex-1 items-center last:flex-none"
+                              className="flex min-w-0 flex-1 items-center last:flex-none"
                             >
-                              <div className="flex flex-col items-center gap-1">
+                              <div className="flex min-w-0 flex-col items-center gap-1">
                                 <div
                                   className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white transition-all"
                                   style={{
@@ -545,12 +591,17 @@ export default function PedidosPage() {
                                   )}
                                 </div>
                                 <span
-                                  className="text-[10px] font-semibold whitespace-nowrap"
+                                  className="max-w-full truncate text-[10px] font-semibold"
                                   style={{
                                     color: done ? cfg.color : "#9ca3af",
                                   }}
                                 >
-                                  {cfg.label}
+                                  <span className="sm:hidden">
+                                    {TIMELINE_LABELS_SHORT[step]}
+                                  </span>
+                                  <span className="hidden sm:inline">
+                                    {cfg.label}
+                                  </span>
                                 </span>
                               </div>
                               {i < TIMELINE.length - 1 && (
@@ -670,17 +721,17 @@ export default function PedidosPage() {
                         </div>
                       </div>
                       {order.trackingNumber && (
-                        <div className="flex items-start gap-2 rounded-xl border border-purple-100 bg-purple-50 p-3 sm:col-span-2">
+                        <div className="flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 sm:col-span-2">
                           <Hash
                             size={13}
-                            className="mt-0.5 flex-shrink-0 text-purple-400"
+                            className="mt-0.5 flex-shrink-0 text-blue-400"
                           />
                           <div className="flex-1">
-                            <p className="mb-0.5 font-semibold text-purple-700">
+                            <p className="mb-0.5 font-semibold text-[#2563eb]">
                               Número de seguimiento GLS
                             </p>
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-mono text-purple-600">
+                              <span className="font-mono text-[#2563eb]">
                                 {order.trackingNumber}
                               </span>
                               <button
@@ -689,7 +740,7 @@ export default function PedidosPage() {
                                     order.trackingNumber!,
                                   )
                                 }
-                                className="flex items-center gap-1 rounded border border-purple-200 px-1.5 py-0.5 text-[11px] text-purple-500 transition hover:text-purple-700"
+                                className="flex items-center gap-1 rounded border border-blue-200 px-1.5 py-0.5 text-[11px] text-[#2563eb] transition hover:text-[#1d4ed8]"
                                 title="Copiar número"
                               >
                                 <Copy size={10} /> Copiar
@@ -698,7 +749,7 @@ export default function PedidosPage() {
                                 href={`https://www.gls-spain.es/es/seguimiento-envios/?match=${order.trackingNumber}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="flex items-center gap-1 text-[11px] font-semibold text-purple-600 hover:text-purple-800"
+                                className="flex items-center gap-1 text-[11px] font-semibold text-[#2563eb] hover:text-[#1d4ed8]"
                               >
                                 <ExternalLink size={10} /> Seguir mi pedido
                               </a>

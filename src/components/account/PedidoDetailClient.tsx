@@ -34,7 +34,15 @@ import {
 import { PaymentInfo } from "@/components/cuenta/PaymentInfo";
 import { parseFiscalAddress } from "@/lib/fiscalAddress";
 
-type OrderStatus = "pedido" | "enviado" | "entregado" | "incidencia" | "cancelado" | "devolucion";
+// Estados customer (2026-04-20). Flujo: pedido → pagado → pendiente_envio → enviado.
+type OrderStatus =
+  | "pedido"
+  | "pagado"
+  | "pendiente_envio"
+  | "enviado"
+  | "incidencia"
+  | "cancelado"
+  | "devolucion";
 
 const INCIDENT_TYPES = [
   { value: "direccion_incorrecta",  label: "Dirección de envío incorrecta" },
@@ -46,13 +54,15 @@ const INCIDENT_TYPES = [
   { value: "otros",                 label: "Otros" },
 ];
 
+// Flujo normal: un único azul (#2563eb) para los 4 estados del cliente.
 const STATUS_CFG: Record<OrderStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  pedido:     { label: "Pendiente de envío", color: "#c2410c", bg: "#fff7ed",  icon: Clock        },
-  enviado:    { label: "Enviado",             color: "#7c3aed", bg: "#ede9fe",  icon: Truck        },
-  entregado:  { label: "Entregado",           color: "#16a34a", bg: "#dcfce7",  icon: CheckCircle  },
-  incidencia: { label: "Incidencia",          color: "#dc2626", bg: "#fee2e2",  icon: AlertTriangle },
-  cancelado:  { label: "Cancelado",           color: "#374151", bg: "#f3f4f6",  icon: Ban          },
-  devolucion: { label: "Devolución",          color: "#6d28d9", bg: "#ede9fe",  icon: RotateCcw    },
+  pedido:           { label: "Pedido",              color: "#2563eb", bg: "#dbeafe",  icon: Package       },
+  pagado:           { label: "Pagado",              color: "#2563eb", bg: "#dbeafe",  icon: CheckCircle   },
+  pendiente_envio:  { label: "Pendiente de envío",  color: "#2563eb", bg: "#dbeafe",  icon: Clock         },
+  enviado:          { label: "Enviado",             color: "#2563eb", bg: "#dbeafe",  icon: Truck         },
+  incidencia:       { label: "Incidencia",          color: "#dc2626", bg: "#fee2e2",  icon: AlertTriangle },
+  cancelado:        { label: "Cancelado",           color: "#374151", bg: "#f3f4f6",  icon: Ban           },
+  devolucion:       { label: "Devolución",          color: "#6d28d9", bg: "#ede9fe",  icon: RotateCcw     },
 };
 
 const GAME_EMOJI: Record<string, string> = {
@@ -60,15 +70,21 @@ const GAME_EMOJI: Record<string, string> = {
   yugioh: "⭐", lorcana: "✨", riftbound: "🌀", topps: "⚽", "dragon-ball": "🐉",
 };
 
-// Timeline progression: how many steps are "done" for each status
+// Timeline 4 pasos — customer-facing. SSOT: flujo pedido → pagado → preparando → enviado.
 const TIMELINE_STEPS = [
-  { label: "Pedido confirmado", icon: CheckCircle },
-  { label: "En preparación",    icon: Package     },
-  { label: "Enviado",           icon: Truck       },
-  { label: "Entregado",         icon: CheckCircle },
+  { label: "Pedido",              icon: Package     },
+  { label: "Pagado",              icon: CheckCircle },
+  { label: "Pendiente de envío",  icon: Clock       },
+  { label: "Enviado",             icon: Truck       },
 ];
+// Número de pasos "done" para cada status.
+// Regla de negocio: "sin pago no hay pedido" — cualquier pedido arranca
+// mínimo con los 2 primeros pasos (Pedido + Pagado) ya completados.
 const TIMELINE_DONE_AT: Record<string, number> = {
-  pedido: 2, enviado: 3, entregado: 4,
+  pedido: 2,
+  pagado: 2,
+  pendiente_envio: 3,
+  enviado: 4,
 };
 
 interface Props {
@@ -180,7 +196,7 @@ export function PedidoDetailClient({ id }: Props) {
           >
             <StatusIcon size={12} /> {stCfg.label}
           </span>
-          {status === "entregado" && (
+          {status === "enviado" && (
             <Link
               href="/cuenta/devoluciones"
               className="flex min-h-[44px] items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100"

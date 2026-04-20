@@ -1,0 +1,66 @@
+// Top cartas SCR por set de Dragon Ball Super Fusion World — fallback Bandai CDN.
+// URL base: https://files.bandai-tcg-plus.com/card_image/{region}/{set}/batch_{set}-{num}.png
+// Región EN = DBSFW-EN.
+
+export const DBS_TOP_CARDS: Record<string, { num: string; name: string }[]> = {
+  FB01: [
+    { num: "140", name: "Son Goku" },
+    { num: "139", name: "Vegeta" },
+    { num: "138", name: "Frieza" },
+    { num: "137", name: "Broly" },
+    { num: "136", name: "Cell" },
+    { num: "135", name: "Beerus" },
+    { num: "134", name: "Whis" },
+    { num: "133", name: "Son Gohan" },
+  ],
+  FB02: [
+    { num: "134", name: "Son Goku" },
+    { num: "133", name: "Vegeta" },
+    { num: "132", name: "Frieza" },
+    { num: "131", name: "Son Gohan" },
+    { num: "130", name: "Piccolo" },
+    { num: "129", name: "Android 17" },
+    { num: "128", name: "Android 18" },
+    { num: "127", name: "Krillin" },
+  ],
+  FB03: [
+    { num: "132", name: "Son Gohan" },
+    { num: "131", name: "Piccolo" },
+    { num: "130", name: "Vegeta" },
+    { num: "129", name: "Son Goku" },
+    { num: "128", name: "Cell" },
+    { num: "127", name: "Trunks" },
+    { num: "126", name: "Android 18" },
+    { num: "125", name: "Krillin" },
+  ],
+  FB04: [
+    { num: "137", name: "Son Goku" },
+    { num: "136", name: "Vegeta" },
+    { num: "135", name: "Frieza" },
+    { num: "134", name: "Broly" },
+    { num: "133", name: "Beerus" },
+    { num: "132", name: "Whis" },
+    { num: "131", name: "Hit" },
+    { num: "130", name: "Jiren" },
+  ],
+  FB05: [
+    { num: "139", name: "Son Goku" },
+    { num: "138", name: "Vegeta" },
+    { num: "137", name: "Future Trunks" },
+    { num: "136", name: "Goku Black" },
+    { num: "135", name: "Zamasu" },
+    { num: "134", name: "Hit" },
+    { num: "133", name: "Beerus" },
+    { num: "132", name: "Champa" },
+  ],
+  FB06: [
+    { num: "138", name: "Son Goku" },
+    { num: "137", name: "Vegeta" },
+    { num: "136", name: "Bardock" },
+    { num: "135", name: "Broly" },
+    { num: "134", name: "Paragus" },
+    { num: "133", name: "Frieza" },
+    { num: "132", name: "Cooler" },
+    { num: "131", name: "Turles" },
+  ],
+};

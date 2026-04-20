@@ -3,19 +3,18 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   loadPoints,
-  buildRedemptionTiers,
   pointsToEuros,
   ensureReferralCode,
   POINTS_PER_EURO,
   POINTS_MAX_DISCOUNT_PCT,
+  REFERRAL_INVITER_BONUS,
+  REFERRAL_NEW_USER_BONUS,
 } from "@/services/pointsService";
 import {
   Trophy,
-  Gift,
   Clock,
   CheckCircle2,
   Info,
-  Star,
   ShoppingBag,
   Share2,
   TrendingUp,
@@ -74,8 +73,9 @@ export default function PuntosPage() {
     );
   }
 
-  const redemptionTiers = buildRedemptionTiers(balance);
   const balanceEuros = pointsToEuros(balance);
+  const inviterEuros = Math.floor(REFERRAL_INVITER_BONUS / 10000);
+  const newUserEuros = Math.floor(REFERRAL_NEW_USER_BONUS / 10000);
 
   return (
     <div className="space-y-6">
@@ -108,53 +108,31 @@ export default function PuntosPage() {
         </div>
       </div>
 
-      {/* Canje */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-5">
-        <h2 className="mb-1 flex items-center gap-2 font-bold text-gray-900">
-          <Gift size={18} className="text-[#2563eb]" /> Canjear puntos
-        </h2>
-        <p className="mb-4 text-sm text-gray-500">
-          Usa tus puntos como descuento al finalizar tu compra
-        </p>
-        {redemptionTiers.length === 0 ? (
-          <div className="rounded-xl bg-gray-50 p-4 text-center text-sm text-gray-400">
-            Necesitas al menos 10.000 puntos (= €1) para canjear.
-            <br />
-            Te faltan {(10000 - balance).toLocaleString("es-ES")} puntos.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {redemptionTiers.slice(0, 4).map((tier) => (
-              <div
-                key={tier.points}
-                className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-2.5"
-              >
-                <div className="flex items-center gap-2">
-                  <Star size={14} className="text-amber-500" />
-                  <span className="text-sm font-semibold text-gray-800">{tier.points.toLocaleString("es-ES")} pts</span>
-                </div>
-                <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-bold text-green-700">
-                  {tier.label} descuento
-                </span>
-              </div>
-            ))}
-            <p className="mt-2 text-xs text-gray-400">
-              Los puntos se canjean en el carrito antes de finalizar la compra.
-            </p>
-          </div>
-        )}
-      </div>
-
       {/* Referral code */}
       {myCode && (
         <div className="rounded-2xl border border-gray-200 bg-white p-5">
           <h2 className="mb-1 flex items-center gap-2 font-bold text-gray-900">
             <Share2 size={18} className="text-[#2563eb]" /> Tu código de bienvenida
           </h2>
-          <p className="mb-4 text-sm text-gray-500">
-            Comparte este código con nuevos usuarios. Al registrarse con él recibirán
-            puntos de bienvenida automáticamente.
+          <p className="mb-3 text-sm text-gray-500">
+            Comparte este código con nuevos usuarios. Al registrarse con él:
           </p>
+          <ul className="mb-4 space-y-1.5 text-sm">
+            <li className="flex items-start gap-2 text-gray-700">
+              <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-[10px] font-bold text-green-700">✓</span>
+              <span>
+                Tú recibes <strong className="text-[#2563eb]">{REFERRAL_INVITER_BONUS.toLocaleString("es-ES")} puntos</strong>{" "}
+                <span className="text-gray-400">(= {inviterEuros}€)</span>
+              </span>
+            </li>
+            <li className="flex items-start gap-2 text-gray-700">
+              <span className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-green-100 text-[10px] font-bold text-green-700">✓</span>
+              <span>
+                Tu invitado recibe <strong className="text-[#2563eb]">{REFERRAL_NEW_USER_BONUS.toLocaleString("es-ES")} puntos</strong>{" "}
+                <span className="text-gray-400">(= {newUserEuros}€) canjeables en su próxima compra</span>
+              </span>
+            </li>
+          </ul>
           <div className="flex items-center gap-3">
             <div className="flex-1 rounded-xl border-2 border-dashed border-[#2563eb]/30 bg-blue-50 px-4 py-3 text-center">
               <p className="font-mono text-xl font-black tracking-widest text-[#2563eb]">

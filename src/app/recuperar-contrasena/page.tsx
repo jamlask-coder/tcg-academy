@@ -118,7 +118,7 @@ export default function RecuperarContrasenaPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
+    <div className="flex items-center justify-center bg-gray-50 px-4 py-10 sm:py-16">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <Link href="/" className="mb-4 inline-flex items-center gap-2">

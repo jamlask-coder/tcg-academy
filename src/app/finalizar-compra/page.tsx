@@ -9,9 +9,12 @@ import {
   deductPoints,
   loadPoints,
   buildRedemptionTiers,
+  getAssociations,
   POINTS_PER_EURO,
   POINTS_MAX_DISCOUNT_PCT,
+  REFERRAL_ASSOC_PTS_PER_100,
 } from "@/services/pointsService";
+import { pushUserNotification } from "@/services/notificationService";
 import {
   createInvoice,
   saveInvoice,
@@ -663,6 +666,23 @@ export default function CheckoutPage() {
       // This prevents earning points on free orders from stacked discounts
       if (pointsBase > 0) {
         awardPurchasePoints(user.id, pointsBase);
+
+        // Notify every group member that this buyer just purchased
+        const buyerDisplay = `${user.name} ${user.lastName.charAt(0)}.`;
+        const euros = Math.floor(pointsBase);
+        const assocPts = Math.floor((euros * REFERRAL_ASSOC_PTS_PER_100) / 100);
+        const assocs = getAssociations(user.id);
+        for (const assoc of assocs) {
+          pushUserNotification(assoc.referrerId, {
+            type: "asociacion",
+            title: `${buyerDisplay} ha hecho una compra`,
+            message: assocPts > 0
+              ? `Un miembro de tu grupo acaba de comprar €${euros}. Has recibido ${assocPts} puntos.`
+              : `Un miembro de tu grupo acaba de hacer una compra.`,
+            date: new Date().toISOString(),
+            link: "/cuenta/grupo",
+          });
+        }
       }
     }
 

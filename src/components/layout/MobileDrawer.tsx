@@ -59,10 +59,24 @@ type NavItem = {
   customIcon?: React.ReactNode;
 };
 
-// Profesionales — orden acordado con el usuario: B2B → Vending → Franquicia
+// Profesionales — orden: Vending → B2B → Franquicia
 // Los 3 llevan icono custom (PNG procesado a ámbar) porque los Lucide no
 // transmiten tan bien el concepto.
 const PRO_ITEMS: NavItem[] = [
+  {
+    href: "/mayoristas/vending",
+    label: "Vending",
+    icon: ShoppingBag,
+    customIcon: (
+      // Máquina expendedora tintada en ámbar — concepto de vending directo.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src="/images/logos/vending-amber.png"
+        alt=""
+        className="h-[22px] w-[22px] object-contain"
+      />
+    ),
+  },
   {
     href: "/mayoristas/b2b",
     label: "B2B",
@@ -73,20 +87,6 @@ const PRO_ITEMS: NavItem[] = [
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src="/images/logos/franquicias-amber.png"
-        alt=""
-        className="h-[22px] w-[22px] object-contain"
-      />
-    ),
-  },
-  {
-    href: "/mayoristas/vending",
-    label: "Vending",
-    icon: ShoppingBag,
-    customIcon: (
-      // Máquina expendedora tintada en ámbar — concepto de vending directo.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src="/images/logos/vending-amber.png"
         alt=""
         className="h-[22px] w-[22px] object-contain"
       />
@@ -195,7 +195,7 @@ function GameIcon({ game }: { game: MobileGame }) {
       <span className={box} aria-hidden="true">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/images/logos/pokeball.png"
+          src="/images/logos/pokeball.png?v=2"
           alt=""
           className="h-[22px] w-[22px] object-contain"
         />
@@ -225,7 +225,7 @@ function GameIcon({ game }: { game: MobileGame }) {
       <span className={box} aria-hidden="true">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/images/logos/magic-planeswalker.png"
+          src="/images/logos/magic-planeswalker.png?v=2"
           alt=""
           className="h-[22px] w-[22px] object-contain"
         />
@@ -540,7 +540,7 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
             {user ? (
               <>
                 <Link
-                  href={user.role === "admin" ? "/admin" : "/cuenta/datos"}
+                  href={user.role === "admin" ? "/admin" : "/cuenta"}
                   onClick={go}
                   className="flex flex-1 items-center justify-center gap-1 rounded-md bg-amber-300 px-2 py-1.5 text-xs font-black text-gray-900 shadow-sm transition hover:bg-amber-200 active:scale-[0.97]"
                 >

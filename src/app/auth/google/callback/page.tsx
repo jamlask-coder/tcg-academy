@@ -90,7 +90,7 @@ export default function GoogleCallbackPage() {
         picture: claims.picture,
       };
 
-      const redirectTo = sessionStorage.getItem(REDIRECT_KEY) ?? "/cuenta/datos";
+      const redirectTo = sessionStorage.getItem(REDIRECT_KEY) ?? "/cuenta";
       sessionStorage.removeItem(REDIRECT_KEY);
 
       const result = await loginWithGoogle(payload);
@@ -115,7 +115,7 @@ export default function GoogleCallbackPage() {
   }, [loginWithGoogle, router]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+    <div className="flex items-center justify-center bg-gray-50 px-4 py-16 sm:py-24">
       <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
         {error ? (
           <>

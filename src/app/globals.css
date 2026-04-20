@@ -187,12 +187,12 @@ html {
 }
 
 @keyframes starGlow {
-  0%, 100% { text-shadow: 0 0 2px #fbbf24, 0 0 4px #fbbf24; transform: scale(1); }
-  50%      { text-shadow: 0 0 8px #fbbf24, 0 0 16px #f59e0b, 0 0 24px #d97706; transform: scale(1.2); }
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 1; }
 }
 
 .animate-star-glow {
-  animation: starGlow 2s ease-in-out infinite;
+  animation: starGlow 3s ease-in-out infinite;
 }
 
 @keyframes slideInRight {

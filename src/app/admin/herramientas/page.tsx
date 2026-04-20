@@ -12,6 +12,8 @@ import {
   AlertCircle,
   RefreshCw,
   CheckCircle2,
+  Sparkles,
+  ChevronRight,
 } from "lucide-react";
 import { type LocalProduct } from "@/data/products";
 import { Package as PackageIcon } from "lucide-react";
@@ -742,6 +744,34 @@ export default function AdminHerramientasPage() {
         <p className="mt-2 text-center text-xs text-gray-400">
           Estos criterios se aplican automáticamente en la ficha de producto visible al cliente
         </p>
+      </div>
+
+      {/* Diagnósticos */}
+      <div className="mb-8">
+        <h2 className="mb-4 font-bold text-gray-900">Diagnósticos</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Link
+            href="/admin/herramientas/highlights"
+            className="group rounded-2xl border border-gray-200 bg-white p-5 transition hover:shadow-md"
+          >
+            <div
+              className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl transition group-hover:scale-110"
+              style={{ backgroundColor: "#f59e0b18" }}
+            >
+              <Sparkles size={20} style={{ color: "#f59e0b" }} />
+            </div>
+            <p className="mb-1 text-sm font-bold text-gray-900">
+              Diagnóstico Highlights
+            </p>
+            <p className="mb-4 text-xs leading-relaxed text-gray-500">
+              Verifica qué productos tienen resolución automática de cartas
+              top y qué juegos fallan
+            </p>
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-[#f59e0b]">
+              Abrir panel <ChevronRight size={13} />
+            </div>
+          </Link>
+        </div>
       </div>
 
       {/* Manual */}

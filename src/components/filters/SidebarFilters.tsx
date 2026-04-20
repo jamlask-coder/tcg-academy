@@ -1,4 +1,6 @@
 "use client";
+// Selected-state color for filters is ALWAYS blue across all games (user rule).
+const FILTER_ACCENT = "#2563eb";
 import { useState, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -218,7 +220,7 @@ function FilterContent({
                             : "border-gray-300"
                         }`}
                         style={
-                          { "--filter-color": color } as React.CSSProperties
+                          { "--filter-color": FILTER_ACCENT } as React.CSSProperties
                         }
                       >
                         {active && (
@@ -275,7 +277,7 @@ function FilterContent({
               <div
                 className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full"
                 style={{
-                  backgroundColor: color,
+                  backgroundColor: FILTER_ACCENT,
                   left: `${((currentMin - minPrice) / (maxPrice - minPrice || 1)) * 100}%`,
                   right: `${((maxPrice - currentMax) / (maxPrice - minPrice || 1)) * 100}%`,
                 }}
@@ -315,14 +317,14 @@ function FilterContent({
                 className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-md"
                 style={{
                   left: `${((currentMin - minPrice) / (maxPrice - minPrice || 1)) * 100}%`,
-                  backgroundColor: color,
+                  backgroundColor: FILTER_ACCENT,
                 }}
               />
               <div
                 className="pointer-events-none absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-md"
                 style={{
                   left: `${((currentMax - minPrice) / (maxPrice - minPrice || 1)) * 100}%`,
-                  backgroundColor: color,
+                  backgroundColor: FILTER_ACCENT,
                 }}
               />
             </div>
@@ -369,7 +371,7 @@ function FilterContent({
           className={`relative h-5 w-9 rounded-full transition-colors ${
             inStock ? "bg-[var(--filter-color)]" : "bg-gray-200"
           }`}
-          style={{ "--filter-color": color } as React.CSSProperties}
+          style={{ "--filter-color": FILTER_ACCENT } as React.CSSProperties}
         >
           <span
             className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
@@ -418,7 +420,7 @@ export function SidebarFilters({
             aria-hidden="true"
           />
           {/* Bottom sheet panel */}
-          <div className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-hidden rounded-t-3xl bg-white shadow-2xl lg:hidden">
+          <div className="fixed inset-x-0 bottom-0 z-50 max-h-[83vh] overflow-hidden rounded-t-3xl bg-white shadow-2xl lg:hidden">
             {/* Handle bar */}
             <div className="flex justify-center pt-3 pb-1">
               <div className="h-1 w-10 rounded-full bg-gray-300" />
@@ -445,12 +447,21 @@ export function SidebarFilters({
             </div>
 
             {/* Scrollable content */}
-            <div className="overflow-y-auto px-5 pt-4 pb-6" style={{ maxHeight: "calc(85vh - 80px)" }}>
-              {/* Categories section */}
+            <div className="overflow-y-auto px-5 pt-4 pb-6" style={{ maxHeight: "calc(83vh - 80px)" }}>
+              {/* Categories section — 2 rows horizontal scroll on mobile */}
               {categoryItems && categoryItems.length > 0 && (
-                <div className="mb-5">
-                  <p className="mb-2.5 text-xs font-bold tracking-wide text-gray-400 uppercase">Categorías</p>
-                  <div className="flex flex-wrap gap-2">
+                <div className="mb-5 -mx-5">
+                  <p className="mb-2.5 px-5 text-xs font-bold tracking-wide text-gray-400 uppercase">Categorías</p>
+                  <div
+                    className="scrollbar-hide grid grid-flow-col auto-cols-max gap-x-2 gap-y-2 overflow-x-auto px-5 pb-1"
+                    style={{
+                      gridTemplateRows: "repeat(2, auto)",
+                      scrollbarWidth: "none",
+                      msOverflowStyle: "none",
+                      WebkitOverflowScrolling: "touch",
+                    }}
+                  >
+                    <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}`}</style>
                     {categoryItems.map((item) => {
                       const isActive = item.id === activeCategory;
                       return (
@@ -458,12 +469,12 @@ export function SidebarFilters({
                           key={item.id}
                           href={item.href}
                           onClick={onMobileClose}
-                          className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold transition ${
+                          className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-semibold transition ${
                             isActive
                               ? "text-white shadow-sm"
                               : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                           }`}
-                          style={isActive ? { backgroundColor: color } : undefined}
+                          style={isActive ? { backgroundColor: FILTER_ACCENT } : undefined}
                         >
                           {isActive && <Check size={13} strokeWidth={3} />}
                           {item.label}
@@ -491,7 +502,7 @@ export function SidebarFilters({
               <button
                 onClick={onMobileClose}
                 className="w-full rounded-xl py-3 text-sm font-bold text-white transition active:scale-[0.98]"
-                style={{ backgroundColor: color }}
+                style={{ backgroundColor: FILTER_ACCENT }}
               >
                 Ver {filteredCount ?? 0} productos
               </button>

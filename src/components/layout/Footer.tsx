@@ -25,9 +25,9 @@ function IconTikTok() {
 const LINKS: [string, string][] = [
   ["Nuestras tiendas", "/tiendas"],
   ["Contacto", "/contacto"],
+  ["Vending TCG", "/mayoristas/vending"],
   ["Profesionales B2B", "/mayoristas"],
   ["Abre tu tienda TCG", "/mayoristas/franquicias"],
-  ["Vending TCG", "/mayoristas/vending"],
 ];
 
 const LEGAL: [string, string][] = [
@@ -60,16 +60,34 @@ function FooterLink({
 
 export function Footer() {
   return (
-    <footer className="relative text-white" style={{ background: "#050810" }}>
-      {/* 4-corner gradient overlay */}
+    <footer className="relative overflow-hidden text-white" style={{ background: "#050810" }}>
+      {/* Gradient overlay — lo más claro se concentra en la esquina inferior
+          derecha (azul #1e3a8a). La capa superior linear-gradient mantiene el
+          borde de arriba al color base para empalmar sin línea con la sección
+          anterior. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{
         background: `
-          radial-gradient(ellipse at top left, #0a0f1a 0%, transparent 60%),
-          radial-gradient(ellipse at top right, #1e3a8a 0%, transparent 50%),
-          radial-gradient(ellipse at bottom left, #050810 0%, transparent 60%),
-          radial-gradient(ellipse at bottom right, #0c1a3a 0%, transparent 50%)
+          linear-gradient(to bottom, #050810 0%, #050810 80px, rgba(5,8,16,0) 220px),
+          radial-gradient(ellipse at 100% 100%, #1e3a8a 0%, transparent 65%),
+          radial-gradient(ellipse at 75% 85%, #0c1a3a 0%, transparent 55%),
+          radial-gradient(ellipse at 0% 100%, #050810 0%, transparent 60%)
         `,
       }} />
+
+      {/* Shield watermark — sólo móvil. Grande, centrado, muy transparente
+          para que el texto se lea bien por encima. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 flex items-start justify-center pt-10 sm:hidden"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logo-tcg-shield.png"
+          alt=""
+          className="h-auto w-[115%] max-w-[560px] object-contain opacity-[0.14]"
+          style={{ filter: "blur(0.3px)" }}
+        />
+      </div>
       <Container className="relative z-10 py-8">
 {/* Shield watermark is inside the Tienda/Legal section below */}
 
@@ -77,16 +95,16 @@ export function Footer() {
         <div className="mb-6 grid gap-8 sm:grid-cols-[2fr_1fr_1fr_auto] sm:gap-12">
           {/* Brand */}
           <div>
-            <Link href="/" className="mb-4 inline-flex items-center gap-2">
+            <Link href="/" className="mb-4 hidden items-center gap-2 sm:inline-flex">
               <span className="text-xl font-black tracking-tight text-white">TCG <span className="text-amber-400">Academy</span></span>
             </Link>
             {/* Store socials */}
             <div className="mt-4 space-y-2.5">
               {[
-                { store: "Calpe", ig: "tcgacademy_calpe", tt: "tcgacademy_calpe" },
-                { store: "Madrid", ig: "tcgacademy_madrid", tt: null },
-                { store: "Barcelona", ig: "tcgacademy_barcelona", tt: null },
-                { store: "Béjar", ig: "tcgacademy_bejar", tt: null },
+                { store: "Madrid", ig: "tcgacademy.madrid", tt: null },
+                { store: "Barcelona", ig: "tcgacademybcn", tt: null },
+                { store: "Calpe", ig: "tcgacademycalpe", tt: "tcgacademy" },
+                { store: "Béjar", ig: "tcg_academy_bejar", tt: null },
               ].map(({ store, ig, tt }) => (
                 <div key={store} className="flex items-center gap-2.5">
                   <span className="w-20 text-xs font-semibold text-slate-400">{store}</span>
@@ -113,16 +131,8 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Tienda + Legal — side by side on mobile, with shield watermark behind */}
-          <div className="relative col-span-1 grid grid-cols-2 gap-6 sm:contents">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/images/logo-tcg-shield.png"
-              alt=""
-              aria-hidden="true"
-              className="pointer-events-none absolute right-0 top-0 opacity-[0.15] sm:hidden"
-              style={{ width: 180, height: "auto" }}
-            />
+          {/* Tienda + Legal — side by side on mobile */}
+          <div className="col-span-1 grid grid-cols-2 gap-6 sm:contents">
             <div>
               <h3 className="mb-3 text-[10px] font-bold tracking-widest text-white/40 uppercase">
                 Tienda

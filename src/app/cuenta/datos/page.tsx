@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { CheckCircle, Eye, EyeOff, MapPin, Plus, Pencil, Trash2, Star, AlertCircle, ShieldCheck } from "lucide-react";
+import { CheckCircle, Eye, EyeOff, MapPin, Plus, Pencil, Trash2, Star, AlertCircle } from "lucide-react";
 import type { Address } from "@/types/user";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
 import { validateSpanishNIF } from "@/lib/validations/nif";
@@ -180,24 +180,12 @@ export default function DatosPage() {
         className="space-y-5 rounded-2xl border border-gray-200 bg-white p-6"
       >
         <h2 className="font-bold text-gray-900">Información personal</h2>
-        {!user.nif && (
-          <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            <ShieldCheck size={18} className="mt-0.5 shrink-0 text-amber-600" />
-            <div>
-              <p className="font-semibold">Falta tu NIF / NIE / CIF</p>
-              <p className="text-xs">
-                Obligatorio para emitir facturas legales (Art. 6.1.d RD
-                1619/2012). No podrás realizar compras hasta completarlo.
-              </p>
-            </div>
-          </div>
-        )}
         <div className="grid gap-4 sm:grid-cols-2">
           {(
             [
               ["name", "Nombre", form.name],
               ["lastName", "Apellidos", form.lastName],
-              ["nif", "NIF / NIE / CIF *", form.nif],
+              ["nif", "NIF / NIE / CIF", form.nif],
               ["phone", "Teléfono", form.phone],
               ["email", "Email", form.email],
             ] as const
@@ -233,8 +221,7 @@ export default function DatosPage() {
               )}
               {isNif && (
                 <p className="mt-1 text-xs text-gray-500">
-                  Obligatorio para facturas — DNI, NIE o CIF. Se valida con
-                  letra de control.
+                  DNI, NIE o CIF. Se valida con letra de control.
                 </p>
               )}
             </div>

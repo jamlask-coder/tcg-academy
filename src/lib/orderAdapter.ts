@@ -20,6 +20,7 @@ import type {
   AdminOrderStatus,
   AdminPaymentStatus,
   OrderItem as AdminItem,
+  OrderStatus as CustomerOrderStatus,
 } from "@/data/mockData";
 
 /**
@@ -119,10 +120,83 @@ export function toAdminStatus(status: string): AdminOrderStatus {
       return "incidencia";
     case "procesando":
     case "pendiente":
+    case "pedido":
     case "pagado":
+    case "pendiente_envio":
     case "preparado":
     default:
       return "pendiente_envio";
+  }
+}
+
+/**
+ * Deriva el estado visible para el cliente desde admin + cobro.
+ *
+ * Estados cliente (2026-04-20): pedido → pagado → pendiente_envio → enviado
+ * más excepciones (incidencia, cancelado, devolucion).
+ *
+ * REGLA DE NEGOCIO (TCG Academy): "sin pago no hay pedido". En la web,
+ * un pedido sólo se crea si el pago se confirma. Por tanto, para el
+ * cliente "pedido" y "pagado" van unidos — el timeline arranca siempre
+ * con ambos hitos completados. "pedido" puro como estado cliente no
+ * existe; cualquier pedido visible es, mínimo, "pagado".
+ *
+ * Mapeo:
+ *  - admin "enviado"         → "enviado"
+ *  - admin "cancelado"       → "cancelado"
+ *  - admin "devolucion"      → "devolucion"
+ *  - admin "incidencia"      → "incidencia"
+ *  - admin "pendiente_envio" → "pagado" (defecto) o "pendiente_envio" si
+ *    el admin lo marcó explícitamente como en preparación con tracking.
+ */
+export function toCustomerStatus(
+  adminStatus: AdminOrderStatus,
+  paymentStatus: AdminPaymentStatus | undefined,
+  paymentMethod: string,
+): CustomerOrderStatus {
+  if (adminStatus === "enviado") return "enviado";
+  if (adminStatus === "cancelado") return "cancelado";
+  if (adminStatus === "devolucion") return "devolucion";
+  if (adminStatus === "incidencia") return "incidencia";
+  // adminStatus === "pendiente_envio": en nuestro flujo, si existe el pedido
+  // ya está pagado. Mostramos "pagado" como estado inicial estable.
+  void paymentStatus;
+  void paymentMethod;
+  return "pagado";
+}
+
+/**
+ * Normaliza un status heredado/externo a uno del set cliente.
+ * Útil cuando leemos `tcgacademy_orders` donde el checkout escribe strings
+ * libres ("pendiente", "procesando", "entregado", etc.).
+ *
+ * Importante: "pedido"/"pendiente" legacy → "pagado" (regla de negocio
+ * "sin pago no hay pedido"). Ningún pedido visible al cliente se queda
+ * colgado en "pedido" puro.
+ */
+export function normalizeCustomerStatus(s: string): CustomerOrderStatus {
+  const v = (s ?? "").toLowerCase();
+  switch (v) {
+    case "entregado":
+    case "finalizado":
+    case "enviado":
+      return "enviado";
+    case "pendiente_envio":
+    case "preparado":
+    case "procesando":
+      return "pendiente_envio";
+    case "cancelado":
+      return "cancelado";
+    case "devuelto":
+    case "devolucion":
+      return "devolucion";
+    case "incidencia":
+      return "incidencia";
+    case "pagado":
+    case "pedido":
+    case "pendiente":
+    default:
+      return "pagado";
   }
 }
 

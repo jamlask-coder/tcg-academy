@@ -80,11 +80,15 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
     ? Number(params.get("priceMax"))
     : null;
 
-  // Derive available languages — ordered: ES, EN, JP, KO, then rest alphabetically
-  const LANG_ORDER = ["ES", "EN", "JP", "KO"];
+  // Derive available languages — ordered: ES, EN, JP, KO, …, ZH (último siempre)
+  const LANG_ORDER = ["ES", "EN", "JP", "KO", "FR", "DE", "IT", "PT", "ZH"];
   const availableLanguages = useMemo(() => {
-    const langs = [...new Set(mergedProducts.map((p) => p.language).filter(Boolean))] as string[];
-    return langs.sort((a, b) => {
+    const fromProducts = new Set(
+      mergedProducts.map((p) => p.language).filter(Boolean) as string[],
+    );
+    // Chino siempre disponible como opción de filtro, aunque aún no haya productos.
+    fromProducts.add("ZH");
+    return [...fromProducts].sort((a, b) => {
       const ai = LANG_ORDER.indexOf(a.toUpperCase());
       const bi = LANG_ORDER.indexOf(b.toUpperCase());
       if (ai !== -1 && bi !== -1) return ai - bi;

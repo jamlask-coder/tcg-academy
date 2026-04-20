@@ -244,18 +244,18 @@ function PriceDisplay({
           {etiquetaRol}
         </span>
       )}
-      <div className="flex items-end gap-2">
+      <div className="flex items-baseline gap-2">
         <span className="text-2xl font-bold" style={{ color }}>
           {displayPrice.toFixed(2)}€
         </span>
-        <span className="mb-0.5 text-xs text-gray-400">IVA incl.</span>
+        <span className="text-xs text-gray-400">IVA incluido</span>
         {effectiveHasDiscount && !isB2B && (
           <>
-            <span className="mb-0.5 text-base text-gray-400 line-through">
+            <span className="text-base text-gray-400 line-through">
               {(effectiveComparePrice ?? 0).toFixed(2)}€
             </span>
             <span
-              className="mb-0.5 rounded-lg px-1.5 py-0.5 text-xs font-bold"
+              className="rounded-lg px-1.5 py-0.5 text-xs font-bold"
               style={{ backgroundColor: `${color}18`, color }}
             >
               -{effectiveDiscountPct}%
@@ -517,7 +517,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
   const related = getRelated(product);
 
   return (
-    <div className="mx-auto max-w-[1280px] px-5 py-4 sm:px-8 lg:px-10">
+    <div className="mx-auto max-w-[1280px] px-5 pt-1 pb-4 sm:px-8 sm:py-4 lg:px-10">
       {/* Confirm delete modal */}
       <ConfirmationModal
         isOpen={deleteConfirmOpen}
@@ -547,7 +547,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
       )}
 
       {/* Breadcrumb */}
-      <nav className="mb-4 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+      <nav className="mb-1 flex flex-wrap items-center gap-2 text-sm leading-tight text-gray-500 sm:mb-2">
         <Link href="/" className="text-[#2563eb] hover:text-[#1d4ed8]">
           Inicio
         </Link>
@@ -568,13 +568,13 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
         </span>
       </nav>
 
-      <div className="mb-4 grid gap-6 md:grid-cols-[45%_1fr]">
+      <div className="mb-4 grid gap-2 md:grid-cols-[45%_1fr] md:gap-6">
         {/* Gallery */}
         <div className="relative">
           <HoloCard
             intensity="full"
             active={isCardCategory}
-            className="mb-1.5 rounded-2xl"
+            className="mb-0 rounded-2xl md:mb-1.5"
           >
             <div
               ref={imgContainerRef}
@@ -643,16 +643,44 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                   </span>
                 </div>
               )}
-              {/* ── ESQUINA SUPERIOR IZQUIERDA: corazón + badges ── */}
+              {/* ── ESQUINA SUPERIOR IZQUIERDA: stock → NUEVO → descuento → corazón ── */}
               <div className="absolute top-3 left-3 z-10 flex flex-col items-start gap-1.5">
+                {(() => {
+                  const si = getStockInfo(product.inStock ? product.stock : 0);
+                  if (si.level === "unlimited" || si.level === "available") return null;
+                  return (
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-bold shadow-sm ${
+                        si.level === "out"
+                          ? "bg-gray-500 text-white"
+                          : si.level === "last"
+                            ? "bg-red-500 text-white"
+                            : "bg-amber-500 text-white"
+                      }`}
+                    >
+                      {si.level === "out" ? "AGOTADO" : si.label.toUpperCase()}
+                    </span>
+                  );
+                })()}
+                {isNewProduct(product) && (
+                  <span className="rounded-full bg-green-500 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm">
+                    NUEVO
+                  </span>
+                )}
+                <DiscountBadgeEdit
+                  displayPrice={inlinePrice}
+                  comparePrice={inlineComparePrice}
+                  onSave={setInlineComparePrice}
+                  badgeClassName="rounded-full bg-red-500 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm"
+                />
                 {user && user.role !== "admin" && (
                   <button
-                    onClick={() => toggleFavorite(product.id)}
-                    aria-label={
-                      isFavorite(product.id)
-                        ? "Quitar de favoritos"
-                        : "Añadir a favoritos"
-                    }
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setHeartAnimKey((k) => k + 1);
+                      toggleFavorite(product.id);
+                    }}
+                    aria-label={isFavorite(product.id) ? "Quitar de favoritos" : "Añadir a favoritos"}
                     className={`flex h-9 w-9 items-center justify-center rounded-full shadow-md transition-all duration-200 ${
                       isFavorite(product.id)
                         ? "bg-red-500 text-white"
@@ -665,17 +693,6 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                     />
                   </button>
                 )}
-                {isNewProduct(product) && (
-                  <span className="rounded-full bg-green-500 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm">
-                    NUEVO
-                  </span>
-                )}
-                <DiscountBadgeEdit
-                  displayPrice={inlinePrice}
-                  comparePrice={inlineComparePrice}
-                  onSave={setInlineComparePrice}
-                  badgeClassName="bg-red-500 text-white text-sm font-bold px-3 py-1 rounded-full shadow-md"
-                />
               </div>
 
             </div>
@@ -753,7 +770,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
         )}
 
         {/* Buy box */}
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-1.5 sm:gap-2.5">
           {/* 1. Title + admin buttons */}
           <div className="flex items-start justify-between gap-3">
             <h1 className="flex flex-1 items-center gap-2.5 text-xl leading-tight font-bold text-gray-900 md:text-2xl">
@@ -922,7 +939,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                         const pct = Math.round((saved / packPrice) * 100);
                         return (
                           <span className="text-xs font-semibold text-green-600">
-                            Ahorras {saved.toFixed(2)}€ ({pct}%)
+                            Ahorras {saved.toFixed(2)}€ ({pct}%) vs comprar los sobres sueltos
                           </span>
                         );
                       })() : null;
@@ -955,7 +972,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           >
             <div
               ref={descRef}
-              className={`overflow-hidden text-sm leading-relaxed text-gray-600 text-justify transition-all ${descExpanded ? "" : "line-clamp-3"}`}
+              className={`overflow-hidden text-sm leading-snug text-gray-600 text-justify transition-all ${descExpanded ? "" : "line-clamp-3"}`}
             >
               {editMode ? (
                 <>
@@ -963,7 +980,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                     value={inlineDesc}
                     onChange={(e) => setInlineDesc(e.target.value)}
                     rows={3}
-                    className="w-full resize-none rounded-lg border border-[#2563eb] px-2 py-1 text-sm leading-relaxed text-gray-600 focus:outline-none"
+                    className="w-full resize-none rounded-lg border border-[#2563eb] px-2 py-1 text-sm leading-snug text-gray-600 focus:outline-none"
                   />
                   <button
                     type="button"
@@ -1087,14 +1104,14 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                 )}
               </div>
 
-              {/* Favorite — circular button */}
+              {/* Favorite — circular button (desktop only; on mobile use heart in image corner) */}
               <button
                 onClick={() => {
                   setHeartAnimKey((k) => k + 1);
                   toggleFavorite(product.id);
                 }}
                 aria-label={isFavorite(product.id) ? "Quitar de favoritos" : "Añadir a favoritos"}
-                className={`flex h-10 w-10 items-center justify-center rounded-full transition-all duration-300 ${
+                className={`hidden h-10 w-10 items-center justify-center rounded-full transition-all duration-300 sm:flex ${
                   isFavorite(product.id)
                     ? "bg-red-50 text-red-500 shadow-md"
                     : "bg-gray-100 text-gray-400 hover:text-red-400 hover:bg-red-50"
@@ -1154,7 +1171,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
             </div>
             <div className="mt-1.5 border-t border-gray-100 pt-1.5">
               <div className="flex items-center gap-1.5 text-xs text-amber-700">
-                <span className="inline-block animate-star-glow text-lg leading-none text-amber-400">★</span>
+                <span className="inline-block animate-star-glow text-base leading-none text-amber-300/80">★</span>
                 <span>
                   Consigue <strong>{Math.round(displayPrice * 100)}</strong> puntos con esta compra
                 </span>

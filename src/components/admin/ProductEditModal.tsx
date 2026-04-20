@@ -25,6 +25,7 @@ const LANGUAGES = [
   { code: "IT", label: "🇮🇹 IT" },
   { code: "KO", label: "🇰🇷 KO" },
   { code: "PT", label: "🇵🇹 PT" },
+  { code: "ZH", label: "🇨🇳 ZH" },
 ];
 
 function toSlug(name: string): string {

@@ -10,10 +10,11 @@ const LANG_TO_COUNTRY: Record<string, string> = {
   IT: "it",
   KO: "kr",
   PT: "br",
+  ZH: "cn",
 };
 
 interface LanguageFlagProps {
-  /** ISO language code: ES | EN | JP | FR | DE | IT | KO | PT */
+  /** ISO language code: ES | EN | JP | FR | DE | IT | KO | PT | ZH */
   language: string;
   /** Show text label next to flag — default: false */
   showLabel?: boolean;

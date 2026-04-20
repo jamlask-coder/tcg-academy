@@ -20,7 +20,8 @@
       "WebFetch(domain:localhost)",
       "WebFetch(domain:pokemillon.es)",
       "WebFetch(domain:www.pokemillon.com)",
-      "WebFetch(domain:battledeck.es)"
+      "WebFetch(domain:battledeck.es)",
+      "WebFetch(domain:scryfall.com)"
     ]
   }
 }

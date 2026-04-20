@@ -1,11 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Gift, Tag, Clock, Check, X, Percent, Euro, Trophy, ArrowRight } from "lucide-react";
+import { Gift, Tag, Clock, Check, X, Percent, Euro } from "lucide-react";
 import { MOCK_USER_COUPONS, type Coupon } from "@/data/mockData";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
-import { useAuth } from "@/context/AuthContext";
-import { loadPoints, pointsToEuros, POINTS_PER_EURO } from "@/services/pointsService";
 
 function CouponCard({ coupon }: { coupon: Coupon }) {
   const isActive = coupon.status === "activo";
@@ -82,61 +78,12 @@ function CouponCard({ coupon }: { coupon: Coupon }) {
 }
 
 export default function CuponesPage() {
-  const { user } = useAuth();
-  const [balance, setBalance] = useState(0);
   const activeCoupons = MOCK_USER_COUPONS.filter((c) => c.status === "activo");
   const historialCoupons = MOCK_USER_COUPONS.filter((c) => c.status !== "activo");
-  const isClient = user?.role === "cliente";
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (user) setBalance(loadPoints(user.id));
-  }, [user]);
-
-  const balanceEuros = pointsToEuros(balance);
 
   return (
     <div>
       <AccountTabs group="recompensas" />
-
-      {/* Points balance */}
-      <div className="relative mb-6 overflow-hidden rounded-2xl bg-gradient-to-br from-[#1e3a8a] to-[#2563eb] p-5 text-white">
-        <div className="pointer-events-none absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/5" />
-        <div className="pointer-events-none absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-white/5" />
-        <div className="relative flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-white/10">
-              <Trophy size={22} className="text-amber-300" />
-            </div>
-            <div>
-              <p className="text-xs text-blue-200">Tus puntos</p>
-              <p className="text-3xl font-black tabular-nums leading-tight">
-                {balance.toLocaleString("es-ES")}
-                <span className="ml-1.5 text-sm font-bold text-blue-300">pts</span>
-              </p>
-              <p className="mt-0.5 text-sm text-blue-100">
-                Equivale a{" "}
-                <strong className="text-amber-300">{balanceEuros.toFixed(2)}€</strong>
-                {" "}de descuento en tu próximo pedido
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-center">
-              <p className="text-[10px] uppercase tracking-wider text-blue-200">Por compra</p>
-              <p className="text-sm font-bold">{POINTS_PER_EURO} pts / €1</p>
-            </div>
-            {isClient && (
-              <Link
-                href="/cuenta/puntos"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-sm font-bold text-[#2563eb] transition hover:bg-amber-300"
-              >
-                Ver detalles <ArrowRight size={14} />
-              </Link>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Active coupons */}
       <div className="mb-8">

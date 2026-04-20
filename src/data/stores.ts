@@ -37,7 +37,7 @@ export const STORES: Record<string, Store> = {
       { day: "Sábado", time: "10:00 – 20:00" },
       { day: "Domingo", time: "10:00 – 14:00" },
     ],
-    instagram: "@tcgacademy_calpe",
+    instagram: "@tcgacademycalpe",
   },
   bejar: {
     id: "bejar",
@@ -57,7 +57,7 @@ export const STORES: Record<string, Store> = {
       { day: "Sábado", time: "10:00 – 14:00" },
       { day: "Domingo", time: "Cerrado" },
     ],
-    instagram: "@tcgacademy_bejar",
+    instagram: "@tcg_academy_bejar",
   },
   madrid: {
     id: "madrid",
@@ -76,7 +76,7 @@ export const STORES: Record<string, Store> = {
       { day: "Lunes – Sábado", time: "10:00 – 21:00" },
       { day: "Domingo", time: "11:00 – 19:00" },
     ],
-    instagram: "@tcgacademy_madrid",
+    instagram: "@tcgacademy.madrid",
   },
   barcelona: {
     id: "barcelona",
@@ -95,6 +95,6 @@ export const STORES: Record<string, Store> = {
       { day: "Lunes – Sábado", time: "10:00 – 21:00" },
       { day: "Domingo", time: "11:00 – 19:00" },
     ],
-    instagram: "@tcgacademy_bcn",
+    instagram: "@tcgacademybcn",
   },
 };

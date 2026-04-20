@@ -276,6 +276,19 @@ const STABLE: EntityRegistryEntry[] = [
     category: "catalogo",
     notes: "Las tiendas consultadas están en src/config/competitorStores.ts. No incluir en backup: se regenera.",
   },
+  {
+    key: "priceHistory",
+    description: "Histórico diario de precios Cardmarket EUR por carta (snapshots {cardId,game,date,eur})",
+    storageKeys: ["tcgacademy_price_history", "tcgacademy_price_history_meta", "tcgacademy_forex_eur_rates"],
+    event: DataHubEvents.PRICE_HISTORY_UPDATED,
+    pii: false,
+    retentionMonths: 36,
+    adapter: "@/services/priceHistoryService",
+    maturity: "stable",
+    category: "catalogo",
+    criticalJson: true,
+    notes: "Snapshots alimentados por cron diario POST /api/cron/price-snapshot. Magic/YGO/Pokémon vía APIs gratis; OP/DB/Riftbound/Lorcana vía TCGplayer + forex BCE. Gráfico público en lightbox de cartas destacadas.",
+  },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════

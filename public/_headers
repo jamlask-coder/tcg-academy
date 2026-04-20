@@ -5,7 +5,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://static.cardmarket.com https://images.pokemontcg.io https://cards.scryfall.io https://c1.scryfall.com https://svgs.scryfall.io https://images.ygoprodeck.com https://api.tcgdex.net; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://static.cardmarket.com https://images.pokemontcg.io https://cards.scryfall.io https://c1.scryfall.com https://svgs.scryfall.io https://images.ygoprodeck.com https://api.tcgdex.net https://assets.tcgdex.net https://files.bandai-tcg-plus.com https://storage.googleapis.com https://tcgplayer-cdn.tcgplayer.com https://lorcana-api.com https://images.riftbound.gg https://apitcg.com https://images.digimoncard.io https://en.digimoncard.com; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://api.scryfall.com https://api.pokemontcg.io https://api.tcgdex.net https://api.lorcana-api.com https://db.ygoprodeck.com https://api.frankfurter.app https://apitcg.com https://digimoncard.io; frame-ancestors 'none'; upgrade-insecure-requests
 
 /_next/static/*
   Cache-Control: public, max-age=31536000, immutable

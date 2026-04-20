@@ -72,7 +72,7 @@ export default async function GamePage({
       )}
 
       {/* Catálogo */}
-      <section className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6 sm:py-5">
+      <section className="mx-auto max-w-[1400px] px-4 py-3 sm:px-6 sm:py-10">
         {all.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-gray-200 py-24 text-center">
             <p className="font-medium text-gray-400">Catálogo en construcción</p>

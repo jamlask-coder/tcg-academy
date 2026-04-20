@@ -110,18 +110,18 @@ export default function ComprarCartasPage() {
   return (
     <div>
       {/* Hero */}
-      <div className="bg-gradient-to-br from-[#2563eb] to-[#3b82f6] py-16 text-white">
+      <div className="border-b border-gray-100 bg-white py-12 sm:py-14">
         <div className="mx-auto max-w-[1100px] px-6 text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-bold tracking-widest uppercase">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#2563eb]/20 bg-[#2563eb]/5 px-3 py-1 text-xs font-bold tracking-widest text-[#2563eb] uppercase">
             <Coins size={14} /> Servicio de compra
           </div>
-          <h1 className="mb-4 text-3xl font-bold md:text-5xl">
+          <h1 className="mb-4 text-3xl font-bold text-gray-900 md:text-5xl">
             Compramos tus cartas
           </h1>
-          <p className="mx-auto max-w-2xl text-lg text-blue-100">
+          <p className="mx-auto max-w-2xl text-base text-gray-600 sm:text-lg">
             Tasación gratuita y sin compromiso. Pago en 24 h o saldo con bonus
             del 10 % extra. Más de{" "}
-            <span className="font-black text-white">15 000 € mensuales</span>{" "}
+            <span className="font-black text-gray-900">15 000 € mensuales</span>{" "}
             en compras a coleccionistas de toda España.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -133,12 +133,12 @@ export default function ComprarCartasPage() {
             </Link>
             <Link
               href="/tiendas"
-              className="inline-flex items-center gap-2 rounded-full border border-white/30 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/10"
+              className="inline-flex items-center gap-2 rounded-full border border-gray-300 px-6 py-3 text-sm font-bold text-gray-700 transition hover:border-[#2563eb] hover:text-[#2563eb]"
             >
               Ir a una tienda
             </Link>
           </div>
-          <p className="mt-4 text-xs text-blue-200">
+          <p className="mt-4 text-xs text-gray-400">
             Borrador — copys y cifras provisionales, pendiente de revisión.
           </p>
         </div>

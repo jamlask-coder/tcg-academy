@@ -117,6 +117,19 @@ export default function CartPage() {
             const productHref = prod
               ? `/${prod.game}/${prod.category}/${prod.slug}`
               : null;
+            // Ahorro vs comprar los sobres sueltos (solo cajas con linkedPackId)
+            const packSavings = (() => {
+              if (!prod || prod.category !== "booster-box" || !prod.packsPerBox) return null;
+              const packId = prod.linkedPackId;
+              if (!packId) return null;
+              const pack = PRODUCTS.find((p) => p.id === packId);
+              if (!pack) return null;
+              const packTotal = pack.price * prod.packsPerBox;
+              const saved = packTotal - prod.price;
+              if (saved <= 0) return null;
+              const pct = Math.round((saved / packTotal) * 100);
+              return { saved, pct };
+            })();
             return (
               <div
                 key={item.key}
@@ -153,6 +166,11 @@ export default function CartPage() {
                   <p className="text-base font-bold text-[#2563eb]">
                     {item.price.toFixed(2)}€/ud
                   </p>
+                  {packSavings && (
+                    <p className="mt-1 text-xs font-semibold text-green-600">
+                      Ahorras {packSavings.saved.toFixed(2)}€ ({packSavings.pct}%) vs comprar los sobres sueltos
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-col items-end gap-3">
                   <button

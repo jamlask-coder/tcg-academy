@@ -76,10 +76,10 @@ export default function ContactoPage() {
   return (
     <div>
       {/* Hero */}
-      <div className="bg-gradient-to-br from-[#2563eb] to-[#3b82f6] py-16 text-white">
+      <div className="border-b border-gray-100 bg-white py-12 sm:py-14">
         <div className="mx-auto max-w-[1400px] px-6 text-center">
-          <h1 className="mb-4 text-3xl font-bold md:text-5xl">Contacto</h1>
-          <p className="mx-auto max-w-lg text-lg text-blue-200">
+          <h1 className="mb-3 text-3xl font-bold text-gray-900 md:text-5xl">Contacto</h1>
+          <p className="mx-auto max-w-lg text-base text-gray-600 sm:text-lg">
             Estamos aquí para ayudarte. Escríbenos y te respondemos en menos de
             24 horas.
           </p>

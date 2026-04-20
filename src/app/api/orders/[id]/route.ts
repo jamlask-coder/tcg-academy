@@ -45,8 +45,18 @@ export async function PATCH(
       return NextResponse.json({ error: "Estado requerido" }, { status: 400 });
     }
 
-    // "entregado" eliminado del flujo 2026-04-18 — estado final = "enviado".
-    const validStatuses = ["pedido", "enviado", "cancelado", "incidencia", "devolucion"];
+    // Estados customer (2026-04-20): pedido → pagado → pendiente_envio → enviado
+    // + excepciones (incidencia, cancelado, devolucion). "entregado" eliminado
+    // 2026-04-18 (depende del transportista, no de nosotros).
+    const validStatuses = [
+      "pedido",
+      "pagado",
+      "pendiente_envio",
+      "enviado",
+      "cancelado",
+      "incidencia",
+      "devolucion",
+    ];
     if (!validStatuses.includes(status)) {
       return NextResponse.json({ error: `Estado no válido: ${status}` }, { status: 400 });
     }

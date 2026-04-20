@@ -179,21 +179,26 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
             <div class="prog-dot done"></div>
             <div class="prog-label done">Pedido</div>
           </div>
+          <div class="prog-line done"></div>
+          <div class="prog-step">
+            <div class="prog-dot done"></div>
+            <div class="prog-label done">Pagado</div>
+          </div>
+          <div class="prog-line pending"></div>
+          <div class="prog-step">
+            <div class="prog-dot pending"></div>
+            <div class="prog-label">Pendiente de envío</div>
+          </div>
           <div class="prog-line pending"></div>
           <div class="prog-step">
             <div class="prog-dot pending"></div>
             <div class="prog-label">Enviado</div>
           </div>
-          <div class="prog-line pending"></div>
-          <div class="prog-step">
-            <div class="prog-dot pending"></div>
-            <div class="prog-label">Entregado</div>
-          </div>
         </div>
       </div>
       <div class="content">
         <p>Hola {{nombre}},</p>
-        <p>Tu pedido ha sido recibido y está pendiente de envío. Aquí tienes el resumen:</p>
+        <p>Hemos recibido y cobrado tu pedido. Ya está en nuestras manos para preparar el envío. Aquí tienes el resumen:</p>
         <div class="info-box">
           <span class="badge">Pedido #{{order_id}}</span>
           &nbsp; Fecha: <strong>{{order_date}}</strong>
@@ -257,12 +262,17 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
           <div class="prog-line done"></div>
           <div class="prog-step">
             <div class="prog-dot done"></div>
-            <div class="prog-label done">Enviado</div>
+            <div class="prog-label done">Pagado</div>
           </div>
-          <div class="prog-line pending"></div>
+          <div class="prog-line done"></div>
           <div class="prog-step">
-            <div class="prog-dot pending"></div>
-            <div class="prog-label">En tus manos</div>
+            <div class="prog-dot done"></div>
+            <div class="prog-label done">Pendiente de envío</div>
+          </div>
+          <div class="prog-line done"></div>
+          <div class="prog-step">
+            <div class="prog-dot done"></div>
+            <div class="prog-label done">Enviado</div>
           </div>
         </div>
       </div>

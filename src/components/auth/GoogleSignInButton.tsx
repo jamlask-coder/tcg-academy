@@ -39,7 +39,7 @@ function buildGoogleAuthUrl(redirectTo: string): string {
  * 4. Callback page validates nonce, decodes JWT, completes login
  */
 export function GoogleSignInButton({
-  redirectTo = "/cuenta/datos",
+  redirectTo = "/cuenta",
 }: {
   redirectTo?: string;
 }) {

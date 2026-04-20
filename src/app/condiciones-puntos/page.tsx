@@ -26,7 +26,7 @@ function LegalRef({ children }: { children: React.ReactNode }) {
 
 export default function CondicionesPuntosPage() {
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="bg-gray-50 py-10 sm:py-12">
       <div className="mx-auto max-w-3xl px-6">
         <Link
           href="/cuenta/grupo"
@@ -157,7 +157,8 @@ export default function CondicionesPuntosPage() {
             </p>
             <p>
               El programa opera en un <strong>único nivel sin cascadas</strong>: cada usuario puede
-              formar un grupo con un máximo de 4 personas. Los puntos solo se generan por las
+              formar un grupo de hasta <strong>4 personas en total</strong> (el titular + 3 asociados).
+              Los puntos solo se generan por las
               compras directas de esos miembros. No existe ningún mecanismo por el que los puntos
               generados por un miembro se trasladen a un tercer nivel, ni hay «uplines», «downlines»
               ni comisiones derivadas de grupos de grupos. Esta limitación estructural excluye por

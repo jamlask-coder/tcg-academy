@@ -3,7 +3,17 @@
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
 
-export type OrderStatus = "pedido" | "enviado" | "entregado" | "incidencia";
+// Estados visibles para el cliente. 4 estados de flujo normal + 3 excepcionales.
+// Flujo lineal: pedido → pagado → pendiente_envio → enviado.
+// "entregado" se eliminó 2026-04-20: depende del transportista y generaba ruido.
+export type OrderStatus =
+  | "pedido"          // orden creada, pago aún no confirmado (pago diferido)
+  | "pagado"          // pago confirmado, aún no acusado por admin
+  | "pendiente_envio" // admin preparando envío
+  | "enviado"         // salió del almacén (estado final normal)
+  | "incidencia"      // excepción: problema reportado
+  | "cancelado"       // excepción: pedido anulado
+  | "devolucion";     // excepción: devolución en curso
 
 export interface OrderItem {
   id: number;
@@ -64,7 +74,7 @@ export const MOCK_ORDERS: Order[] = [
     id: "TCG-20250115-002",
     userId: "demo_cliente",
     date: "2025-01-15",
-    status: "entregado",
+    status: "enviado",
     trackingNumber: "ES2025011500002",
     items: [
       {
@@ -92,7 +102,7 @@ export const MOCK_ORDERS: Order[] = [
     id: "TCG-20241230-003",
     userId: "demo_cliente",
     date: "2024-12-30",
-    status: "entregado",
+    status: "enviado",
     trackingNumber: "ES2024123000003",
     items: [
       {
@@ -113,7 +123,7 @@ export const MOCK_ORDERS: Order[] = [
     id: "TCG-20241201-004",
     userId: "demo_cliente",
     date: "2024-12-01",
-    status: "entregado",
+    status: "enviado",
     items: [
       {
         id: 6,
@@ -145,7 +155,7 @@ export const ALL_ORDERS: Order[] = [
     id: "TCG-20250125-005",
     userId: "demo_mayorista",
     date: "2025-01-25",
-    status: "pedido",
+    status: "pagado",
     items: [
       {
         id: 3,
@@ -172,7 +182,7 @@ export const ALL_ORDERS: Order[] = [
     id: "TCG-20250122-006",
     userId: "demo_tienda",
     date: "2025-01-22",
-    status: "pedido",
+    status: "pagado",
     items: [
       {
         id: 5,
@@ -598,9 +608,9 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
   {
     id: "n6",
     type: "pedido",
-    title: "Pedido entregado",
+    title: "Pedido enviado",
     message:
-      "Tu pedido #TCG-20241230-003 ha sido entregado. ¿Qué te ha parecido?",
+      "Tu pedido #TCG-20241230-003 ha sido enviado. Puedes seguir el envío desde tu cuenta.",
     date: "2025-01-03T11:15:00Z",
     read: true,
     link: "/cuenta/pedidos/TCG-20241230-003",

@@ -132,14 +132,14 @@ function ResetForm() {
 
   if (tokenValid === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 px-4">
+      <div className="flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 px-4 py-20">
         <div className="text-white">Verificando enlace...</div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
+    <div className="flex items-center justify-center bg-gray-50 px-4 py-10 sm:py-16">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <Link href="/" className="mb-4 inline-flex items-center gap-2">
@@ -285,7 +285,7 @@ export default function RestablecerContrasenaPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="flex items-center justify-center bg-gray-50 py-20">
           <p className="text-gray-500">Cargando...</p>
         </div>
       }

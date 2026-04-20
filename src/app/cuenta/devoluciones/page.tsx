@@ -136,7 +136,9 @@ function RequestForm({ onClose }: { onClose: () => void }) {
   });
   const [submitted, setSubmitted] = useState(false);
 
-  const deliveredOrders = MOCK_ORDERS.filter((o) => o.status === "entregado");
+  // Migración 2026-04-20: "entregado" se eliminó del set customer; pedidos
+  // enviados (estado final del flujo) son elegibles para devolución.
+  const deliveredOrders = MOCK_ORDERS.filter((o) => o.status === "enviado");
 
   if (submitted) {
     return (

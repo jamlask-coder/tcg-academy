@@ -301,7 +301,7 @@ function Breadcrumb({ pathname }: { pathname: string }) {
   if (!current || pathname === "/admin") return null;
 
   return (
-    <nav className="mb-4 flex items-center gap-1.5 text-sm text-gray-500">
+    <nav className="flex items-center gap-1.5 text-sm text-gray-500">
       <Link href="/admin" className="transition hover:text-[#2563eb]">
         Admin
       </Link>
@@ -383,7 +383,7 @@ export default function AdminLayout({
 
         {/* Content */}
         <main className="min-w-0 [&_a]:text-black [&_a]:no-underline [&_a:hover]:text-[#2563eb]">
-          <div className="hidden lg:block">
+          <div className="mb-4 hidden lg:block">
             <Breadcrumb pathname={pathname} />
           </div>
           {children}

@@ -10,7 +10,6 @@ import {
   Shield,
   Package,
   Receipt,
-  RotateCcw,
   Trophy,
   Gift,
   Share2,
@@ -39,11 +38,10 @@ const TABS: Record<TabGroup, { title: string; subtitle?: string; items: TabDef[]
   },
   pedidos: {
     title: "Pedidos",
-    subtitle: "Historial de compras, facturas y devoluciones",
+    subtitle: "Historial de compras y facturas",
     items: [
       { href: "/cuenta/pedidos", label: "Pedidos", icon: Package },
       { href: "/cuenta/facturas", label: "Facturas", icon: Receipt },
-      { href: "/cuenta/devoluciones", label: "Devoluciones", icon: RotateCcw },
     ],
   },
   recompensas: {
@@ -51,8 +49,8 @@ const TABS: Record<TabGroup, { title: string; subtitle?: string; items: TabDef[]
     subtitle: "Puntos, cupones y programa de referidos",
     items: [
       { href: "/cuenta/puntos", label: "Puntos", icon: Trophy, clientOnly: true },
-      { href: "/cuenta/cupones", label: "Cupones", icon: Gift },
       { href: "/cuenta/grupo", label: "Mi grupo", icon: Share2, clientOnly: true },
+      { href: "/cuenta/cupones", label: "Cupones", icon: Gift },
     ],
   },
 };

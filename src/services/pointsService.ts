@@ -14,7 +14,13 @@
  *
  *   Otros:
  *   - Cada asociado: 5 pts por cada €10 que gaste el comprador (regla heredada)
- *   - Registro con código: 10.000 pts de bienvenida (= €1)
+ *   - Registro con código: nuevo usuario y su invitador reciben 30.000 pts (= €3)
+ *                          ⚠️ Impacto fiscal: los puntos emitidos son un PASIVO
+ *                          DIFERIDO contable. No se facturan al emitir. Cuando
+ *                          el cliente los canjee, generarán un descuento por
+ *                          línea en la factura (base imponible reducida → IVA
+ *                          sobre la base tras descuento). Ver invoiceService y
+ *                          el flujo de `pointsDiscount` en finalizar-compra.
  *   - En caso de devolución se revierten los puntos de comprador y asociados
  *
  * Seguridad (client-side):
@@ -31,8 +37,11 @@ export const POINTS_PER_EURO_REDEMPTION = 10000; // 10.000 pts = €1 de descuen
 // y el cliente puede canjearlos SIEMPRE, sin mínimo de pedido y hasta
 // el 100% del subtotal de productos (el envío no entra, se paga aparte).
 export const POINTS_MAX_DISCOUNT_PCT    = 1.0; // sin restricción: descuento hasta el total de productos
-export const MAX_ASSOCIATIONS           = 4;   // máximo de asociados en el grupo
-export const REFERRAL_WELCOME_BONUS     = 10000; // pts al registrarse con código (= €1 de bienvenida)
+export const MAX_ASSOCIATIONS           = 3;   // máximo de asociados (1 titular + 3 = 4 personas en total)
+// Bonus de bienvenida (en puntos) — se otorga a AMBOS: invitador y nuevo usuario.
+// 30.000 pts = €3 al canjearlos como descuento en una compra futura.
+export const REFERRAL_INVITER_BONUS      = 30000;
+export const REFERRAL_NEW_USER_BONUS     = 30000;
 // Asociados: 0,50€ por cada 100€ del comprador (adaptado a escala 10.000 pts=€1)
 export const REFERRAL_ASSOC_PTS_PER_100 = 5000;
 export const ASSOCIATION_LOCK_MS = 365 * 24 * 60 * 60 * 1000; // bloqueo 1 año
@@ -340,19 +349,38 @@ export function addAssociation(
 
 export function registerWithReferral(
   newUserId: string,
+  newUserDisplayName: string,
   referralCode: string,
 ): { ok: boolean; error?: string } {
   const result = addAssociation(newUserId, referralCode, true);
-  if (result.ok) {
-    addPoints(newUserId, REFERRAL_WELCOME_BONUS);
-    addHistory(newUserId, {
-      ts: Date.now(),
-      pts: REFERRAL_WELCOME_BONUS,
+  if (!result.ok) return result;
+
+  const referrerId = getReferrerUserId(referralCode);
+  const ts = Date.now();
+
+  // 1) Invitador → 30.000 pts (= €3)
+  if (referrerId) {
+    addPoints(referrerId, REFERRAL_INVITER_BONUS);
+    addHistory(referrerId, {
+      ts,
+      pts: REFERRAL_INVITER_BONUS,
       type: "bienvenida",
-      desc: "Bonus de bienvenida por código de referido",
+      desc: `Nuevo miembro ${newUserDisplayName} se registró con tu código`,
+      sourceUserId: newUserId,
     });
   }
-  return result;
+
+  // 2) Nuevo usuario → 30.000 pts (= €3) de bienvenida
+  addPoints(newUserId, REFERRAL_NEW_USER_BONUS);
+  addHistory(newUserId, {
+    ts,
+    pts: REFERRAL_NEW_USER_BONUS,
+    type: "bienvenida",
+    desc: "Bonus de bienvenida por registro con código",
+    ...(referrerId ? { sourceUserId: referrerId } : {}),
+  });
+
+  return { ok: true };
 }
 
 export interface DirectReferral {

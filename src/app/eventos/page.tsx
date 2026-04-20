@@ -165,15 +165,15 @@ export default function EventosPage() {
   return (
     <div>
       {/* Hero */}
-      <div className="bg-gradient-to-br from-[#2563eb] via-[#1e4a73] to-[#3b82f6] py-16 text-white">
+      <div className="border-b border-gray-100 bg-white py-12 sm:py-14">
         <div className="mx-auto max-w-[1400px] px-6 text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-yellow-400/30 bg-yellow-400/20 px-4 py-1.5 text-sm font-semibold text-yellow-300">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-50 px-4 py-1.5 text-sm font-semibold text-amber-700">
             <Calendar size={14} /> Agenda TCG
           </div>
-          <h1 className="mb-4 text-3xl font-bold md:text-5xl">
+          <h1 className="mb-3 text-3xl font-bold text-gray-900 md:text-5xl">
             Eventos y Torneos
           </h1>
-          <p className="mx-auto max-w-xl text-lg text-blue-200">
+          <p className="mx-auto max-w-xl text-base text-gray-600 sm:text-lg">
             Participa en pre-releases, ligas semanales, torneos regionales y
             campeonatos oficiales en nuestras 4 tiendas.
           </p>

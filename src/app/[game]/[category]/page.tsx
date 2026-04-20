@@ -111,7 +111,7 @@ export default async function CategoryPage({
       </div>
 
       {/* Products with sidebar filters */}
-      <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6 sm:py-10">
+      <div className="mx-auto max-w-[1400px] px-4 py-3 sm:px-6 sm:py-10">
         {products.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-gray-200 py-24 text-center">
             <p className="font-medium text-gray-400">

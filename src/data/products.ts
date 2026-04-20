@@ -30,7 +30,7 @@ export interface LocalProduct {
   isNew: boolean;
   createdAt?: string; // ISO date — used for "Nuevo" badge (45-day window)
   isFeatured?: boolean;
-  language: string; // 'EN' | 'ES' | 'JP' | 'FR' | 'DE' | 'IT' | 'KO' | 'PT'
+  language: string; // 'EN' | 'ES' | 'JP' | 'FR' | 'DE' | 'IT' | 'KO' | 'PT' | 'ZH'
   // language?: string reserved for filtering — see memory/project_language_requirement.md
   tags: string[];
   vatRate?: number; // IVA en porcentaje (21 por defecto para TCG en España)
@@ -270,6 +270,7 @@ export const LANGUAGE_FLAGS: Record<string, string> = {
   DE: "🇩🇪",
   IT: "🇮🇹",
   PT: "🇧🇷",
+  ZH: "🇨🇳",
 };
 
 export const LANGUAGE_NAMES: Record<string, string> = {
@@ -281,6 +282,7 @@ export const LANGUAGE_NAMES: Record<string, string> = {
   DE: "Alemán",
   IT: "Italiano",
   PT: "Portugués",
+  ZH: "Chino",
 };
 
 // ─── Products ─────────────────────────────────────────────────────────────────

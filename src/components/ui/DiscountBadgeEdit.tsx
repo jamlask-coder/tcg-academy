@@ -77,7 +77,7 @@ export function DiscountBadgeEdit({
 
   const defaultBadgeClass =
     badgeClassName ??
-    "bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm";
+    "inline-flex h-5 items-center rounded-full bg-red-500 px-2 text-[10px] leading-none font-bold text-white shadow-sm";
 
   if (!isAdmin) {
     if (!hasDiscount) return null;
@@ -127,14 +127,14 @@ export function DiscountBadgeEdit({
   /* ── Admin: has discount → badge + pencil on hover ───────────── */
   if (hasDiscount) {
     return (
-      <span className="group/disc inline-flex items-center gap-0.5">
-        <span className={defaultBadgeClass}>-{currentPct}%</span>
+      <span className={`group/disc relative ${defaultBadgeClass}`}>
+        -{currentPct}%
         <button
           onClick={openEdit}
-          className="flex-shrink-0 rounded p-0.5 text-gray-400 opacity-0 transition-opacity group-hover/disc:opacity-100 hover:text-[#2563eb]"
+          className="absolute top-1/2 -right-5 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded bg-white/80 text-gray-500 opacity-0 shadow-sm backdrop-blur-sm transition hover:text-[#2563eb] group-hover/disc:opacity-100"
           title="Editar descuento"
         >
-          <Pencil size={9} />
+          <Pencil size={10} />
         </button>
       </span>
     );

@@ -142,22 +142,22 @@ function LocalProductCardInner({ product }: Props) {
         </div>
       )}
 
-      {/* ── ESQUINA SUPERIOR IZQUIERDA: stock → NUEVO → descuento → corazón ── */}
+      {/* ── ESQUINA SUPERIOR IZQUIERDA: NUEVO → stock → descuento → corazón ── */}
       <div className="absolute top-2 left-2 z-10 flex flex-col items-start gap-1">
+        {isNewProduct(product) && (
+          <span className="animate-badge-pulse inline-flex h-5 items-center rounded-full bg-green-500 px-2 text-[10px] leading-none font-bold text-white shadow-sm">
+            NUEVO
+          </span>
+        )}
         {(() => {
           const si = getStockInfo(product.inStock ? product.stock : 0);
           if (si.level === "unlimited" || si.level === "available") return null;
           return (
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${si.level === "out" ? "bg-gray-500 text-white" : si.level === "last" ? "bg-red-500 text-white" : "bg-amber-500 text-white"}`}>
+            <span className={`inline-flex h-5 items-center rounded-full px-2 text-[10px] leading-none font-bold shadow-sm ${si.level === "out" ? "bg-gray-500 text-white" : si.level === "last" ? "bg-red-500 text-white" : "bg-amber-500 text-white"}`}>
               {si.level === "out" ? "AGOTADO" : si.label.toUpperCase()}
             </span>
           );
         })()}
-        {isNewProduct(product) && (
-          <span className="animate-badge-pulse rounded-full bg-green-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
-            NUEVO
-          </span>
-        )}
         <DiscountBadgeEdit
           displayPrice={displayPrice}
           comparePrice={effectiveComparePrice}
@@ -369,7 +369,7 @@ function LocalProductCardInner({ product }: Props) {
         )}
 
         {/* ── INFO ── */}
-        <div className="mt-auto flex flex-col gap-0.5 px-2.5 pt-0.5 pb-2 sm:gap-1 sm:pt-2">
+        <div className="flex flex-col gap-0.5 px-2.5 pt-0.5 pb-2 sm:gap-1 sm:pt-2">
           <span className="text-[9px] font-semibold tracking-wider text-gray-400 uppercase sm:text-[10px]">
             {CATEGORY_LABELS[product.category] ?? product.category}
           </span>
@@ -400,12 +400,12 @@ function LocalProductCardInner({ product }: Props) {
               <span className="text-sm font-bold" style={{ color }}>
                 {displayPrice.toFixed(2)}€
               </span>
-              <span className="text-[10px] text-gray-300">IVA incl.</span>
               {effectiveHasDiscount && (
                 <span className="text-xs text-gray-400 line-through">
                   {effectiveComparePrice!.toFixed(2)}€
                 </span>
               )}
+              <span className="text-[10px] text-gray-300">IVA incl.</span>
             </div>
           </div>
           {(() => {

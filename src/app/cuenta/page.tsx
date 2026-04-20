@@ -594,7 +594,7 @@ export default function CuentaPage() {
   if (user.role === "admin") {
     return (
       <div>
-        <div className="mb-6 rounded-2xl bg-gradient-to-br from-[#2563eb] to-[#3b82f6] p-6 text-white">
+        <div className="mb-5 rounded-2xl bg-gradient-to-br from-[#2563eb] to-[#3b82f6] p-5 text-white sm:mb-6 sm:p-6">
           <p className="mb-1 text-sm text-blue-200">Panel de administración</p>
           <h1 className="text-xl font-bold">Hola, {user.name} 👋</h1>
           <p className="text-sm text-blue-200">
@@ -676,7 +676,7 @@ export default function CuentaPage() {
   return (
     <div>
       {/* Welcome */}
-      <div className="mb-8 rounded-2xl bg-gradient-to-br from-[#2563eb] to-[#3b82f6] p-8 text-white">
+      <div className="mb-5 rounded-2xl bg-gradient-to-br from-[#2563eb] to-[#3b82f6] p-5 text-white sm:mb-6 sm:p-6">
         <p className="mb-1 text-sm text-blue-200">Bienvenido de nuevo</p>
         <h1 className="mb-1 text-2xl font-bold">Hola, {user.name} 👋</h1>
         <p className="text-sm text-blue-200">
@@ -687,27 +687,22 @@ export default function CuentaPage() {
           {user.role === "cliente" &&
             "Explora el catálogo y gestiona tus pedidos desde aquí."}
         </p>
-        {user.birthDate && (
-          <p className="mt-2 text-xs text-blue-300">
-            🎂{" "}
-            {new Date(user.birthDate + "T12:00:00").toLocaleDateString("es-ES", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
-          </p>
-        )}
       </div>
 
       {/* Last order — hidden for B2B (mayoristas/tiendas) */}
       {!isB2B && (() => {
         const lastOrder = MOCK_ORDERS[0];
         if (!lastOrder) return null;
+        // Estados customer 2026-04-20: pedido → pagado → pendiente_envio → enviado
+        // Flujo normal unificado en azul #2563eb (el mismo que los menús).
         const statusLabels: Record<string, { label: string; color: string; bg: string }> = {
-          pedido:     { label: "Pendiente de envío", color: "#c2410c", bg: "#fff7ed" },
-          enviado:    { label: "Enviado",             color: "#7c3aed", bg: "#ede9fe" },
-          entregado:  { label: "Entregado",           color: "#16a34a", bg: "#dcfce7" },
-          incidencia: { label: "Incidencia",          color: "#dc2626", bg: "#fee2e2" },
+          pedido:          { label: "Pedido",              color: "#2563eb", bg: "#dbeafe" },
+          pagado:          { label: "Pagado",              color: "#2563eb", bg: "#dbeafe" },
+          pendiente_envio: { label: "Pendiente de envío",  color: "#2563eb", bg: "#dbeafe" },
+          enviado:         { label: "Enviado",             color: "#2563eb", bg: "#dbeafe" },
+          incidencia:      { label: "Incidencia",          color: "#dc2626", bg: "#fee2e2" },
+          cancelado:       { label: "Cancelado",           color: "#374151", bg: "#f3f4f6" },
+          devolucion:      { label: "Devolución",          color: "#6d28d9", bg: "#ede9fe" },
         };
         const st = statusLabels[lastOrder.status] ?? statusLabels.pedido;
         const dateStr = new Date(lastOrder.date + "T12:00:00").toLocaleDateString("es-ES", {

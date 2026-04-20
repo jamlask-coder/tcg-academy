@@ -210,3 +210,47 @@ The app runs in two modes controlled by `NEXT_PUBLIC_BACKEND_MODE` in `.env.loca
 4. Fill in Stripe keys → real payment processing
 5. Fill in VeriFactu credentials → invoices sent to AEAT
 6. Security headers already in `next.config.ts` `headers()`
+
+## Sistema de histórico de precios (gráfico evolución Cardmarket)
+
+Gráfico SVG que aparece en el CardLightbox (debajo de la carta ampliada) mostrando
+la evolución EUR de cada carta con datos Cardmarket (trend). Todos los visitantes
+ven la misma serie — no es por-usuario. Se alimenta con snapshots diarios.
+
+### Archivos clave
+- `src/components/product/PriceHistoryChart.tsx` — componente SVG (sin libs externas)
+- `src/services/priceHistoryService.ts` — API cliente read-only (cache 1h localStorage)
+- `src/lib/priceHistoryStore.ts` — storage server (file JSON local / Supabase server)
+- `src/lib/priceFetchers.ts` — adaptadores por juego (Scryfall, ygoprodeck, pokemontcg.io, TCGplayer)
+- `src/lib/forex.ts` — USD→EUR vía frankfurter.app (BCE), cache 24h
+- `src/app/api/price-history/route.ts` — GET público + POST bootstrap
+- `src/app/api/cron/price-snapshot/route.ts` — refresco diario (header `x-cron-secret`)
+- `supabase/migrations/price_history.sql` — tabla + RLS lectura pública
+
+### Fuentes de precio por juego
+| Juego | API | Moneda | Conversión |
+|-------|-----|--------|-----------|
+| Magic | Scryfall `prices.eur` | EUR | — |
+| Yu-Gi-Oh | ygoprodeck `cardmarket_price` | EUR | — |
+| Pokemon | pokemontcg.io `cardmarket.trendPrice` | EUR | — (solo sets EN) |
+| One Piece, Dragon Ball, Riftbound, Lorcana | TCGplayer marketPrice | USD | frankfurter.app (BCE) |
+
+### Cron diario
+- Vercel: añadir `{ "crons": [{ "path": "/api/cron/price-snapshot", "schedule": "0 4 * * *" }] }` en `vercel.json`
+- Netlify / externo: POST con header `x-cron-secret: $CRON_SECRET`
+- 4:00 UTC = después del cierre BCE y del refresco trend de Cardmarket
+
+### Modo local vs server
+- **local**: snapshots en `<repo>/data/price-history.json` (ok para dev, fs efímero en Vercel)
+- **server**: tabla Supabase `price_history` (PK `card_id,date`, retención 36 meses)
+
+### Variables de entorno requeridas
+- `CRON_SECRET` — secret para /api/cron/price-snapshot
+- `TCGPLAYER_PUBLIC_KEY` + `TCGPLAYER_PRIVATE_KEY` — solo si quieres histórico OP/DB/Lorcana/Riftbound
+- `POKEMON_TCG_API_KEY` — opcional (rate limit)
+
+### Añadir un juego nuevo al histórico
+1. Implementa `fetchNuevoPrice(id)` en `src/lib/priceFetchers.ts`
+2. Añádelo al dispatcher `fetchPriceByGame(game, externalId)`
+3. En `SetHighlightCards.tsx`, popula `game` + `externalId` en los highlights de ese juego
+4. El chart aparece automáticamente si `card.externalId && card.game` en el lightbox

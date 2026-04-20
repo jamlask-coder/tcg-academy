@@ -1,14 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
-import {
-  Receipt,
-  Download,
-  Search,
-  ChevronDown,
-  X,
-  FileSpreadsheet,
-  Calendar,
-} from "lucide-react";
+import { Receipt, Download, FileSpreadsheet, Calendar } from "lucide-react";
 import { MOCK_INVOICES, type Invoice, type InvoiceItem } from "@/data/mockData";
 import { useAuth } from "@/context/AuthContext";
 import { calcVAT } from "@/hooks/usePrice";
@@ -280,10 +272,6 @@ function InvoiceCard({ inv }: { inv: Invoice }) {
 
 export default function FacturasPage() {
   const { user } = useAuth();
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"" | "pagada" | "pendiente">(
-    "",
-  );
   const [dateFilter, setDateFilter] = useState("");
   const [reportPeriod, setReportPeriod] = useState("");
 
@@ -294,18 +282,10 @@ export default function FacturasPage() {
 
   const filtered = useMemo(() => {
     return MOCK_INVOICES.filter((inv) => {
-      if (statusFilter && inv.status !== statusFilter) return false;
       if (dateFilter && !inv.date.startsWith(dateFilter)) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        return (
-          inv.id.toLowerCase().includes(q) ||
-          inv.orderId.toLowerCase().includes(q)
-        );
-      }
       return true;
     });
-  }, [search, statusFilter, dateFilter]);
+  }, [dateFilter]);
 
   return (
     <div>
@@ -337,45 +317,17 @@ export default function FacturasPage() {
       </div>
 
       {/* Filters */}
-      <div className="mb-5 flex flex-wrap gap-3">
-        <div className="relative min-w-[160px] flex-1">
-          <Search
-            size={14}
-            className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar factura o pedido..."
-            className="h-10 w-full rounded-xl border border-gray-200 pr-8 pl-8 text-sm transition focus:border-[#2563eb] focus:outline-none"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute top-1/2 right-2.5 -translate-y-1/2 text-gray-400"
-            >
-              <X size={13} />
-            </button>
-          )}
-        </div>
-        <div className="relative">
-          <select
-            value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value as typeof statusFilter)
-            }
-            className="h-10 appearance-none rounded-xl border border-gray-200 bg-white pr-8 pl-3 text-sm text-gray-700 focus:border-[#2563eb] focus:outline-none"
-          >
-            <option value="">Todos los estados</option>
-            <option value="pagada">Pagada</option>
-            <option value="pendiente">Pendiente</option>
-          </select>
-          <ChevronDown
-            size={12}
-            className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-gray-400"
-          />
-        </div>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <button
+          onClick={() => setDateFilter("")}
+          className={`h-10 rounded-xl px-4 text-sm font-semibold transition ${
+            dateFilter
+              ? "border border-gray-200 bg-white text-gray-700 hover:border-[#2563eb] hover:text-[#2563eb]"
+              : "bg-[#2563eb] text-white"
+          }`}
+        >
+          Todas
+        </button>
         <div className="relative">
           <Calendar
             size={14}

@@ -8,7 +8,14 @@ import {
   type ReactNode,
 } from "react";
 import type { User, UserRole, RegisterData } from "@/types/user";
-import { ensureReferralCode, registerWithReferral } from "@/services/pointsService";
+import {
+  ensureReferralCode,
+  registerWithReferral,
+  getReferrerUserId,
+  REFERRAL_INVITER_BONUS,
+  REFERRAL_NEW_USER_BONUS,
+} from "@/services/pointsService";
+import { pushUserNotification } from "@/services/notificationService";
 import { sanitizeString } from "@/utils/sanitize";
 import { recordBulkConsent, type ConsentType } from "@/services/consentService";
 
@@ -540,8 +547,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         ensureReferralCode(newUserId);
         if (data.referralCode) {
-          const refResult = registerWithReferral(newUserId, data.referralCode);
-          if (refResult.ok) newUser.referredBy = data.referralCode;
+          const displayName = `${sanitizedName} ${sanitizedLastName.charAt(0)}.`;
+          const refResult = registerWithReferral(
+            newUserId,
+            displayName,
+            data.referralCode,
+          );
+          if (refResult.ok) {
+            newUser.referredBy = data.referralCode;
+
+            // Notify the inviter: they earned the bonus
+            const inviterId = getReferrerUserId(data.referralCode);
+            if (inviterId) {
+              pushUserNotification(inviterId, {
+                type: "asociacion",
+                title: `${displayName} se ha unido con tu código`,
+                message: `Has recibido ${REFERRAL_INVITER_BONUS.toLocaleString("es-ES")} puntos (${(REFERRAL_INVITER_BONUS / 10000).toFixed(0)}€) como recompensa.`,
+                date: new Date().toISOString(),
+                link: "/cuenta/grupo",
+              });
+            }
+
+            // Notify the new user about their welcome points
+            pushUserNotification(newUserId, {
+              type: "puntos",
+              title: `¡Bienvenido! Tienes ${REFERRAL_NEW_USER_BONUS.toLocaleString("es-ES")} puntos`,
+              message: `Hemos añadido ${REFERRAL_NEW_USER_BONUS.toLocaleString("es-ES")} puntos (${(REFERRAL_NEW_USER_BONUS / 10000).toFixed(0)}€) a tu cuenta. Los puedes canjear como descuento al finalizar tu próxima compra.`,
+              date: new Date().toISOString(),
+              link: "/cuenta/puntos",
+            });
+          }
         }
 
         const hashedPw = await hashPassword(data.password);

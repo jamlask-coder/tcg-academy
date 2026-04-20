@@ -40,7 +40,7 @@ export default function NovedadesPage() {
   const hasMore = visible.length < novedades.length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="bg-gray-50">
       {/* Hero */}
       <div className="bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 py-8 text-center text-white">
         <div className="mx-auto max-w-[1400px] px-4">

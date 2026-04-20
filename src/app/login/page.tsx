@@ -56,7 +56,7 @@ function LoginForm() {
   }, [lockoutUntil]);
 
   useEffect(() => {
-    if (user) router.push(user.role === "admin" ? "/admin" : "/cuenta/datos");
+    if (user) router.push(user.role === "admin" ? "/admin" : "/cuenta");
   }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -85,11 +85,11 @@ function LoginForm() {
       setTimeout(() => setShake(false), 600);
     }
     // On success, the useEffect above handles the redirect once `user`
-    // state updates (admin → /admin, others → /cuenta/datos).
+    // state updates (admin → /admin, others → /cuenta resumen).
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-6">
+    <div className="flex items-center justify-center bg-gray-50 px-4 py-10 sm:py-16">
       <div
         className="w-full max-w-md"
         style={{
@@ -322,7 +322,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="flex items-center justify-center bg-gray-50 py-20">
           <p className="text-gray-500">Cargando...</p>
         </div>
       }

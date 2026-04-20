@@ -159,6 +159,7 @@ function SearchDropdown({
                 p.id > 1_700_000_000_000
                   ? `/producto?id=${p.id}`
                   : `/${p.game}/${p.category}/${p.slug}`;
+              const img = p.images?.[0];
               return (
                 <Link
                   key={p.id}
@@ -166,9 +167,27 @@ function SearchDropdown({
                   onClick={onSelect}
                   className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-gray-50"
                 >
+                  {img ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={img}
+                      alt={p.name}
+                      loading="lazy"
+                      className="h-10 w-10 flex-shrink-0 rounded-xl border border-gray-100 bg-white object-contain"
+                      onError={(e) => {
+                        const el = e.currentTarget;
+                        el.style.display = "none";
+                        const fb = el.nextElementSibling as HTMLElement | null;
+                        if (fb) fb.style.display = "flex";
+                      }}
+                    />
+                  ) : null}
                   <div
-                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-lg"
-                    style={{ backgroundColor: config?.bgColor || "#f3f4f6" }}
+                    className="h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-lg"
+                    style={{
+                      display: img ? "none" : "flex",
+                      backgroundColor: config?.bgColor || "#f3f4f6",
+                    }}
                   >
                     <span aria-hidden="true">{config?.emoji || "🃏"}</span>
                   </div>
@@ -364,7 +383,7 @@ function HeaderInlineAuth() {
               </p>
             </div>
             <Link
-              href={user.role === "admin" ? "/admin" : "/cuenta/datos"}
+              href={user.role === "admin" ? "/admin" : "/cuenta"}
               onClick={() => setMenuOpen(false)}
               className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50"
             >
@@ -589,6 +608,14 @@ export function Header() {
     setMobileQuery("");
   }, []);
 
+  // Al cambiar de ruta, vaciar el buscador para que no quede la búsqueda previa.
+  useEffect(() => {
+    setDesktopQuery("");
+    setDesktopDropdownOpen(false);
+    setMobileQuery("");
+    setMobileDropdownOpen(false);
+  }, [pathname]);
+
   return (
     <>
     <header
@@ -685,7 +712,7 @@ export function Header() {
                 user
                   ? user.role === "admin"
                     ? "/admin"
-                    : "/cuenta/datos"
+                    : "/cuenta"
                   : "/login"
               }
               className="flex items-center justify-center rounded-lg p-1.5 transition active:scale-[0.95] hover:bg-white/10"
@@ -811,7 +838,7 @@ export function Header() {
           {/* 1. User icon — solo desktop. En móvil el login/cuenta vive en
               la píldora estilo YouTube del centro (middle zone). */}
           <Link
-            href={user ? (user.role === "admin" ? "/admin" : "/cuenta/datos") : "/login"}
+            href={user ? (user.role === "admin" ? "/admin" : "/cuenta") : "/login"}
             className="hidden items-center justify-center gap-1.5 rounded-lg p-2 transition hover:bg-white/10 lg:flex lg:min-h-[44px]"
             aria-label={user?.role === "admin" ? "Panel de administración" : "Mi cuenta"}
           >
