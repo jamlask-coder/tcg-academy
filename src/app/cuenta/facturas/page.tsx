@@ -62,6 +62,27 @@ function openInvoicePDF(inv: Invoice) {
   void printInvoiceWithCSV(buildInvoiceData(inv));
 }
 
+// ─── Quarter helper ───────────────────────────────────────────────────────────
+// Trimestre natural: Q1 ene-mar, Q2 abr-jun, Q3 jul-sep, Q4 oct-dic.
+// "Trimestre anterior" = el inmediatamente previo al que contiene `today`.
+function getPreviousQuarter(today: Date = new Date()) {
+  const m = today.getMonth();
+  const currentQ = Math.floor(m / 3);
+  let prevQ = currentQ - 1;
+  let year = today.getFullYear();
+  if (prevQ < 0) {
+    prevQ = 3;
+    year -= 1;
+  }
+  const startMonth = prevQ * 3;
+  const endMonth = startMonth + 2;
+  const pad = (n: number) => String(n + 1).padStart(2, "0");
+  return {
+    from: `${year}-${pad(startMonth)}`,
+    to: `${year}-${pad(endMonth)}`,
+  };
+}
+
 // ─── Generate purchase report CSV ─────────────────────────────────────────────
 
 function downloadPurchaseReport(invoices: Invoice[], period: string) {
@@ -272,8 +293,9 @@ function InvoiceCard({ inv }: { inv: Invoice }) {
 
 export default function FacturasPage() {
   const { user } = useAuth();
-  const [dateFilter, setDateFilter] = useState("");
-  const [reportPeriod, setReportPeriod] = useState("");
+  const defaultQ = useMemo(() => getPreviousQuarter(), []);
+  const [dateFrom, setDateFrom] = useState(defaultQ.from);
+  const [dateTo, setDateTo] = useState(defaultQ.to);
 
   const isB2B =
     user?.role === "mayorista" ||
@@ -282,64 +304,78 @@ export default function FacturasPage() {
 
   const filtered = useMemo(() => {
     return MOCK_INVOICES.filter((inv) => {
-      if (dateFilter && !inv.date.startsWith(dateFilter)) return false;
+      const ym = inv.date.slice(0, 7);
+      if (dateFrom && ym < dateFrom) return false;
+      if (dateTo && ym > dateTo) return false;
       return true;
     });
-  }, [dateFilter]);
+  }, [dateFrom, dateTo]);
+
+  const periodLabel = dateFrom && dateTo ? `${dateFrom}_${dateTo}` : "completo";
+  const showingAll = !dateFrom && !dateTo;
 
   return (
     <div>
       <AccountTabs group="pedidos" />
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm text-gray-500">
-            Descarga tus facturas con desglose de IVA
-          </p>
+      <div className="mb-6 space-y-3">
+        {/* Línea 1: Todas + rango de fechas */}
+        <div className="flex items-center justify-between gap-2">
+          <button
+            onClick={() => {
+              setDateFrom("");
+              setDateTo("");
+            }}
+            className={`h-10 shrink-0 rounded-xl px-4 text-sm font-semibold transition ${
+              showingAll
+                ? "bg-[#2563eb] text-white"
+                : "border border-gray-200 bg-white text-gray-700 hover:border-[#2563eb] hover:text-[#2563eb]"
+            }`}
+          >
+            Todas
+          </button>
+
+          <div className="flex min-w-0 items-center gap-1.5">
+            <div className="relative min-w-0">
+              <Calendar
+                size={14}
+                className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                type="month"
+                aria-label="Desde"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-10 w-full min-w-0 rounded-xl border border-gray-200 pr-2 pl-7 text-sm text-gray-700 focus:border-[#2563eb] focus:outline-none"
+              />
+            </div>
+            <span className="shrink-0 text-sm text-gray-500">a</span>
+            <div className="relative min-w-0">
+              <Calendar
+                size={14}
+                className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                type="month"
+                aria-label="Hasta"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-10 w-full min-w-0 rounded-xl border border-gray-200 pr-2 pl-7 text-sm text-gray-700 focus:border-[#2563eb] focus:outline-none"
+              />
+            </div>
+          </div>
         </div>
+
+        {/* Línea 2: Informe de compras CSV */}
         {isB2B && (
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="month"
-              value={reportPeriod}
-              onChange={(e) => setReportPeriod(e.target.value)}
-              className="h-10 rounded-xl border border-gray-200 px-3 text-sm text-gray-700 focus:border-[#2563eb] focus:outline-none"
-            />
+          <div className="flex">
             <button
-              onClick={() =>
-                downloadPurchaseReport(filtered, reportPeriod || "completo")
-              }
-              className="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
+              onClick={() => downloadPurchaseReport(filtered, periodLabel)}
+              className="flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8] sm:w-auto"
             >
               <FileSpreadsheet size={15} /> Informe de compras (CSV)
             </button>
           </div>
         )}
-      </div>
-
-      {/* Filters */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <button
-          onClick={() => setDateFilter("")}
-          className={`h-10 rounded-xl px-4 text-sm font-semibold transition ${
-            dateFilter
-              ? "border border-gray-200 bg-white text-gray-700 hover:border-[#2563eb] hover:text-[#2563eb]"
-              : "bg-[#2563eb] text-white"
-          }`}
-        >
-          Todas
-        </button>
-        <div className="relative">
-          <Calendar
-            size={14}
-            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-gray-400"
-          />
-          <input
-            type="month"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="h-10 rounded-xl border border-gray-200 pr-3 pl-8 text-sm text-gray-700 focus:border-[#2563eb] focus:outline-none"
-          />
-        </div>
       </div>
 
       {filtered.length === 0 ? (
