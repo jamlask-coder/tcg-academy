@@ -1,19 +1,30 @@
 "use client";
-// SmartProductCreator — Flujo buscador (Phase 2).
+// SmartProductCreator — Buscador premium Phase 2.
 //
 // El admin escribe unas palabras ("bloomburrow booster box", "stellar crown etb", ...).
-// Busca en paralelo en 4 catálogos TCG públicos (Scryfall, pokemontcg.io, TCGDex,
-// ygoprodeck), fusiona duplicados por game+setName y muestra una rejilla con
-// las posibles opciones. Al seleccionar una, el ProductForm se prellena con
+// Busca en paralelo en 5 catálogos TCG públicos (TCGCSV, Scryfall, pokemontcg.io,
+// TCGDex, ygoprodeck), fusiona duplicados por game+setName y muestra una rejilla
+// con las posibles opciones. Al seleccionar una, el ProductForm se prellena con
 // nombre, slug, juego, categoría, precios estimados, descripción, tags e
 // imágenes sugeridas (logos del set). Puede limpiar el fondo de cada imagen
 // con flood-fill de bordes.
+//
+// Extras premium:
+//   - Chips de filtro por juego (in-memory, sobre los candidatos devueltos)
+//   - Ordenación: relevancia / reciente / más cartas
+//   - Historial de búsqueda (localStorage, 8 últimas)
+//   - Sugerencias curadas cuando la query está vacía
+//   - Resaltado de tokens coincidentes en el nombre del set
+//   - Esqueletos de carga (animate-pulse)
+//   - Atajos de teclado: "/" enfoca buscador · ↑↓←→ navega · Enter selecciona · Esc limpia
+//   - Badges con conteo por fuente (tcgcsv, scryfall, ...)
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   ImagePlus,
+  Keyboard,
   Loader2,
   Search,
   Sparkles,
@@ -35,6 +46,21 @@ import {
   type CatalogSearchResult,
 } from "@/lib/productIdentifier";
 import { GAME_CONFIG, CATEGORY_LABELS } from "@/data/products";
+import { GameFilterChips } from "./smartProduct/GameFilterChips";
+import { HighlightedText } from "./smartProduct/HighlightedText";
+import { ResultSkeleton } from "./smartProduct/ResultSkeleton";
+import { SearchEmptyState } from "./smartProduct/SearchEmptyState";
+import { SortDropdown } from "./smartProduct/SortDropdown";
+import {
+  clearHistory,
+  countByGame,
+  countBySource,
+  filterAndSort,
+  loadHistory,
+  pushHistory,
+  saveHistory,
+  type SortMode,
+} from "./smartProduct/searchHelpers";
 
 interface Props {
   onSubmit: (data: ProductFormValues, tags: string[], images: string[]) => void;
@@ -69,9 +95,13 @@ function draftToFormValues(d: ProductDraft): Partial<ProductFormValues> {
 
 function CandidateCard({
   candidate,
+  query,
+  focused,
   onSelect,
 }: {
   candidate: ProductCandidate;
+  query: string;
+  focused: boolean;
   onSelect: () => void;
 }) {
   const game = GAME_CONFIG[candidate.game];
@@ -82,26 +112,40 @@ function CandidateCard({
     <button
       type="button"
       onClick={onSelect}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white text-left transition hover:-translate-y-0.5 hover:border-[#2563eb] hover:shadow-md"
+      data-candidate-card
+      className={`group flex flex-col overflow-hidden rounded-2xl border-2 bg-white text-left transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none ${
+        focused
+          ? "-translate-y-0.5 border-[#2563eb] shadow-lg ring-4 ring-[#2563eb]/15"
+          : "border-gray-200 hover:border-[#2563eb]"
+      }`}
     >
-      <div className="relative flex h-32 items-center justify-center bg-gray-50">
+      <div className="relative flex h-32 items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={cover}
             alt={candidate.setName}
-            className="max-h-28 max-w-[80%] object-contain"
+            className="max-h-28 max-w-[80%] object-contain drop-shadow-sm transition group-hover:scale-105"
             loading="lazy"
           />
         ) : (
           <span className="text-3xl opacity-40">{game?.emoji ?? "📦"}</span>
         )}
-        <span className="absolute top-2 right-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-gray-700 shadow-sm">
+        <span
+          className={`absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${
+            scorePct >= 80
+              ? "bg-green-100 text-green-700"
+              : scorePct >= 50
+                ? "bg-yellow-100 text-yellow-700"
+                : "bg-gray-100 text-gray-600"
+          }`}
+          title={`Relevancia: ${scorePct}%`}
+        >
           {scorePct}%
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-3">
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <span
             className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
             style={{
@@ -119,7 +163,7 @@ function CandidateCard({
           )}
         </div>
         <p className="line-clamp-2 text-sm font-bold text-gray-900">
-          {candidate.setName}
+          <HighlightedText text={candidate.setName} query={query} />
         </p>
         <div className="mt-auto flex flex-wrap gap-1 text-[10px] text-gray-500">
           {candidate.releasedAt && <span>{candidate.releasedAt}</span>}
@@ -316,14 +360,30 @@ export function SmartProductCreator({ onSubmit, onSubmitAndNew }: Props) {
   const [finalImages, setFinalImages] = useState<string[]>([]);
   const [ocrRunning, setOcrRunning] = useState(false);
   const [ocrNote, setOcrNote] = useState<string | null>(null);
+  const [gameFilter, setGameFilter] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortMode>("score");
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [history, setHistory] = useState<string[]>([]);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Debounce de la query (450 ms)
+  // Carga inicial del historial desde localStorage
   useEffect(() => {
-    const id = setTimeout(() => setDebouncedQuery(query.trim()), 450);
+    setHistory(loadHistory());
+  }, []);
+
+  // Debounce de la query (300 ms — más reactivo que los 450 originales)
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(query.trim()), 300);
     return () => clearTimeout(id);
   }, [query]);
+
+  // Al cambiar de query resetea el focus del grid y el filtro por juego
+  useEffect(() => {
+    setFocusedIndex(-1);
+  }, [debouncedQuery, gameFilter, sortBy]);
 
   // Ejecuta búsqueda cuando cambia debouncedQuery
   useEffect(() => {
@@ -361,11 +421,121 @@ export function SmartProductCreator({ onSubmit, onSubmitAndNew }: Props) {
     };
   }, [debouncedQuery]);
 
-  const pickCandidate = (c: ProductCandidate) => {
-    setSelected(c);
-    setFinalImages(c.suggestedImages);
-    setStage("selected");
-  };
+  // Filtrado + ordenación in-memory (no re-dispara búsqueda)
+  const displayedCandidates = useMemo(() => {
+    if (!result) return [];
+    return filterAndSort(result.candidates, { gameFilter, sortBy });
+  }, [result, gameFilter, sortBy]);
+
+  const gamesPresent = useMemo(() => {
+    if (!result) return [];
+    const set = new Set(result.candidates.map((c) => c.game));
+    return Array.from(set);
+  }, [result]);
+
+  const gameCounts = useMemo(
+    () => (result ? countByGame(result.candidates) : {}),
+    [result],
+  );
+
+  const sourceCounts = useMemo(
+    () => (result ? countBySource(result.candidates) : {}),
+    [result],
+  );
+
+  const pickCandidate = useCallback(
+    (c: ProductCandidate) => {
+      setSelected(c);
+      setFinalImages(c.suggestedImages);
+      setStage("selected");
+      // Guarda la query que llevó a este resultado en el historial
+      setHistory((prev) => {
+        const next = pushHistory(prev, debouncedQuery);
+        saveHistory(next);
+        return next;
+      });
+    },
+    [debouncedQuery],
+  );
+
+  // Atajos de teclado globales
+  useEffect(() => {
+    if (stage !== "search") return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const inInput =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+
+      // "/" enfoca buscador desde cualquier sitio (salvo si ya estás escribiendo)
+      if (e.key === "/" && !inInput) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+      // Esc: limpia query o quita focus
+      if (e.key === "Escape") {
+        if (inInput && query) {
+          e.preventDefault();
+          setQuery("");
+          return;
+        }
+        setFocusedIndex(-1);
+        return;
+      }
+      // Navegación del grid sólo cuando hay resultados y no estás escribiendo
+      if (inInput && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        // Con flechas desde el input, saltamos al grid
+        if (displayedCandidates.length === 0) return;
+        e.preventDefault();
+        setFocusedIndex(0);
+        searchInputRef.current?.blur();
+        return;
+      }
+      if (displayedCandidates.length === 0) return;
+      // Cols responsive: asumimos 4 en desktop. Para navegación sin medir el DOM.
+      const cols = 4;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setFocusedIndex((i) =>
+          Math.min(displayedCandidates.length - 1, (i < 0 ? 0 : i + 1)),
+        );
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setFocusedIndex((i) => Math.max(0, (i < 0 ? 0 : i - 1)));
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusedIndex((i) =>
+          Math.min(displayedCandidates.length - 1, (i < 0 ? 0 : i + cols)),
+        );
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusedIndex((i) => {
+          if (i < 0) return 0;
+          const next = i - cols;
+          return next < 0 ? 0 : next;
+        });
+      } else if (e.key === "Enter" && focusedIndex >= 0) {
+        const c = displayedCandidates[focusedIndex];
+        if (c) {
+          e.preventDefault();
+          pickCandidate(c);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [stage, displayedCandidates, focusedIndex, query, pickCandidate]);
+
+  // Scroll into view del candidato enfocado
+  useEffect(() => {
+    if (focusedIndex < 0) return;
+    const cards = document.querySelectorAll<HTMLButtonElement>(
+      "[data-candidate-card]",
+    );
+    cards[focusedIndex]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [focusedIndex]);
 
   const handleImageUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -420,6 +590,10 @@ export function SmartProductCreator({ onSubmit, onSubmitAndNew }: Props) {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
+  const hasQuery = debouncedQuery.length >= 2;
+  const totalCandidates = result?.candidates.length ?? 0;
+  const showEmptyState = stage === "search" && !hasQuery && !ocrRunning;
+
   return (
     <div className="space-y-6">
       {/* Cabecera */}
@@ -433,9 +607,9 @@ export function SmartProductCreator({ onSubmit, onSubmitAndNew }: Props) {
         <p className="text-sm text-gray-700">
           Escribe el producto (ej. <em>&quot;bloomburrow booster box&quot;</em>,{" "}
           <em>&quot;stellar crown etb&quot;</em>). Buscamos en paralelo en
-          Scryfall, pokemontcg.io, TCGDex y ygoprodeck, fusionamos duplicados y
-          te mostramos candidatos. Al seleccionar uno, el formulario se rellena
-          solo; tú solo validas.
+          TCGCSV, Scryfall, pokemontcg.io, TCGDex y ygoprodeck, fusionamos
+          duplicados y te mostramos candidatos. Al seleccionar uno, el
+          formulario se rellena solo; tú solo validas.
         </p>
       </div>
 
@@ -449,31 +623,44 @@ export function SmartProductCreator({ onSubmit, onSubmitAndNew }: Props) {
                 className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-gray-400"
               />
               <input
+                ref={searchInputRef}
                 type="search"
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Busca un set, producto o juego..."
                 aria-label="Buscar producto"
-                className="h-14 w-full rounded-2xl border-2 border-gray-200 bg-white pl-12 pr-12 text-base text-gray-900 transition focus:border-[#2563eb] focus:outline-none"
+                className="h-14 w-full rounded-2xl border-2 border-gray-200 bg-white pl-12 pr-28 text-base text-gray-900 transition focus:border-[#2563eb] focus:outline-none focus:ring-4 focus:ring-[#2563eb]/10"
               />
-              {(searching || ocrRunning) && (
-                <Loader2
-                  size={18}
-                  className="absolute top-1/2 right-4 -translate-y-1/2 animate-spin text-[#2563eb]"
-                  aria-label={ocrRunning ? "Leyendo imagen" : "Buscando"}
-                />
-              )}
-              {!searching && !ocrRunning && query && (
-                <button
-                  type="button"
-                  onClick={() => setQuery("")}
-                  className="absolute top-1/2 right-3 -translate-y-1/2 rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                  aria-label="Limpiar búsqueda"
-                >
-                  <X size={16} />
-                </button>
-              )}
+              {/* Indicador / badge atajo "/" */}
+              <div className="absolute top-1/2 right-3 flex -translate-y-1/2 items-center gap-2">
+                {(searching || ocrRunning) && (
+                  <Loader2
+                    size={18}
+                    className="animate-spin text-[#2563eb]"
+                    aria-label={ocrRunning ? "Leyendo imagen" : "Buscando"}
+                  />
+                )}
+                {!searching && !ocrRunning && query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                    aria-label="Limpiar búsqueda"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+                {!query && !searching && !ocrRunning && (
+                  <kbd
+                    className="hidden select-none items-center gap-1 rounded-md border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[10px] font-semibold text-gray-500 sm:flex"
+                    aria-hidden="true"
+                    title='Pulsa "/" para enfocar el buscador'
+                  >
+                    /
+                  </kbd>
+                )}
+              </div>
             </div>
 
             <button
@@ -498,7 +685,27 @@ export function SmartProductCreator({ onSubmit, onSubmitAndNew }: Props) {
               hidden
               onChange={(e) => void handleImageUpload(e.target.files)}
             />
+
+            <button
+              type="button"
+              onClick={() => setShowShortcuts((v) => !v)}
+              className="hidden h-14 w-14 items-center justify-center rounded-2xl border-2 border-gray-200 bg-white text-gray-500 transition hover:border-[#2563eb] hover:text-[#2563eb] md:flex"
+              aria-label="Atajos de teclado"
+              aria-expanded={showShortcuts}
+              title="Atajos de teclado"
+            >
+              <Keyboard size={18} />
+            </button>
           </div>
+
+          {showShortcuts && (
+            <div className="grid gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 sm:grid-cols-2 md:grid-cols-4">
+              <ShortcutRow keys={["/"]} label="Enfocar buscador" />
+              <ShortcutRow keys={["↑", "↓", "←", "→"]} label="Navegar candidatos" />
+              <ShortcutRow keys={["Enter"]} label="Seleccionar candidato" />
+              <ShortcutRow keys={["Esc"]} label="Limpiar búsqueda" />
+            </div>
+          )}
 
           {ocrNote && !ocrRunning && (
             <div className="-mt-3 rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-2 text-[11px] text-gray-600">
@@ -506,23 +713,72 @@ export function SmartProductCreator({ onSubmit, onSubmitAndNew }: Props) {
             </div>
           )}
 
+          {/* Empty state: historial + sugerencias */}
+          {showEmptyState && (
+            <SearchEmptyState
+              history={history}
+              onPick={(q) => setQuery(q)}
+              onClearHistory={() => setHistory(clearHistory())}
+            />
+          )}
+
+          {/* Skeletons durante búsqueda */}
+          {hasQuery && searching && <ResultSkeleton />}
+
           {/* Resultados */}
-          {result && !searching && (
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
-                <span>
-                  {result.candidates.length} candidato
-                  {result.candidates.length === 1 ? "" : "s"} · fuentes:{" "}
-                  {result.sourcesQueried.join(", ")} · {result.tookMs} ms
-                </span>
-                {result.errors.length > 0 && (
-                  <span className="flex items-center gap-1 text-amber-600">
-                    <AlertTriangle size={12} /> {result.errors.length} avisos
+          {hasQuery && !searching && result && (
+            <div className="space-y-4">
+              {/* Barra de estado: contadores, fuentes, errores */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                  <span className="font-semibold text-gray-700">
+                    {displayedCandidates.length}
+                    {gameFilter ? ` / ${totalCandidates}` : ""} candidato
+                    {displayedCandidates.length === 1 ? "" : "s"}
                   </span>
-                )}
+                  <span>· {result.tookMs} ms</span>
+                  {result.errors.length > 0 && (
+                    <span className="flex items-center gap-1 text-amber-600">
+                      <AlertTriangle size={12} />
+                      {result.errors.length} avisos
+                    </span>
+                  )}
+                </div>
+                {totalCandidates > 0 && <SortDropdown value={sortBy} onChange={setSortBy} />}
               </div>
 
-              {result.candidates.length === 0 ? (
+              {/* Conteo por fuente */}
+              {result.sourcesQueried.length > 0 && totalCandidates > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <span className="font-semibold text-gray-500">Fuentes:</span>
+                  {result.sourcesQueried.map((s) => (
+                    <span
+                      key={s}
+                      className={`rounded-md px-1.5 py-0.5 font-semibold ${
+                        (sourceCounts[s] ?? 0) > 0
+                          ? "bg-blue-50 text-[#2563eb]"
+                          : "bg-gray-100 text-gray-400"
+                      }`}
+                    >
+                      {s}:{sourceCounts[s] ?? 0}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Chips por juego */}
+              {gamesPresent.length > 1 && (
+                <GameFilterChips
+                  games={gamesPresent}
+                  counts={gameCounts}
+                  selected={gameFilter}
+                  onChange={setGameFilter}
+                  totalCount={totalCandidates}
+                />
+              )}
+
+              {/* Grid resultados */}
+              {totalCandidates === 0 ? (
                 <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
                   <p className="text-sm text-gray-500">
                     Sin resultados para{" "}
@@ -531,26 +787,32 @@ export function SmartProductCreator({ onSubmit, onSubmitAndNew }: Props) {
                     mejor).
                   </p>
                 </div>
+              ) : displayedCandidates.length === 0 ? (
+                <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
+                  <p className="text-sm text-gray-500">
+                    No hay candidatos para el filtro activo.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setGameFilter(null)}
+                    className="mt-3 rounded-full bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700"
+                  >
+                    Ver todos
+                  </button>
+                </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                  {result.candidates.map((c) => (
+                  {displayedCandidates.map((c, i) => (
                     <CandidateCard
                       key={c.id}
                       candidate={c}
+                      query={debouncedQuery}
+                      focused={i === focusedIndex}
                       onSelect={() => pickCandidate(c)}
                     />
                   ))}
                 </div>
               )}
-            </div>
-          )}
-
-          {!result && !searching && debouncedQuery.length < 2 && (
-            <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-white p-10 text-center">
-              <Search size={28} className="mx-auto mb-3 text-gray-300" />
-              <p className="text-sm text-gray-500">
-                Escribe al menos 2 caracteres para empezar la búsqueda.
-              </p>
             </div>
           )}
         </>
@@ -610,6 +872,24 @@ export function SmartProductCreator({ onSubmit, onSubmitAndNew }: Props) {
           </section>
         </>
       )}
+    </div>
+  );
+}
+
+function ShortcutRow({ keys, label }: { keys: string[]; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex gap-1">
+        {keys.map((k) => (
+          <kbd
+            key={k}
+            className="inline-flex min-w-[22px] items-center justify-center rounded border border-gray-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-gray-700 shadow-sm"
+          >
+            {k}
+          </kbd>
+        ))}
+      </div>
+      <span>{label}</span>
     </div>
   );
 }
