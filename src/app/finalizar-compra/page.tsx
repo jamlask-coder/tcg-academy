@@ -540,8 +540,12 @@ export default function CheckoutPage() {
     }
 
     // ── PHASE 3: Generate fiscal invoice ──
-    // Invoice amounts reflect ACTUAL discounted prices for correct VAT
-    if (form.pago !== "tienda" && form.pago !== "transferencia") {
+    // Invoice amounts reflect ACTUAL discounted prices for correct VAT.
+    // Regla fiscal: NO emitir factura mientras el pago esté pendiente (pago
+    // diferido: tienda, transferencia, recogida, contrarrembolso). La factura
+    // se emitirá cuando admin marque el pedido como "cobrado" vía
+    // regenerateInvoiceForOrder.
+    if (!isDeferredPayment(form.pago)) {
       try {
         const paymentMethodMap: Record<string, PaymentMethod> = {
           tarjeta: PaymentMethod.TARJETA,

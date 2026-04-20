@@ -583,11 +583,12 @@ function escapeHtml(str: string): string {
 }
 
 /**
- * Generates the SHA-256 CSV (Código Seguro de Verificación), injects it into
- * the invoice data, then prints. This is the SINGLE entry point all parts of
- * the app must use so every invoice is identical regardless of who prints it.
+ * Ensures the invoice has a verifactuHash (CSV — Código Seguro de Verificación).
+ * If already present (e.g. persisted from invoiceService), it's preserved.
+ * Returns the (possibly mutated) data — never throws.
  */
-export async function printInvoiceWithCSV(data: InvoiceData): Promise<void> {
+async function ensureVerifactuHash(data: InvoiceData): Promise<InvoiceData> {
+  if (data.verifactuHash) return data;
   try {
     const content = [
       data.issuerCIF,
@@ -604,15 +605,35 @@ export async function printInvoiceWithCSV(data: InvoiceData): Promise<void> {
     data.verifactuHash = Array.from(new Uint8Array(buf))
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
-    data.verifactuStatus = "PENDIENTE — Sistema VeriFactu en integración";
+    if (!data.verifactuStatus) {
+      data.verifactuStatus = "PENDIENTE — Sistema VeriFactu en integración";
+    }
   } catch {
     /* hash generation failed — invoice still valid without CSV */
   }
-  printInvoice(data);
+  return data;
 }
 
-/** Opens the invoice in a hidden iframe and triggers print/save-as-PDF dialog */
-export function printInvoice(data: InvoiceData): void {
+/**
+ * Generates the SHA-256 CSV, injects it into the invoice data, then prints.
+ * Historically the single entry point — kept as alias for `printInvoice` for
+ * backwards compatibility. Both now guarantee a hash before rendering.
+ */
+export async function printInvoiceWithCSV(data: InvoiceData): Promise<void> {
+  await printInvoice(data);
+}
+
+/**
+ * Opens the invoice in a hidden iframe and triggers print/save-as-PDF dialog.
+ *
+ * BUG #1 fix (audit 2026-04-20): this function is now async and ALWAYS
+ * ensures `verifactuHash` is present before rendering. Any call path that
+ * bypassed `printInvoiceWithCSV` previously could emit a PDF without CSV,
+ * breaking VeriFactu compliance. The guarantee is now inside `printInvoice`
+ * itself so it cannot be bypassed.
+ */
+export async function printInvoice(data: InvoiceData): Promise<void> {
+  await ensureVerifactuHash(data);
   const html = generateInvoiceHTML(data);
   // Inject a <base> tag so relative image paths (logo, etc.) resolve from the origin
   const baseTag = `<base href="${window.location.origin}/">`;

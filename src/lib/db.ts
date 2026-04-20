@@ -29,6 +29,8 @@ export interface OrderRecord {
   paymentMethod: string;
   paymentStatus: string;
   paymentIntent?: string;
+  /** ISO timestamp when payment was confirmed by the provider (webhook). */
+  paymentDate?: string;
   trackingNumber?: string;
   trackingUrl?: string;
   notes?: string;

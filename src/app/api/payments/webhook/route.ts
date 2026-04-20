@@ -51,10 +51,15 @@ export async function POST(req: NextRequest) {
         const orderId = intent.metadata?.orderId;
         if (!orderId) break;
 
-        // Update order status
+        // Update order status + authoritative payment date from Stripe
+        // (webhook is the ground truth for when cobro actually happened).
+        const paymentDate = new Date(
+          (intent.created ?? Math.floor(Date.now() / 1000)) * 1000,
+        ).toISOString();
         await db.updateOrderStatus(orderId, "confirmado", {
           paymentStatus: "cobrado",
           paymentIntent: intent.id,
+          paymentDate,
         });
 
         // Fetch order to get customer email

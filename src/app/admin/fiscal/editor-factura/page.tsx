@@ -411,7 +411,7 @@ export default function EditorFacturaPage() {
   }
 
   function handlePrintTest() {
-    printInvoice(dummy);
+    void printInvoice(dummy);
   }
 
   return (

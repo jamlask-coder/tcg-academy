@@ -25,7 +25,7 @@ import { loadInvoices, saveInvoice, createInvoice } from "@/services/invoiceServ
 import { tripleCheckInvoice } from "@/lib/fiscalAudit";
 import { getDeadLetterQueue, resolveDeadLetter } from "@/lib/circuitBreaker";
 import { safeRead, safeWrite } from "@/lib/safeStorage";
-import { getPaymentStatusMap, getOrderPaymentStatus } from "@/lib/orderAdapter";
+import { getPaymentStatusMap, getOrderPaymentStatus, isDeferredPayment } from "@/lib/orderAdapter";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -423,10 +423,10 @@ export async function regenerateInvoiceForOrder(
     if (!order) return { ok: false, error: `Pedido ${orderId} no encontrado` };
 
     // Regla fiscal: sólo se emite factura tras cobro confirmado.
-    // Los métodos diferidos (tienda, transferencia) requieren paymentStatus=cobrado.
-    const pago = (order.pago ?? "").toLowerCase();
-    const isDeferred = pago === "tienda" || pago === "transferencia" || pago === "recogida";
-    if (isDeferred) {
+    // Los métodos diferidos (tienda, transferencia, recogida, contrarrembolso)
+    // requieren paymentStatus=cobrado. SSOT: isDeferredPayment.
+    const pago = order.pago ?? "";
+    if (isDeferredPayment(pago)) {
       // SSOT: estado leído vía orderAdapter (antes: clave paralela `tcgacademy_payment_status`).
       if (getOrderPaymentStatus(orderId) !== "cobrado") {
         return {

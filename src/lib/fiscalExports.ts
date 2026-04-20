@@ -378,8 +378,8 @@ function recordToData(inv: InvoiceRecord): InvoiceData {
 }
 
 /** Print a single invoice as PDF */
-export function printSingleInvoicePDF(inv: InvoiceRecord): void {
-  printInvoice(recordToData(inv));
+export async function printSingleInvoicePDF(inv: InvoiceRecord): Promise<void> {
+  await printInvoice(recordToData(inv));
 }
 
 /** Print multiple invoices as a single PDF (all on separate pages) */
