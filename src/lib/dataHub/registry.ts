@@ -97,7 +97,7 @@ const STABLE: EntityRegistryEntry[] = [
   {
     key: "users",
     description: "Usuarios registrados + sesión + overrides de rol",
-    storageKeys: ["tcgacademy_registered", "tcgacademy_usernames", "tcgacademy_user", "tcgacademy_user_role_overrides", "tcgacademy_user_overrides", "tcgacademy_user_changelog", "tcgacademy_reset_tokens"],
+    storageKeys: ["tcgacademy_registered", "tcgacademy_usernames", "tcgacademy_user", "tcgacademy_user_role_overrides", "tcgacademy_user_overrides", "tcgacademy_user_changelog", "tcgacademy_reset_tokens", "tcga_auth_token", "tcga_session"],
     event: DataHubEvents.USERS_UPDATED,
     pii: true,
     retentionMonths: 0,
@@ -232,7 +232,7 @@ const STABLE: EntityRegistryEntry[] = [
   {
     key: "consents",
     description: "Consentimientos RGPD + preferencias de comunicación",
-    storageKeys: ["tcgacademy_consents", "tcgacademy_comm_preferences"],
+    storageKeys: ["tcgacademy_consents", "tcgacademy_comm_preferences", "tcga_cookie_consent"],
     event: DataHubEvents.SETTINGS_UPDATED,
     pii: true,
     retentionMonths: 60,
@@ -325,7 +325,7 @@ const PARTIAL: EntityRegistryEntry[] = [
   {
     key: "logs",
     description: "Logs técnicos + audit trail + logs fiscales + emails",
-    storageKeys: ["tcgacademy_app_logs", "tcgacademy_audit_log", "tcgacademy_autopilot_log", "tcgacademy_fiscal_audit_log", "tcgacademy_email_log"],
+    storageKeys: ["tcgacademy_app_logs", "tcgacademy_audit_log", "tcgacademy_autopilot_log", "tcgacademy_fiscal_audit_log", "tcgacademy_email_log", "tcgacademy_runtime_errors"],
     event: "tcga:logs:updated" as DataHubEventName,
     pii: true,
     retentionMonths: 72,
@@ -460,7 +460,7 @@ const PARTIAL: EntityRegistryEntry[] = [
   {
     key: "userActivity",
     description: "Historial de navegación/búsqueda: recientes vistos, búsquedas, pedidos recientes",
-    storageKeys: ["tcgacademy_recent_views", "tcgacademy_recently_viewed", "tcgacademy_search_history", "tcgacademy_recent_order_ids"],
+    storageKeys: ["tcgacademy_recent_views", "tcgacademy_recently_viewed", "tcgacademy_search_history", "tcgacademy_recent_order_ids", "tcga_recent_searches", "tcga_admin_ia_search_history", "tcga_restock_subs"],
     event: "tcga:user_activity:updated" as DataHubEventName,
     pii: true,
     retentionMonths: 6,
