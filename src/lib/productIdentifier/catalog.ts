@@ -11,7 +11,7 @@
 // Todas las peticiones tienen AbortController con timeout para no colgarse,
 // y `cache: "force-cache"` para que navegador/CDN las reutilicen.
 
-import { normalizeForMatch } from "@/lib/setHighlights/matching";
+import { enrichForMatch, normalizeForMatch } from "@/lib/setHighlights/matching";
 import type { CatalogHit } from "./types";
 
 const DEFAULT_TIMEOUT_MS = 6000;
@@ -42,10 +42,49 @@ async function timedFetch(
  *   - Normalizamos por el número de tokens del query (recall) — así queries
  *     cortas (1-2 palabras) no se penalizan contra nombres largos.
  */
+/**
+ * Tokens genéricos de producto que no aportan información discriminativa sobre
+ * el set y sólo penalizan el score (query "prismatic evolutions etb" contra
+ * nombre "Prismatic Evolutions" → 2/3 en vez de 2/2). Se filtran de la query.
+ */
+const GENERIC_PRODUCT_TOKENS = new Set([
+  "booster",
+  "boosters",
+  "box",
+  "display",
+  "etb",
+  "bundle",
+  "tin",
+  "pack",
+  "packs",
+  "play",
+  "collector",
+  "draft",
+  "blister",
+  "caja",
+  "sobre",
+  "sobres",
+  "deck",
+  "starter",
+  "juego",
+  "card",
+  "cards",
+  "trading",
+  "tcg",
+  "pokemon",
+  "magic",
+  "mtg",
+  "yugioh",
+  "juguetes",
+]);
+
 export function scoreMatch(query: string, name: string): number {
-  const qTokens = normalizeForMatch(query)
+  // Enrich query con sinónimos ES→EN para que "evoluciones prismáticas"
+  // matchee "prismatic evolutions" aunque el catálogo sea sólo en inglés.
+  const qTokens = enrichForMatch(query)
     .split(" ")
-    .filter((t) => t.length >= 2);
+    .filter((t) => t.length >= 2)
+    .filter((t) => !GENERIC_PRODUCT_TOKENS.has(t));
   const nTokens = normalizeForMatch(name)
     .split(" ")
     .filter((t) => t.length >= 2);
@@ -175,10 +214,12 @@ async function searchPokemonTcg(query: string, errors: string[]): Promise<Catalo
     const init: RequestInit = apiKey
       ? { headers: { "X-Api-Key": apiKey }, cache: "force-cache" }
       : { cache: "force-cache" };
-    // La API soporta q=name:"<term>*"
-    const q = encodeURIComponent(`name:"${query.replace(/"/g, "")}*"`);
+    // Fetch-all: pokemontcg.io tiene ~150 sets. El prefix-search previo
+    // (name:"<query>*") fallaba si la query incluía palabras extra (ETB,
+    // caja...) o estaba en español. Mucho más robusto scorear localmente
+    // con scoreMatch (que aplica sinónimos ES→EN y filtra tokens genéricos).
     const r = await timedFetch(
-      `https://api.pokemontcg.io/v2/sets?q=${q}&pageSize=10`,
+      `https://api.pokemontcg.io/v2/sets?pageSize=250`,
       init,
     );
     if (!r.ok) {
@@ -186,20 +227,26 @@ async function searchPokemonTcg(query: string, errors: string[]): Promise<Catalo
       return [];
     }
     const json = (await r.json()) as { data?: PokemonTcgSet[] };
-    return (json.data ?? []).slice(0, 10).map<CatalogHit>((s) => ({
-      key: `pokemontcg:${s.id}`,
-      source: "pokemontcg",
-      game: "pokemon",
-      setId: s.id,
-      setName: s.name,
-      imageUrl: s.images?.logo ?? s.images?.symbol,
-      extraImages: [s.images?.symbol, s.images?.logo].filter(
-        (x): x is string => !!x,
-      ),
-      releasedAt: s.releaseDate,
-      cardCount: s.total,
-      note: s.series,
-    }));
+    const sets = json.data ?? [];
+    return sets
+      .map((s) => ({ s, score: scoreMatch(query, s.name) }))
+      .filter((x) => x.score >= 0.3)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8)
+      .map<CatalogHit>(({ s }) => ({
+        key: `pokemontcg:${s.id}`,
+        source: "pokemontcg",
+        game: "pokemon",
+        setId: s.id,
+        setName: s.name,
+        imageUrl: s.images?.logo ?? s.images?.symbol,
+        extraImages: [s.images?.symbol, s.images?.logo].filter(
+          (x): x is string => !!x,
+        ),
+        releasedAt: s.releaseDate,
+        cardCount: s.total,
+        note: s.series,
+      }));
   } catch (e) {
     errors.push(`pokemontcg:${String(e)}`);
     return [];
@@ -217,41 +264,76 @@ interface TcgDexSet {
   releaseDate?: string;
 }
 
-async function searchTcgDex(query: string, errors: string[]): Promise<CatalogHit[]> {
+async function fetchTcgDexLang(
+  lang: string,
+  errors: string[],
+): Promise<TcgDexSet[]> {
   try {
-    // Empezamos por EN; si la query parece JP/ES podríamos expandir por lang.
-    const r = await timedFetch("https://api.tcgdex.net/v2/en/sets", {
+    const r = await timedFetch(`https://api.tcgdex.net/v2/${lang}/sets`, {
       cache: "force-cache",
     });
     if (!r.ok) {
-      errors.push(`tcgdex:${r.status}`);
+      errors.push(`tcgdex/${lang}:${r.status}`);
       return [];
     }
-    const sets = (await r.json()) as TcgDexSet[];
-    return sets
-      .map((s) => ({ s, score: scoreMatch(query, s.name) }))
-      .filter((x) => x.score >= 0.3)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 6)
-      .map<CatalogHit>(({ s }) => ({
-        key: `tcgdex:${s.id}`,
-        source: "tcgdex",
-        game: "pokemon",
-        setId: s.id,
-        setName: s.name,
-        // TCGDex expone logo/symbol sin extensión — añadimos .png
-        imageUrl: s.logo ? `${s.logo}.png` : s.symbol ? `${s.symbol}.png` : undefined,
-        extraImages: [
-          s.logo ? `${s.logo}.png` : undefined,
-          s.symbol ? `${s.symbol}.png` : undefined,
-        ].filter((x): x is string => !!x),
-        releasedAt: s.releaseDate,
-        cardCount: s.cardCount?.total,
-      }));
+    return (await r.json()) as TcgDexSet[];
   } catch (e) {
-    errors.push(`tcgdex:${String(e)}`);
+    errors.push(`tcgdex/${lang}:${String(e)}`);
     return [];
   }
+}
+
+async function searchTcgDex(query: string, errors: string[]): Promise<CatalogHit[]> {
+  // Multi-lang: EN (base) + ES (nombres localizados para queries en español).
+  // TCGDex indexa el mismo setId en todos los idiomas → deduplicamos por id.
+  const [setsEn, setsEs] = await Promise.all([
+    fetchTcgDexLang("en", errors),
+    fetchTcgDexLang("es", errors),
+  ]);
+
+  // Scoreamos cada set contra la query usando el mejor nombre (EN u ES).
+  // Si el set aparece en ambos idiomas, tomamos el score más alto y el
+  // nombre EN como canónico (así los duplicados se funden bien en fusion.ts).
+  const byId = new Map<
+    string,
+    { s: TcgDexSet; score: number }
+  >();
+
+  for (const s of setsEn) {
+    const score = scoreMatch(query, s.name);
+    if (score >= 0.3) byId.set(s.id, { s, score });
+  }
+  for (const s of setsEs) {
+    const score = scoreMatch(query, s.name);
+    if (score < 0.3) continue;
+    const existing = byId.get(s.id);
+    // Si ya existe desde EN, nos quedamos con el mejor score pero el nombre EN.
+    if (existing) {
+      if (score > existing.score) existing.score = score;
+    } else {
+      // Solo aparece en ES — lo añadimos con el nombre ES.
+      byId.set(s.id, { s, score });
+    }
+  }
+
+  return Array.from(byId.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 6)
+    .map<CatalogHit>(({ s }) => ({
+      key: `tcgdex:${s.id}`,
+      source: "tcgdex",
+      game: "pokemon",
+      setId: s.id,
+      setName: s.name,
+      // TCGDex expone logo/symbol sin extensión — añadimos .png
+      imageUrl: s.logo ? `${s.logo}.png` : s.symbol ? `${s.symbol}.png` : undefined,
+      extraImages: [
+        s.logo ? `${s.logo}.png` : undefined,
+        s.symbol ? `${s.symbol}.png` : undefined,
+      ].filter((x): x is string => !!x),
+      releasedAt: s.releaseDate,
+      cardCount: s.cardCount?.total,
+    }));
 }
 
 // ─── ygoprodeck (Yu-Gi-Oh) ────────────────────────────────────────────────────
