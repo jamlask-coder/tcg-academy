@@ -16,6 +16,13 @@ export interface Store {
   longDesc: string;
   hours: StoreHours[];
   instagram?: string;
+  /**
+   * Coordenadas rooftop de la tienda. Se emiten como `GeoCoordinates` en
+   * LocalBusiness JSON-LD — Google las usa para Maps y resultados locales.
+   * Rellenar con las coords reales de cada tienda (no las inferimos
+   * automáticamente para no meter imprecisiones).
+   */
+  geo?: { lat: number; lng: number };
 }
 
 export const STORES: Record<string, Store> = {

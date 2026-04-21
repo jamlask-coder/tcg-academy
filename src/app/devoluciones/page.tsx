@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SITE_CONFIG } from "@/config/siteConfig";
+import { faqJsonLd, jsonLdProps } from "@/lib/seo";
 
 export const metadata = {
   title: "Devoluciones y desistimiento | TCG Academy",
@@ -7,9 +8,54 @@ export const metadata = {
     "Información sobre el derecho de desistimiento, devoluciones y reembolsos en TCG Academy.",
 };
 
+// FAQPage para SEO — NO añade UI visible, solo JSON-LD en el <head>-equivalent.
+// Alimenta los rich results de Google y es consumible por IAs (Perplexity,
+// ChatGPT, Claude) cuando responden sobre políticas de devolución de la tienda.
+// Fuente de las respuestas: mismo contenido visible de esta página +
+// memoria feedback_returns_transferencia (reembolso siempre por transferencia).
+const FAQ_ITEMS = [
+  {
+    question: "¿Cuál es el plazo para devolver un producto en TCG Academy?",
+    answer:
+      "Dispones de 14 días naturales desde la recepción del pedido para ejercer el derecho de desistimiento (Real Decreto Legislativo 1/2007, artículos 102 a 108), sin necesidad de justificar la decisión y sin penalización.",
+  },
+  {
+    question: "¿Cómo se realiza el reembolso de una devolución?",
+    answer:
+      "Todos los reembolsos se emiten por transferencia bancaria al IBAN que facilite el cliente. No se realizan devoluciones en efectivo ni reversos automáticos a tarjeta ni vales de tienda.",
+  },
+  {
+    question: "¿Cuánto tarda en llegar el reembolso?",
+    answer:
+      "Una vez recibido y revisado el producto devuelto, el reembolso se emite por transferencia en un plazo máximo de 14 días naturales, junto con la correspondiente factura rectificativa.",
+  },
+  {
+    question: "¿Puedo devolver cartas sueltas o singles?",
+    answer:
+      "Sí. El derecho de desistimiento aplica a cartas sueltas siempre que se devuelvan en el mismo estado en el que fueron entregadas, en su funda protectora original cuando proceda.",
+  },
+  {
+    question: "¿Los sobres o boosters abiertos se pueden devolver?",
+    answer:
+      "No. Los productos precintados (sobres, boosters, ETBs) solo se pueden devolver si se mantienen precintados. Una vez abierto el precinto, el contenido aleatorio hace inviable la devolución salvo que el producto presente defectos de fabricación.",
+  },
+  {
+    question: "¿Quién paga los gastos de envío de la devolución?",
+    answer:
+      "Los gastos de envío de vuelta corren por cuenta del cliente salvo que la devolución se deba a un error de TCG Academy (producto incorrecto, defectuoso o dañado en el transporte), en cuyo caso asumimos el coste íntegro.",
+  },
+  {
+    question: "¿Qué documentación recibiré tras el reembolso?",
+    answer:
+      "Junto con la transferencia recibirás una factura rectificativa generada automáticamente por nuestro sistema VeriFactu. Queda registrada en el Libro de facturas de tu área de cliente.",
+  },
+];
+
 export default function DevolucionesPage() {
   return (
     <div className="bg-gray-50 py-10 sm:py-12">
+      {/* JSON-LD FAQPage — pure metadata, not rendered visually. */}
+      <script {...jsonLdProps(faqJsonLd(FAQ_ITEMS))} />
       <div className="mx-auto max-w-3xl px-6">
         <Link
           href="/"

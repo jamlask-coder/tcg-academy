@@ -22,7 +22,7 @@ import {
 
 // Imágenes por defecto (mostradas sólo si el admin no ha subido nada).
 const DEFAULTS = [
-  { filename: "slide-1.png", src: "/images/hero/slide-1.png", alt: "Magic: The Gathering x TMNT" },
+  { filename: "slide-1.jpg", src: "/images/hero/slide-1.jpg", alt: "Magic: The Gathering x TMNT" },
   { filename: "slide-2.png", src: "/images/hero/slide-2.png", alt: "Secrets of Strixhaven" },
 ];
 

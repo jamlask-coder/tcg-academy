@@ -21,7 +21,8 @@
       "WebFetch(domain:pokemillon.es)",
       "WebFetch(domain:www.pokemillon.com)",
       "WebFetch(domain:battledeck.es)",
-      "WebFetch(domain:scryfall.com)"
+      "WebFetch(domain:scryfall.com)",
+      "WebFetch(domain:magic.wizards.com)"
     ]
   }
 }

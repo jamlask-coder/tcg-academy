@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState, Suspense, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
-import { Search } from "lucide-react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { Search, X } from "lucide-react";
 import Link from "next/link";
 import type { LocalProduct } from "@/data/products";
 import { CARD_CATEGORIES } from "@/data/products";
@@ -11,6 +11,9 @@ import {
   SidebarFilters,
   MobileFilterButton,
 } from "@/components/filters/SidebarFilters";
+
+// Idiomas ordenados para el filtro (estable top-level).
+const LANG_ORDER = ["ES", "EN", "JP", "KO", "FR", "DE", "IT", "PT", "ZH"];
 
 interface CategoryItem {
   id: string;
@@ -71,7 +74,12 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
    
   }, [game, category]);
 
-  const langs = params.get("lang")?.split(",").filter(Boolean) ?? [];
+  const router = useRouter();
+  const pathname = usePathname();
+  const langs = useMemo(
+    () => params.get("lang")?.split(",").filter(Boolean) ?? [],
+    [params],
+  );
   const inStock = params.get("inStock") !== "0";
   const priceMin = params.get("priceMin")
     ? Number(params.get("priceMin"))
@@ -79,9 +87,16 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
   const priceMax = params.get("priceMax")
     ? Number(params.get("priceMax"))
     : null;
+  const query = (params.get("q") ?? "").trim();
+
+  const clearQuery = () => {
+    const next = new URLSearchParams(params.toString());
+    next.delete("q");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  };
 
   // Derive available languages — ordered: ES, EN, JP, KO, …, ZH (último siempre)
-  const LANG_ORDER = ["ES", "EN", "JP", "KO", "FR", "DE", "IT", "PT", "ZH"];
   const availableLanguages = useMemo(() => {
     const fromProducts = new Set(
       mergedProducts.map((p) => p.language).filter(Boolean) as string[],
@@ -111,7 +126,8 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
     langs.length +
     (!inStock ? 1 : 0) +
     (priceMin !== null ? 1 : 0) +
-    (priceMax !== null ? 1 : 0);
+    (priceMax !== null ? 1 : 0) +
+    (query ? 1 : 0);
 
   const filtered = useMemo(() => {
     let list = [...mergedProducts];
@@ -119,8 +135,20 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
     if (inStock) list = list.filter((p) => p.inStock);
     if (priceMin !== null) list = list.filter((p) => p.price >= priceMin);
     if (priceMax !== null) list = list.filter((p) => p.price <= priceMax);
+    if (query) {
+      // Multi-token AND search (accent-insensitive) over name + description + category.
+      // Works for cross-language queries: "Teenage Mutant Ninja Turtles"
+      // matches products whose descripción en español los cita textualmente.
+      const norm = (s: string) =>
+        s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const tokens = norm(query).split(/\s+/).filter(Boolean);
+      list = list.filter((p) => {
+        const hay = norm(`${p.name} ${p.description ?? ""} ${p.category ?? ""}`);
+        return tokens.every((t) => hay.includes(t));
+      });
+    }
     return list;
-  }, [mergedProducts, langs, inStock, priceMin, priceMax]);
+  }, [mergedProducts, langs, inStock, priceMin, priceMax, query]);
 
   const visible = filtered.slice(0, page * PAGE_SIZE);
   const hasMore = visible.length < filtered.length;
@@ -151,6 +179,26 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
             categoryLabel={categoryItems?.find((c) => c.id === category)?.label}
           />
         </div>
+
+        {/* Active search chip (visible on all breakpoints) */}
+        {query && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+            <span>Buscando:</span>
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 font-semibold text-amber-700"
+            >
+              “{query}”
+              <button
+                onClick={clearQuery}
+                aria-label="Quitar búsqueda"
+                className="text-amber-700/70 hover:text-amber-700"
+              >
+                <X size={12} />
+              </button>
+            </span>
+            <span className="text-gray-400">{filtered.length} resultados</span>
+          </div>
+        )}
 
         {filtered.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-gray-200 py-20 text-center">

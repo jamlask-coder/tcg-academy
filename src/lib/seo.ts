@@ -67,6 +67,17 @@ export function websiteJsonLd() {
  * y Maps. Se inserta en cada página de tienda.
  */
 export function localBusinessJsonLd(store: Store) {
+  // Solo emitimos `geo` si tenemos coordenadas reales — mejor omitir que enviar
+  // imprecisiones que confundirían a Google Maps.
+  const geo = store.geo
+    ? {
+        geo: {
+          "@type": "GeoCoordinates",
+          latitude: store.geo.lat,
+          longitude: store.geo.lng,
+        },
+      }
+    : {};
   return {
     "@context": "https://schema.org",
     "@type": "Store",
@@ -83,6 +94,7 @@ export function localBusinessJsonLd(store: Store) {
       addressLocality: store.city,
       addressCountry: "ES",
     },
+    ...geo,
     priceRange: "€€",
     parentOrganization: { "@id": `${SITE_URL}/#organization` },
     openingHoursSpecification: store.hours

@@ -9,13 +9,17 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import bcrypt from "bcryptjs";
 import type { NextRequest, NextResponse } from "next/server";
+import { SITE_CONFIG } from "@/config/siteConfig";
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 
 const BCRYPT_ROUNDS = 12;
 const JWT_ALGORITHM = "HS256";
 const COOKIE_NAME = "tcga_session";
-const SESSION_EXPIRY = "24h";
+// Duración derivada de SITE_CONFIG para mantener una única fuente de verdad:
+// si cambia en el config global (por ejemplo a 48 h), el JWT lo sigue sin que
+// haya que tocar código.
+const SESSION_EXPIRY = `${SITE_CONFIG.sessionExpiryHours}h`;
 const REMEMBER_ME_EXPIRY = "30d";
 
 function getJwtSecret(): Uint8Array {

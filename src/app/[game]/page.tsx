@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import {
   GAME_CONFIG,
   CATEGORY_LABELS,
@@ -75,19 +74,6 @@ export default async function GamePage({
     <div>
       <script {...jsonLdProps(breadcrumbLd)} />
 
-      {/* SEO H1 + intro */}
-      <header className="border-b border-gray-100 bg-white">
-        <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
-            {config.name} — Cartas, sobres y accesorios
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600 sm:text-base">
-            {config.description} Stock real, envío en 24&nbsp;h desde nuestras 4 tiendas
-            físicas en España y atención especializada. Precios con IVA incluido.
-          </p>
-        </div>
-      </header>
-
       {/* Category nav */}
       {categories.length > 0 && (
         <div className="sticky-under-nav hidden border-b border-gray-100 bg-white lg:block">
@@ -133,30 +119,6 @@ export default async function GamePage({
             ]}
           />
         )}
-      </section>
-
-      {/* Enlazado interno SEO: otros juegos */}
-      <section className="border-t border-gray-100 bg-white">
-        <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6">
-          <h2 className="mb-3 text-sm font-semibold tracking-wide text-gray-500 uppercase">
-            Explorar otros juegos
-          </h2>
-          <ul className="flex flex-wrap gap-2">
-            {Object.entries(GAME_CONFIG)
-              .filter(([slug]) => slug !== game)
-              .map(([slug, cfg]) => (
-                <li key={slug}>
-                  <Link
-                    href={`/${slug}`}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50"
-                  >
-                    <span aria-hidden="true">{cfg.emoji}</span>
-                    {cfg.name}
-                  </Link>
-                </li>
-              ))}
-          </ul>
-        </div>
       </section>
     </div>
   );

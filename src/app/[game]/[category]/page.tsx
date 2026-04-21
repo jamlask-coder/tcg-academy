@@ -117,20 +117,6 @@ export default async function CategoryPage({
     <div>
       <script {...jsonLdProps(breadcrumbLd)} />
 
-      {/* SEO H1 + intro */}
-      <header className="border-b border-gray-100 bg-white">
-        <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 sm:py-8">
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
-            {catLabel} de {config.name}
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600 sm:text-base">
-            Compra {catLabel.toLowerCase()} de {config.name} con stock real y envío en
-            24&nbsp;h. Productos originales, precios con IVA incluido y atención
-            especializada desde nuestras tiendas físicas en España.
-          </p>
-        </div>
-      </header>
-
       {/* Category nav */}
       <div className="sticky-under-nav hidden border-b border-gray-100 bg-white lg:block">
         <div className="mx-auto max-w-[1400px] px-4 py-3 sm:px-6">
@@ -181,53 +167,6 @@ export default async function CategoryPage({
           />
         )}
       </div>
-
-      {/* Enlazado interno SEO */}
-      <section className="border-t border-gray-100 bg-white">
-        <div className="mx-auto max-w-[1400px] space-y-6 px-4 py-8 sm:px-6">
-          {allCategories.length > 1 && (
-            <div>
-              <h2 className="mb-3 text-sm font-semibold tracking-wide text-gray-500 uppercase">
-                Otras categorías de {name}
-              </h2>
-              <ul className="flex flex-wrap gap-2">
-                {allCategories
-                  .filter((cat) => cat !== category)
-                  .map((cat) => (
-                    <li key={cat}>
-                      <Link
-                        href={`/${game}/${cat}`}
-                        className="inline-flex rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50"
-                      >
-                        {CATEGORY_LABELS[cat] ?? cat}
-                      </Link>
-                    </li>
-                  ))}
-              </ul>
-            </div>
-          )}
-          <div>
-            <h2 className="mb-3 text-sm font-semibold tracking-wide text-gray-500 uppercase">
-              {catLabel} en otros juegos
-            </h2>
-            <ul className="flex flex-wrap gap-2">
-              {Object.entries(GAME_CONFIG)
-                .filter(([slug]) => slug !== game)
-                .map(([slug, cfg]) => (
-                  <li key={slug}>
-                    <Link
-                      href={`/${slug}/${category}`}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50"
-                    >
-                      <span aria-hidden="true">{cfg.emoji}</span>
-                      {cfg.name}
-                    </Link>
-                  </li>
-                ))}
-            </ul>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

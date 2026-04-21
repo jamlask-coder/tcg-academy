@@ -12,6 +12,7 @@
  */
 
 import { DataHub } from "@/lib/dataHub";
+import { validateIban } from "@/lib/validations/iban";
 
 const RETURNS_KEY = "tcgacademy_returns";
 const RETURN_WINDOW_DAYS = 14; // Legal return window in Spain
@@ -32,6 +33,14 @@ export type ReturnReason =
   | "danado_envio"
   | "falta_producto"
   | "otro";
+
+/**
+ * Método de reembolso. Regla de negocio obligatoria:
+ * TODAS las devoluciones se reembolsan por TRANSFERENCIA BANCARIA.
+ * Hay un único valor en el enum para forzar esta regla en el sistema de tipos.
+ */
+export type RefundMethod = "transferencia";
+export const REFUND_METHOD: RefundMethod = "transferencia";
 
 export interface ReturnItem {
   productId: number;
@@ -54,9 +63,19 @@ export interface ReturnRequest {
   createdAt: string;
   updatedAt: string;
   adminNotes?: string;
-  refundMethod?: string; // original payment method
+  /** Siempre "transferencia" — regla fiscal/negocio (ver docstring RefundMethod) */
+  refundMethod: RefundMethod;
+  /** IBAN del cliente donde se emitirá la transferencia. Obligatorio antes de reembolsar. */
+  refundIban?: string;
+  /** Titular de la cuenta bancaria (opcional, por claridad en registros contables). */
+  refundHolderName?: string;
+  /** Timestamp ISO del momento en el que se marcó como reembolsada (transferencia emitida). */
+  refundedAt?: string;
   trackingNumber?: string; // return shipment tracking
+  /** ID interno de la factura rectificativa generada al marcar como reembolsada. */
   rectificativeInvoiceId?: string;
+  /** Número visible de la factura rectificativa (FAC-YYYY-NNNNNXXXXXE). */
+  rectificativeInvoiceNumber?: string;
   statusHistory: Array<{
     status: ReturnStatus;
     timestamp: string;
@@ -100,6 +119,10 @@ export function isWithinReturnWindow(orderDate: string): boolean {
 
 /**
  * Create a new return request.
+ *
+ * El método de reembolso queda fijado a "transferencia" (única opción permitida
+ * por regla de negocio). El IBAN se puede capturar ya en esta fase si el
+ * cliente lo provee en el formulario, o más tarde antes de marcar "reembolsada".
  */
 export function createReturnRequest(
   orderId: string,
@@ -107,12 +130,25 @@ export function createReturnRequest(
   customerEmail: string,
   customerName: string,
   items: ReturnItem[],
-  refundMethod?: string,
+  options?: { refundIban?: string; refundHolderName?: string },
 ): ReturnRequest {
   const totalRefundAmount = items.reduce(
     (sum, item) => sum + item.unitPrice * item.quantity,
     0,
   );
+
+  // Si el cliente pasa IBAN ya en la solicitud, lo normalizamos y validamos.
+  let normalizedIban: string | undefined;
+  if (options?.refundIban) {
+    const v = validateIban(options.refundIban);
+    if (!v.valid) {
+      throw new Error(
+        `IBAN no válido: ${v.error ?? "formato incorrecto"}. ` +
+          `La devolución NO se creará hasta que se proporcione un IBAN correcto.`,
+      );
+    }
+    normalizedIban = v.normalized;
+  }
 
   const returnReq: ReturnRequest = {
     id: generateRmaId(),
@@ -125,7 +161,9 @@ export function createReturnRequest(
     status: "solicitada",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    refundMethod,
+    refundMethod: REFUND_METHOD,
+    refundIban: normalizedIban,
+    refundHolderName: options?.refundHolderName,
     statusHistory: [
       {
         status: "solicitada",
@@ -140,6 +178,42 @@ export function createReturnRequest(
   saveReturns(returns);
 
   return returnReq;
+}
+
+/**
+ * Actualiza el IBAN (y opcionalmente titular) del reembolso de una devolución
+ * ya existente. Valida el IBAN antes de guardar.
+ *
+ * Se usa cuando el cliente manda el IBAN después de haber creado la solicitud,
+ * o cuando el admin lo corrige tras comunicarse con el cliente.
+ */
+export function setRefundBankInfo(
+  rmaId: string,
+  iban: string,
+  holderName?: string,
+): ReturnRequest {
+  const v = validateIban(iban);
+  if (!v.valid) {
+    throw new Error(
+      `IBAN no válido: ${v.error ?? "formato incorrecto"}. ` +
+        `El IBAN NO se ha guardado.`,
+    );
+  }
+
+  const returns = loadReturns();
+  const idx = returns.findIndex((r) => r.id === rmaId);
+  if (idx === -1) {
+    throw new Error(`Devolución ${rmaId} no encontrada`);
+  }
+
+  returns[idx].refundIban = v.normalized;
+  if (holderName !== undefined) {
+    returns[idx].refundHolderName = holderName;
+  }
+  returns[idx].updatedAt = new Date().toISOString();
+
+  saveReturns(returns);
+  return returns[idx];
 }
 
 /**
@@ -221,6 +295,172 @@ export function restoreStockForReturn(items: ReturnItem[]): void {
   }
 
   localStorage.setItem("tcgacademy_product_overrides", JSON.stringify(overrides));
+}
+
+/**
+ * Marca una devolución como "reembolsada" y genera la factura rectificativa
+ * correspondiente de forma atómica.
+ *
+ * ESTA ACCIÓN ES IRREVERSIBLE (afecta cadena VeriFactu, Libro de facturas,
+ * Modelo 303 del trimestre, Modelo 390 anual, asiento contable).
+ * La UI que la invoque DEBE mostrar modal de confirmación explícito.
+ *
+ * Requisitos:
+ *  - La devolución debe tener `refundIban` válido (si no, lanza error).
+ *  - Debe existir factura original vinculada al `orderId` del RMA.
+ *
+ * Flujo:
+ *  1. Localiza factura original por `sourceOrderId === return.orderId`.
+ *  2. Construye líneas rectificativas con CANTIDAD NEGATIVA — esto hace que
+ *     `calculateTotals()` produzca base imponible + IVA NEGATIVOS, lo que
+ *     se resta automáticamente del Modelo 303 del trimestre de emisión.
+ *  3. Llama a `rectifyInvoice()` con `reasonCode: "R4"` (otras causas).
+ *  4. Emite evento DataHub "invoices" (dispara refresh de paneles fiscales).
+ *  5. Restaura stock de los productos devueltos.
+ *  6. Actualiza el RMA → status "reembolsada" + referencias cruzadas.
+ */
+export async function markAsRefunded(
+  rmaId: string,
+  options?: { adminNote?: string; adminUserId?: string; adminUserName?: string },
+): Promise<{ ok: true; rectificativeInvoiceNumber: string; refundedAt: string }> {
+  const returns = loadReturns();
+  const idx = returns.findIndex((r) => r.id === rmaId);
+  if (idx === -1) throw new Error(`Devolución ${rmaId} no encontrada`);
+  const rma = returns[idx];
+
+  if (rma.status === "reembolsada") {
+    throw new Error(
+      `La devolución ${rmaId} ya está marcada como reembolsada. ` +
+        `Las operaciones fiscales son irreversibles — no se pueden reejecutar.`,
+    );
+  }
+
+  // IBAN obligatorio antes de emitir la transferencia.
+  if (!rma.refundIban) {
+    throw new Error(
+      `No se puede marcar como reembolsada sin IBAN. ` +
+        `El cliente debe proporcionar IBAN → setRefundBankInfo() antes de continuar.`,
+    );
+  }
+  const ibanCheck = validateIban(rma.refundIban);
+  if (!ibanCheck.valid) {
+    throw new Error(
+      `El IBAN guardado (${rma.refundIban}) no es válido: ` +
+        `${ibanCheck.error}. Corrige con setRefundBankInfo() y reintenta.`,
+    );
+  }
+
+  // Import dinámico para evitar ciclos y para que el servicio de devoluciones
+  // pueda ejecutarse en contextos donde invoiceService no esté cargado.
+  const { loadInvoices, rectifyInvoice, buildLineItem } =
+    await import("@/services/invoiceService");
+  const { CorrectionType, InvoiceStatus, InvoiceType } = await import("@/types/fiscal");
+
+  // 1. Localizar factura original (por sourceOrderId = rma.orderId).
+  const invoices = loadInvoices();
+  const original = invoices.find(
+    (inv) =>
+      inv.sourceOrderId === rma.orderId &&
+      inv.status !== InvoiceStatus.ANULADA &&
+      inv.invoiceType !== InvoiceType.RECTIFICATIVA,
+  );
+  if (!original) {
+    throw new Error(
+      `No se encontró factura original para el pedido ${rma.orderId}. ` +
+        `No se puede generar rectificativa. Verifica que la factura existe ` +
+        `y no está ya anulada.`,
+    );
+  }
+
+  // 2. Construir líneas rectificativas con cantidad negativa.
+  //    Para cada item devuelto busco la línea equivalente en la original
+  //    (por productId) para heredar vatRate, unitPrice y descuentos.
+  //    Si no la encuentro, asumo IVA 21% general (fallback conservador).
+  const rectifiedItems = rma.items.map((returnItem, i) => {
+    const matched = original.items.find(
+      (line) => line.productId === String(returnItem.productId),
+    );
+    const vatRate: 0 | 4 | 10 | 21 = matched?.vatRate ?? 21;
+    const unitPriceWithVAT = matched
+      ? matched.quantity > 0
+        ? matched.totalLine / matched.quantity
+        : returnItem.unitPrice
+      : returnItem.unitPrice;
+
+    return buildLineItem({
+      lineNumber: i + 1,
+      productId: String(returnItem.productId),
+      description: `[DEV] ${returnItem.productName}`,
+      quantity: -Math.abs(returnItem.quantity), // NEGATIVO para restar en 303
+      unitPriceWithVAT,
+      vatRate,
+      discount: matched?.discount ?? 0,
+      applySurcharge: (matched?.surchargeRate ?? 0) > 0,
+    });
+  });
+
+  // 3. Emitir rectificativa (hereda cadena VeriFactu; rectifyInvoice llama
+  //    internamente a createInvoice + persistInvoices).
+  const rectificativa = await rectifyInvoice(original.invoiceId, {
+    items: rectifiedItems,
+    paymentMethod: original.paymentMethod,
+    correctionData: {
+      originalInvoiceId: original.invoiceId,
+      originalInvoiceNumber: original.invoiceNumber,
+      originalInvoiceDate: original.invoiceDate,
+      correctionType: CorrectionType.DIFERENCIAS,
+      reason:
+        `Devolución ${rma.id} — reembolso por transferencia bancaria a IBAN del cliente. ` +
+        (options?.adminNote ? `Nota admin: ${options.adminNote}` : ""),
+      reasonCode: "R4",
+    },
+  });
+
+  // 4. rectifyInvoice() ya dispara los side-effects internos (asiento contable
+  //    + VeriFactu dispatch) desde su propia implementación, por lo que aquí
+  //    no hace falta llamada extra a saveInvoice (evitamos duplicación).
+
+  // 5. Restaurar stock.
+  restoreStockForReturn(rma.items);
+
+  // 6. Actualizar RMA con referencias cruzadas + timestamp refundedAt.
+  const refundedAt = new Date().toISOString();
+  returns[idx] = {
+    ...rma,
+    status: "reembolsada",
+    updatedAt: refundedAt,
+    refundedAt,
+    rectificativeInvoiceId: rectificativa.invoiceId,
+    rectificativeInvoiceNumber: rectificativa.invoiceNumber,
+    statusHistory: [
+      ...rma.statusHistory,
+      {
+        status: "reembolsada",
+        timestamp: refundedAt,
+        note:
+          `Transferencia emitida a IBAN ${maskIbanShort(rma.refundIban)}. ` +
+          `Factura rectificativa ${rectificativa.invoiceNumber} generada. ` +
+          (options?.adminNote ?? ""),
+      },
+    ],
+  };
+  saveReturns(returns);
+
+  return {
+    ok: true,
+    rectificativeInvoiceNumber: rectificativa.invoiceNumber,
+    refundedAt,
+  };
+}
+
+/**
+ * Máscara IBAN compacta para notas/timeline (solo muestra primeros + últimos 4).
+ * Formato: "ES91 •••• 1332". Evita loggear IBAN completo en el statusHistory.
+ */
+function maskIbanShort(iban: string): string {
+  const clean = iban.replace(/\s+/g, "");
+  if (clean.length < 8) return "••••";
+  return `${clean.slice(0, 4)} •••• ${clean.slice(-4)}`;
 }
 
 /**

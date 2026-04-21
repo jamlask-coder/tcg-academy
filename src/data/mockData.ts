@@ -683,7 +683,7 @@ export const MOCK_RETURNS: ReturnRequest[] = [
       {
         date: "2025-01-12",
         status: "reembolsada",
-        note: "Reembolso de 54,95€ procesado a tu Visa ****4242.",
+        note: "Transferencia de 54,95€ emitida a IBAN ES** **** **** **** **** 4242. Factura rectificativa adjunta al pedido.",
       },
     ],
   },

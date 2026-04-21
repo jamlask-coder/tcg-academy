@@ -549,6 +549,53 @@ export async function rectifyInvoice(
   );
   persistInvoices([...updatedInvoices, rectificativa]);
 
+  // ── Side-effects sobre la rectificativa ────────────────────────────────
+  // La original ya tenía asiento y envío VeriFactu previos; solo la
+  // RECTIFICATIVA necesita dispararlos ahora. Estos side effects son idénticos
+  // a los de `saveInvoice()`, pero no podemos reutilizarlo porque re-añadiría
+  // la rectificativa (duplicado). Ver flujo análogo en saveInvoice().
+  void (async () => {
+    try {
+      const { createJournalFromInvoice } = await import("@/accounting/journalEngine");
+      await createJournalFromInvoice(rectificativa);
+    } catch {
+      // Silent — autopilot fiscal detectará discrepancia en cross-validation.
+    }
+  })();
+
+  void (async () => {
+    try {
+      const { VERIFACTU_CONFIG } = await import("@/config/verifactuConfig");
+      if (VERIFACTU_CONFIG.mode === "off") return;
+      const { getVerifactuProvider } = await import("@/services/verifactuService");
+      const provider = getVerifactuProvider();
+      const response = await provider.sendInvoice(rectificativa);
+      const updatedRectificativa: InvoiceRecord = {
+        ...rectificativa,
+        verifactuStatus: response.status,
+        verifactuTimestamp: response.aeatTimestamp ?? new Date(),
+        verifactuError: response.errorMessage ?? null,
+        status: response.success ? InvoiceStatus.ENVIADA_AEAT : rectificativa.status,
+        updatedAt: new Date(),
+        auditLog: [
+          ...rectificativa.auditLog,
+          {
+            timestamp: new Date(),
+            userId: "system",
+            userName: "Sistema VeriFactu",
+            action: AuditAction.ENVIADA_VERIFACTU,
+            detail: response.success
+              ? `Rectificativa enviada a VeriFactu (${response.providerId ?? "mock"}). Estado: ${response.status}.`
+              : `Envío de rectificativa rechazado: ${response.errorMessage ?? "desconocido"}`,
+          },
+        ],
+      };
+      updateInvoice(updatedRectificativa);
+    } catch {
+      // VeriFactu silent fail — autopilot lo detectará en próximo escaneo.
+    }
+  })();
+
   return rectificativa;
 }
 

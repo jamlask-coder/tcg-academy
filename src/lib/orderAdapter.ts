@@ -11,6 +11,26 @@
  * Regla de oro: la información del comprador vive en `shippingAddress` + `userId`.
  * Cualquier otro campo (userName, userEmail, address string) se DERIVA de aquí —
  * nunca se pide dos veces al usuario ni se guarda con nombre distinto.
+ *
+ * ─── INVARIANTE MULTI-ROL (ver memoria project_all_orders_reach_admin) ────────
+ *  Los siguientes roles generan entradas en la bandeja admin vía este adapter:
+ *    - `cliente`   (B2C)      → checkout público → normalizeLegacyOrder → inbox
+ *    - `tienda`    (tiendas)  → MISMO checkout público (no tiene panel propio);
+ *                               se distingue por `userRole` + flag `storePrice`.
+ *                               Todos los filtros tipo "mis pedidos" son VISTAS
+ *                               sobre el inbox común, no un almacén paralelo.
+ *    - `mayorista` (B2B)      → checkout público o API /api/orders → inbox
+ *    - `admin`     (manual)   → /admin/pedidos/nuevo → appendToAdminInbox directo
+ *
+ *  EXCEPCIÓN INTENCIONAL (ver memoria feedback_deferred_payment_no_order):
+ *    Los pagos diferidos (transferencia / recogida / "pago en tienda") NO crean
+ *    pedido ni factura hasta que se confirma cobro (paymentStatus="cobrado").
+ *    Esto NO es una violación del invariante: son "intenciones de compra" que
+ *    viven en `tcgacademy_email_log` + email a la tienda. Cuando se confirma el
+ *    pago manualmente, el admin crea el pedido desde /admin/pedidos/nuevo y
+ *    entonces sí pasa por `appendToAdminInbox`. De este modo el invariante se
+ *    cumple siempre sobre "pedidos confirmados fiscalmente".
+ * ────────────────────────────────────────────────────────────────────────────
  */
 
 import { PRODUCTS } from "@/data/products";

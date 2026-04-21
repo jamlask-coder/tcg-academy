@@ -30,7 +30,15 @@ export function DiscountBadgeEdit({
   badgeClassName,
 }: Props) {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  // `mounted` evita hydration mismatch: en SSR user es undefined, tras
+  // montar en cliente se lee de localStorage y `isAdmin` puede cambiar.
+  // Hasta que `mounted` sea true renderizamos la rama pública (no-admin).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hidratación post-SSR para evitar mismatch cuando user se lee de localStorage
+    setMounted(true);
+  }, []);
+  const isAdmin = mounted && user?.role === "admin";
 
   const hasDiscount = comparePrice !== undefined && comparePrice > displayPrice;
   const currentPct = hasDiscount
