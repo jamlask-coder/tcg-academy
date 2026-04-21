@@ -95,6 +95,7 @@ export function HoloCard({
   return (
     <div
       ref={containerRef}
+      role="presentation"
       className={className}
       style={{ perspective: "800px" }}
       onMouseMove={handleMouseMove}

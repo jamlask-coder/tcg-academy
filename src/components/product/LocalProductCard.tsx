@@ -120,7 +120,7 @@ function LocalProductCardInner({ product }: Props) {
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={displayImage}
-          alt={product.name}
+          alt={`${product.name} — ${config?.name ?? product.game} | TCG Academy`}
           loading="lazy"
           onError={() => setImageBroken(true)}
           className={`h-full w-full ${imageObjectFit} transition-all duration-300 ${!product.inStock ? "opacity-50" : ""}`}

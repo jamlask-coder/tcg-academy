@@ -122,6 +122,7 @@ export function HoloCard({
           {/* Tiltable card face */}
           <div
             ref={innerRef}
+            role="presentation"
             onMouseMove={onMouseMove}
             onMouseLeave={onMouseLeave}
             style={{

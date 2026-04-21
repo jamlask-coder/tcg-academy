@@ -1,5 +1,5 @@
 /**
- * Next.js Middleware — Global request protection.
+ * Next.js Proxy — Global request protection.
  *
  * Runs on EVERY request before reaching the page/API route.
  *
@@ -15,7 +15,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const response = NextResponse.next();
 
@@ -99,7 +99,7 @@ export function middleware(request: NextRequest) {
   return response;
 }
 
-// Only run middleware on relevant paths (skip static files)
+// Only run proxy on relevant paths (skip static files)
 export const config = {
   matcher: [
     /*

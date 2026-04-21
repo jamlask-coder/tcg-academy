@@ -59,6 +59,7 @@ import {
   type EncryptedPayload,
 } from "@/lib/encryption";
 import { formatDateShort } from "@/lib/format";
+import { clickableProps } from "@/lib/a11y";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -854,12 +855,12 @@ function Modal({
 }) {
   return (
     <div
+      {...clickableProps(onClose)}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
     >
       <div
+        {...clickableProps((e) => e?.stopPropagation())}
         className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-bold text-gray-900">{title}</h3>

@@ -378,27 +378,19 @@ function HeaderInlineAuth() {
               <p className="text-sm font-bold text-gray-900">
                 {user.name} {user.lastName}
               </p>
-              <p className="mt-0.5 truncate text-[11px] text-gray-400">
-                {user.email ?? ""}
-              </p>
+              {user.role !== "admin" && user.email && (
+                <p className="mt-0.5 truncate text-[11px] text-gray-400">
+                  {user.email}
+                </p>
+              )}
             </div>
             <Link
               href={user.role === "admin" ? "/admin" : "/cuenta"}
               onClick={() => setMenuOpen(false)}
               className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50"
             >
-              <User size={15} className="text-gray-400" /> Mi cuenta
+              <LayoutDashboard size={15} className="text-gray-400" /> Resumen
             </Link>
-            {user.role === "admin" && (
-              <Link
-                href="/admin"
-                onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-amber-600 transition hover:bg-amber-50"
-              >
-                <LayoutDashboard size={15} className="text-amber-400" /> Panel
-                admin
-              </Link>
-            )}
             <div className="my-1 border-t border-gray-100" />
             <button
               onClick={() => {

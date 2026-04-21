@@ -2,6 +2,7 @@ import type { NextRequest} from "next/server";
 import { NextResponse } from "next/server";
 import { requireAuth, requireAdmin } from "@/lib/apiAuth";
 import { logger } from "@/lib/logger";
+import { orderPatchSchema, zodMessage } from "@/lib/validations/api";
 
 // GET /api/orders/[id] — Get a single order
 export async function GET(
@@ -38,28 +39,15 @@ export async function PATCH(
     const adminResult = await requireAdmin(req);
     if (adminResult instanceof NextResponse) return adminResult;
 
-    const body = await req.json();
-    const { status, tracking, note } = body;
-
-    if (!status) {
-      return NextResponse.json({ error: "Estado requerido" }, { status: 400 });
+    const rawBody = await req.json();
+    const parsed = orderPatchSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: zodMessage(parsed.error) },
+        { status: 400 },
+      );
     }
-
-    // Estados customer (2026-04-20): pedido → pagado → pendiente_envio → enviado
-    // + excepciones (incidencia, cancelado, devolucion). "entregado" eliminado
-    // 2026-04-18 (depende del transportista, no de nosotros).
-    const validStatuses = [
-      "pedido",
-      "pagado",
-      "pendiente_envio",
-      "enviado",
-      "cancelado",
-      "incidencia",
-      "devolucion",
-    ];
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json({ error: `Estado no válido: ${status}` }, { status: 400 });
-    }
+    const { status, tracking, note } = parsed.data;
 
     logger.info(
       `Order ${id} status changed to ${status}`,

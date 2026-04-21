@@ -1,19 +1,21 @@
 import type { NextRequest} from "next/server";
 import { NextResponse } from "next/server";
+import { notificationSchema, zodMessage } from "@/lib/validations/api";
+import { logger } from "@/lib/logger";
 
 // POST /api/notifications — Send notification to customer
 // Used internally when order status changes
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { orderId, status, customerEmail, customerName, tracking, note } = body;
-
-    if (!orderId || !status || !customerEmail) {
+    const rawBody = await req.json();
+    const parsed = notificationSchema.safeParse(rawBody);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Datos de notificación incompletos" },
+        { error: zodMessage(parsed.error) },
         { status: 400 },
       );
     }
+    const { orderId, status, customerEmail, customerName, tracking, note } = parsed.data;
 
     const backendMode = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
 
@@ -46,6 +48,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         ok: true,
         sent: false,
+        recipient: customerEmail,
         message: "Email service no configurado. Configurar RESEND_API_KEY.",
       });
     }
@@ -54,9 +57,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       template: template.subject,
+      recipient: customerEmail,
       message: "Modo local: notificación gestionada en cliente.",
     });
-  } catch {
+  } catch (err) {
+    logger.error("notifications POST failed", "notifications", {
+      err: err instanceof Error ? err.message : String(err),
+    });
     return NextResponse.json(
       { error: "Error al enviar notificación" },
       { status: 500 },

@@ -1,8 +1,13 @@
 "use client";
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { getMergedById } from "@/lib/productStore";
 import { useAuth } from "@/context/AuthContext";
 import { getRoleLimit, getPurchasedQty } from "@/services/purchaseLimitService";
+import { logger } from "@/lib/logger";
+
+const LEGACY_CART_KEY = "tcga_cart";
+const cartKeyFor = (userId?: string) =>
+  userId ? `tcga_cart_${userId}` : "tcga_cart_anon";
 
 export interface CartItem {
   key: string;
@@ -40,23 +45,34 @@ const CartContext = createContext<CartCtx | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user, role } = useAuth();
-  const [items, setItems] = useState<CartItem[]>(() => {
+  const storageKey = cartKeyFor(user?.id);
+  const [items, setItems] = useState<CartItem[]>([]);
+
+  // Carga/recarga cuando cambia el usuario (login / logout / switch).
+  // Migra la clave legacy "tcga_cart" al slot del usuario actual la primera vez.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
     try {
-      const s =
-        typeof window !== "undefined"
-          ? localStorage.getItem("tcga_cart")
-          : null;
-      return s ? (JSON.parse(s) as CartItem[]) : [];
+      const legacy = localStorage.getItem(LEGACY_CART_KEY);
+      if (legacy && !localStorage.getItem(storageKey)) {
+        localStorage.setItem(storageKey, legacy);
+      }
+      if (legacy) localStorage.removeItem(LEGACY_CART_KEY);
+      const raw = localStorage.getItem(storageKey);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setItems(raw ? (JSON.parse(raw) as CartItem[]) : []);
     } catch {
-      return [];
+      setItems([]);
     }
-  });
+  }, [storageKey]);
 
   const save = (next: CartItem[]) => {
     setItems(next);
     try {
-      localStorage.setItem("tcga_cart", JSON.stringify(next));
-    } catch {}
+      localStorage.setItem(storageKey, JSON.stringify(next));
+    } catch (err) {
+      logger.warn("No se pudo guardar carrito", "cart", { err: String(err) });
+    }
   };
 
   const addItem = (

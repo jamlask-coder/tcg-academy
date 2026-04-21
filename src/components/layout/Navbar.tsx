@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { MegaMenu } from "./MegaMenu";
@@ -9,6 +9,8 @@ import { TiendasMenu } from "./TiendasMenu";
 import { MayoristasMenu } from "./MayoristasMenu";
 import { OtrosMenu } from "./OtrosMenu";
 import { MEGA_MENU_DATA } from "@/data/megaMenuData";
+import { getMergedMegaMenu } from "@/lib/megaMenuOverrides";
+import { DataHub } from "@/lib/dataHub";
 import { Container } from "@/components/ui/Container";
 
 // ─── Cardmarket sprite sheet ───────────────────────────────────────────────────
@@ -149,8 +151,6 @@ const TIENDAS_KEY = "tiendas";
 const MAYORISTAS_KEY = "mayoristas";
 const OTROS_KEY = "otros";
 
-const NAVBAR_GAMES = MEGA_MENU_DATA.slice(0, 6);
-
 export function Navbar() {
   const pathname = usePathname();
   const [activeItem, setActiveItem] = useState<string | null>(null);
@@ -159,6 +159,13 @@ export function Navbar() {
   const navRef = useRef<HTMLDivElement>(null);
   const logoRefsMap = useRef<Map<string, HTMLDivElement>>(new Map());
   const [activeLogoLeft, setActiveLogoLeft] = useState<number | null>(null);
+  const [menuData, setMenuData] = useState(() => MEGA_MENU_DATA);
+  useEffect(() => {
+    const reload = () => setMenuData(getMergedMegaMenu());
+    reload();
+    return DataHub.on("megamenu", reload);
+  }, []);
+  const NAVBAR_GAMES = menuData.slice(0, 6);
 
   const cancelClose = useCallback(() => {
     if (closeTimerRef.current) {
@@ -210,11 +217,11 @@ export function Navbar() {
     activeItem !== TIENDAS_KEY &&
     activeItem !== MAYORISTAS_KEY &&
     activeItem !== OTROS_KEY
-      ? (MEGA_MENU_DATA.find((g) => g.slug === activeItem) ?? null)
+      ? (menuData.find((g) => g.slug === activeItem) ?? null)
       : null;
 
   return (
-    <div ref={navRef} className="relative z-40 hidden lg:block" onMouseLeave={handleNavMouseLeave}>
+    <div ref={navRef} role="presentation" className="relative z-40 hidden lg:block" onMouseLeave={handleNavMouseLeave}>
       <nav
         className="relative overflow-hidden border-b border-white/10"
         style={{ background: "#1f2937", minHeight: NAV_HEIGHT }}
@@ -249,6 +256,7 @@ export function Navbar() {
                     <div
                       key={slug}
                       ref={(el) => { if (el) logoRefsMap.current.set(slug, el); }}
+                      role="presentation"
                       className="group/logo flex items-stretch"
                       onMouseEnter={() => openItem(slug)}
                       style={(() => {
@@ -309,6 +317,7 @@ export function Navbar() {
 
               {/* ── "Otros TCG" ───────────────────────────────────────────────── */}
               <div
+                role="presentation"
                 className="flex shrink-0 items-stretch"
                 onMouseEnter={() => openItem(OTROS_KEY)}
               >
@@ -339,6 +348,7 @@ export function Navbar() {
             <div className="flex items-stretch" style={{ height: NAV_HEIGHT }}>
               {/* ── Eventos ──────────────────────────────────────────────────── */}
               <div
+                role="presentation"
                 onMouseEnter={() => setActiveItem(null)}
                 className="flex items-stretch"
               >
@@ -356,6 +366,7 @@ export function Navbar() {
 
               {/* ── Tiendas ──────────────────────────────────────────────────── */}
               <div
+                role="presentation"
                 onMouseEnter={() => openItem(TIENDAS_KEY)}
                 className="flex items-stretch"
               >
@@ -380,6 +391,7 @@ export function Navbar() {
 
               {/* ── Profesionales ────────────────────────────────────────────── */}
               <div
+                role="presentation"
                 onMouseEnter={() => openItem(MAYORISTAS_KEY)}
                 className="flex items-stretch"
               >

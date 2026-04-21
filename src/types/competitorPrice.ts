@@ -62,13 +62,19 @@ export interface CompetitorPriceRange {
 export interface CompetitorPricesRequest {
   productId: number;
   productName: string;
-  /** Imagen del producto — para búsqueda inversa (Phase 2). */
+  /** Imagen del producto — se hashea (dHash) en el server y se usa para scoring visual. */
   productImage?: string;
   /**
    * Slug del juego (magic, pokemon, yugioh, one-piece, lorcana, dragon-ball, ...).
    * Disponible para adapters que quieran segmentar búsqueda por catálogo.
    */
   productGame?: string;
+  /**
+   * Idioma del producto (EN, ES, JP, FR, DE, IT, KO, PT, ZH). Crítico para
+   * descartar versiones en otro idioma que comparten el nombre (p.ej. un booster
+   * Pokémon EN vs su equivalente JP).
+   */
+  productLanguage?: string;
   /** Lista de storeIds a consultar (opcional; default = todos). */
   storeIds?: string[];
 }

@@ -48,6 +48,7 @@ import {
   buildTrackingUrl,
   type Carrier,
 } from "@/components/admin/ShipModal";
+import { clickableProps } from "@/lib/a11y";
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -823,12 +824,12 @@ export default function PedidoDetailClient() {
           {/* Email preview modal */}
           {emailPreview && (
             <div
+              {...clickableProps(() => setEmailPreview(null))}
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-              onClick={() => setEmailPreview(null)}
             >
               <div
+                {...clickableProps((e) => e?.stopPropagation())}
                 className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl"
-                onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
                   <div>

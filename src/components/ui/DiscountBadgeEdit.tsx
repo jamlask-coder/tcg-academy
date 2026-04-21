@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Pencil, Check, X, Plus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { clickableProps } from "@/lib/a11y";
 
 interface Props {
   /** The current sale price (used to convert % ↔ comparePrice) */
@@ -88,11 +89,11 @@ export function DiscountBadgeEdit({
   if (editing) {
     return (
       <span
+        {...clickableProps((e) => {
+          e?.preventDefault();
+          e?.stopPropagation();
+        })}
         className="inline-flex items-center gap-0.5"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }}
       >
         <span className="text-[10px] font-bold text-red-500">-</span>
         <input

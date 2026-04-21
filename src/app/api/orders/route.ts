@@ -8,6 +8,7 @@ import { getDb, type OrderRecord } from "@/lib/db";
 import { sendOrderNotification, getEmailService } from "@/lib/email";
 import { getClientIp } from "@/lib/auth";
 import { validateSpanishNIF } from "@/lib/validations/nif";
+import { orderCreateSchema, zodMessage } from "@/lib/validations/api";
 
 interface OrderItem {
   product_id: number;
@@ -68,7 +69,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "La solicitud es demasiado grande" }, { status: 413 });
     }
 
-    const body: OrderBody = await req.json();
+    const rawBody = await req.json();
+    const parsed = orderCreateSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: zodMessage(parsed.error) },
+        { status: 400 },
+      );
+    }
+    const body: OrderBody = rawBody;
     const { items, customer, shipping, payment, coupon, pointsDiscount } = body;
 
     // ── Validation ────────────────────────────────────────────────────────

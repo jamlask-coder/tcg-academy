@@ -1,25 +1,39 @@
 /**
- * Generic adapter — lógica común a las 4 tiendas soportadas.
+ * Generic adapter — flujo multi-señal para encontrar el match correcto.
  *
- * Flujo:
- *  1) GET URL de búsqueda con query primary.
- *  2) Intentar extraer precio directamente de la página de resultados
- *     (algunas tiendas muestran la ficha con precio en la misma SERP).
- *  3) Si no hay precio pero hay enlace al primer producto → seguir el link
- *     y extraer del detalle.
- *  4) Si la primary query no devuelve nada usable → probar variantes.
- *  5) Si todo falla → devolver la URL de búsqueda como `parse_error` para
- *     que el usuario pueda abrirla manualmente.
+ * 1) GET URL de búsqueda con la query principal.
+ * 2) Extrae hasta 10 candidatos de la SERP (título, precio, url, imagen).
+ * 3) Para cada candidato:
+ *    - Calcula nameScore (tokens compartidos con la query)
+ *    - Calcula languageScore (idioma del producto vs. texto del candidato)
+ *    - Descarga la imagen y computa dHash → imageScore
+ * 4) Combina con pesos (nombre 35% · idioma 25% · imagen 40%) y elige el
+ *    candidato con mejor score ≥ 0.50. Idioma contradictorio → veto.
+ * 5) Si el mejor candidato no tiene precio en la SERP → GET su detalle.
+ * 6) Si ningún candidato supera el umbral → not_found.
  */
 
-import { extractFirstProductLink, extractProductInfo } from "@/lib/competitors/priceExtract";
+import {
+  extractFirstProductLink,
+  extractProductInfo,
+  extractSearchCandidates,
+  type SearchCandidate,
+} from "@/lib/competitors/priceExtract";
 import { matchScore } from "@/lib/competitors/nameNormalize";
-import type { AdapterResult, AdapterContext } from "./types";
+import {
+  combinedScore,
+  imageUrlTokenScore,
+  languageScore,
+} from "@/lib/competitors/scoring";
+import { dhashFromUrl, imageSimilarity } from "@/lib/competitors/imageHash";
+import type { AdapterContext, AdapterResult } from "./types";
 import type { CompetitorStoreConfig } from "@/config/competitorStores";
 import type { NormalizedName } from "@/lib/competitors/nameNormalize";
 
-/** Umbral mínimo de score para aceptar un match remoto. */
-const MATCH_THRESHOLD = 0.35;
+/** Umbral mínimo del score combinado para aceptar el match. */
+const MATCH_THRESHOLD = 0.5;
+/** Límite de imágenes remotas a descargar por búsqueda (protección). */
+const MAX_IMAGES_PER_SEARCH = 8;
 
 export async function genericSearch(
   store: CompetitorStoreConfig,
@@ -46,27 +60,68 @@ export async function genericSearch(
       continue;
     }
 
-    // 1) Intento directo sobre SERP (muchas webs muestran precio en la grid)
-    const direct = extractProductInfo(searchHtml, store.baseUrl);
-    if (direct?.price && (!direct.title || matchScore(q, direct.title) >= MATCH_THRESHOLD)) {
-      return {
-        status: "ok",
-        price: direct.price,
-        url: direct.url ?? searchUrl,
-        matchedTitle: direct.title,
-        inStock: direct.inStock,
-      };
+    // Extraer múltiples candidatos con imagen y título.
+    const candidates = extractSearchCandidates(searchHtml, store.baseUrl);
+
+    if (candidates.length > 0) {
+      const best = await pickBestCandidate(candidates, q, ctx);
+      if (best && best.combined.score >= MATCH_THRESHOLD) {
+        // Si el candidato de la SERP ya trae precio, úsalo.
+        if (best.candidate.price) {
+          return {
+            status: "ok",
+            price: best.candidate.price,
+            url: best.candidate.url,
+            matchedTitle: best.candidate.title ?? best.candidate.altText,
+            confidence: best.combined.score,
+          };
+        }
+        // Si no, entra al detalle.
+        try {
+          const detailHtml = await ctx.fetchHtml(best.candidate.url, store.timeoutMs);
+          const info = extractProductInfo(detailHtml, store.baseUrl);
+          if (info?.price) {
+            return {
+              status: "ok",
+              price: info.price,
+              url: best.candidate.url,
+              matchedTitle: info.title ?? best.candidate.title ?? best.candidate.altText,
+              inStock: info.inStock,
+              confidence: best.combined.score,
+            };
+          }
+        } catch (e) {
+          networkFailed = true;
+          lastErr = e instanceof Error ? e.message : "detail fetch failed";
+        }
+      }
     }
 
-    // 2) Seguir el enlace del primer producto si existe
+    // Fallback clásico: primer enlace de producto + match textual suave.
+    const directOnSerp = extractProductInfo(searchHtml, store.baseUrl);
+    if (directOnSerp?.price) {
+      const titleOk = !directOnSerp.title || matchScore(q, directOnSerp.title) >= 0.35;
+      const langOk = languageScoreForCandidate(directOnSerp.title ?? "", directOnSerp.url ?? "", ctx) >= 0;
+      if (titleOk && langOk) {
+        return {
+          status: "ok",
+          price: directOnSerp.price,
+          url: directOnSerp.url ?? searchUrl,
+          matchedTitle: directOnSerp.title,
+          inStock: directOnSerp.inStock,
+        };
+      }
+    }
+
     const firstLink = extractFirstProductLink(searchHtml, store.baseUrl);
     if (firstLink) {
       try {
         const productHtml = await ctx.fetchHtml(firstLink, store.timeoutMs);
         const info = extractProductInfo(productHtml, store.baseUrl);
         if (info?.price) {
-          const scoreOk = !info.title || matchScore(q, info.title) >= MATCH_THRESHOLD;
-          if (scoreOk) {
+          const titleOk = !info.title || matchScore(q, info.title) >= 0.4;
+          const langOk = languageScoreForCandidate(info.title ?? "", firstLink, ctx) >= 0;
+          if (titleOk && langOk) {
             return {
               status: "ok",
               price: info.price,
@@ -81,10 +136,8 @@ export async function genericSearch(
         lastErr = e instanceof Error ? e.message : "product fetch failed";
       }
     }
-    // Si llegamos aquí con esta query, probar la siguiente variante.
   }
 
-  // Ningún query funcionó. Distinguir entre "no encontrado" y "bloqueado".
   if (networkFailed) {
     return {
       status: "network_error",
@@ -98,4 +151,64 @@ export async function genericSearch(
     price: null,
     url: lastSearchUrl,
   };
+}
+
+// ─── Scoring helpers ─────────────────────────────────────────────────────────
+
+interface ScoredCandidate {
+  candidate: SearchCandidate;
+  combined: ReturnType<typeof combinedScore>;
+}
+
+/**
+ * Puntúa todos los candidatos y devuelve el mejor.
+ * - Descarga hasta MAX_IMAGES_PER_SEARCH imágenes (en paralelo) para dHash.
+ * - El resto cae a comparación por filename de imagen (señal débil).
+ */
+async function pickBestCandidate(
+  candidates: SearchCandidate[],
+  query: string,
+  ctx: AdapterContext,
+): Promise<ScoredCandidate | null> {
+  const ourHash = ctx.productImageHash ?? null;
+
+  // Prepara hashes en paralelo sólo para los N primeros candidatos.
+  const toHash = candidates.slice(0, MAX_IMAGES_PER_SEARCH);
+  const hashes = ourHash
+    ? await Promise.all(
+        toHash.map((c) => (c.imageUrl ? dhashFromUrl(c.imageUrl) : Promise.resolve(null))),
+      )
+    : toHash.map(() => null);
+
+  const scored: ScoredCandidate[] = candidates.map((c, i) => {
+    const hay = [c.title, c.altText, c.url, c.nearbyText].filter(Boolean).join(" ");
+    const name = matchScore(query, hay);
+    const language = ctx.productLanguage
+      ? languageScore(ctx.productLanguage, hay)
+      : 0;
+    let image: number | undefined;
+    const remoteHash = hashes[i] ?? null;
+    if (ourHash && remoteHash) {
+      image = imageSimilarity(ourHash, remoteHash);
+    } else if (ctx.productImageUrl && c.imageUrl) {
+      // Señal débil cuando no hay dos hashes: tokens del filename.
+      const tok = imageUrlTokenScore(ctx.productImageUrl, c.imageUrl);
+      // Sólo contar si supera algo; evitar ruido.
+      if (tok >= 0.25) image = tok;
+    }
+    const combined = combinedScore({ name, language, image });
+    return { candidate: c, combined };
+  });
+
+  scored.sort((a, b) => b.combined.score - a.combined.score);
+  return scored[0] ?? null;
+}
+
+function languageScoreForCandidate(
+  title: string,
+  url: string,
+  ctx: AdapterContext,
+): number {
+  if (!ctx.productLanguage) return 0;
+  return languageScore(ctx.productLanguage, `${title} ${url}`);
 }

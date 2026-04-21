@@ -9,6 +9,8 @@
 
 import type { CompetitorLookupStatus } from "@/types/competitorPrice";
 import type { NormalizedName } from "@/lib/competitors/nameNormalize";
+import type { DHash } from "@/lib/competitors/imageHash";
+import type { ProductLanguage } from "@/lib/competitors/scoring";
 
 export interface AdapterResult {
   status: CompetitorLookupStatus;
@@ -17,6 +19,8 @@ export interface AdapterResult {
   matchedTitle?: string;
   inStock?: boolean;
   errorMessage?: string;
+  /** Confianza del match 0..1 — sirve para diagnóstico en el UI. */
+  confidence?: number;
 }
 
 export interface AdapterContext {
@@ -30,6 +34,12 @@ export interface AdapterContext {
    * Opcional porque adapters de tiendas generalistas no lo usan.
    */
   productGame?: string;
+  /** Idioma del producto — crítico para descartar versiones en otro idioma. */
+  productLanguage?: ProductLanguage;
+  /** URL de nuestra imagen (por si el adapter necesita re-descargar). */
+  productImageUrl?: string;
+  /** dHash de nuestra imagen — pre-computado una vez por request. */
+  productImageHash?: DHash | null;
 }
 
 export interface StoreAdapter {

@@ -29,6 +29,8 @@ import {
   type IntegrityReport,
 } from "@/lib/dataHub";
 import { HeroImagesManager } from "@/components/admin/HeroImagesManager";
+import { BackupServerPanel } from "@/components/admin/BackupServerPanel";
+import { BreachIncidentsPanel } from "@/components/admin/BreachIncidentsPanel";
 
 // ─── CSV export helpers ───────────────────────────────────────────────────────
 
@@ -631,6 +633,12 @@ export default function AdminHerramientasPage() {
           </div>
         </div>
       </div>
+
+      {/* Backups producción (RGPD art. 32) */}
+      <BackupServerPanel onToast={showToast} />
+
+      {/* Brechas de seguridad (RGPD art. 33 — AEPD 72h) */}
+      <BreachIncidentsPanel onToast={showToast} />
 
       {/* Hero carousel images */}
       <HeroImagesManager onToast={showToast} />

@@ -2,6 +2,11 @@ import type { NextRequest} from "next/server";
 import { NextResponse } from "next/server";
 import { requireAuth, requireAdmin } from "@/lib/apiAuth";
 import { logger } from "@/lib/logger";
+import {
+  returnCreateSchema,
+  returnPatchSchema,
+  zodMessage,
+} from "@/lib/validations/api";
 
 // POST /api/returns — Create a return request (customer)
 export async function POST(req: NextRequest) {
@@ -9,25 +14,15 @@ export async function POST(req: NextRequest) {
     const authResult = await requireAuth(req);
     if (authResult instanceof NextResponse) return authResult;
 
-    const body = await req.json();
-    const { orderId, items } = body;
-
-    if (!orderId || !items?.length) {
+    const rawBody = await req.json();
+    const parsed = returnCreateSchema.safeParse(rawBody);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Datos de devolución incompletos. Se requiere orderId e items." },
+        { error: zodMessage(parsed.error) },
         { status: 400 },
       );
     }
-
-    // Validate each item has required fields
-    for (const item of items) {
-      if (!item.productId || !item.quantity || !item.reason) {
-        return NextResponse.json(
-          { error: "Cada artículo necesita productId, quantity y reason." },
-          { status: 400 },
-        );
-      }
-    }
+    const { orderId, items } = parsed.data;
 
     logger.info(
       `Return request created for order ${orderId}`,
@@ -87,26 +82,15 @@ export async function PATCH(req: NextRequest) {
     const adminResult = await requireAdmin(req);
     if (adminResult instanceof NextResponse) return adminResult;
 
-    const body = await req.json();
-    const { rmaId, status, note, trackingNumber } = body;
-
-    if (!rmaId || !status) {
+    const rawBody = await req.json();
+    const parsed = returnPatchSchema.safeParse(rawBody);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Se requiere rmaId y status" },
+        { error: zodMessage(parsed.error) },
         { status: 400 },
       );
     }
-
-    const validStatuses = [
-      "solicitada", "aprobada", "en_transito",
-      "recibida", "reembolsada", "rechazada", "cerrada",
-    ];
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json(
-        { error: `Estado no válido: ${status}` },
-        { status: 400 },
-      );
-    }
+    const { rmaId, status, note, trackingNumber } = parsed.data;
 
     logger.info(
       `Return ${rmaId} status changed to ${status}`,

@@ -25,11 +25,13 @@ import {
   MessageSquare,
   Mail,
   Star,
-  Settings,
   Euro,
   Boxes,
   ShieldCheck,
   AlertTriangle,
+  Gift,
+  Bell,
+  Send,
 } from "lucide-react";
 
 const SOLICITUDES_KEY = "tcgacademy_solicitudes";
@@ -49,39 +51,60 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  {
-    href: "/admin",
-    label: "Panel principal",
-    icon: LayoutDashboard,
-    exact: true,
-  },
+  { href: "/admin", label: "Resumen", icon: LayoutDashboard, exact: true },
   { href: "/admin/pedidos", label: "Pedidos", icon: Package },
-  {
-    href: "/admin/productos/nuevo",
-    label: "Añadir producto",
-    icon: PackagePlus,
-  },
-  { href: "/admin/precios", label: "Precios", icon: Euro },
   { href: "/admin/stock", label: "Stock", icon: Boxes },
-  { href: "/admin/usuarios", label: "Usuarios registrados", icon: Users },
-  { href: "/admin/solicitudes", label: "Solicitudes B2B", icon: Inbox },
+  { href: "/admin/precios", label: "Precios", icon: Euro },
+  { href: "/admin/productos/nuevo", label: "Añadir producto", icon: PackagePlus },
+  {
+    href: "/admin/usuarios",
+    label: "Usuarios",
+    icon: Users,
+    sub: [
+      { href: "/admin/usuarios", label: "Registrados", icon: Users },
+      { href: "/admin/solicitudes", label: "Solicitudes B2B", icon: Inbox },
+    ],
+  },
   { href: "/admin/fiscal/facturas", label: "Facturas", icon: Receipt },
-  { href: "/admin/cupones", label: "Cupones", icon: Ticket },
   { href: "/admin/categorias", label: "Categorías", icon: Layers },
-  { href: "/admin/bonos", label: "Sistema de puntos", icon: Star },
+  {
+    href: "/admin/bonos",
+    label: "Bonificaciones",
+    icon: Gift,
+    sub: [
+      { href: "/admin/bonos", label: "Sistema de puntos", icon: Star },
+      { href: "/admin/cupones", label: "Cupones", icon: Ticket },
+    ],
+  },
   { href: "/admin/mensajes", label: "Mensajes", icon: MessageSquare },
-  { href: "/admin/emails", label: "Emails automáticos", icon: Mail },
+  {
+    href: "/admin/emails",
+    label: "Emails",
+    icon: Mail,
+    sub: [
+      { href: "/admin/emails", label: "Datos emails", icon: Bell, exact: true },
+      { href: "/admin/emails/automaticos", label: "Emails automáticos", icon: Send },
+    ],
+  },
   { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart2 },
-  { href: "/admin/herramientas", label: "Herramientas", icon: Wrench },
-  { href: "/admin/errores", label: "Errores runtime", icon: AlertTriangle },
-  { href: "/admin/copias", label: "Copias de seguridad", icon: ShieldCheck },
-  { href: "/admin/ajustes", label: "Ajustes", icon: Settings },
+  {
+    href: "/admin/herramientas",
+    label: "Herramientas",
+    icon: Wrench,
+    sub: [
+      { href: "/admin/herramientas", label: "Diagnóstico", icon: Wrench },
+      { href: "/admin/errores", label: "Errores runtime", icon: AlertTriangle },
+      { href: "/admin/copias", label: "Copias de seguridad", icon: ShieldCheck },
+    ],
+  },
   { href: "/cuenta/datos", label: "Mis datos", icon: UserCircle },
 ];
 
-// Flat list of all items (including sub-items) for breadcrumb lookup
+// Flat list for breadcrumb lookup — subs come first so more-specific labels
+// win over the parent group header when pathnames overlap (e.g. /admin/usuarios
+// is a sub under the "Usuarios" parent).
 const ALL_NAV_ITEMS: NavItem[] = NAV_ITEMS.flatMap((i) =>
-  i.sub ? [i, ...i.sub] : [i],
+  i.sub ? [...i.sub, i] : [i],
 );
 
 function useSidebarBadges() {

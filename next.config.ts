@@ -22,6 +22,16 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
+    const csp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "img-src 'self' data: blob: https://static.cardmarket.com https://images.pokemontcg.io https://cards.scryfall.io https://c1.scryfall.com https://svgs.scryfall.io https://images.ygoprodeck.com https://api.tcgdex.net https://assets.tcgdex.net https://files.bandai-tcg-plus.com https://storage.googleapis.com https://tcgplayer-cdn.tcgplayer.com https://lorcana-api.com https://images.riftbound.gg https://apitcg.com https://images.digimoncard.io https://en.digimoncard.com",
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "connect-src 'self' https://api.scryfall.com https://api.pokemontcg.io https://api.tcgdex.net https://api.lorcana-api.com https://db.ygoprodeck.com https://api.frankfurter.app https://apitcg.com https://digimoncard.io",
+      "frame-ancestors 'none'",
+      "upgrade-insecure-requests",
+    ].join("; ");
     return [
       {
         source: "/(.*)",
@@ -37,6 +47,7 @@ const nextConfig: NextConfig = {
           { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
           { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+          { key: "Content-Security-Policy", value: csp },
         ],
       },
       // NOTA: no sobrescribimos Cache-Control en /_next/static — Next.js ya establece

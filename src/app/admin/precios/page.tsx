@@ -14,7 +14,9 @@ import {
   ChevronRight,
   AlertTriangle,
   Percent,
-  Eye,
+  RefreshCw,
+  ExternalLink,
+  Calendar,
 } from "lucide-react";
 import {
   GAME_CONFIG,
@@ -26,9 +28,10 @@ import Link from "next/link";
 import CompetitorPricesModal from "@/components/admin/CompetitorPricesModal";
 import {
   getCachedSnapshot,
-  deriveRange,
+  refreshCompetitorPrices,
   subscribeCompetitorPrices,
 } from "@/services/competitorPriceService";
+import type { CompetitorPriceSnapshot } from "@/types/competitorPrice";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,6 +42,7 @@ interface PriceRow {
   category: string;
   slug: string;
   image: string;
+  language: string; // EN | ES | JP | ... — ayuda a los rivales a descartar versiones en otro idioma
   price: number; // PV Público
   wholesalePrice: number; // PV Mayorista
   storePrice: number; // PV Tiendas
@@ -81,6 +85,7 @@ function initRows(): PriceRow[] {
     category: p.category,
     slug: p.slug,
     image: p.images[0] ?? "",
+    language: p.language ?? "EN",
     price: p.price,
     wholesalePrice: p.wholesalePrice,
     storePrice: p.storePrice,
@@ -260,7 +265,10 @@ function SortIcon({
   );
 }
 
-const PAGE_SIZE = 30;
+// Sin paginación: el admin prefiere ver todos los productos de un tirón.
+// Número arbitrariamente grande para que `Math.ceil(n/PAGE_SIZE) === 1` siempre
+// y la UI de paginación quede oculta.
+const PAGE_SIZE = Number.MAX_SAFE_INTEGER;
 
 export default function PreciosPage() {
   const [rows, setRows] = useState<PriceRow[]>(initRows);
@@ -296,6 +304,66 @@ export default function PreciosPage() {
   // (guardar/refresh dispara el evento y refleja el rango en la columna).
   const [compTick, setCompTick] = useState(0);
   useEffect(() => subscribeCompetitorPrices(() => setCompTick((t) => t + 1)), []);
+
+  // Fila expandida para descuentos + refresco rival (ids de PriceRow)
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  // Rows en curso de refresco rival — para mostrar spinner.
+  const [fetchingIds, setFetchingIds] = useState<Set<number>>(new Set());
+
+  const toggleExpanded = useCallback((id: number) => {
+    setExpandedIds((prev) => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id);
+      else s.add(id);
+      return s;
+    });
+  }, []);
+
+  const clearDiscount = useCallback((id: number) => {
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              comparePrice: undefined,
+              discountActive: false,
+              discountStart: undefined,
+              discountEnd: undefined,
+            }
+          : r,
+      ),
+    );
+    setDirtyIds((prev) => new Set(prev).add(id));
+  }, []);
+
+  const saveRow = useCallback((id: number) => {
+    // En producción, aquí persistiríamos sólo este producto al backend.
+    setDirtyIds((prev) => {
+      const s = new Set(prev);
+      s.delete(id);
+      return s;
+    });
+  }, []);
+
+  const handleRefreshCompetitors = useCallback(async (row: PriceRow) => {
+    setFetchingIds((prev) => new Set(prev).add(row.id));
+    try {
+      await refreshCompetitorPrices(row.id, row.name, {
+        productImage: row.image,
+        productGame: row.game,
+        productLanguage: row.language,
+        storeIds: ["cardzone", "pokemillon", "manavortex", "cardmarket"],
+      });
+    } catch {
+      // El servicio ya marca la snapshot; el error se refleja en las celdas.
+    } finally {
+      setFetchingIds((prev) => {
+        const s = new Set(prev);
+        s.delete(row.id);
+        return s;
+      });
+    }
+  }, []);
 
   // ── Update helper ──────────────────────────────────────────────────────────
 
@@ -638,13 +706,15 @@ export default function PreciosPage() {
             <colgroup>
               <col className="w-10" />
               <col />
-              <col className="w-[86px]" />
-              <col className="w-[86px]" />
               <col className="w-[80px]" />
               <col className="w-[80px]" />
-              <col className="w-[60px]" />
-              <col className="w-[104px]" />
-              <col className="w-[150px]" />
+              <col className="w-[74px]" />
+              <col className="w-[74px]" />
+              <col className="w-[74px]" />
+              <col className="w-[74px]" />
+              <col className="w-[80px]" />
+              <col className="w-[80px]" />
+              <col className="w-[40px]" />
             </colgroup>
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
@@ -695,35 +765,31 @@ export default function PreciosPage() {
                 <th className="px-1 py-2.5 text-right font-semibold leading-tight text-purple-600">
                   P Adquisición
                 </th>
-                <th className="px-1 py-2.5 text-right">
-                  <button
-                    className="ml-auto flex items-center gap-0.5 font-semibold text-gray-600 hover:text-[#2563eb]"
-                    onClick={() => setSort("discount")}
-                  >
-                    Dto%{" "}
-                    <SortIcon
-                      field="discount"
-                      sortField={sortField}
-                      sortDir={sortDir}
-                    />
-                  </button>
+                <th
+                  className="px-1 py-2.5 text-right font-semibold leading-tight text-orange-600"
+                  title="Precio del mismo producto en cardzone.es"
+                >
+                  CardZone
                 </th>
-                <th className="px-1 py-2.5 text-left">
-                  <button
-                    className="flex items-center gap-0.5 font-semibold text-gray-600 hover:text-[#2563eb]"
-                    onClick={() => setSort("discountEnd")}
-                  >
-                    Fin dto{" "}
-                    <SortIcon
-                      field="discountEnd"
-                      sortField={sortField}
-                      sortDir={sortDir}
-                    />
-                  </button>
+                <th
+                  className="px-1 py-2.5 text-right font-semibold leading-tight text-yellow-700"
+                  title="Precio del mismo producto en pokemillon.com"
+                >
+                  Pokémillon
                 </th>
-                <th className="px-1 py-2.5 text-right font-semibold leading-tight text-gray-600">
-                  Competencia
+                <th
+                  className="px-1 py-2.5 text-right font-semibold leading-tight text-indigo-600"
+                  title="Precio del mismo producto en manavortex.es"
+                >
+                  Manavortex
                 </th>
+                <th
+                  className="px-1 py-2.5 text-right font-semibold leading-tight text-purple-600"
+                  title="Cardmarket — precio más bajo de vendedor profesional"
+                >
+                  Cardmarket
+                </th>
+                <th className="px-1 py-2.5" aria-label="Desplegar descuento" />
               </tr>
             </thead>
             <tbody>
@@ -733,7 +799,7 @@ export default function PreciosPage() {
                 const _soon = isExpiringSoon(row.discountEnd);
                 const gameColor = GAME_CONFIG[row.game]?.color ?? "#2563eb";
 
-                return (
+                return [
                   <tr
                     key={row.id}
                     className={`border-b border-gray-50 transition-colors last:border-0 ${
@@ -779,7 +845,7 @@ export default function PreciosPage() {
                             href={`/${row.game}/${row.category}/${row.slug}`}
                             target="_blank"
                             title={row.name}
-                            className="block truncate leading-tight font-medium text-gray-800 hover:text-[#2563eb] hover:underline"
+                            className="block truncate leading-tight font-medium text-gray-800 no-underline hover:text-[#2563eb] hover:no-underline"
                           >
                             {row.name}
                           </Link>
@@ -818,30 +884,123 @@ export default function PreciosPage() {
                       />
                     </td>
                     <td className="px-1 py-1.5">
-                      <DiscountPctCell
-                        value={pct}
-                        onChange={(v) => updateDiscount(row.id, v)}
-                        dirty={isDirty}
-                      />
+                      <StorePriceCell row={row} storeId="cardzone" tick={compTick} />
                     </td>
                     <td className="px-1 py-1.5">
-                      {row.comparePrice !== undefined && (
-                        <DateCell
-                          value={row.discountEnd}
-                          onChange={(v) => update(row.id, { discountEnd: v })}
-                          expiry
-                        />
-                      )}
+                      <StorePriceCell row={row} storeId="pokemillon" tick={compTick} />
                     </td>
                     <td className="px-1 py-1.5">
-                      <CompetitorRangeCell
-                        row={row}
-                        onOpen={() => setCompetitorProduct(row)}
-                        tick={compTick}
-                      />
+                      <StorePriceCell row={row} storeId="manavortex" tick={compTick} />
                     </td>
-                  </tr>
-                );
+                    <td className="px-1 py-1.5">
+                      <StorePriceCell row={row} storeId="cardmarket" tick={compTick} />
+                    </td>
+                    <td className="px-1 py-1.5">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(row.id)}
+                        aria-expanded={expandedIds.has(row.id)}
+                        aria-label={
+                          expandedIds.has(row.id)
+                            ? "Ocultar descuento"
+                            : "Ajustar descuento y rival"
+                        }
+                        title={pct > 0 ? `Descuento -${pct}%` : "Ajustar descuento"}
+                        className={`flex h-7 w-7 items-center justify-center rounded-md transition ${
+                          expandedIds.has(row.id)
+                            ? "bg-[#2563eb] text-white"
+                            : pct > 0
+                              ? "bg-red-50 text-red-600 hover:bg-red-100"
+                              : "text-gray-400 hover:bg-gray-100 hover:text-[#2563eb]"
+                        }`}
+                      >
+                        {expandedIds.has(row.id) ? (
+                          <ChevronUp size={13} />
+                        ) : (
+                          <ChevronDown size={13} />
+                        )}
+                      </button>
+                    </td>
+                  </tr>,
+                  expandedIds.has(row.id) ? (
+                    <tr
+                      key={`${row.id}-expand`}
+                      className="border-b border-gray-100 bg-gray-50/80"
+                    >
+                      <td colSpan={11} className="px-4 py-4">
+                        <div className="flex flex-wrap items-end gap-5">
+                          <div className="min-w-[120px]">
+                            <label className="mb-1 flex items-center gap-1 text-[10px] font-bold tracking-wide text-gray-500 uppercase">
+                              <Percent size={10} /> Descuento
+                            </label>
+                            <DiscountPctCell
+                              value={pct}
+                              onChange={(v) => updateDiscount(row.id, v)}
+                              dirty={isDirty}
+                            />
+                          </div>
+                          <div className="min-w-[160px]">
+                            <label className="mb-1 flex items-center gap-1 text-[10px] font-bold tracking-wide text-gray-500 uppercase">
+                              <Calendar size={10} /> Fin del descuento
+                            </label>
+                            {row.comparePrice !== undefined ? (
+                              <DateCell
+                                value={row.discountEnd}
+                                onChange={(v) => update(row.id, { discountEnd: v })}
+                                expiry
+                              />
+                            ) : (
+                              <p className="text-[11px] text-gray-400">
+                                Aplica un % primero.
+                              </p>
+                            )}
+                          </div>
+                          <div className="ml-auto flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => clearDiscount(row.id)}
+                              disabled={row.comparePrice === undefined}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-300 disabled:hover:bg-white"
+                            >
+                              <Trash2 size={11} /> Borrar descuento
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => saveRow(row.id)}
+                              disabled={!isDirty}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-[#2563eb] px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#3b82f6] disabled:cursor-not-allowed disabled:bg-gray-300"
+                            >
+                              <Save size={11} />
+                              {isDirty ? "Guardar" : "Guardado"}
+                            </button>
+                            <span className="mx-1 h-5 w-px bg-gray-200" />
+                            <button
+                              type="button"
+                              onClick={() => handleRefreshCompetitors(row)}
+                              disabled={fetchingIds.has(row.id)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-gray-700 transition hover:border-[#2563eb] hover:text-[#2563eb] disabled:opacity-60"
+                            >
+                              <RefreshCw
+                                size={11}
+                                className={fetchingIds.has(row.id) ? "animate-spin" : ""}
+                              />
+                              {fetchingIds.has(row.id)
+                                ? "Consultando…"
+                                : "Refrescar rivales"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCompetitorProduct(row)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-[#2563eb] transition hover:bg-blue-50"
+                            >
+                              <ExternalLink size={11} /> Ver detalle
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null,
+                ];
               })}
               {pageRows.length === 0 && (
                 <tr>
@@ -1111,62 +1270,71 @@ function DiscountPctCell({
   );
 }
 
-// ─── Competitor range cell ────────────────────────────────────────────────────
-// Muestra en compacto el rango de precios del mismo producto en otras tiendas
-// (leído del cache 24h de `competitorPriceService`) + botón "Ver" que abre el
-// modal con detalle por tienda. Si el cache está vacío → placeholder + Ver.
+// ─── Per-store price cell ─────────────────────────────────────────────────────
+// Muestra el precio del producto en una tienda rival concreta, leído del cache
+// 24h de `competitorPriceService`. Fuzzy match ya aplicado por el adapter en
+// la API (`/api/competitor-prices` → genericAdapter + nameNormalize). Para
+// disparar el fetch, el admin pulsa "Refrescar rivales" en la fila expandida.
 
-function CompetitorRangeCell({
+function StorePriceCell({
   row,
-  onOpen,
+  storeId,
   tick: _tick,
 }: {
   row: PriceRow;
-  onOpen: () => void;
-  /** Se usa sólo para forzar re-render tras refresh del servicio. */
+  storeId: "cardzone" | "pokemillon" | "manavortex" | "cardmarket";
+  /** Re-render tras evento del servicio. */
   tick: number;
 }) {
-  // Leer cache fresco en cada render (cambia con el tick del subscribe)
-  const snapshot = getCachedSnapshot(row.id);
-  const range = deriveRange(snapshot);
+  const snapshot: CompetitorPriceSnapshot | null = getCachedSnapshot(row.id);
+  const entry = snapshot?.prices.find((p) => p.storeId === storeId) ?? null;
+  const price = entry?.price ?? null;
+  const cheaper = price !== null && row.price > 0 && price < row.price;
 
-  const rangeLabel = (() => {
-    if (!snapshot) return "— · —";
-    if (range.hits === 0) return "Sin datos";
-    if (range.min === range.max)
-      return `${(range.min ?? 0).toFixed(2)}€`;
-    return `${(range.min ?? 0).toFixed(2)}€ – ${(range.max ?? 0).toFixed(2)}€`;
-  })();
-
-  const cheaperThanUs =
-    range.min !== null && row.price > 0 && range.min < row.price;
-
-  return (
-    <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+  if (!snapshot) {
+    return (
       <span
-        className={`font-mono text-[10.5px] ${
-          snapshot
-            ? cheaperThanUs
-              ? "font-semibold text-red-600"
-              : "text-gray-600"
-            : "text-gray-300"
-        }`}
-        title={
-          snapshot
-            ? `${range.hits}/${range.total} tiendas con datos`
-            : "Aún sin consultar"
-        }
+        className="block text-right font-mono text-[10.5px] text-gray-300"
+        title="Aún sin consultar — pulsa el ▼ de la fila para refrescar"
       >
-        {rangeLabel}
+        —
       </span>
-      <button
-        onClick={onOpen}
-        className="inline-flex items-center rounded-md border border-gray-200 px-1 py-0.5 text-[10px] font-semibold text-[#2563eb] transition hover:bg-blue-50"
-        aria-label={`Ver precios en otras tiendas para ${row.name}`}
-        title="Ver precios en otras tiendas"
+    );
+  }
+
+  if (price === null) {
+    return (
+      <span
+        className="block text-right font-mono text-[10.5px] text-gray-300"
+        title={entry?.errorMessage ?? "No localizado en esta tienda"}
       >
-        <Eye size={10} />
-      </button>
-    </div>
+        —
+      </span>
+    );
+  }
+
+  const cell = (
+    <span
+      className={`block text-right font-mono text-[11px] whitespace-nowrap ${
+        cheaper ? "font-semibold text-red-600" : "text-gray-700"
+      }`}
+      title={entry?.matchedTitle ?? "Precio detectado"}
+    >
+      {price.toFixed(2)}€
+    </span>
+  );
+
+  return entry?.url ? (
+    <a
+      href={entry.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block transition hover:opacity-70"
+      aria-label={`Abrir ${row.name} en ${storeId}`}
+    >
+      {cell}
+    </a>
+  ) : (
+    cell
   );
 }

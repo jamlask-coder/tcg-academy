@@ -30,10 +30,35 @@ export interface CompetitorStoreConfig {
   accent: string;
   /**
    * Si true, esta fuente es un AGREGADOR de mercado. El UI lo etiqueta como
-   * "mercado" y su precio es una referencia agregada, no el de una sola tienda.
-   * Actualmente ninguna tienda configurada es agregador (Cardmarket retirado).
+   * "mercado" y su precio es una referencia agregada (precio más bajo de un
+   * profesional), no el de una tienda concreta. Cardmarket es el único.
    */
   isAggregator?: boolean;
+}
+
+/**
+ * Mapea nuestros slugs de juego al segmento de URL que usa Cardmarket.
+ * Devuelve `Magic` por defecto si no lo reconocemos — el peor caso es una
+ * búsqueda sobre MTG que fallará por `not_found` (no match), nunca un
+ * crash del adapter.
+ */
+function toCardmarketGameSegment(game?: string): string {
+  switch (game) {
+    case "magic": return "Magic";
+    case "pokemon": return "Pokemon";
+    case "yugioh": return "YuGiOh";
+    case "one-piece": return "OnePiece";
+    case "lorcana": return "Lorcana";
+    case "dragon-ball":
+    case "dragonball":
+      return "DragonBallSuper";
+    case "digimon": return "Digimon";
+    case "flesh-and-blood":
+    case "fleshandblood":
+      return "FleshAndBlood";
+    case "riftbound": return "Riftbound";
+    default: return "Magic";
+  }
 }
 
 export const COMPETITOR_STORES: readonly CompetitorStoreConfig[] = [
@@ -105,6 +130,24 @@ export const COMPETITOR_STORES: readonly CompetitorStoreConfig[] = [
     enabled: true,
     timeoutMs: 8000,
     accent: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  },
+  {
+    // Cardmarket es un MERCADO (agregador): cada "producto" lleva a una página
+    // de ofertas de múltiples vendedores. El adapter extrae el precio más bajo
+    // de un vendedor profesional (trend/from price). El segmento de juego va
+    // en la ruta: /es/Magic/Products/Search?searchString=...
+    id: "cardmarket",
+    name: "Cardmarket",
+    domain: "cardmarket.com",
+    baseUrl: "https://www.cardmarket.com",
+    searchUrl: (q, productGame) => {
+      const seg = toCardmarketGameSegment(productGame);
+      return `https://www.cardmarket.com/es/${seg}/Products/Search?searchString=${encodeURIComponent(q)}`;
+    },
+    enabled: true,
+    timeoutMs: 10000,
+    accent: "bg-purple-50 text-purple-700 border-purple-200",
+    isAggregator: true,
   },
 ] as const;
 

@@ -9,10 +9,6 @@ import {
   Eye,
   EyeOff,
   UserPlus,
-  Package,
-  Clock,
-  ShieldCheck,
-  Star,
   Check,
   AtSign,
   Loader2,
@@ -48,13 +44,6 @@ const schema = z
   });
 
 type FormData = z.infer<typeof schema>;
-
-const FEATURES = [
-  { icon: Package, text: "+10.000 productos TCG en stock" },
-  { icon: Clock, text: "Envío en menos de 24h" },
-  { icon: ShieldCheck, text: "Precios exclusivos para profesionales" },
-  { icon: Star, text: "Programa de puntos y recompensas" },
-];
 
 function PasswordStrength({ password }: { password: string }) {
   const score =
@@ -199,76 +188,8 @@ export default function RegistroPage() {
     }`;
 
   return (
-    <div className="flex min-h-screen">
-      {/* ── Left panel ───────────────────────────── */}
+    <div className="flex min-h-screen justify-center bg-gray-50 px-6 py-12">
       <div
-        className="relative hidden flex-col justify-between overflow-hidden p-12 lg:flex lg:w-[45%]"
-        style={{
-          background:
-            "linear-gradient(135deg, #1e40af 0%, #2563eb 55%, #1d4ed8 100%)",
-        }}
-      >
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
-          <div className="absolute bottom-10 -left-20 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
-          <div
-            className="absolute top-32 right-8 h-36 w-24 rotate-12 rounded-xl bg-white/5 shadow-2xl"
-            style={{ border: "1px solid rgba(255,255,255,0.1)" }}
-          />
-          <div
-            className="absolute top-44 right-20 h-36 w-24 rotate-6 rounded-xl bg-white/5 shadow-2xl"
-            style={{ border: "1px solid rgba(255,255,255,0.1)" }}
-          />
-          <div
-            className="absolute right-10 bottom-32 h-28 w-20 -rotate-6 rounded-xl bg-amber-400/10 shadow-2xl"
-            style={{ border: "1px solid rgba(251,191,36,0.15)" }}
-          />
-        </div>
-
-        <Link href="/" className="relative z-10 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 shadow-lg backdrop-blur-sm">
-            <span className="text-xl font-bold text-white">T</span>
-          </div>
-          <span className="text-2xl font-bold text-white">TCG Academy</span>
-        </Link>
-
-        <div className="relative z-10">
-          <h1 className="mb-4 text-4xl leading-tight font-bold text-white">
-            Únete a la comunidad TCG más grande de España
-          </h1>
-          <p className="mb-10 text-lg text-blue-200">
-            Crea tu cuenta gratis y empieza a disfrutar de ventajas exclusivas.
-          </p>
-          <ul className="space-y-4">
-            {FEATURES.map(({ icon: Icon, text }) => (
-              <li key={text} className="flex items-center gap-3">
-                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-white/10">
-                  <Icon size={18} className="text-amber-300" />
-                </div>
-                <span className="text-base font-medium text-blue-100">
-                  {text}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <p className="relative z-10 text-xs text-blue-300/60">
-          © 2025 TCG Academy · Todos los derechos reservados
-        </p>
-      </div>
-
-      {/* ── Right panel ──────────────────────────── */}
-      <div className="flex flex-1 flex-col items-center justify-center bg-white px-6 py-12">
-        {/* Mobile logo */}
-        <Link href="/" className="mb-8 flex items-center gap-2 lg:hidden">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#2563eb]">
-            <span className="font-bold text-white">T</span>
-          </div>
-          <span className="text-xl font-bold text-[#2563eb]">TCG Academy</span>
-        </Link>
-
-        <div
           className="w-full max-w-lg"
           style={{
             opacity: mounted ? 1 : 0,
@@ -629,7 +550,6 @@ export default function RegistroPage() {
               Inicia sesión
             </Link>
           </p>
-        </div>
       </div>
     </div>
   );

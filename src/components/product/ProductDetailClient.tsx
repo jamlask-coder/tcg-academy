@@ -35,6 +35,7 @@ import { InlineEdit } from "@/components/admin/InlineEdit";
 import { ShareButtons } from "@/components/ui/ShareButtons";
 import { HoloCard } from "@/components/product/HoloCard";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
+import { clickableProps } from "@/lib/a11y";
 
 interface GameConfig {
   name: string;
@@ -578,8 +579,8 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
           >
             <div
               ref={imgContainerRef}
+              {...clickableProps(() => { if (displayImages[activeImg]) setLightboxOpen(true); })}
               className={`group/img relative ${isCardCategory ? "aspect-[2/3] overflow-hidden" : "flex items-center justify-center"} max-h-[510px] cursor-pointer rounded-2xl border border-gray-100 bg-gray-50 select-none`}
-              onClick={() => displayImages[activeImg] && setLightboxOpen(true)}
             >
               {displayImages[activeImg] ? (
                 <InlineEdit
@@ -735,8 +736,8 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
         {/* Lightbox */}
         {lightboxOpen && displayImages[activeImg] && (
           <div
+            {...clickableProps(() => setLightboxOpen(false))}
             className="fixed inset-0 z-[999] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
-            onClick={() => setLightboxOpen(false)}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -744,6 +745,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
               alt={inlineTitle}
               className="max-h-[90vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl"
               onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); }}
               onError={(e) => { (e.target as HTMLImageElement).src = "/images/placeholder-product.svg"; }}
             />
             <button

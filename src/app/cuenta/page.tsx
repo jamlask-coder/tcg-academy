@@ -532,8 +532,9 @@ export default function CuentaPage() {
     if (user.role !== "mayorista" && user.role !== "tienda") return;
     try {
       const raw = localStorage.getItem("tcgacademy_orders");
-      const stored = raw
+      const all = raw
         ? (JSON.parse(raw) as Array<{
+            userId?: string;
             total: number;
             date: string;
             items?: Array<{
@@ -544,8 +545,11 @@ export default function CuentaPage() {
             }>;
           }>)
         : [];
-      // Fallback to MOCK_ORDERS (same source as /cuenta/pedidos) so stats
-      // reflect what the user actually sees in their order history.
+      // Filtro estricto: solo los pedidos del usuario actual.
+      const stored = all.filter((o) => o.userId === user.id);
+      // Fallback a MOCK_ORDERS solo para usuarios demo (cuentas de prueba).
+      // Los usuarios reales ven sus pedidos reales o lista vacía.
+      const isDemoUser = user.id?.startsWith("demo-") ?? false;
       const raw_orders: Array<{
         total: number;
         date: string;
@@ -558,15 +562,17 @@ export default function CuentaPage() {
       }> =
         stored.length > 0
           ? stored
-          : MOCK_ORDERS.map((o) => ({
-              total: o.total,
-              date: o.date,
-              items: o.items.map((it) => ({
-                game: it.game,
-                price: it.price,
-                qty: it.qty,
-              })),
-            }));
+          : isDemoUser
+            ? MOCK_ORDERS.map((o) => ({
+                total: o.total,
+                date: o.date,
+                items: o.items.map((it) => ({
+                  game: it.game,
+                  price: it.price,
+                  qty: it.qty,
+                })),
+              }))
+            : [];
       // Normalize items: real checkout orders use `quantity`, mock uses `qty`.
       const orders = raw_orders.map((o) => ({
         total: o.total,

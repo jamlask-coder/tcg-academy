@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth";
 import { getEmailService } from "@/lib/email";
 import { sanitizeString } from "@/utils/sanitize";
+import { authBodySchema, zodMessage } from "@/lib/validations/api";
 
 const isServerMode = () => (process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local") === "server";
 
@@ -27,8 +28,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const { action } = body;
+    const rawBody = await req.json();
+    const parsed = authBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: zodMessage(parsed.error) },
+        { status: 400 },
+      );
+    }
+    const body = rawBody;
+    const { action } = parsed.data;
 
     if (!isServerMode()) {
       // Local mode: return acknowledgment, client handles everything
@@ -275,6 +284,16 @@ export async function POST(req: NextRequest) {
         }
 
         const cleanEmail = confirmEmail.toLowerCase().trim();
+
+        // Rate limit brute-force de tokens por email: 5 intentos / 5 min
+        const confirmRl = serverRateLimit(`reset-confirm:${cleanEmail}`, 5, 300_000);
+        if (!confirmRl.allowed) {
+          return NextResponse.json(
+            { error: "Demasiados intentos. Solicita un nuevo enlace." },
+            { status: 429 },
+          );
+        }
+
         const user = await db.getUserByEmail(cleanEmail);
         if (!user) {
           return NextResponse.json({ error: "Enlace no válido o expirado" }, { status: 400 });

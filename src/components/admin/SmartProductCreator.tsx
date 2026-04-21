@@ -46,6 +46,7 @@ import {
   type CatalogSearchResult,
 } from "@/lib/productIdentifier";
 import { GAME_CONFIG, CATEGORY_LABELS } from "@/data/products";
+import { logger } from "@/lib/logger";
 import { GameFilterChips } from "./smartProduct/GameFilterChips";
 import { HighlightedText } from "./smartProduct/HighlightedText";
 import { ResultSkeleton } from "./smartProduct/ResultSkeleton";
@@ -403,8 +404,7 @@ export function SmartProductCreator({ onSubmit, onSubmitAndNew }: Props) {
       })
       .catch((e) => {
         if (!alive) return;
-        // eslint-disable-next-line no-console
-        console.error("[SmartProductCreator] search error", e);
+        logger.error("search error", "SmartProductCreator", { err: String(e) });
         setResult({
           candidates: [],
           rawHits: [],
@@ -562,8 +562,7 @@ export function SmartProductCreator({ onSubmit, onSubmitAndNew }: Props) {
         );
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error("[SmartProductCreator] OCR upload error", e);
+      logger.error("OCR upload error", "SmartProductCreator", { err: String(e) });
       setOcrNote("Error procesando la imagen.");
     } finally {
       setOcrRunning(false);

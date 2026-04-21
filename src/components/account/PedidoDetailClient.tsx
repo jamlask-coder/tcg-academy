@@ -101,17 +101,20 @@ export function PedidoDetailClient({ id }: Props) {
   const [existingIncident, setExistingIncident] = useState<Incident | null>(null);
   const { user } = useAuth();
 
-  // Try localStorage orders first, then fall back to MOCK_ORDERS
+  // Busca el pedido del usuario actual. Filtra por userId para evitar que un
+  // usuario vea un pedido de otra cuenta aunque conozca/adivine el id. Solo
+  // cuentas demo caen al fallback MOCK_ORDERS.
   const order = (() => {
+    const isDemoUser = user?.id?.startsWith("demo-") ?? false;
     try {
       const raw = typeof window !== "undefined" ? localStorage.getItem("tcgacademy_orders") : null;
-      if (raw) {
-        const local = JSON.parse(raw) as typeof MOCK_ORDERS;
-        const found = local.find((o) => o.id === id);
+      if (raw && user?.id) {
+        const local = JSON.parse(raw) as Array<typeof MOCK_ORDERS[number] & { userId?: string }>;
+        const found = local.find((o) => o.id === id && o.userId === user.id);
         if (found) return found;
       }
     } catch {}
-    return MOCK_ORDERS.find((o) => o.id === id) ?? null;
+    return isDemoUser ? MOCK_ORDERS.find((o) => o.id === id) ?? null : null;
   })();
 
   useEffect(() => {

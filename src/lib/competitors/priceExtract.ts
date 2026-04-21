@@ -229,3 +229,187 @@ export function resolveUrl(href: string, baseUrl: string): string {
     return href.startsWith("/") ? baseUrl.replace(/\/$/, "") + href : href;
   }
 }
+
+// ─── Multi-candidate SERP extraction ─────────────────────────────────────────
+
+/**
+ * Un candidato extraído de una página de resultados de búsqueda: título,
+ * precio (si visible en SERP), URL del producto e imagen (para comparación
+ * perceptual). Los scrapers extraen hasta N=10 y dejan que el orquestador
+ * puntúe y elija el mejor match.
+ */
+export interface SearchCandidate {
+  /** URL directa al producto. */
+  url: string;
+  /** Título limpio (alt de la imagen, nombre del link, H tags). */
+  title?: string;
+  /** Precio si aparece en la tarjeta de producto de la SERP. */
+  price?: number;
+  /** URL de la imagen del producto (para dHash). */
+  imageUrl?: string;
+  /** Texto ALT de la imagen — otra pista útil para idioma y match. */
+  altText?: string;
+  /** Snippet arbitrario cerca del link (puede contener idioma, edición). */
+  nearbyText?: string;
+}
+
+const MAX_CANDIDATES = 10;
+
+/**
+ * Extrae hasta 10 candidatos de producto de una página de resultados.
+ * Busca bloques <article|li|div class="...product..."> o <a href="...product...">
+ * y dentro saca título, imagen y precio si están presentes.
+ */
+export function extractSearchCandidates(
+  html: string,
+  baseUrl: string,
+): SearchCandidate[] {
+  const seenUrls = new Set<string>();
+  const candidates: SearchCandidate[] = [];
+
+  const push = (c: SearchCandidate) => {
+    if (!c.url || seenUrls.has(c.url)) return;
+    if (candidates.length >= MAX_CANDIDATES) return;
+    seenUrls.add(c.url);
+    candidates.push(c);
+  };
+
+  // 1) JSON-LD ItemList (Shopify y algunos WooCommerce lo emiten)
+  const ldBlocks = html.match(
+    /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  );
+  if (ldBlocks) {
+    for (const block of ldBlocks) {
+      const jsonText = block
+        .replace(/<script[^>]*>/i, "")
+        .replace(/<\/script>/i, "")
+        .trim();
+      try {
+        const parsed = JSON.parse(jsonText);
+        const items: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+        for (const item of items) {
+          if (!item || typeof item !== "object") continue;
+          const obj = item as Record<string, unknown>;
+          if (obj["@type"] === "ItemList" && Array.isArray(obj.itemListElement)) {
+            for (const el of obj.itemListElement) {
+              if (!el || typeof el !== "object") continue;
+              const inner = (el as Record<string, unknown>).item ?? el;
+              if (!inner || typeof inner !== "object") continue;
+              const o = inner as Record<string, unknown>;
+              const url = typeof o.url === "string" ? resolveUrl(o.url, baseUrl) : undefined;
+              if (!url) continue;
+              const title = typeof o.name === "string" ? o.name : undefined;
+              const image = typeof o.image === "string"
+                ? resolveUrl(o.image, baseUrl)
+                : Array.isArray(o.image) && typeof o.image[0] === "string"
+                  ? resolveUrl(String(o.image[0]), baseUrl)
+                  : undefined;
+              const offers = o.offers;
+              const offer = Array.isArray(offers) ? offers[0] : offers;
+              const priceRaw =
+                (offer as Record<string, unknown> | undefined)?.price ??
+                (offer as Record<string, unknown> | undefined)?.priceSpecification;
+              const price = typeof priceRaw === "string" || typeof priceRaw === "number"
+                ? parsePriceString(String(priceRaw))
+                : null;
+              push({ url, title, imageUrl: image, price: price ?? undefined });
+            }
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  // 2) Bloques HTML con "product" en clase
+  // Busca contenedores típicos y extrae link, img y precio cercano.
+  const blockRe =
+    /<(article|li|div)[^>]*class=["'][^"']*\b(?:product[-_]?item|product[-_]?card|product[-_]?tile|product[-_]?box|grid[-_]?item|item|card)\b[^"']*["'][^>]*>([\s\S]*?)<\/\1>/gi;
+  let m: RegExpExecArray | null;
+  let safety = 0;
+  while ((m = blockRe.exec(html)) && safety < 40 && candidates.length < MAX_CANDIDATES) {
+    safety++;
+    const block = m[2];
+    const c = candidateFromBlock(block, baseUrl);
+    if (c) push(c);
+  }
+
+  // 3) Fallback: anchors directos con href que contiene "product" o "/p/" o "/prod"
+  if (candidates.length === 0) {
+    const anchorRe =
+      /<a[^>]+href=["']([^"']*(?:\/product|\/products\/|\/p\/|\/prod-|\/producto)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi;
+    let a: RegExpExecArray | null;
+    let loop = 0;
+    while ((a = anchorRe.exec(html)) && loop < 30 && candidates.length < MAX_CANDIDATES) {
+      loop++;
+      const href = a[1];
+      const inner = a[2];
+      if (/\/cart|\/checkout|\/login|\/account/i.test(href)) continue;
+      const url = resolveUrl(href, baseUrl);
+      const imgMatch = inner.match(/<img[^>]+(?:src|data-src|data-lazy-src)=["']([^"']+)["'][^>]*(?:\salt=["']([^"']*)["'])?/i);
+      const altMatch = inner.match(/\salt=["']([^"']+)["']/i);
+      const titleText = stripTags(inner).slice(0, 160).trim();
+      push({
+        url,
+        title: altMatch?.[1] ?? titleText ?? undefined,
+        imageUrl: imgMatch ? resolveUrl(imgMatch[1], baseUrl) : undefined,
+        altText: imgMatch?.[2] ?? altMatch?.[1] ?? undefined,
+      });
+    }
+  }
+
+  return candidates;
+}
+
+function candidateFromBlock(block: string, baseUrl: string): SearchCandidate | null {
+  const hrefMatch = block.match(/<a[^>]+href=["']([^"']+)["']/i);
+  if (!hrefMatch) return null;
+  const href = hrefMatch[1];
+  if (/^#|^javascript:|^mailto:/i.test(href)) return null;
+  if (/\/cart|\/checkout|\/login|\/account|\/wishlist/i.test(href)) return null;
+  const url = resolveUrl(href, baseUrl);
+
+  // Imagen: src, data-src o srcset (primer elemento)
+  const imgMatch = block.match(
+    /<img[^>]+(?:src|data-src|data-lazy-src|data-original)=["']([^"']+)["'][^>]*>/i,
+  );
+  const srcsetMatch = block.match(/<img[^>]+srcset=["']([^"',\s]+)/i);
+  const imageUrl = imgMatch
+    ? resolveUrl(imgMatch[1], baseUrl)
+    : srcsetMatch
+      ? resolveUrl(srcsetMatch[1], baseUrl)
+      : undefined;
+  const altMatch = block.match(/<img[^>]+alt=["']([^"']+)["']/i);
+
+  // Título: h1..h4, .product-name, .name, .title, o alt
+  const titleMatch =
+    block.match(
+      /<(?:h[1-4]|[a-z]+)[^>]*class=["'][^"']*\b(?:product[-_]?name|product[-_]?title|product__title|name|title)\b[^"']*["'][^>]*>([\s\S]*?)<\/(?:h[1-4]|[a-z]+)>/i,
+    ) ?? block.match(/<h[1-4][^>]*>([\s\S]*?)<\/h[1-4]>/i);
+  const title = titleMatch
+    ? stripTags(titleMatch[1]).trim()
+    : altMatch?.[1]?.trim();
+
+  // Precio: itemprop, clase price, data-price
+  const priceMatch =
+    block.match(/<[^>]+itemprop=["']price["'][^>]*content=["']([^"']+)["']/i) ??
+    block.match(
+      /<[^>]+class=["'][^"']*\b(?:price|product[-_]?price|money)\b[^"']*["'][^>]*>([\s\S]{0,80}?)</i,
+    ) ??
+    block.match(/<[^>]+data-price(?:-amount)?=["']([^"']+)["']/i);
+  const price = priceMatch ? parsePriceString(priceMatch[1]) ?? undefined : undefined;
+
+  return {
+    url,
+    title,
+    imageUrl,
+    altText: altMatch?.[1],
+    price,
+    nearbyText: stripTags(block).slice(0, 280).trim() || undefined,
+  };
+}
+
+function stripTags(s: string): string {
+  return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}

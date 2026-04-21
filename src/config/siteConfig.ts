@@ -21,4 +21,8 @@ export const SITE_CONFIG = {
 
   // Product display
   newProductDays: 45, // badge "NUEVO" expires after N days
+
+  // Sesión
+  sessionExpiryHours: 24, // duración por defecto de la sesión
+  rememberMeDays: 30, // duración con "Recordarme"
 };

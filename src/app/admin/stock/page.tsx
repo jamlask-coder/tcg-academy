@@ -13,17 +13,19 @@ import {
   Save,
   X,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Pencil,
   Copy,
   Trash2,
   AlertTriangle,
   RotateCcw,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import Link from "next/link";
 
-const PAGE_SIZE = 50;
+// Sin paginación: el admin prefiere ver todos los productos de un tirón.
+// Constante arbitrariamente grande para que `Math.ceil(n/PAGE_SIZE) === 1` siempre.
+const PAGE_SIZE = Number.MAX_SAFE_INTEGER;
 
 type StockEdit = {
   stock?: string; // raw input; "" = ilimitado
@@ -65,6 +67,8 @@ export default function AdminStockPage() {
     }
   });
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   const handleDuplicate = (p: LocalProduct) => {
     try {
@@ -93,6 +97,33 @@ export default function AdminStockPage() {
       JSON.stringify([...next]),
     );
     setConfirmDelete(null);
+    setSelected((prev) => {
+      const s = new Set(prev);
+      s.delete(id);
+      return s;
+    });
+  };
+
+  const toggleRow = (id: number) => {
+    setSelected((prev) => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id);
+      else s.add(id);
+      return s;
+    });
+  };
+
+  const handleBulkDelete = () => {
+    if (selected.size === 0) return;
+    const next = new Set(deletedIds);
+    selected.forEach((id) => next.add(id));
+    setDeletedIds(next);
+    localStorage.setItem(
+      "tcgacademy_deleted_products",
+      JSON.stringify([...next]),
+    );
+    setSelected(new Set());
+    setConfirmBulkDelete(false);
   };
 
   const games = Object.entries(GAME_CONFIG);
@@ -126,7 +157,17 @@ export default function AdminStockPage() {
   }, [gameFilter, catFilter, search, deletedIds, allProducts, stockFilter]);
 
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+
+  const allPageSelected =
+    paginated.length > 0 && paginated.every((p) => selected.has(p.id));
+  const toggleAll = () => {
+    setSelected((prev) => {
+      const s = new Set(prev);
+      if (allPageSelected) paginated.forEach((p) => s.delete(p.id));
+      else paginated.forEach((p) => s.add(p.id));
+      return s;
+    });
+  };
 
   const getStock = (p: LocalProduct): string => {
     if (edits[p.id]?.stock !== undefined) return edits[p.id]!.stock!;
@@ -364,12 +405,47 @@ export default function AdminStockPage() {
         )}
       </div>
 
+      {/* Bulk toolbar */}
+      {selected.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl bg-[#2563eb] px-4 py-2.5 text-xs text-white">
+          <span className="font-semibold">{selected.size} seleccionados</span>
+          <div className="ml-auto flex flex-wrap gap-2">
+            <button
+              onClick={() => setConfirmBulkDelete(true)}
+              className="flex items-center gap-1 rounded-lg bg-red-400/70 px-2.5 py-1.5 transition hover:bg-red-400"
+            >
+              <Trash2 size={11} /> Eliminar seleccionados
+            </button>
+            <button
+              onClick={() => setSelected(new Set())}
+              className="px-2 py-1.5 text-white/60 transition hover:text-white"
+              aria-label="Limpiar selección"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
+                <th className="w-10 px-2 py-3">
+                  <button
+                    onClick={toggleAll}
+                    className="text-gray-400 hover:text-[#2563eb]"
+                    aria-label={allPageSelected ? "Deseleccionar todo" : "Seleccionar todo"}
+                  >
+                    {allPageSelected ? (
+                      <CheckSquare size={14} className="text-[#2563eb]" />
+                    ) : (
+                      <Square size={14} />
+                    )}
+                  </button>
+                </th>
                 <th className="px-3 py-3 text-left font-semibold text-gray-600">
                   Producto
                 </th>
@@ -416,11 +492,31 @@ export default function AdminStockPage() {
                       : si.level === "low"
                         ? "border-amber-300 bg-amber-50 text-amber-700"
                         : "border-gray-200";
+                const isSelected = selected.has(p.id);
                 return (
                   <tr
                     key={p.id}
-                    className={`border-b border-gray-100 transition hover:bg-gray-50 ${hasEdit ? "bg-amber-50" : ""}`}
+                    className={`border-b border-gray-100 transition ${
+                      hasEdit
+                        ? "bg-amber-50"
+                        : isSelected
+                          ? "bg-blue-50"
+                          : "hover:bg-gray-50"
+                    }`}
                   >
+                    <td className="px-2 py-3">
+                      <button
+                        onClick={() => toggleRow(p.id)}
+                        className="text-gray-400 hover:text-[#2563eb]"
+                        aria-label={isSelected ? "Deseleccionar" : "Seleccionar"}
+                      >
+                        {isSelected ? (
+                          <CheckSquare size={14} className="text-[#2563eb]" />
+                        ) : (
+                          <Square size={14} />
+                        )}
+                      </button>
+                    </td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-3">
                         {p.images[0] ? (
@@ -554,7 +650,7 @@ export default function AdminStockPage() {
               {paginated.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-4 py-12 text-center text-sm text-gray-400"
                   >
                     No se encontraron productos con los filtros aplicados.
@@ -564,38 +660,44 @@ export default function AdminStockPage() {
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-4 py-3">
-            <p className="text-xs text-gray-500">
-              {(page - 1) * PAGE_SIZE + 1}–
-              {Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length}
+      {/* Bulk delete confirmation */}
+      {confirmBulkDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setConfirmBulkDelete(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center gap-2">
+              <AlertTriangle size={18} className="text-red-500" />
+              <h3 className="text-base font-bold text-gray-900">
+                Eliminar {selected.size} producto{selected.size !== 1 ? "s" : ""}
+              </h3>
+            </div>
+            <p className="mb-5 text-sm text-gray-600">
+              Se marcarán como eliminados y dejarán de aparecer en el catálogo. Se puede revertir borrando <code className="rounded bg-gray-100 px-1">tcgacademy_deleted_products</code> de localStorage.
             </p>
-            <div className="flex items-center gap-1">
+            <div className="flex justify-end gap-2">
               <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 transition hover:bg-gray-100 disabled:opacity-40"
-                aria-label="Página anterior"
+                onClick={() => setConfirmBulkDelete(false)}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 transition hover:bg-gray-50"
               >
-                <ChevronLeft size={14} />
+                Cancelar
               </button>
-              <span className="px-3 py-1 text-xs font-semibold text-gray-700">
-                {page} / {totalPages}
-              </span>
               <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 transition hover:bg-gray-100 disabled:opacity-40"
-                aria-label="Página siguiente"
+                onClick={handleBulkDelete}
+                className="flex items-center gap-1.5 rounded-lg bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600"
               >
-                <ChevronRight size={14} />
+                <Trash2 size={13} /> Eliminar {selected.size}
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Fixed bottom save bar */}
       {dirtyCount > 0 && (

@@ -11,6 +11,7 @@ import { CATEGORY_LABELS, GAME_CONFIG, type LocalProduct } from "@/data/products
 import { PriceHistoryChart } from "@/components/product/PriceHistoryChart";
 import { resolveHighlights, type HighlightCard } from "@/lib/setHighlights";
 import { TCGDEX_EN_SET, TCGDEX_JP_SET, TCGDEX_LANG } from "@/lib/setHighlights/setMaps";
+import { clickableProps } from "@/lib/a11y";
 
 // ─── Helpers de nombre (para título "Colección completa de ...") ─────────────
 
@@ -134,8 +135,8 @@ function CardLightbox({
 
   return (
     <div
+      {...clickableProps(onClose)}
       className="fixed inset-0 z-[110] flex flex-col items-center justify-center bg-black/85 backdrop-blur-md"
-      onClick={onClose}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -190,6 +191,10 @@ function CardLightbox({
           return (
             <div
               key={c.id}
+              {...clickableProps((e) => {
+                e?.stopPropagation();
+                if (!isCenter) onNavigate(idx);
+              })}
               className="absolute"
               style={{
                 transform: `translateX(${xPos}px) scale(${s.scale})`,
@@ -197,10 +202,6 @@ function CardLightbox({
                 opacity: s.opacity,
                 transition: "transform 0.4s ease, opacity 0.4s ease",
                 cursor: isCenter ? "default" : "pointer",
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!isCenter) onNavigate(idx);
               }}
             >
               <div className="relative overflow-hidden rounded-2xl">
@@ -239,12 +240,12 @@ function CardLightbox({
 
       {/* Info + chart for center card */}
       <div
+        {...clickableProps((e) => e?.stopPropagation())}
         className={
           hasChart
             ? "flex w-full flex-col items-center gap-3 px-4 pt-4 pb-6"
             : "absolute bottom-4 left-0 right-0 flex flex-col items-center gap-3 px-4 sm:bottom-6"
         }
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="text-center">
           <p className="text-base font-bold text-white sm:text-lg">{card.name}</p>
@@ -449,6 +450,7 @@ function AutoScrollRow<T extends { id: string }>({
       </button>
       <div
         ref={scrollRef}
+        role="presentation"
         className="flex gap-2 overflow-x-auto scrollbar-hide scroll-smooth"
         style={{
           scrollbarWidth: "none",
@@ -515,6 +517,7 @@ function CoverflowRow<T extends { id: string }>({
 
   return (
     <div
+      role="presentation"
       className="relative"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}

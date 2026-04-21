@@ -30,6 +30,7 @@ import { readAdminOrdersMerged } from "@/lib/orderAdapter";
 import { ADMIN_ORDERS } from "@/data/mockData";
 import { loadAdminCoupons } from "@/services/couponService";
 import type { AdminCoupon } from "@/data/mockData";
+import { clickableProps } from "@/lib/a11y";
 
 const SalesChart = dynamic(
   () => import("@/components/admin/SalesChart").then((m) => m.SalesChart),
@@ -311,8 +312,8 @@ export default function AdminDashboard() {
               <p className="mt-1 text-xs text-gray-400">{sub}</p>
               {kpi === "ventas" && (
                 <div
+                  {...clickableProps((e) => e?.stopPropagation())}
                   className="mt-3 flex flex-wrap gap-1"
-                  onClick={(e) => e.stopPropagation()}
                 >
                   {(["hoy","7d","30d","3m","1a","todo"] as const).map((p) => (
                     <button

@@ -29,6 +29,7 @@ import {
 } from "@/data/mockData";
 import { saveMessages as persistMessages } from "@/services/messageService";
 import { DataHub } from "@/lib/dataHub";
+import { clickableProps } from "@/lib/a11y";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -383,12 +384,12 @@ export default function AdminMensajesPage() {
       {/* Confirm modal */}
       {bcConfirm && (
         <div
+          {...clickableProps(() => setBcConfirm(false))}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setBcConfirm(false)}
         >
           <div
+            {...clickableProps((e) => e?.stopPropagation())}
             className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center gap-2">
               <Megaphone size={18} className="text-[#2563eb]" />

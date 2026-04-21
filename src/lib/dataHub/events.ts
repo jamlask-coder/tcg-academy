@@ -30,6 +30,9 @@ export const DataHubEvents = {
   COMPETITOR_PRICES_UPDATED: "tcga:competitor_prices:updated",
   HERO_IMAGES_UPDATED: "tcga:hero_images:updated",
   PRICE_HISTORY_UPDATED: "tcga:price_history:updated",
+  BREACH_INCIDENTS_UPDATED: "tcga:breach_incidents:updated",
+  BACKUPS_SERVER_UPDATED: "tcga:backups_server:updated",
+  MEGAMENU_UPDATED: "tcga:megamenu:updated",
 
   // Entidades future (stubs — listeners aún no implementados)
   AFFILIATES_UPDATED: "tcga:affiliates:updated",
@@ -76,6 +79,9 @@ export const ENTITY_EVENT: Record<string, DataHubEventName> = {
   competitorPrices: DataHubEvents.COMPETITOR_PRICES_UPDATED,
   heroImages: DataHubEvents.HERO_IMAGES_UPDATED,
   priceHistory: DataHubEvents.PRICE_HISTORY_UPDATED,
+  breach_incidents: DataHubEvents.BREACH_INCIDENTS_UPDATED,
+  backups_server: DataHubEvents.BACKUPS_SERVER_UPDATED,
+  megamenu: DataHubEvents.MEGAMENU_UPDATED,
   affiliates: DataHubEvents.AFFILIATES_UPDATED,
   subscriptions: DataHubEvents.SUBSCRIPTIONS_UPDATED,
   warehouses: DataHubEvents.WAREHOUSES_UPDATED,

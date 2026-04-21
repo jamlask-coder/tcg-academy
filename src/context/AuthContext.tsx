@@ -18,6 +18,7 @@ import {
 import { pushUserNotification } from "@/services/notificationService";
 import { sanitizeString } from "@/utils/sanitize";
 import { recordBulkConsent, type ConsentType } from "@/services/consentService";
+import { SITE_CONFIG } from "@/config/siteConfig";
 
 export interface GoogleSignInPayload {
   email: string;
@@ -61,8 +62,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const STORAGE_KEY = "tcgacademy_user";
 const REGISTERED_KEY = "tcgacademy_registered";
 const USERNAMES_KEY = "tcgacademy_usernames"; // username (lowercase) → email
-const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
-const REMEMBER_ME_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const SESSION_EXPIRY_MS = SITE_CONFIG.sessionExpiryHours * 60 * 60 * 1000;
+const REMEMBER_ME_MS = SITE_CONFIG.rememberMeDays * 24 * 60 * 60 * 1000;
 
 /** Persist the registered-users map and notify reactive consumers (admin dashboard). */
 function persistRegistered(registered: Record<string, unknown>): void {

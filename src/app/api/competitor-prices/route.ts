@@ -17,12 +17,25 @@ import {
 import { normalizeProductName } from "@/lib/competitors/nameNormalize";
 import { getAdapter } from "@/lib/competitors/adapters";
 import type { AdapterContext } from "@/lib/competitors/adapters/types";
+import { dhashFromUrl } from "@/lib/competitors/imageHash";
+import type { ProductLanguage } from "@/lib/competitors/scoring";
 import type {
   CompetitorPrice,
   CompetitorPricesRequest,
   CompetitorPricesResponse,
   CompetitorPriceSnapshot,
 } from "@/types/competitorPrice";
+
+/** Conjunto válido de códigos ISO 2 de idiomas que soporta el scoring. */
+const VALID_LANGUAGES = new Set<ProductLanguage>([
+  "EN", "ES", "JP", "FR", "DE", "IT", "KO", "PT", "ZH",
+]);
+
+function normalizeLanguage(input: unknown): ProductLanguage | undefined {
+  if (typeof input !== "string") return undefined;
+  const up = input.toUpperCase() as ProductLanguage;
+  return VALID_LANGUAGES.has(up) ? up : undefined;
+}
 
 export const runtime = "nodejs";
 // Sin caché en Next — nuestro cache se hace client-side (24h TTL) para
@@ -90,9 +103,22 @@ export async function POST(req: Request): Promise<Response> {
     ? body.storeIds.map(getCompetitorStore).filter((s): s is NonNullable<typeof s> => Boolean(s && s.enabled))
     : listEnabledCompetitorStores();
 
+  // Pre-hasheamos NUESTRA imagen una sola vez por request — los adapters
+  // lo reutilizan para comparar contra cada candidato remoto. Si no hay
+  // URL o falla el fetch, `productImageHash` queda null y el scoring cae
+  // a la combinación sin imagen.
+  const productImageHash =
+    typeof body.productImage === "string" && body.productImage.length > 0
+      ? await dhashFromUrl(body.productImage, 8000).catch(() => null)
+      : null;
+
   const ctx: AdapterContext = {
     fetchHtml,
     productGame: typeof body.productGame === "string" ? body.productGame : undefined,
+    productLanguage: normalizeLanguage(body.productLanguage),
+    productImageUrl:
+      typeof body.productImage === "string" ? body.productImage : undefined,
+    productImageHash,
   };
   const nowIso = new Date().toISOString();
 

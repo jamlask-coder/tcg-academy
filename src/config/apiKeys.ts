@@ -11,14 +11,15 @@
 export const API_KEYS = {
   /**
    * Cardmarket OAuth 1.0a credentials.
+   * ⚠️ SERVER-ONLY. Nunca uses estas credenciales en código "use client".
+   * Si necesitas consultarlas desde el browser, crea un proxy en /api/cardmarket/*.
    * Obtain at https://www.cardmarket.com/en/Magic/Account/API
-   * All four values are required to sign requests.
    */
   cardmarket: {
-    appToken: process.env.NEXT_PUBLIC_MKM_APP_TOKEN ?? "",
-    appSecret: process.env.NEXT_PUBLIC_MKM_APP_SECRET ?? "",
-    accessToken: process.env.NEXT_PUBLIC_MKM_ACCESS_TOKEN ?? "",
-    accessSecret: process.env.NEXT_PUBLIC_MKM_ACCESS_SECRET ?? "",
+    appToken: process.env.MKM_APP_TOKEN ?? "",
+    appSecret: process.env.MKM_APP_SECRET ?? "",
+    accessToken: process.env.MKM_ACCESS_TOKEN ?? "",
+    accessSecret: process.env.MKM_ACCESS_SECRET ?? "",
   },
 
   /**

@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { useAuth } from "./AuthContext";
+import { logger } from "@/lib/logger";
 
 const STORAGE_KEY = "tcga_favorites";
 
@@ -23,7 +24,11 @@ function readLocal(): number[] {
 }
 
 function writeLocal(ids: number[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ids)); } catch {}
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+  } catch (err) {
+    logger.warn("No se pudo guardar favoritos", "favorites", { err: String(err) });
+  }
 }
 
 export function FavoritesProvider({ children }: { children: ReactNode }) {

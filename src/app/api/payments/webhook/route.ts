@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getDb } from "@/lib/db";
 import { sendOrderNotification } from "@/lib/email";
+import { logger } from "@/lib/logger";
 
 // Stripe sends raw body — disable Next.js body parsing for signature verification
 export const dynamic = "force-dynamic";
@@ -174,7 +175,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Webhook error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    logger.error("Webhook processing failed", "payments-webhook", {
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
   }
 }

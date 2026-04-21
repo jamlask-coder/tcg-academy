@@ -525,6 +525,49 @@ const DEPRECATED: EntityRegistryEntry[] = [
   },
 ];
 
+// ─── Partial (compliance & ops) ─────────────────────────────────────────────
+// Brechas de seguridad (art. 33/34 RGPD) y registro local de backups servidor.
+
+const COMPLIANCE: EntityRegistryEntry[] = [
+  {
+    key: "breach_incidents",
+    description: "Registro de incidentes de seguridad (RGPD art. 33 — ventana 72h AEPD)",
+    storageKeys: ["tcgacademy_breach_incidents"],
+    event: DataHubEvents.BREACH_INCIDENTS_UPDATED,
+    pii: true,
+    retentionMonths: 72,
+    adapter: "@/services/breachNotificationService",
+    maturity: "partial",
+    category: "logs",
+    criticalJson: true,
+    notes: "Obligatorio mantener incluso cuando no hay brechas notificables — demuestra diligencia debida.",
+  },
+  {
+    key: "megamenu",
+    description: "Overrides de columnas del mega menú por juego (categorías editables desde admin)",
+    storageKeys: ["tcgacademy_megamenu_overrides"],
+    event: DataHubEvents.MEGAMENU_UPDATED,
+    pii: false,
+    retentionMonths: 0,
+    adapter: "@/lib/megaMenuOverrides",
+    maturity: "partial",
+    category: "config",
+    notes: "Sin override → se usan los defaults de src/data/megaMenuData.ts. Afecta a Navbar y rutas /[juego]/[categoria].",
+  },
+  {
+    key: "backups_server",
+    description: "Índice local de manifiestos de backup cifrado en S3 (RGPD art. 32)",
+    storageKeys: ["tcgacademy_backups_index"],
+    event: DataHubEvents.BACKUPS_SERVER_UPDATED,
+    pii: false,
+    retentionMonths: 72,
+    adapter: "@/lib/backup/backupJob",
+    maturity: "partial",
+    category: "logs",
+    notes: "El SSOT real vive en el bucket S3; esta clave solo cachea el listado UI.",
+  },
+];
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ENTIDADES STUB — reservadas para futuro (no implementadas todavía)
 // Ya tienen evento + key asignados para encajar directas cuando se construyan.
@@ -744,6 +787,7 @@ const STUBS: EntityRegistryEntry[] = [
 export const ENTITIES: readonly EntityRegistryEntry[] = [
   ...STABLE,
   ...PARTIAL,
+  ...COMPLIANCE,
   ...STUBS,
   ...DEPRECATED,
 ] as const;

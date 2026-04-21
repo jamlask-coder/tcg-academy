@@ -75,13 +75,19 @@ export function deriveRange(snapshot: CompetitorPriceSnapshot | null): Competito
 export async function refreshCompetitorPrices(
   productId: number,
   productName: string,
-  opts?: { productImage?: string; productGame?: string; storeIds?: string[] },
+  opts?: {
+    productImage?: string;
+    productGame?: string;
+    productLanguage?: string;
+    storeIds?: string[];
+  },
 ): Promise<CompetitorPriceSnapshot> {
   const body: CompetitorPricesRequest = {
     productId,
     productName,
     productImage: opts?.productImage,
     productGame: opts?.productGame,
+    productLanguage: opts?.productLanguage,
     storeIds: opts?.storeIds,
   };
   const res = await fetch("/api/competitor-prices", {

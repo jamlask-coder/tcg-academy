@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { clickableProps } from "@/lib/a11y";
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -85,13 +86,15 @@ export function GoogleSignInButton({
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
           onClick={() => setShowConsent(false)}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setShowConsent(false); }}
+          tabIndex={0}
           role="dialog"
           aria-modal="true"
           aria-label="Consentimiento Google"
         >
           <div
+            {...clickableProps((e) => e?.stopPropagation())}
             className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
           >
             <h2 className="mb-2 text-lg font-bold text-gray-900">
               Continuar con Google

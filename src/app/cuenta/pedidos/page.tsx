@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 import {
   Package,
   Clock,
@@ -29,6 +30,7 @@ import {
   generateInvoiceNumber,
 } from "@/utils/invoiceGenerator";
 import { formatDate } from "@/lib/format";
+import { clickableProps } from "@/lib/a11y";
 
 // Estados customer (2026-04-20). Flujo lineal: pedido → pagado → pendiente_envio → enviado.
 // "entregado" eliminado (depende del transportista). Admin tiene su propio set.
@@ -53,6 +55,7 @@ interface OrderItem {
 
 interface StoredOrder {
   id: string;
+  userId?: string;
   date: string;
   status: string;
   total: number;
@@ -286,12 +289,12 @@ function IncidentModal({ orderId, onClose, onSubmit }: IncidentModalProps) {
   const [description, setDescription] = useState("");
   return (
     <div
+      {...clickableProps(onClose)}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
     >
       <div
+        {...clickableProps((e) => e?.stopPropagation())}
         className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
       >
         <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900">
           <AlertCircle size={20} className="text-red-500" /> Abrir incidencia
@@ -358,6 +361,8 @@ function IncidentModal({ orderId, onClose, onSubmit }: IncidentModalProps) {
 const DEMO_BANNER_KEY = "tcgacademy_demo_pedidos_dismissed";
 
 export default function PedidosPage() {
+  const { user } = useAuth();
+  const isDemoUser = !!user?.id?.startsWith("demo-");
   const [showDemoBanner, setShowDemoBanner] = useState(() => {
     try {
       return typeof window !== "undefined"
@@ -373,16 +378,21 @@ export default function PedidosPage() {
         typeof window !== "undefined"
           ? localStorage.getItem("tcgacademy_orders")
           : null;
-      if (!raw) return MOCK_ORDERS;
+      const seed = isDemoUser ? MOCK_ORDERS : [];
+      if (!raw || !user?.id) return seed;
       const local = JSON.parse(raw) as StoredOrder[];
-      const normalized: Order[] = local.map((o) => ({
+      // Filtro ESTRICTO: solo pedidos con userId === user.id. Pedidos sin userId
+      // (guest checkout legacy) NUNCA se muestran a usuarios autenticados, o
+      // fugan entre cuentas.
+      const mine = local.filter((o) => o.userId === user.id);
+      const normalized: Order[] = mine.map((o) => ({
         ...o,
         status: normalizeStatus(o.status),
         dateFormatted: formatDate(o.date),
       }));
-      return [...normalized, ...MOCK_ORDERS];
+      return [...normalized, ...seed];
     } catch {
-      return MOCK_ORDERS;
+      return isDemoUser ? MOCK_ORDERS : [];
     }
   });
   const [expanded, setExpanded] = useState<string | null>(null);

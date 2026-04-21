@@ -14,6 +14,7 @@ import {
 import { loadIncidents, updateIncident } from "@/services/incidentService";
 import { sendIncidentReplyEmail } from "@/services/emailService";
 import type { Incident, IncidentStatus } from "@/types/incident";
+import { clickableProps } from "@/lib/a11y";
 
 const STATUS_CFG: Record<IncidentStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
   nueva:      { label: "Nueva",       color: "#dc2626", bg: "#fee2e2", icon: AlertTriangle },
@@ -128,8 +129,8 @@ function IncidentCard({ incident, onUpdate }: { incident: Incident; onUpdate: ()
           {/* Photo lightbox */}
           {photoIndex !== null && (
             <div
+              {...clickableProps(() => setPhotoIndex(null))}
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-              onClick={() => setPhotoIndex(null)}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -137,6 +138,7 @@ function IncidentCard({ incident, onUpdate }: { incident: Incident; onUpdate: ()
                 alt="foto ampliada"
                 className="max-h-[90vh] max-w-[90vw] rounded-2xl object-contain"
                 onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); }}
                 onError={(e) => { (e.target as HTMLImageElement).src = "/images/placeholder-product.svg"; }}
               />
             </div>

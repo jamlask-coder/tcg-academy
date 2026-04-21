@@ -1,7 +1,9 @@
-import type { NextRequest} from "next/server";
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { STORES } from "@/data/stores";
+import { requireAdmin } from "@/lib/apiAuth";
+import { logger } from "@/lib/logger";
 
 export interface AdminSettings {
   adminEmail: string;
@@ -10,8 +12,6 @@ export interface AdminSettings {
   storeEmails: Record<string, string>;
 }
 
-// Los defaults se derivan de la configuración central del sitio y del registro
-// de tiendas — nunca se hardcodean direcciones de correo ni nombres aquí.
 const DEFAULT_SETTINGS: AdminSettings = {
   adminEmail: process.env.ADMIN_NOTIFICATION_EMAIL ?? SITE_CONFIG.email,
   senderName: SITE_CONFIG.name,
@@ -21,40 +21,38 @@ const DEFAULT_SETTINGS: AdminSettings = {
   ),
 };
 
-// GET /api/admin/settings — Get current admin settings
-export async function GET() {
-  // TODO: Verify admin auth
-  // TODO: In server mode, fetch from getDb().getSettings()
+export async function GET(req: NextRequest) {
+  const admin = await requireAdmin(req);
+  if (admin instanceof NextResponse) return admin;
 
-  // Local mode: return defaults (client reads from localStorage directly)
   return NextResponse.json({
     ok: true,
     settings: DEFAULT_SETTINGS,
   });
 }
 
-// PUT /api/admin/settings — Update admin settings
 export async function PUT(req: NextRequest) {
+  const admin = await requireAdmin(req);
+  if (admin instanceof NextResponse) return admin;
+
   try {
-    // TODO: Verify admin auth
     const body = await req.json();
-    const { adminEmail, senderName, replyToEmail, storeEmails } = body;
+    const { adminEmail, senderName, replyToEmail, storeEmails } = body ?? {};
 
     const updated: AdminSettings = {
-      adminEmail: adminEmail ?? DEFAULT_SETTINGS.adminEmail,
-      senderName: senderName ?? DEFAULT_SETTINGS.senderName,
-      replyToEmail: replyToEmail ?? DEFAULT_SETTINGS.replyToEmail,
-      storeEmails: storeEmails ?? DEFAULT_SETTINGS.storeEmails,
+      adminEmail: typeof adminEmail === "string" ? adminEmail : DEFAULT_SETTINGS.adminEmail,
+      senderName: typeof senderName === "string" ? senderName : DEFAULT_SETTINGS.senderName,
+      replyToEmail: typeof replyToEmail === "string" ? replyToEmail : DEFAULT_SETTINGS.replyToEmail,
+      storeEmails: storeEmails && typeof storeEmails === "object" ? storeEmails : DEFAULT_SETTINGS.storeEmails,
     };
-
-    // TODO: In server mode, persist via getDb().updateSettings(updated)
 
     return NextResponse.json({
       ok: true,
       settings: updated,
       message: "Ajustes actualizados.",
     });
-  } catch {
+  } catch (err) {
+    logger.error("PUT failed", "admin-settings", { err: String(err) });
     return NextResponse.json(
       { error: "Error al guardar ajustes" },
       { status: 500 },

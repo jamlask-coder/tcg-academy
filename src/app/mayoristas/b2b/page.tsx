@@ -683,14 +683,8 @@ export default function B2BPage() {
                         </div>
                       ) : (
                         <div
-                          onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("border-[#2563eb]", "bg-blue-50"); }}
-                          onDragLeave={(e) => { e.currentTarget.classList.remove("border-[#2563eb]", "bg-blue-50"); }}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            e.currentTarget.classList.remove("border-[#2563eb]", "bg-blue-50");
-                            const file = e.dataTransfer.files[0];
-                            if (file) handleFileDrop(key, file);
-                          }}
+                          role="button"
+                          tabIndex={0}
                           onClick={() => {
                             const input = document.createElement("input");
                             input.type = "file";
@@ -700,6 +694,27 @@ export default function B2BPage() {
                               if (file) handleFileDrop(key, file);
                             };
                             input.click();
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              const input = document.createElement("input");
+                              input.type = "file";
+                              input.accept = ".pdf,.jpg,.jpeg,.png";
+                              input.onchange = () => {
+                                const file = input.files?.[0];
+                                if (file) handleFileDrop(key, file);
+                              };
+                              input.click();
+                            }
+                          }}
+                          onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("border-[#2563eb]", "bg-blue-50"); }}
+                          onDragLeave={(e) => { e.currentTarget.classList.remove("border-[#2563eb]", "bg-blue-50"); }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.currentTarget.classList.remove("border-[#2563eb]", "bg-blue-50");
+                            const file = e.dataTransfer.files[0];
+                            if (file) handleFileDrop(key, file);
                           }}
                           className="flex h-20 w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 transition hover:border-[#2563eb] hover:bg-blue-50"
                         >

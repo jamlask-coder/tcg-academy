@@ -2,6 +2,8 @@ import type { NextRequest} from "next/server";
 import { NextResponse } from "next/server";
 import { getClientIp } from "@/lib/auth";
 import { serverRateLimit } from "@/utils/sanitize";
+import { paymentCreateSchema, zodMessage } from "@/lib/validations/api";
+import { logger } from "@/lib/logger";
 
 // POST /api/payments — Create payment intent
 export async function POST(req: NextRequest) {
@@ -12,16 +14,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Demasiadas solicitudes." }, { status: 429 });
     }
 
-    const body = await req.json();
-    const { orderId, amount, method, currency = "eur" } = body;
-
-    if (!orderId || !amount || !method) {
-      return NextResponse.json({ error: "Datos de pago incompletos" }, { status: 400 });
+    const rawBody = await req.json();
+    const parsed = paymentCreateSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: zodMessage(parsed.error) },
+        { status: 400 },
+      );
     }
-
-    if (!Number.isFinite(amount) || amount <= 0 || amount > 99999) {
-      return NextResponse.json({ error: "Importe inválido" }, { status: 400 });
-    }
+    const { orderId, amount, method } = parsed.data;
+    const currency = parsed.data.currency ?? "eur";
 
     const backendMode = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
 
@@ -115,7 +117,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: "Método de pago no soportado" }, { status: 400 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error al procesar el pago";
-    return NextResponse.json({ error: message }, { status: 500 });
+    logger.error("payments POST failed", "payments", {
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json({ error: "Error al procesar el pago" }, { status: 500 });
   }
 }

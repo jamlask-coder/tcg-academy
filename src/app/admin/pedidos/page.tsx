@@ -48,6 +48,7 @@ import {
   buildTrackingUrl,
   type Carrier,
 } from "@/components/admin/ShipModal";
+import { clickableProps } from "@/lib/a11y";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 50;
@@ -305,12 +306,12 @@ function EmailModal({
 
   return (
     <div
+      {...clickableProps(onClose)}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
     >
       <div
+        {...clickableProps((e) => e?.stopPropagation())}
         className="w-full max-w-lg rounded-2xl bg-white shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <div className="flex items-center gap-2 font-bold text-gray-900">
@@ -975,12 +976,12 @@ function MessageModal({
   const [body, setBody] = useState("");
   return (
     <div
+      {...clickableProps(onClose)}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
     >
       <div
+        {...clickableProps((e) => e?.stopPropagation())}
         className="w-full max-w-md rounded-2xl bg-white shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <div className="flex items-center gap-2 font-bold text-gray-900">
@@ -1829,7 +1830,7 @@ export default function AdminPedidosPage() {
                         <Link
                           href={`/admin/pedidos/${order.id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="font-mono font-bold text-[#2563eb] hover:underline"
+                          className="font-mono font-bold text-[#2563eb] no-underline hover:no-underline"
                         >
                           {order.id}
                         </Link>
@@ -1850,7 +1851,7 @@ export default function AdminPedidosPage() {
                         <Link
                           href={`/admin/usuarios/${order.userId}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="font-medium text-[#2563eb] hover:underline"
+                          className="font-medium text-[#2563eb] no-underline hover:no-underline"
                         >
                           {order.userName}
                         </Link>

@@ -9,6 +9,7 @@
 import { useRouter } from "next/navigation";
 import { SmartProductCreator } from "@/components/admin/SmartProductCreator";
 import type { ProductFormValues } from "@/components/admin/ProductForm";
+import { logger } from "@/lib/logger";
 
 const STORAGE_KEY = "tcgacademy_new_products";
 
@@ -29,8 +30,7 @@ function persist(
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...stored, product]));
     window.dispatchEvent(new Event("tcga:products:updated"));
   } catch (e) {
-    // eslint-disable-next-line no-console
-    console.error("[nuevo-ia] no se pudo guardar el producto", e);
+    logger.error("no se pudo guardar el producto", "nuevo-ia", { err: String(e) });
   }
 }
 
