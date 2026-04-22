@@ -19,6 +19,10 @@ import {
   type AutopilotReport,
   type AutopilotAction,
 } from "@/lib/fiscalAutopilot";
+import { exportReconciliationCSV } from "@/lib/fiscalAudit";
+import { exportIssuesCSV } from "@/lib/invoiceRecovery";
+import { loadInvoices } from "@/services/invoiceService";
+import { readAdminOrdersMerged } from "@/lib/orderAdapter";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -102,12 +106,36 @@ export default function ControlFiscalPage() {
             Sistema autónomo — Solo lectura. Se ejecuta automáticamente al cargar esta página.
           </p>
         </div>
-        <button
-          onClick={() => downloadCSV(exportAutopilotCSV(), `autopilot_fiscal_${new Date().toISOString().slice(0, 10)}.csv`)}
-          className="flex h-9 items-center gap-2 rounded-lg bg-[#2563eb] px-4 text-sm font-semibold text-white transition hover:bg-[#1d4ed8]"
-        >
-          <Download size={14} /> Descargar log completo
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => downloadCSV(exportAutopilotCSV(), `autopilot_fiscal_${new Date().toISOString().slice(0, 10)}.csv`)}
+            className="flex h-9 items-center gap-2 rounded-lg bg-[#2563eb] px-4 text-sm font-semibold text-white transition hover:bg-[#1d4ed8]"
+          >
+            <Download size={14} /> Log completo
+          </button>
+          <button
+            onClick={() => {
+              const csv = exportIssuesCSV();
+              downloadCSV(csv, `incidencias_fiscales_${new Date().toISOString().slice(0, 10)}.csv`);
+            }}
+            className="flex h-9 items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+            title="Todas las incidencias detectadas (NIF faltantes, hashes rotos, rectificativas huérfanas...)"
+          >
+            <Download size={14} /> Incidencias
+          </button>
+          <button
+            onClick={() => {
+              const orders = readAdminOrdersMerged();
+              const invoices = loadInvoices();
+              const csv = exportReconciliationCSV(orders, invoices);
+              downloadCSV(csv, `reconciliacion_pedidos_facturas_${new Date().toISOString().slice(0, 10)}.csv`);
+            }}
+            className="flex h-9 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+            title="Cruce pedido↔factura: detecta pedidos cobrados sin factura o facturas sin pedido"
+          >
+            <Download size={14} /> Reconciliación
+          </button>
+        </div>
       </div>
 
       {/* Autonomy notice */}

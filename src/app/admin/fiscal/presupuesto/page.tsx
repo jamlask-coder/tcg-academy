@@ -14,6 +14,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { getMergedProducts, getMergedById } from "@/lib/productStore";
+import { persistProductPatch } from "@/lib/productPersist";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { getIssuerAddress } from "@/lib/fiscalAddress";
 import { generateInvoiceHTML } from "@/utils/invoiceGenerator";
@@ -143,28 +144,23 @@ function ProductPicker({
 // ─── Stock deduction ──────────────────────────────────────────────────────────
 
 function deductStock(lines: DraftLine[]) {
-  const overrides = JSON.parse(
-    localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
-  );
-
+  // Usa persistProductPatch para que el decremento llegue a la colección
+  // correcta (admin-created → tcgacademy_new_products; estático → overrides).
+  // Antes se escribía siempre a overrides y los productos admin-created
+  // facturados por presupuesto no decrementaban stock. Ver GOTCHA 5.
   for (const line of lines) {
     if (line.productId === "manual") continue;
     const productId = Number(line.productId);
     const product = getMergedById(productId);
     if (product?.stock !== undefined && typeof product.stock === "number") {
       const newStock = Math.max(0, product.stock - line.quantity);
-      overrides[productId] = {
-        ...overrides[productId],
+      persistProductPatch(productId, {
         stock: newStock,
         inStock: newStock > 0,
-      };
+      });
     }
   }
 
-  localStorage.setItem(
-    "tcgacademy_product_overrides",
-    JSON.stringify(overrides),
-  );
   window.dispatchEvent(new Event("tcga:products:updated"));
 }
 

@@ -7,14 +7,9 @@ import {
   type ReactNode,
 } from "react";
 import type { LocalProduct } from "@/data/products";
+import { computeEffectivePrice, type ProductDiscount as ProductDiscountCore } from "@/lib/priceEngine";
 
-export interface ProductDiscount {
-  productId: number;
-  pct: number; // 0–100, applied to all price tiers
-  active: boolean;
-  startsAt?: string; // ISO date string, no start restriction if undefined
-  endsAt?: string; // ISO date string, auto-deactivated after this date
-}
+export type ProductDiscount = ProductDiscountCore;
 
 export interface PriceOverride {
   productId: number;
@@ -59,14 +54,6 @@ const STORAGE_KEY = "tcgacademy_discounts";
 const OVERRIDE_KEY = "tcgacademy_price_overrides";
 
 const DiscountContext = createContext<DiscountContextValue | null>(null);
-
-function isActive(d: ProductDiscount): boolean {
-  if (!d.active) return false;
-  const now = new Date();
-  if (d.startsAt && new Date(d.startsAt) > now) return false;
-  if (d.endsAt && new Date(d.endsAt) < now) return false;
-  return true;
-}
 
 export function DiscountProvider({ children }: { children: ReactNode }) {
   const [discounts, setDiscounts] = useState<Record<number, ProductDiscount>>(
@@ -157,61 +144,12 @@ export function DiscountProvider({ children }: { children: ReactNode }) {
     (
       product: LocalProduct,
       role: "cliente" | "mayorista" | "tienda" | "admin" | null,
-    ) => {
-      const override = priceOverrides[product.id];
-      const basePrice = override?.price ?? product.price;
-      const baseWholesale = override?.wholesalePrice ?? product.wholesalePrice;
-      const baseStore = override?.storePrice ?? product.storePrice;
-
-      let displayPrice: number;
-      let priceLabel: string | undefined;
-
-      if (role === "mayorista") {
-        displayPrice = baseWholesale;
-        priceLabel = "PV Mayorista";
-      } else if (role === "tienda") {
-        displayPrice = baseStore;
-        priceLabel = "PV Tiendas";
-      } else if (role === "admin") {
-        displayPrice = basePrice;
-        priceLabel = "PV Público";
-      } else {
-        displayPrice = basePrice;
-      }
-
-      // Apply discount
-      const disc = discounts[product.id];
-      if (disc && isActive(disc) && disc.pct > 0) {
-        const discounted = displayPrice * (1 - disc.pct / 100);
-        return {
-          displayPrice: Math.round(discounted * 100) / 100,
-          comparePrice: displayPrice,
-          hasDiscount: true,
-          discountPct: disc.pct,
-          priceLabel,
-        };
-      }
-
-      // No active discount — compare to public price for privileged roles
-      const compareRef =
-        role === "mayorista" || role === "tienda"
-          ? basePrice
-          : product.comparePrice;
-
-      const hasDiscount = compareRef !== undefined && compareRef > displayPrice;
-      const discountPct = hasDiscount
-        ? Math.round((1 - displayPrice / compareRef!) * 100)
-        : 0;
-
-      return {
-        displayPrice,
-        comparePrice: hasDiscount ? compareRef : undefined,
-        hasDiscount,
-        discountPct,
-        priceLabel,
-      };
-    },
-    [discounts, priceOverrides],
+    ) => computeEffectivePrice(product, role, discounts),
+    // priceOverrides se mantiene en el context value por compatibilidad con
+    // el registry de DataHub, pero NO entra en las deps: computeEffectivePrice
+    // NO consulta el canal legacy `tcgacademy_price_overrides`.
+    // Ver: feedback_catalog_detail_consistency.md GOTCHA 4
+    [discounts],
   );
 
   return (

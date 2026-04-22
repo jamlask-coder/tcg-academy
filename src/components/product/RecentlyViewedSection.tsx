@@ -13,16 +13,25 @@ export function RecentlyViewedSection({ excludeId }: Props) {
   const [products, setProducts] = useState<LocalProduct[]>([]);
 
   useEffect(() => {
-    const ids = getRecentlyViewedIds();
-    const all = getMergedProducts();
-    const result: LocalProduct[] = [];
-    for (const id of ids) {
-      if (id === excludeId) continue;
-      const p = all.find((x) => x.id === id);
-      if (p) result.push(p);
-    }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setProducts(result.slice(0, 8));
+    // Fix 2026-04-22: si el admin edita nombre/precio/imagen mientras el
+    // usuario está viendo un producto, la sección "vistos recientemente"
+    // mostraba datos caducos. Ahora escuchamos tcga:products:updated y
+    // recalculamos la lista a partir de merged products en cada emisión.
+    const recompute = () => {
+      const ids = getRecentlyViewedIds();
+      const all = getMergedProducts();
+      const result: LocalProduct[] = [];
+      for (const id of ids) {
+        if (id === excludeId) continue;
+        const p = all.find((x) => x.id === id);
+        if (p) result.push(p);
+      }
+      setProducts(result.slice(0, 8));
+    };
+    recompute();
+    if (typeof window === "undefined") return;
+    window.addEventListener("tcga:products:updated", recompute);
+    return () => window.removeEventListener("tcga:products:updated", recompute);
   }, [excludeId]);
 
   if (products.length === 0) return null;

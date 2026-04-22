@@ -288,10 +288,19 @@ export default function AdminDashboard() {
         ).map(({ kpi, label, value, sub, icon: Icon, color }) => {
           const isActive = activeKpi === kpi;
           return (
-            <button
+            <div
               key={kpi}
+              role="button"
+              tabIndex={0}
               onClick={() => kpi === "descuentos" ? router.push("/admin/cupones") : setActiveKpi(kpi)}
-              className="rounded-2xl border bg-white p-5 text-left transition hover:shadow-md"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  if (kpi === "descuentos") router.push("/admin/cupones");
+                  else setActiveKpi(kpi);
+                }
+              }}
+              className="cursor-pointer rounded-2xl border bg-white p-5 text-left transition hover:shadow-md"
               style={{
                 borderColor: isActive ? color : "#e5e7eb",
                 boxShadow: isActive ? `0 0 0 2px ${color}30` : undefined,
@@ -336,7 +345,7 @@ export default function AdminDashboard() {
                   Ver evolución ↓
                 </p>
               )}
-            </button>
+            </div>
           );
         })}
       </div>

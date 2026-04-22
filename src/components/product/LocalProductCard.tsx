@@ -202,9 +202,12 @@ function LocalProductCardInner({ product }: Props) {
         {product.language && <LanguageFlag language={product.language} size="md" />}
       </div>
 
-      {/* ── FRANJA INFERIOR: Añadir al carrito (desktop hover) ── */}
+      {/* ── FRANJA INFERIOR: Añadir al carrito (desktop, SIEMPRE visible) ──
+          Fix 2026-04-22: antes solo aparecía en hover (`hidden opacity-0
+          group-hover:opacity-100`) y el usuario lo consideró un bug grave.
+          Ver memory: feedback_cart_button_always_visible.md */}
       {!isOutOfStock && (
-        <div className="absolute right-0 bottom-0 left-0 hidden translate-y-2 opacity-0 transition-all duration-200 ease-out group-hover:translate-y-0 group-hover:opacity-100 sm:block">
+        <div className="absolute right-0 bottom-0 left-0 hidden sm:block">
           <div className="relative bg-gradient-to-t from-black/60 via-black/25 to-transparent px-2 pt-8 pb-2">
             <style>{`
               @keyframes floatUp {
@@ -274,9 +277,9 @@ function LocalProductCardInner({ product }: Props) {
         </div>
       )}
 
-      {/* ── Restock alert (desktop hover) ── */}
+      {/* ── Restock alert (desktop, SIEMPRE visible) ── */}
       {isOutOfStock && (
-        <div className="absolute right-0 bottom-0 left-0 hidden translate-y-2 opacity-0 transition-all duration-200 ease-out group-hover:translate-y-0 group-hover:opacity-100 sm:block">
+        <div className="absolute right-0 bottom-0 left-0 hidden sm:block">
           <div className="bg-gradient-to-t from-black/60 via-black/25 to-transparent px-2 pt-8 pb-2">
             {restockSub ? (
               <div className="flex items-center justify-center gap-1.5 rounded-lg bg-green-50 py-2 text-xs font-bold text-green-600">

@@ -162,23 +162,29 @@ describe("returnService — getReturns con filtros", () => {
 // ─── restoreStockForReturn ──────────────────────────────────────────────────
 
 describe("returnService — restoreStockForReturn", () => {
-  it("incrementa stock de cada producto devuelto y marca inStock=true", () => {
+  it("incrementa stock de producto admin-created y marca inStock=true", () => {
     const items = sampleItems();
-    // stock inicial para producto 101
+    // Productos admin-created (ids > 1.7e12 en prod; aquí usamos 101/202 que
+    // persistProductPatch detecta como admin-created por estar en new_products).
     storage.setItem(
-      "tcgacademy_product_overrides",
-      JSON.stringify({ "101": { stock: 3, inStock: false } }),
+      "tcgacademy_new_products",
+      JSON.stringify([
+        { id: 101, name: "Booster Box Magic", stock: 3, inStock: false },
+        { id: 202, name: "Sleeves", stock: 0, inStock: false },
+      ]),
     );
 
     restoreStockForReturn(items);
 
-    const overrides = JSON.parse(
-      storage.getItem("tcgacademy_product_overrides") as string,
+    const newProducts = JSON.parse(
+      storage.getItem("tcgacademy_new_products") as string,
     );
-    expect(overrides["101"].stock).toBe(4); // 3 + 1
-    expect(overrides["101"].inStock).toBe(true);
-    expect(overrides["202"].stock).toBe(2); // 0 + 2
-    expect(overrides["202"].inStock).toBe(true);
+    const p101 = newProducts.find((p: { id: number }) => p.id === 101);
+    const p202 = newProducts.find((p: { id: number }) => p.id === 202);
+    expect(p101.stock).toBe(4); // 3 + 1
+    expect(p101.inStock).toBe(true);
+    expect(p202.stock).toBe(2); // 0 + 2
+    expect(p202.inStock).toBe(true);
   });
 
   it("crea overrides desde cero si no existían", () => {

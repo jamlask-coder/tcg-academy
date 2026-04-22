@@ -7,6 +7,7 @@ import {
   type LocalProduct,
 } from "@/data/products";
 import { getMergedProducts, getProductUrl } from "@/lib/productStore";
+import { persistProductPatch } from "@/lib/productPersist";
 import { getStockInfo } from "@/utils/stockStatus";
 import {
   Search,
@@ -54,6 +55,7 @@ export default function AdminStockPage() {
   const [gameFilter, setGameFilter] = useState("");
   const [catFilter, setCatFilter] = useState("");
   const [stockFilter, setStockFilter] = useState<"" | "out" | "low" | "ok">("");
+  const [langFilter, setLangFilter] = useState("");
   const [page, setPage] = useState(1);
   const [saved, setSaved] = useState(false);
 
@@ -135,11 +137,21 @@ export default function AdminStockPage() {
     return [...new Set(src.map((p) => p.category))].sort();
   }, [gameFilter, allProducts]);
 
-   
+  // Idiomas únicos presentes en el catálogo (respetando filtro de juego si lo hay,
+  // para no ofrecer idiomas que no existen dentro del juego seleccionado).
+  const allLangs = useMemo(() => {
+    const src = gameFilter
+      ? allProducts.filter((p) => p.game === gameFilter)
+      : allProducts;
+    return [...new Set(src.map((p) => p.language).filter((l): l is string => !!l))].sort();
+  }, [gameFilter, allProducts]);
+
+
   const filtered = useMemo(() => {
     let list = allProducts.filter((p) => !deletedIds.has(p.id));
     if (gameFilter) list = list.filter((p) => p.game === gameFilter);
     if (catFilter) list = list.filter((p) => p.category === catFilter);
+    if (langFilter) list = list.filter((p) => p.language === langFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter((p) => p.name.toLowerCase().includes(q));
@@ -154,7 +166,7 @@ export default function AdminStockPage() {
       });
     }
     return list;
-  }, [gameFilter, catFilter, search, deletedIds, allProducts, stockFilter]);
+  }, [gameFilter, catFilter, langFilter, search, deletedIds, allProducts, stockFilter]);
 
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -192,57 +204,31 @@ export default function AdminStockPage() {
 
   const handleSaveAll = () => {
     if (dirtyCount === 0) return;
-    const stored = JSON.parse(
-      localStorage.getItem("tcgacademy_new_products") ?? "[]",
-    ) as LocalProduct[];
-    // SSOT: stock y maxPerUser de productos del catálogo estático viven en
-    // `tcgacademy_product_overrides[id]` (lo que lee `getMergedProducts`).
-    // La antigua clave `tcgacademy_stock_overrides` queda deprecada.
-    const productOverrides = JSON.parse(
-      localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
-    ) as Record<string, Partial<LocalProduct>>;
-
+    // SSOT: delegamos en `persistProductPatch` — distingue admin-created vs
+    // estático y escribe en la colección correcta. La antigua clave
+    // `tcgacademy_stock_overrides` queda deprecada.
     for (const [idStr, changes] of Object.entries(edits)) {
       const id = Number(idStr);
-      const adminIdx = stored.findIndex((sp) => sp.id === id);
-      const isAdminProduct = adminIdx >= 0;
+      const patch: Partial<LocalProduct> = {};
 
-      // stock
       if (changes.stock !== undefined) {
         const raw = changes.stock.trim();
         const stockVal = raw === "" ? undefined : parseInt(raw);
-        if (isAdminProduct) {
-          stored[adminIdx].stock = stockVal;
-          stored[adminIdx].inStock = stockVal === undefined || stockVal > 0;
-        } else {
-          productOverrides[idStr] = {
-            ...productOverrides[idStr],
-            stock: stockVal,
-            inStock: stockVal === undefined || stockVal > 0,
-          };
-        }
+        patch.stock = stockVal;
+        patch.inStock = stockVal === undefined || stockVal > 0;
       }
-      // Límites por rol (acumulados de por vida)
       for (const field of ["maxPerClient", "maxPerWholesaler", "maxPerStore"] as const) {
         if (changes[field] === undefined) continue;
         const raw = changes[field]!.trim();
         const val = raw === "" ? undefined : parseInt(raw);
-        if (isAdminProduct) {
-          stored[adminIdx][field] = val;
-        } else {
-          productOverrides[idStr] = {
-            ...productOverrides[idStr],
-            [field]: val,
-          };
-        }
+        patch[field] = val;
+      }
+
+      if (Object.keys(patch).length > 0) {
+        persistProductPatch(id, patch);
       }
     }
 
-    localStorage.setItem("tcgacademy_new_products", JSON.stringify(stored));
-    localStorage.setItem(
-      "tcgacademy_product_overrides",
-      JSON.stringify(productOverrides),
-    );
     window.dispatchEvent(new Event("tcga:products:updated"));
     setEdits({});
     setSaved(true);
@@ -321,7 +307,10 @@ export default function AdminStockPage() {
 
       {/* Filters */}
       <div className="mb-4 flex flex-wrap gap-3">
-        <div className="relative min-w-[180px] flex-1">
+        {/* Buscador con ancho reducido — al añadir el filtro de idioma ocupaba
+            demasiado (2026-04-22). max-w limita su expansión manteniendo grow
+            controlado para que no pise a los selects en pantallas estrechas. */}
+        <div className="relative min-w-[180px] max-w-[360px] flex-1">
           <Search
             size={14}
             className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400"
@@ -352,6 +341,7 @@ export default function AdminStockPage() {
             onChange={(e) => {
               setGameFilter(e.target.value);
               setCatFilter("");
+              setLangFilter("");
               setPage(1);
             }}
             className="h-9 appearance-none rounded-xl border border-gray-200 bg-white pr-8 pl-3 text-sm text-gray-700 focus:border-[#2563eb] focus:outline-none"
@@ -389,12 +379,35 @@ export default function AdminStockPage() {
             className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-gray-400"
           />
         </div>
-        {(search || gameFilter || catFilter || stockFilter) && (
+        <div className="relative">
+          <select
+            value={langFilter}
+            onChange={(e) => {
+              setLangFilter(e.target.value);
+              setPage(1);
+            }}
+            className="h-9 appearance-none rounded-xl border border-gray-200 bg-white pr-8 pl-3 text-sm text-gray-700 focus:border-[#2563eb] focus:outline-none"
+            aria-label="Filtrar por idioma"
+          >
+            <option value="">Todos los idiomas</option>
+            {allLangs.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            size={12}
+            className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-gray-400"
+          />
+        </div>
+        {(search || gameFilter || catFilter || langFilter || stockFilter) && (
           <button
             onClick={() => {
               setSearch("");
               setGameFilter("");
               setCatFilter("");
+              setLangFilter("");
               setStockFilter("");
               setPage(1);
             }}

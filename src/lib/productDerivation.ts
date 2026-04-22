@@ -1,6 +1,7 @@
 import type { LocalProduct } from "@/data/products";
 import type { ProductFormValues } from "@/components/admin/ProductForm";
 import { slugify } from "@/components/admin/ProductForm";
+import { persistProductPatch } from "@/lib/productPersist";
 
 export type DerivationMode = "pack" | "box" | "lang";
 
@@ -23,7 +24,12 @@ function r2(n: number): number {
 }
 
 function cleanBoxNameToPack(name: string): string {
-  // Quita "Display", "Booster Box", "(N sobres)" y añade "Pack"/"Booster Pack"
+  // Español: "Caja de sobres X" / "Display X" → "Sobre de X"
+  // (antes devolvía "Caja de sobres X Booster Pack", incoherente)
+  const esMatch = name.match(/^caja\s+de\s+sobres?\s+(.+)$/i);
+  if (esMatch) return `Sobre de ${esMatch[1].replace(/\s*\(\s*\d+\s*sobres?\s*\)/i, "").trim()}`;
+
+  // Inglés: quita "Display"/"Booster Box"/"(N sobres)" y añade "Booster Pack"
   const out = name
     .replace(/\s*\(\s*\d+\s*sobres?\s*\)/i, "")
     .replace(/\s*Booster\s*Box\s*/i, " ")
@@ -37,6 +43,14 @@ function cleanBoxNameToPack(name: string): string {
 }
 
 function cleanPackNameToBox(name: string, packsPerBox: number): string {
+  // Español: "Sobre de X" / "Sobre individual X" → "Caja de sobres X (N sobres)"
+  const esMatch = name.match(/^sobre(?:\s+individual)?\s+(?:de\s+)?(.+)$/i);
+  if (esMatch) {
+    const base = esMatch[1].replace(/\s*\(\s*\d+\s*cartas?\s*\)/i, "").trim();
+    return `Caja de sobres ${base} (${packsPerBox} sobres)`;
+  }
+
+  // Inglés: quita sufijos de pack/sobre y añade "Booster Display (N sobres)"
   let out = name
     .replace(/\s*\(\s*\d+\s*cartas?\s*\)/i, "")
     .replace(/\s*Booster\s*Pack\s*/i, " ")
@@ -58,7 +72,9 @@ export function derivePackDefaults(box: LocalProduct): DerivedFormState {
     values: {
       name: newName,
       slug: slugify(`${base}-pack`),
-      description: "",
+      // Hereda la descripción del padre (admin ya invirtió tiempo escribiéndola).
+      // Si queda incoherente, se ajusta desde el form o con "Generar descripción".
+      description: box.description ?? "",
       game: box.game,
       category: "sobres",
       language: box.language ?? "",
@@ -90,7 +106,8 @@ export function deriveBoxDefaults(
     values: {
       name: newName,
       slug: slugify(`${base}-display`),
-      description: "",
+      // Hereda la descripción del padre (admin ya invirtió tiempo escribiéndola).
+      description: pack.description ?? "",
       game: pack.game,
       category: "booster-box",
       language: pack.language ?? "",
@@ -155,26 +172,17 @@ export function closeParentLink(
   packsPerBox?: number,
 ): void {
   if (mode === "lang") return; // los paralelos se detectan por slug base, no necesitan FK
-  let overrides: Record<string, Partial<LocalProduct>> = {};
-  try {
-    overrides = JSON.parse(
-      localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
-    );
-  } catch {
-    overrides = {};
-  }
-  const current = overrides[String(parentId)] ?? {};
+  // Delegamos en la utility canónica: `persistProductPatch` detecta si el
+  // padre es admin-created (vive en `tcgacademy_new_products`) o estático
+  // (patch en `tcgacademy_product_overrides`). Antes escribía siempre a
+  // overrides → si el padre era admin-created el linkedPackId/linkedBoxId
+  // quedaba huérfano (incidente StrixHaven, feedback_catalog_detail_consistency.md GOTCHA 5).
   if (mode === "pack") {
-    overrides[String(parentId)] = { ...current, linkedPackId: childId };
+    persistProductPatch(parentId, { linkedPackId: childId });
   } else if (mode === "box") {
-    overrides[String(parentId)] = {
-      ...current,
+    persistProductPatch(parentId, {
       linkedBoxId: childId,
       ...(packsPerBox ? { packsPerBox } : {}),
-    };
+    });
   }
-  localStorage.setItem(
-    "tcgacademy_product_overrides",
-    JSON.stringify(overrides),
-  );
 }

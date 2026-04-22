@@ -24,6 +24,7 @@ import {
   type LocalProduct,
 } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
+import { persistProductPatch } from "@/lib/productPersist";
 import Link from "next/link";
 import CompetitorPricesModal from "@/components/admin/CompetitorPricesModal";
 import {
@@ -275,6 +276,31 @@ export default function PreciosPage() {
   const [dirtyIds, setDirtyIds] = useState<Set<number>>(new Set());
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
+  // SSOT: si el admin edita precio/nombre desde ProductDetailClient o
+  // /admin/stock mientras esta página está abierta, recargamos respetando
+  // las filas con cambios pendientes (no las pisamos).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const reload = () => {
+      setRows((prev) => {
+        const fresh = initRows();
+        // Conserva las filas con cambios pendientes sin guardar.
+        return fresh.map((r) => {
+          const pending = prev.find(
+            (p) => p.id === r.id && dirtyIds.has(p.id),
+          );
+          return pending ?? r;
+        });
+      });
+    };
+    window.addEventListener("tcga:products:updated", reload);
+    window.addEventListener("storage", reload);
+    return () => {
+      window.removeEventListener("tcga:products:updated", reload);
+      window.removeEventListener("storage", reload);
+    };
+  }, [dirtyIds]);
+
   // Filters
   const [search, setSearch] = useState("");
   const [filterGame, setFilterGame] = useState("");
@@ -282,6 +308,7 @@ export default function PreciosPage() {
   const [filterDiscount, setFilterDiscount] = useState<"" | "with" | "without">(
     "",
   );
+  const [filterLanguage, setFilterLanguage] = useState("");
 
   // Sort
   const [sortField, setSortField] = useState<SortField>("name");
@@ -336,14 +363,47 @@ export default function PreciosPage() {
     setDirtyIds((prev) => new Set(prev).add(id));
   }, []);
 
-  const saveRow = useCallback((id: number) => {
-    // En producción, aquí persistiríamos sólo este producto al backend.
-    setDirtyIds((prev) => {
-      const s = new Set(prev);
-      s.delete(id);
-      return s;
-    });
-  }, []);
+  /**
+   * Persiste los cambios de una fila al SSOT (localStorage).
+   * - Productos del catálogo estático (PRODUCTS) → `tcgacademy_product_overrides[id]`
+   * - Productos creados por admin → `tcgacademy_new_products` (mutados in-place)
+   * Emite `tcga:products:updated` para que catálogo/carrito/etc. refresquen.
+   *
+   * Incidente 2026-04-22: `saveRow` y `handleSave` sólo limpiaban `dirtyIds`
+   * sin escribir nada → el admin veía "Guardado" pero el precio editado nunca
+   * llegaba al catálogo ni al carrito → factura con precio obsoleto.
+   */
+  const persistRows = useCallback((rowIds: number[]) => {
+    if (typeof window === "undefined") return;
+    try {
+      for (const id of rowIds) {
+        const row = rows.find((r) => r.id === id);
+        if (!row) continue;
+        persistProductPatch(id, {
+          price: row.price,
+          wholesalePrice: row.wholesalePrice,
+          storePrice: row.storePrice,
+          costPrice: row.costPrice,
+          comparePrice: row.comparePrice,
+        });
+      }
+      window.dispatchEvent(new Event("tcga:products:updated"));
+    } catch {
+      // non-fatal: el admin puede reintentar
+    }
+  }, [rows]);
+
+  const saveRow = useCallback(
+    (id: number) => {
+      persistRows([id]);
+      setDirtyIds((prev) => {
+        const s = new Set(prev);
+        s.delete(id);
+        return s;
+      });
+    },
+    [persistRows],
+  );
 
   const handleRefreshCompetitors = useCallback(async (row: PriceRow) => {
     setFetchingIds((prev) => new Set(prev).add(row.id));
@@ -397,6 +457,7 @@ export default function PreciosPage() {
         return false;
       if (filterGame && r.game !== filterGame) return false;
       if (filterCategory && r.category !== filterCategory) return false;
+      if (filterLanguage && r.language !== filterLanguage) return false;
       if (filterDiscount === "with" && !r.comparePrice) return false;
       if (filterDiscount === "without" && r.comparePrice) return false;
       return true;
@@ -430,6 +491,7 @@ export default function PreciosPage() {
     search,
     filterGame,
     filterCategory,
+    filterLanguage,
     filterDiscount,
     sortField,
     sortDir,
@@ -532,7 +594,8 @@ export default function PreciosPage() {
   };
 
   const handleSave = () => {
-    // In production would persist to backend; here we just clear dirty state
+    // Persiste TODAS las filas con cambios pendientes al SSOT.
+    persistRows([...dirtyIds]);
     setDirtyIds(new Set());
     setShowSaveModal(false);
   };
@@ -549,6 +612,16 @@ export default function PreciosPage() {
         ),
       ].sort()
     : [...new Set(rows.map((r) => r.category))].sort();
+  // Idiomas únicos filtrados por el juego seleccionado (si lo hay) para no
+  // mostrar opciones que no existen dentro del subconjunto. Mismo patrón que
+  // uniqueCategories — mantiene la UX coherente entre stock y precios.
+  const uniqueLanguages = filterGame
+    ? [
+        ...new Set(
+          rows.filter((r) => r.game === filterGame).map((r) => r.language),
+        ),
+      ].sort()
+    : [...new Set(rows.map((r) => r.language))].sort();
 
   return (
     <div className="flex min-h-0 flex-col">
@@ -572,7 +645,9 @@ export default function PreciosPage() {
 
       {/* ── Filters ── */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 bg-white p-4">
-        <div className="relative min-w-[180px] flex-1">
+        {/* Buscador con ancho limitado para dejar sitio al nuevo select de
+            idioma (2026-04-22). Mismo tratamiento que en /admin/stock. */}
+        <div className="relative min-w-[180px] max-w-[360px] flex-1">
           <Search
             size={13}
             className="absolute top-1/2 left-2.5 -translate-y-1/2 text-gray-400"
@@ -594,6 +669,7 @@ export default function PreciosPage() {
           onChange={(e) => {
             setFilterGame(e.target.value);
             setFilterCategory("");
+            setFilterLanguage("");
             setPage(1);
           }}
           className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:border-[#2563eb] focus:outline-none"
@@ -621,6 +697,22 @@ export default function PreciosPage() {
           ))}
         </select>
         <select
+          value={filterLanguage}
+          onChange={(e) => {
+            setFilterLanguage(e.target.value);
+            setPage(1);
+          }}
+          className="rounded-lg border border-gray-200 px-2 py-2 text-xs focus:border-[#2563eb] focus:outline-none"
+          aria-label="Filtrar por idioma"
+        >
+          <option value="">Todos los idiomas</option>
+          {uniqueLanguages.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
+        <select
           value={filterDiscount}
           onChange={(e) => {
             setFilterDiscount(e.target.value as typeof filterDiscount);
@@ -632,12 +724,13 @@ export default function PreciosPage() {
           <option value="with">Con descuento</option>
           <option value="without">Sin descuento</option>
         </select>
-        {(search || filterGame || filterCategory || filterDiscount) && (
+        {(search || filterGame || filterCategory || filterLanguage || filterDiscount) && (
           <button
             onClick={() => {
               setSearch("");
               setFilterGame("");
               setFilterCategory("");
+              setFilterLanguage("");
               setFilterDiscount("");
               setPage(1);
             }}

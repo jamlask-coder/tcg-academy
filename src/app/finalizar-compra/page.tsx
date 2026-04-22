@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { useCart } from "@/context/CartContext";
 import { getMergedById } from "@/lib/productStore";
+import { persistProductPatch } from "@/lib/productPersist";
 import { useAuth } from "@/context/AuthContext";
 import {
   awardPurchasePoints,
@@ -286,6 +287,48 @@ export default function CheckoutPage() {
         setOrderError(`Precio inválido en "${badPriceItem.name}". Vuelve al carrito e inténtalo de nuevo.`);
         return;
       }
+
+      // ── Guard 6b: Stock + roleLimit availability (client-side doble-check) ──
+      // Si el admin editó stock/límites justo antes de que el usuario confirmase,
+      // o si hubo una carrera con otra compra, debemos bloquear aquí. El API
+      // hace verifyOrder en modo server, pero en modo local necesitamos este
+      // check explícito antes de crear pedido + factura (incidente 2026-04-22).
+      try {
+        const { verifyStockAvailability, verifyPurchaseLimits } = await import(
+          "@/lib/priceVerification"
+        );
+        const cartItems = items.map((it) => ({
+          product_id: it.product_id,
+          quantity: it.quantity,
+          price: it.price,
+        }));
+        const stockCheck = verifyStockAvailability(cartItems);
+        if (!stockCheck.available) {
+          const issue = stockCheck.issues[0];
+          setOrderError(
+            `"${issue.name}": solicitadas ${issue.requested} uds pero solo hay ${issue.available} en stock. Ajusta el carrito.`,
+          );
+          return;
+        }
+        if (user?.id) {
+          const roleForLimit: "cliente" | "mayorista" | "tienda" =
+            user.role === "mayorista" || user.role === "tienda"
+              ? user.role
+              : "cliente";
+          const limitCheck = verifyPurchaseLimits(
+            cartItems,
+            user.id,
+            roleForLimit,
+          );
+          if (!limitCheck.valid) {
+            const issue = limitCheck.issues[0];
+            setOrderError(
+              `"${issue.name}": máximo ${issue.limit} uds por ${roleForLimit} (${issue.purchased} ya comprado, ${issue.remaining} disponibles).`,
+            );
+            return;
+          }
+        }
+      } catch { /* guardia no-bloqueante si el módulo falla al importar */ }
 
       // ── Guard 7: Idempotency (prevent exact duplicate orders) ──
       const fp = orderFingerprint(items, form.email, finalTotal);
@@ -695,21 +738,23 @@ export default function CheckoutPage() {
     }
 
     // ── PHASE 6: Decrement stock ──
+    // Usar persistProductPatch para que el decremento se aplique a la colección
+    // correcta (admin-created → tcgacademy_new_products; estático → overrides).
+    // Antes, escribir siempre a overrides dejaba huérfano el decremento para
+    // productos admin-created → se vendía stock infinito. Ver GOTCHA 5.
     try {
-      const overrides = JSON.parse(localStorage.getItem("tcgacademy_product_overrides") ?? "{}");
       for (const item of items) {
         const productId = parseInt(item.key?.replace("item_", "") ?? "0");
         if (!productId) continue;
         const product = getMergedById(productId);
         if (product?.stock !== undefined && typeof product.stock === "number") {
           const newStock = Math.max(0, product.stock - item.quantity);
-          overrides[productId] = { ...overrides[productId], stock: newStock };
-          if (newStock === 0) {
-            overrides[productId].inStock = false;
-          }
+          persistProductPatch(productId, {
+            stock: newStock,
+            inStock: newStock > 0,
+          });
         }
       }
-      localStorage.setItem("tcgacademy_product_overrides", JSON.stringify(overrides));
       window.dispatchEvent(new Event("tcga:products:updated"));
     } catch { /* stock update is non-critical */ }
 

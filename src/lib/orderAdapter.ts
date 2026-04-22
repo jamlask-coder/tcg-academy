@@ -33,7 +33,7 @@
  * ────────────────────────────────────────────────────────────────────────────
  */
 
-import { PRODUCTS } from "@/data/products";
+import { getMergedById } from "@/lib/productStore";
 import { safeRead, robustWrite } from "@/lib/safeStorage";
 import type {
   AdminOrder,
@@ -245,7 +245,10 @@ function coerceAdminRole(
 export function checkoutOrderToAdmin(o: CheckoutOrder): AdminOrder {
   const items: AdminItem[] = o.items.map((it) => {
     const idNum = Number(it.id);
-    const prod = PRODUCTS.find((p) => p.id === idNum);
+    // getMergedById cubre PRODUCTS + productos creados por admin. Antes
+    // PRODUCTS.find() devolvía undefined para admin-created y el juego
+    // caía a "otros" en el admin, rompiendo filtros por juego.
+    const prod = getMergedById(idNum);
     return {
       id: Number.isFinite(idNum) ? idNum : 0,
       name: it.name,

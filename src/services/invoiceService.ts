@@ -43,6 +43,7 @@ import {
 import { buildVerifactuQRUrl } from "@/services/verifactuService";
 import { DataHub } from "@/lib/dataHub";
 import { validateSpanishNIF } from "@/lib/validations/nif";
+import { moneyRound as roundTo2, baseFromPriceWithVAT } from "@/lib/money";
 
 // ─── Datos del emisor (TCG Academy) ──────────────────────────────────────────
 
@@ -249,7 +250,7 @@ export function buildLineItem(params: {
     applySurcharge = false,
   } = params;
 
-  const unitPriceNoVAT = roundTo2(unitPriceWithVAT / (1 + vatRate / 100));
+  const unitPriceNoVAT = baseFromPriceWithVAT(unitPriceWithVAT, vatRate);
   const subtotal = roundTo2(unitPriceNoVAT * quantity);
   const discountAmount = roundTo2(subtotal * (discount / 100));
   const taxableBase = roundTo2(subtotal - discountAmount);
@@ -1011,9 +1012,7 @@ function formatDateForHash(date: Date | string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function roundTo2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
+// roundTo2 ahora se importa de @/lib/money (big.js-based, precisión exacta).
 
 function deserializeDates(inv: InvoiceRecord): InvoiceRecord {
   return {

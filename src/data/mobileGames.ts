@@ -24,7 +24,9 @@ export interface MobileGame {
 }
 
 export const MOBILE_GAMES: MobileGame[] = [
-  { slug: "pokemon", label: "Pokémon", bg: MOBILE_GAMES_BG, sprite: { origW: 273, origX: 1228, renderH: 50 } },
+  // Pokémon: bajado de 50→44 el 2026-04-22 — a 50 se cortaba la "N" por la derecha
+  // de la tarjeta y aparecía un artefacto del sprite vecino a la izquierda de la "P".
+  { slug: "pokemon", label: "Pokémon", bg: MOBILE_GAMES_BG, sprite: { origW: 273, origX: 1228, renderH: 44 } },
   { slug: "magic", label: "Magic", bg: MOBILE_GAMES_BG, logo: "/images/logos/magic-clean.png" },
   { slug: "one-piece", label: "One Piece", bg: MOBILE_GAMES_BG, logo: "/images/logos/onepiece.png", blend: true },
   { slug: "riftbound", label: "Riftbound", bg: MOBILE_GAMES_BG, logo: "/images/logos/riftbound-clean.png?v=5", blend: true },

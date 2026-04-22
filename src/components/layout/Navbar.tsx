@@ -21,7 +21,9 @@ const TARGET_W = 115;       // normalized visual width for all logos
 
 // Per-logo target overrides [maxW, maxH] — increase both to scale the logo up
 const CM_SPRITE_TARGET: Record<string, [number, number]> = {
-  pokemon: [128, 46],
+  // Pokémon: reducido 2026-04-22 — a 128x46 se cortaba la "N" por la derecha
+  // y aparecía un artefacto del sprite vecino a la izquierda de la "P".
+  pokemon: [118, 42],
   magic: [122, 44],
   "one-piece": [118, 45],
 };

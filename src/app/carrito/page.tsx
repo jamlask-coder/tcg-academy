@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { PRODUCTS } from "@/data/products";
+import { getMergedById, getProductUrl } from "@/lib/productStore";
 import { validateCoupon, calcCouponDiscount, type AppliedCoupon } from "@/services/couponService";
 import { useAuth } from "@/context/AuthContext";
 import { ensureReferralCode } from "@/services/pointsService";
@@ -22,7 +22,7 @@ import { ensureReferralCode } from "@/services/pointsService";
 
 export default function CartPage() {
   const router = useRouter();
-  const { items, count, total, removeItem, updateQty, clearCart } = useCart();
+  const { items, count, total, removeItem, updateQty, clearCart, getLimitForItem } = useCart();
   const { user } = useAuth();
 
   const [couponInput, setCouponInput] = useState("");
@@ -30,6 +30,41 @@ export default function CartPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(
     null,
   );
+  // Mapa key → mensaje efímero ("sólo quedan 3 uds") que aparece si el
+  // usuario intenta subir cantidad por encima del tope. Se autolimpia a 3s.
+  const [limitNotices, setLimitNotices] = useState<Record<string, string>>({});
+  // Mapa key → borrador del input de cantidad en edición (commit on blur).
+  // Patrón anti-feedback-loop (ver memoria feedback_controlled_input_loop).
+  const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
+
+  const flashNotice = (key: string, msg: string) => {
+    setLimitNotices((m) => ({ ...m, [key]: msg }));
+    setTimeout(() => {
+      setLimitNotices((m) => {
+        const { [key]: _removed, ...rest } = m;
+        void _removed;
+        return rest;
+      });
+    }, 3000);
+  };
+
+  const handleQtyStep = (key: string, nextQty: number) => {
+    const result = updateQty(key, nextQty);
+    if (result.capped && result.reason) flashNotice(key, result.reason);
+  };
+
+  const handleQtyCommit = (key: string, raw: string) => {
+    // Limpia el draft siempre; el valor real lo determina updateQty.
+    setQtyDrafts((d) => {
+      const { [key]: _removed, ...rest } = d;
+      void _removed;
+      return rest;
+    });
+    const n = Number.parseInt(raw, 10);
+    if (!Number.isFinite(n)) return;
+    const result = updateQty(key, Math.max(0, n));
+    if (result.capped && result.reason) flashNotice(key, result.reason);
+  };
 
   useEffect(() => {
     if (user?.role === "cliente") {
@@ -113,16 +148,20 @@ export default function CartPage() {
         {/* Items */}
         <div className="space-y-3 lg:col-span-2">
           {items.map((item) => {
-            const prod = PRODUCTS.find((p) => p.id === item.product_id);
-            const productHref = prod
-              ? `/${prod.game}/${prod.category}/${prod.slug}`
-              : null;
+            // SSOT: leer siempre del merged (PRODUCTS + overrides admin) para
+            // que el slug/juego/categoría/precio/linked refleje la edición
+            // más reciente. Incidente 2026-04-22: se mostraba PRODUCTS estático
+            // → nombre/imagen/enlace obsoletos tras editar.
+            const prod = getMergedById(item.product_id);
+            // getProductUrl cubre tanto rutas estáticas SEO como productos
+            // creados por admin (/producto/[slug]).
+            const productHref = prod ? getProductUrl(prod) : null;
             // Ahorro vs comprar los sobres sueltos (solo cajas con linkedPackId)
             const packSavings = (() => {
               if (!prod || prod.category !== "booster-box" || !prod.packsPerBox) return null;
               const packId = prod.linkedPackId;
               if (!packId) return null;
-              const pack = PRODUCTS.find((p) => p.id === packId);
+              const pack = getMergedById(packId);
               if (!pack) return null;
               const packTotal = pack.price * prod.packsPerBox;
               const saved = packTotal - prod.price;
@@ -160,9 +199,18 @@ export default function CartPage() {
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <h3 className="mb-1 line-clamp-2 text-sm leading-tight font-semibold text-gray-900">
-                    {item.name}
-                  </h3>
+                  {productHref ? (
+                    <Link
+                      href={productHref}
+                      className="mb-1 block line-clamp-2 text-sm leading-tight font-semibold text-gray-900 transition hover:text-[#2563eb]"
+                    >
+                      {item.name}
+                    </Link>
+                  ) : (
+                    <h3 className="mb-1 line-clamp-2 text-sm leading-tight font-semibold text-gray-900">
+                      {item.name}
+                    </h3>
+                  )}
                   <p className="text-base font-bold text-[#2563eb]">
                     {item.price.toFixed(2)}€/ud
                   </p>
@@ -171,41 +219,72 @@ export default function CartPage() {
                       Ahorras {packSavings.saved.toFixed(2)}€ ({packSavings.pct}%) vs comprar los sobres sueltos
                     </p>
                   )}
+                  {limitNotices[item.key] && (
+                    <p className="mt-1 text-xs font-medium text-amber-600">
+                      {limitNotices[item.key]}
+                    </p>
+                  )}
                 </div>
-                <div className="flex flex-col items-end gap-3">
-                  <button
-                    aria-label={`Eliminar ${item.name}`}
-                    onClick={() => removeItem(item.key)}
-                    className="flex min-h-[32px] min-w-[32px] items-center justify-center text-gray-300 transition hover:text-red-400"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                  <div className="flex items-center overflow-hidden rounded-lg border border-gray-200">
-                    <button
-                      aria-label={`Reducir cantidad de ${item.name}`}
-                      onClick={() => updateQty(item.key, item.quantity - 1)}
-                      className="flex h-9 w-9 items-center justify-center transition hover:bg-gray-50"
-                    >
-                      <Minus size={12} />
-                    </button>
-                    <span
-                      className="w-12 text-center text-sm font-bold"
-                      aria-label={`Cantidad: ${item.quantity}`}
-                    >
-                      {item.quantity}
-                    </span>
-                    <button
-                      aria-label={`Aumentar cantidad de ${item.name}`}
-                      onClick={() => updateQty(item.key, item.quantity + 1)}
-                      className="flex h-9 w-9 items-center justify-center transition hover:bg-gray-50"
-                    >
-                      <Plus size={12} />
-                    </button>
-                  </div>
-                  <span className="text-sm font-bold text-gray-900">
-                    {(item.price * item.quantity).toFixed(2)}€
-                  </span>
-                </div>
+                {(() => {
+                  const limit = getLimitForItem(item.product_id);
+                  const atCap = item.quantity >= limit.max;
+                  const draft = qtyDrafts[item.key];
+                  return (
+                    <div className="flex flex-col items-end gap-3">
+                      <button
+                        aria-label={`Eliminar ${item.name}`}
+                        onClick={() => removeItem(item.key)}
+                        className="flex min-h-[32px] min-w-[32px] items-center justify-center text-gray-300 transition hover:text-red-400"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                      <div className="flex items-center overflow-hidden rounded-lg border border-gray-200">
+                        <button
+                          aria-label={`Reducir cantidad de ${item.name}`}
+                          onClick={() => handleQtyStep(item.key, item.quantity - 1)}
+                          className="flex h-9 w-9 items-center justify-center transition hover:bg-gray-50"
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          aria-label={`Cantidad de ${item.name}`}
+                          value={draft !== undefined ? draft : String(item.quantity)}
+                          onChange={(e) => {
+                            const v = e.target.value.replace(/[^0-9]/g, "");
+                            setQtyDrafts((d) => ({ ...d, [item.key]: v }));
+                          }}
+                          onBlur={(e) => handleQtyCommit(item.key, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                            if (e.key === "Escape") {
+                              setQtyDrafts((d) => {
+                                const { [item.key]: _r, ...rest } = d;
+                                void _r;
+                                return rest;
+                              });
+                              (e.target as HTMLInputElement).blur();
+                            }
+                          }}
+                          className="w-12 text-center text-sm font-bold outline-none focus:bg-blue-50"
+                        />
+                        <button
+                          aria-label={`Aumentar cantidad de ${item.name}`}
+                          disabled={atCap}
+                          onClick={() => handleQtyStep(item.key, item.quantity + 1)}
+                          className="flex h-9 w-9 items-center justify-center transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
+                      <span className="text-sm font-bold text-gray-900">
+                        {(item.price * item.quantity).toFixed(2)}€
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}

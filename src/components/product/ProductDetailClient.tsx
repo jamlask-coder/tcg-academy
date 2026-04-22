@@ -9,7 +9,7 @@ import {
   Check,
   Bell,
 } from "lucide-react";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useFavorites } from "@/context/FavoritesContext";
@@ -27,6 +27,7 @@ import {
   LANGUAGE_FLAGS,
 } from "@/data/products";
 import { getMergedProducts, getMergedById, getProductUrl } from "@/lib/productStore";
+import { persistProductPatch } from "@/lib/productPersist";
 import { SetHighlightCards } from "@/components/product/SetHighlightCards";
 import { LanguageFlag } from "@/components/ui/LanguageFlag";
 import { DiscountBadgeEdit } from "@/components/ui/DiscountBadgeEdit";
@@ -101,11 +102,28 @@ function AdminPriceRow({
   editMode: boolean;
 }) {
   const [draft, setDraft] = useState(value.toFixed(2));
+  const [focused, setFocused] = useState(false);
 
-  // keep draft in sync when value changes externally
+  // Mantén draft sincronizado con `value` SOLO si el input no está enfocado.
+  // Fix 2026-04-22: antes el effect machacaba lo que el usuario tecleaba —
+  // cada keystroke disparaba onSave → re-render del padre → effect reseteaba
+  // draft a `value.toFixed(2)` haciendo imposible escribir cifras de varios
+  // dígitos. Ahora el save ocurre solo en blur/Enter.
   useEffect(() => {
+    if (focused) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sincronización externa controlada: solo actualiza draft cuando el input NO está enfocado
     setDraft(value.toFixed(2));
-  }, [value]);
+  }, [value, focused]);
+
+  const commit = () => {
+    const n = parseFloat(draft.replace(",", "."));
+    if (!isNaN(n) && n > 0) {
+      onSave(n);
+      setDraft(n.toFixed(2));
+    } else {
+      setDraft(value.toFixed(2));
+    }
+  };
 
   return (
     <div className="flex items-center justify-between gap-2">
@@ -118,10 +136,18 @@ function AdminPriceRow({
           step="0.01"
           min="0.01"
           value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            const n = parseFloat(e.target.value);
-            if (!isNaN(n) && n > 0) onSave(n);
+          onChange={(e) => setDraft(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => {
+            setFocused(false);
+            commit();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            if (e.key === "Escape") {
+              setDraft(value.toFixed(2));
+              (e.target as HTMLInputElement).blur();
+            }
           }}
           className="w-24 rounded border border-[#2563eb] px-1.5 py-0.5 text-right font-mono text-sm focus:outline-none"
         />
@@ -286,7 +312,39 @@ function PriceDisplay({
   );
 }
 
-export function ProductDetailClient({ product, config, catLabel }: Props) {
+export function ProductDetailClient({ product: initialProduct, config, catLabel }: Props) {
+  // Fix 2026-04-22 — divergencia catálogo↔detalle.
+  // La ruta `/[game]/[category]/[slug]` es Server Component y pasa `product`
+  // desde `PRODUCTS` (estático) sin mezclar `tcgacademy_product_overrides`.
+  // Resultado: el catálogo (que sí usa `getMergedProducts`) mostraba el nombre
+  // y precio editados por el admin, pero el detalle mostraba los estáticos.
+  // Hidratamos aquí para que TODA la UI del detalle use el producto mergeado.
+  // Ver: feedback_catalog_detail_consistency.md + feedback_ssr_override_hydration.md
+  const [product, setProduct] = useState<LocalProduct>(initialProduct);
+  // Flag anti-loop: cuando persistPatch dispara `tcga:products:updated`
+  // este listener NO debe reaccionar (si lo hace, setProduct → product
+  // cambia con nueva referencia → sync effect re-dispara → bucle infinito
+  // que bloquea la página y hace imposible navegar).
+  // Los eventos externos (otras pestañas, otros componentes) siguen
+  // llegando vía `storage` o vía `tcga:products:updated` cuando no estamos
+  // auto-despachando.
+  const isSelfDispatchingRef = useRef(false);
+  useEffect(() => {
+    const merged = getMergedById(initialProduct.id);
+    if (merged) setProduct(merged);
+    const onUpdated = () => {
+      if (isSelfDispatchingRef.current) return;
+      const m = getMergedById(initialProduct.id);
+      if (m) setProduct(m);
+    };
+    window.addEventListener("tcga:products:updated", onUpdated);
+    window.addEventListener("storage", onUpdated);
+    return () => {
+      window.removeEventListener("tcga:products:updated", onUpdated);
+      window.removeEventListener("storage", onUpdated);
+    };
+  }, [initialProduct.id]);
+
   const { addItem, items, removeItem, updateQty } = useCart();
   const { user } = useAuth();
   const { toggle: toggleFavorite, isFavorite } = useFavorites();
@@ -341,7 +399,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
     number | undefined
   >(product.comparePrice);
   const [inlineStock] = useState(product.inStock);
-  const [inlineStockQty] = useState<string>(
+  const [inlineStockQty, setInlineStockQty] = useState<string>(
     product.stock !== undefined ? String(product.stock) : "",
   );
   const [descExpanded, setDescExpanded] = useState(false);
@@ -354,6 +412,42 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
   const [editMode, setEditMode] = useState(false);
+
+  // Sincroniza los inline* con el producto hidratado.
+  //
+  // ONE-SHOT al montar: initialProduct llega del Server Component (estático,
+  // sin overrides aplicados). El useEffect de arriba hidrata product con
+  // getMergedById. Cuando eso ocurre, sync TODOS los inline* al merged para
+  // cerrar el bug StrixHaven (catálogo 50€, detalle 40€).
+  //
+  // DESPUÉS de la hidratación NO volvemos a sincronizar automáticamente
+  // — cada editor (precios, stock, título, descripción, imágenes) es dueño
+  // de su propio campo y persiste directamente vía persistPatch.
+  // Si otra pestaña edita el producto, el listener de tcga:products:updated
+  // actualiza `product` pero NO machacamos inline* porque el admin podría
+  // estar editando localmente.
+  //
+  // Historia: intentos previos con sync continuo [product, editMode]
+  // provocaban machacones entre ciclos de edición y pérdida del valor nuevo
+  // justo después de guardar. Ver feedback_controlled_input_loop.md y
+  // feedback_catalog_detail_consistency.md.
+  const didInitialHydrate = useRef(false);
+  useEffect(() => {
+    if (didInitialHydrate.current) return;
+    if (product === initialProduct) return; // aún no ha hidratado
+    didInitialHydrate.current = true;
+    setInlineTitle(product.name);
+    setInlineDesc(product.description || "");
+    setInlinePrice(product.price);
+    setInlineWholesalePrice(product.wholesalePrice);
+    setInlineStorePrice(product.storePrice);
+    setInlineCostPrice(product.costPrice ?? 0);
+    setInlineComparePrice(product.comparePrice);
+    setInlineStockQty(
+      product.stock !== undefined ? String(product.stock) : "",
+    );
+    setInlineImages(product.images);
+  }, [product, initialProduct]);
 
   // Detect if description overflows line-clamp-3
   useEffect(() => {
@@ -377,6 +471,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
     const [moved] = imgs.splice(from, 1);
     imgs.splice(targetIdx, 0, moved);
     setInlineImages(imgs);
+    persistPatch({ images: imgs });
     setActiveImg(targetIdx);
     dragIdx.current = null;
   };
@@ -450,42 +545,86 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
 
       lines.push(`Envío rápido y embalaje protegido para garantizar que tu producto llega en perfectas condiciones.`);
 
-      setInlineDesc(lines.join(" "));
+      const generated = lines.join(" ");
+      setInlineDesc(generated);
+      persistPatch({ description: generated });
     } finally {
       setGeneratingDesc(false);
     }
   }, [inlineTitle, inlineGame, inlineCategory, product.tags, product.packsPerBox, product.cardsPerPack]);
 
-  const handleSave = useCallback(() => {
-    let overrides: Record<string, unknown> = {};
-    try {
-      overrides = JSON.parse(
-        localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
-      );
-    } catch { overrides = {}; }
-    overrides[product.id] = {
-      name: inlineTitle,
-      description: inlineDesc,
+  // Persiste UN campo (o varios) del producto, haciendo MERGE con lo que ya
+  // había. La lógica canónica vive en `@/lib/productPersist` y distingue
+  // automáticamente entre:
+  //   - Producto estático (PRODUCTS[]) → escribe a `tcgacademy_product_overrides`
+  //   - Producto admin-created → actualiza `tcgacademy_new_products` in-place
+  //
+  // Por qué esto importa (incidente StrixHaven 6ª iteración 2026-04-22):
+  // StrixHaven es admin-created (id > 1.7e12, ruta `/producto/<slug>`).
+  // `getMergedProducts` no aplica overrides a admin-created → escribir siempre
+  // a "overrides" desde aquí dejaba el precio huérfano. El mismo producto
+  // editado desde /admin/precios sí funcionaba porque ese panel SÍ
+  // distingue. Centralizamos la lógica en `persistProductPatch`.
+  //
+  // Por qué merge y no replace: approach anterior (persistOverrides full-state
+  // con closure) tenía stale-closure y autosave races. Con persistPatch por
+  // campo + valor explícito en el handler + useCallback con dep única estable
+  // [product.id], cada editor es idempotente.
+  //
+  // Ver: feedback_catalog_detail_consistency.md GOTCHA 5.
+  const persistPatch = useCallback((patch: Partial<LocalProduct>) => {
+    persistProductPatch(product.id, patch);
+    // Suprime el listener propio durante el dispatch síncrono para romper
+    // el loop persist → evento → setProduct → sync effect → setInline* →
+    // persist. Otros listeners (admin/catálogo/carrito) reciben el evento
+    // con normalidad.
+    isSelfDispatchingRef.current = true;
+    window.dispatchEvent(new Event("tcga:products:updated"));
+    isSelfDispatchingRef.current = false;
+  }, [product.id]);
+
+  // Debounce del título editado para no disparar llamadas de resolución de
+  // cartas (Scryfall / TCGDex / etc.) en cada keystroke. 600ms es suficiente
+  // para cubrir pausas cortas sin sentirse laggy.
+  const [debouncedTitle, setDebouncedTitle] = useState(inlineTitle);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedTitle(inlineTitle), 600);
+    return () => clearTimeout(t);
+  }, [inlineTitle]);
+
+  // Producto "editado" con los valores inline — se usa para los consumidores
+  // que dependen del contenido (p.ej. SetHighlightCards re-resuelve top cards
+  // y colección según el nombre/juego/idioma editados, no el estático).
+  // Fix 2026-04-22: al cambiar el título inline las "cartas más cotizadas" y
+  // la "colección" seguían apuntando al set del nombre antiguo.
+  const editedProduct: LocalProduct = useMemo(
+    () => ({
+      ...product,
+      name: debouncedTitle,
       game: inlineGame,
       category: inlineCategory,
-      language: inlineLanguage || undefined,
+      language: inlineLanguage || product.language,
+    }),
+    [product, debouncedTitle, inlineGame, inlineCategory, inlineLanguage],
+  );
+
+  const handleSave = useCallback(() => {
+    // Pasada DEFENSIVA: garantiza que todos los campos inline actuales
+    // queden persistidos, incluso si algún editor (ej. título) no llegó a
+    // disparar blur antes del click en Guardar. Como persistPatch hace
+    // MERGE (no replace), esto es idempotente y nunca machaca otros campos.
+    persistPatch({
+      name: inlineTitle,
+      description: inlineDesc,
       price: inlinePrice,
       wholesalePrice: inlineWholesalePrice,
       storePrice: inlineStorePrice,
       costPrice: inlineCostPrice,
       comparePrice: inlineComparePrice,
-      inStock: inlineStock,
       stock: inlineStockQty.trim() === "" ? undefined : parseInt(inlineStockQty),
+      inStock: inlineStockQty.trim() === "" ? inlineStock : parseInt(inlineStockQty) > 0,
       images: inlineImages,
-    };
-    localStorage.setItem(
-      "tcgacademy_product_overrides",
-      JSON.stringify(overrides),
-    );
-    // SSOT: el stock ya vive dentro de `tcgacademy_product_overrides[id].stock`
-    // (ver `overrides[product.id].stock` arriba). La antigua clave paralela
-    // `tcgacademy_stock_overrides` queda deprecada.
-    window.dispatchEvent(new Event("tcga:products:updated"));
+    });
 
     // Trigger restock emails if product went from out-of-stock to in-stock
     const wasOutOfStock = !product.inStock || (typeof product.stock === "number" && product.stock === 0);
@@ -500,7 +639,20 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
     setSavedToast(true);
     setTimeout(() => setSavedToast(false), 2500);
     setEditMode(false);
-  }, [product.id, product.inStock, product.stock, product.images, inlineTitle, inlineDesc, inlineGame, inlineCategory, inlineLanguage, inlinePrice, inlineWholesalePrice, inlineStorePrice, inlineCostPrice, inlineComparePrice, inlineStock, inlineStockQty, inlineImages]);
+  }, [
+    persistPatch,
+    product,
+    inlineTitle,
+    inlineDesc,
+    inlinePrice,
+    inlineWholesalePrice,
+    inlineStorePrice,
+    inlineCostPrice,
+    inlineComparePrice,
+    inlineStock,
+    inlineStockQty,
+    inlineImages,
+  ]);
 
   const handleDelete = useCallback(() => {
     const deleted = JSON.parse(
@@ -591,6 +743,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                     const imgs = [...inlineImages];
                     imgs[activeImg] = url;
                     setInlineImages(imgs);
+                    persistPatch({ images: imgs });
                   }}
                   className="h-full w-full"
                 >
@@ -672,7 +825,10 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                 <DiscountBadgeEdit
                   displayPrice={inlinePrice}
                   comparePrice={inlineComparePrice}
-                  onSave={setInlineComparePrice}
+                  onSave={(v) => {
+                    setInlineComparePrice(v);
+                    persistPatch({ comparePrice: v });
+                  }}
                   badgeClassName="rounded-full bg-red-500 px-2.5 py-0.5 text-xs font-bold text-white shadow-sm"
                 />
                 {user && user.role !== "admin" && (
@@ -782,6 +938,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                   type="text"
                   value={inlineTitle}
                   onChange={(e) => setInlineTitle(e.target.value)}
+                  onBlur={() => persistPatch({ name: inlineTitle })}
                   className="w-full rounded-lg border border-[#2563eb] px-2 py-0.5 text-xl font-bold focus:outline-none"
                 />
               ) : (
@@ -815,33 +972,105 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
             product={product}
             color={color}
             inlinePrice={inlinePrice}
-            onPriceChange={(v) => setInlinePrice(parseFloat(v) || inlinePrice)}
+            onPriceChange={(v) => {
+              const next = parseFloat(v) || inlinePrice;
+              setInlinePrice(next);
+              persistPatch({ price: next });
+            }}
             inlineWholesalePrice={inlineWholesalePrice}
-            onWholesalePriceChange={setInlineWholesalePrice}
+            onWholesalePriceChange={(v) => {
+              setInlineWholesalePrice(v);
+              persistPatch({ wholesalePrice: v });
+            }}
             inlineStorePrice={inlineStorePrice}
-            onStorePriceChange={setInlineStorePrice}
+            onStorePriceChange={(v) => {
+              setInlineStorePrice(v);
+              persistPatch({ storePrice: v });
+            }}
             inlineComparePrice={inlineComparePrice}
-            onComparePriceChange={setInlineComparePrice}
+            onComparePriceChange={(v) => {
+              setInlineComparePrice(v);
+              persistPatch({ comparePrice: v });
+            }}
             inlineCostPrice={inlineCostPrice}
-            onCostPriceChange={setInlineCostPrice}
+            onCostPriceChange={(v) => {
+              setInlineCostPrice(v);
+              persistPatch({ costPrice: v });
+            }}
             editMode={editMode}
           />
 
           {/* 4. Stock */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {(() => {
               const stockNum = inlineStockQty.trim() === "" ? undefined : parseInt(inlineStockQty);
               const si = getStockInfo(inlineStock ? stockNum : 0);
               return (
-                <div className={`inline-flex items-center gap-2 text-sm font-semibold ${si.color}`}>
-                  <span className="relative flex h-2 w-2">
-                    {si.pulse && (
-                      <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${si.dotColor}`} />
-                    )}
-                    <span className={`relative inline-flex h-2 w-2 rounded-full ${si.dotColor}`} />
-                  </span>
-                  {si.label}
-                </div>
+                <>
+                  <div className={`inline-flex items-center gap-2 text-sm font-semibold ${si.color}`}>
+                    <span className="relative flex h-2 w-2">
+                      {si.pulse && (
+                        <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${si.dotColor}`} />
+                      )}
+                      <span className={`relative inline-flex h-2 w-2 rounded-full ${si.dotColor}`} />
+                    </span>
+                    {si.label}
+                  </div>
+                  {/* Cantidad exacta — editable SOLO admin.
+                      En editMode (botón Editar pulsado) se muestra input directo
+                      igual que las filas de precio: evitar un 2º click al lápiz.
+                      Fuera de editMode, InlineEdit con lápiz-hover para edición rápida puntual. */}
+                  {isAdmin && editMode ? (
+                    <span className={`text-2xl font-bold ${si.color}`}>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={inlineStockQty}
+                        onChange={(e) => setInlineStockQty(e.target.value)}
+                        onBlur={() => {
+                          const trimmed = inlineStockQty.trim();
+                          if (trimmed === "") {
+                            persistPatch({ stock: undefined });
+                            return;
+                          }
+                          const n = parseInt(trimmed);
+                          const clamped = isNaN(n) || n < 0 ? 0 : n;
+                          setInlineStockQty(String(clamped));
+                          persistPatch({ stock: clamped, inStock: clamped > 0 });
+                        }}
+                        className={`w-24 rounded border border-current bg-white px-2 py-0.5 text-right font-mono text-2xl font-bold focus:outline-none ${si.color}`}
+                        aria-label="Unidades en stock"
+                      />
+                      <span className="ml-1 text-2xl font-bold">ud.</span>
+                    </span>
+                  ) : isAdmin ? (
+                    <span className={`text-2xl font-bold ${si.color}`}>
+                      <InlineEdit
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={stockNum ?? ""}
+                        onSave={(v) => {
+                          const trimmed = v.trim();
+                          if (trimmed === "") {
+                            setInlineStockQty("");
+                            persistPatch({ stock: undefined });
+                            return;
+                          }
+                          const n = parseInt(trimmed);
+                          const clamped = isNaN(n) || n < 0 ? 0 : n;
+                          setInlineStockQty(String(clamped));
+                          persistPatch({ stock: clamped, inStock: clamped > 0 });
+                        }}
+                        toastMessage="Stock actualizado"
+                        className="inline-flex"
+                      >
+                        {stockNum !== undefined ? `${stockNum} ud.` : "— ud."}
+                      </InlineEdit>
+                    </span>
+                  ) : null}
+                </>
               );
             })()}
           </div>
@@ -987,9 +1216,6 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
               "inline-flex items-center gap-1.5 rounded-full border-2 border-dashed px-3 py-1.5 text-xs font-semibold transition sm:py-1";
             return (
               <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/40 p-2.5">
-                <span className="text-[11px] font-bold tracking-wide text-blue-700 uppercase">
-                  Admin
-                </span>
                 {canCreatePack && (
                   <Link
                     href={`/admin/productos/nuevo?derivedFrom=${product.id}&mode=pack`}
@@ -1049,6 +1275,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                   <textarea
                     value={inlineDesc}
                     onChange={(e) => setInlineDesc(e.target.value)}
+                    onBlur={() => persistPatch({ description: inlineDesc })}
                     rows={3}
                     className="w-full resize-none rounded-lg border border-[#2563eb] px-2 py-1 text-sm leading-snug text-gray-600 focus:outline-none"
                   />
@@ -1263,7 +1490,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
 
       {/* Best cards — full width */}
       {(product.category === "booster-box" || product.category === "sobres") && (
-        <SetHighlightCards product={product} />
+        <SetHighlightCards product={editedProduct} />
       )}
 
 

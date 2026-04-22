@@ -30,11 +30,50 @@ interface PriceVerificationResult {
 }
 
 /**
+ * Aplica sobre un producto los overrides de localStorage (precio + stock +
+ * límites). En servidor devuelve el producto tal cual — los overrides son
+ * datos de cliente; el motor server-side real los leerá de BD.
+ *
+ * Incidente 2026-04-22: antes sólo `verifyPurchaseLimits` aplicaba overrides;
+ * `getProductPrice` y `verifyStockAvailability` leían PRODUCTS crudo → el
+ * precio editado por el admin en /admin/precios o /admin/stock no se
+ * consideraba al verificar el carrito → factura con precio obsoleto.
+ */
+function applyOverrides(p: LocalProduct): LocalProduct {
+  if (typeof window === "undefined") return p;
+  try {
+    const overrides = JSON.parse(
+      localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
+    ) as Record<string, Partial<LocalProduct>>;
+    const ov = overrides[String(p.id)];
+    return ov ? { ...p, ...ov } : p;
+  } catch {
+    return p;
+  }
+}
+
+/** Busca en PRODUCTS + productos creados por admin + aplica overrides. */
+function getMergedProduct(id: number): LocalProduct | null {
+  const base = PRODUCTS.find((p) => p.id === id);
+  if (base) return applyOverrides(base);
+  if (typeof window !== "undefined") {
+    try {
+      const admins = JSON.parse(
+        localStorage.getItem("tcgacademy_new_products") ?? "[]",
+      ) as LocalProduct[];
+      const found = admins.find((p) => p.id === id);
+      if (found) return applyOverrides(found);
+    } catch { /* empty */ }
+  }
+  return null;
+}
+
+/**
  * Get the correct price for a product based on user role.
  * This is the server-side equivalent of the usePrice hook.
  */
 function getProductPrice(productId: number, role: string): number | null {
-  const product = PRODUCTS.find((p) => p.id === productId);
+  const product = getMergedProduct(productId);
   if (!product) return null;
 
   switch (role) {
@@ -65,7 +104,7 @@ export function verifyCartPrices(
 
   for (const item of items) {
     const serverPrice = getProductPrice(item.product_id, userRole);
-    const product = PRODUCTS.find((p) => p.id === item.product_id);
+    const product = getMergedProduct(item.product_id);
 
     if (serverPrice === null || !product) {
       discrepancies.push({
@@ -122,33 +161,22 @@ export function verifyStockAvailability(
 ): { available: boolean; issues: Array<{ productId: number; name: string; requested: number; available: number }> } {
   const issues: Array<{ productId: number; name: string; requested: number; available: number }> = [];
 
-  // Read stock overrides from localStorage (in browser) or skip (in server)
-  let overrides: Record<string, { stock?: number; inStock?: boolean }> = {};
-  if (typeof window !== "undefined") {
-    try {
-      overrides = JSON.parse(localStorage.getItem("tcgacademy_product_overrides") ?? "{}");
-    } catch { /* empty */ }
-  }
-
   for (const item of items) {
-    const product = PRODUCTS.find((p) => p.id === item.product_id);
+    // getMergedProduct ya aplica los overrides (stock + inStock) y cubre
+    // productos creados por el admin vía localStorage.
+    const product = getMergedProduct(item.product_id);
     if (!product) {
       issues.push({ productId: item.product_id, name: "Desconocido", requested: item.quantity, available: 0 });
       continue;
     }
 
-    // Check override first, then product data
-    const override = overrides[String(item.product_id)];
-    const currentStock = override?.stock ?? product.stock;
-    const isInStock = override?.inStock ?? product.inStock;
-
-    if (!isInStock) {
+    if (!product.inStock) {
       issues.push({ productId: item.product_id, name: product.name, requested: item.quantity, available: 0 });
       continue;
     }
 
-    if (currentStock !== undefined && item.quantity > currentStock) {
-      issues.push({ productId: item.product_id, name: product.name, requested: item.quantity, available: currentStock });
+    if (product.stock !== undefined && item.quantity > product.stock) {
+      issues.push({ productId: item.product_id, name: product.name, requested: item.quantity, available: product.stock });
     }
   }
 
@@ -166,24 +194,6 @@ export function calculateShipping(
   if (subtotal >= SITE_CONFIG.shippingThreshold) return 0; // Free shipping above threshold
   if (method === "express") return 6.99;
   return 3.99; // standard
-}
-
-/**
- * Aplica sobre un producto los overrides de localStorage (stock + límites
- * por rol). En servidor se devuelve el producto tal cual (los overrides son
- * datos de cliente; el motor server-side real debería leerlos de BD).
- */
-function applyOverrides(p: LocalProduct): LocalProduct {
-  if (typeof window === "undefined") return p;
-  try {
-    const overrides = JSON.parse(
-      localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
-    ) as Record<string, Partial<LocalProduct>>;
-    const ov = overrides[String(p.id)];
-    return ov ? { ...p, ...ov } : p;
-  } catch {
-    return p;
-  }
 }
 
 /**
@@ -220,9 +230,10 @@ export function verifyPurchaseLimits(
   if (!userId) return { valid: true, issues };
 
   for (const item of items) {
-    const base = PRODUCTS.find((p) => p.id === item.product_id);
-    if (!base) continue;
-    const product = applyOverrides(base);
+    // getMergedProduct cubre PRODUCTS + productos creados por admin + overrides
+    // (precio, stock, maxPerClient/Wholesaler/Store editados en vivo).
+    const product = getMergedProduct(item.product_id);
+    if (!product) continue;
     const limit = getRoleLimit(product, userRole);
     if (limit === undefined) continue;
 

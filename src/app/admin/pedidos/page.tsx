@@ -43,6 +43,8 @@ import {
   generateInvoiceNumber,
 } from "@/utils/invoiceGenerator";
 import { logAudit } from "@/services/auditService";
+import { getMergedById } from "@/lib/productStore";
+import { persistProductPatch } from "@/lib/productPersist";
 import { parseFiscalAddress } from "@/lib/fiscalAddress";
 import {
   ShipModal,
@@ -1310,30 +1312,24 @@ export default function AdminPedidosPage() {
       });
     }
 
-    // Restore stock when order is cancelled or returned
+    // Restore stock when order is cancelled or returned.
+    // Usa persistProductPatch para que la restauración llegue a la colección
+    // correcta (admin-created → tcgacademy_new_products; estático →
+    // tcgacademy_product_overrides). Antes se escribía siempre a overrides y
+    // los productos admin-created cancelados no recuperaban stock. GOTCHA 5.
     if (isStockRestoring && previousOrder) {
       try {
-        const overrides = JSON.parse(
-          localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
-        ) as Record<string, Record<string, unknown>>;
         for (const item of previousOrder.items) {
-          const pid = String(item.id);
+          const merged = getMergedById(item.id);
           const currentStock =
-            typeof overrides[pid]?.stock === "number"
-              ? (overrides[pid].stock as number)
-              : undefined;
+            typeof merged?.stock === "number" ? merged.stock : undefined;
           if (currentStock !== undefined) {
-            overrides[pid] = {
-              ...overrides[pid],
+            persistProductPatch(item.id, {
               stock: currentStock + item.qty,
               inStock: true,
-            };
+            });
           }
         }
-        localStorage.setItem(
-          "tcgacademy_product_overrides",
-          JSON.stringify(overrides),
-        );
         window.dispatchEvent(new Event("tcga:products:updated"));
       } catch {
         /* ignore */

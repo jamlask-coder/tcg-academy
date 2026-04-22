@@ -29,6 +29,11 @@ import type {
   TaxExportRow,
   Quarter,
 } from "@/types/tax";
+import {
+  moneyRound as roundTo2,
+  baseFromPriceWithVAT,
+  feeOnBase,
+} from "@/lib/money";
 
 // ─── Tablas de tipos ─────────────────────────────────────────────────────────
 
@@ -48,12 +53,12 @@ export const SURCHARGE_RATES: Record<VatRate, 0 | 0.5 | 1.4 | 5.2> = {
 
 /** Calcula la cuota de IVA sobre una base imponible */
 export function calculateVAT(taxableBase: number, rate: number): number {
-  return roundTo2(taxableBase * (rate / 100));
+  return feeOnBase(taxableBase, rate);
 }
 
 /** Calcula el recargo de equivalencia sobre una base imponible */
 export function calculateSurcharge(taxableBase: number, rate: number): number {
-  return roundTo2(taxableBase * (rate / 100));
+  return feeOnBase(taxableBase, rate);
 }
 
 /**
@@ -61,7 +66,7 @@ export function calculateSurcharge(taxableBase: number, rate: number): number {
  * Útil cuando el precio de venta ya incluye IVA.
  */
 export function priceToBase(priceWithVAT: number, vatRate: number): number {
-  return roundTo2(priceWithVAT / (1 + vatRate / 100));
+  return baseFromPriceWithVAT(priceWithVAT, vatRate);
 }
 
 /**
@@ -437,10 +442,7 @@ export function generateCSVForAdvisor(
 }
 
 // ─── Utilidades ──────────────────────────────────────────────────────────────
-
-function roundTo2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
+// roundTo2 ahora se importa de @/lib/money (big.js-based, precisión exacta)
 
 function formatDateISO(date: Date | string): string {
   const d = new Date(date);

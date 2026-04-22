@@ -1,0 +1,229 @@
+{
+  "series": {
+    "pokemon:sv3pt5-199": {
+      "cardId": "pokemon:sv3pt5-199",
+      "game": "pokemon",
+      "cardName": "Charizard ex",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 235.71,
+          "sourceCurrency": "EUR",
+          "source": "pokemontcg"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:21:12.563Z"
+    },
+    "pokemon:sv3pt5-200": {
+      "cardId": "pokemon:sv3pt5-200",
+      "game": "pokemon",
+      "cardName": "Blastoise ex",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 79.37,
+          "sourceCurrency": "EUR",
+          "source": "pokemontcg"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:21:25.499Z"
+    },
+    "pokemon:sv3pt5-198": {
+      "cardId": "pokemon:sv3pt5-198",
+      "game": "pokemon",
+      "cardName": "Venusaur ex",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 79.88,
+          "sourceCurrency": "EUR",
+          "source": "pokemontcg"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:21:27.555Z"
+    },
+    "pokemon:sv3pt5-202": {
+      "cardId": "pokemon:sv3pt5-202",
+      "game": "pokemon",
+      "cardName": "Zapdos ex",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 90.46,
+          "sourceCurrency": "EUR",
+          "source": "pokemontcg"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:21:30.319Z"
+    },
+    "pokemon:sv3pt5-173": {
+      "cardId": "pokemon:sv3pt5-173",
+      "game": "pokemon",
+      "cardName": "Pikachu",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 44.73,
+          "sourceCurrency": "EUR",
+          "source": "pokemontcg"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:21:32.264Z"
+    },
+    "pokemon:sv5-215": {
+      "cardId": "pokemon:sv5-215",
+      "game": "pokemon",
+      "cardName": "Farigiraf ex",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 10.56,
+          "sourceCurrency": "EUR",
+          "source": "pokemontcg"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:22:44.444Z"
+    },
+    "pokemon:sv5-216": {
+      "cardId": "pokemon:sv5-216",
+      "game": "pokemon",
+      "cardName": "Morpeko ex",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 10.09,
+          "sourceCurrency": "EUR",
+          "source": "pokemontcg"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:22:46.207Z"
+    },
+    "pokemon:sv5-207": {
+      "cardId": "pokemon:sv5-207",
+      "game": "pokemon",
+      "cardName": "Raging Bolt ex",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 19.67,
+          "sourceCurrency": "EUR",
+          "source": "pokemontcg"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:22:48.318Z"
+    },
+    "pokemon:sv5-206": {
+      "cardId": "pokemon:sv5-206",
+      "game": "pokemon",
+      "cardName": "Gouging Fire ex",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 44.35,
+          "sourceCurrency": "EUR",
+          "source": "pokemontcg"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:22:49.430Z"
+    },
+    "magic:de547f52-3798-4b3a-947d-24873251204b": {
+      "cardId": "magic:de547f52-3798-4b3a-947d-24873251204b",
+      "game": "magic",
+      "cardName": "Crackle with Power",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 9.23,
+          "sourceCurrency": "EUR",
+          "source": "scryfall"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:31:10.244Z"
+    },
+    "magic:18a2bdc8-b705-4eb5-b3a5-ff2e2ab8f312": {
+      "cardId": "magic:18a2bdc8-b705-4eb5-b3a5-ff2e2ab8f312",
+      "game": "magic",
+      "cardName": "Wandering Archaic // Explore the Vastlands",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 8.02,
+          "sourceCurrency": "EUR",
+          "source": "scryfall"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:31:16.500Z"
+    },
+    "magic:013eeb99-1b66-4fba-ad96-78deee901ea4": {
+      "cardId": "magic:013eeb99-1b66-4fba-ad96-78deee901ea4",
+      "game": "magic",
+      "cardName": "Professor Onyx",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 4,
+          "sourceCurrency": "EUR",
+          "source": "scryfall"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:31:18.557Z"
+    },
+    "magic:a46d64ec-aca4-428e-bce6-66cd755c8cc3": {
+      "cardId": "magic:a46d64ec-aca4-428e-bce6-66cd755c8cc3",
+      "game": "magic",
+      "cardName": "Blade Historian",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 5.11,
+          "sourceCurrency": "EUR",
+          "source": "scryfall"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:31:20.369Z"
+    },
+    "magic:e900c1eb-968b-4046-b824-c167a7a5b682": {
+      "cardId": "magic:e900c1eb-968b-4046-b824-c167a7a5b682",
+      "game": "magic",
+      "cardName": "Sedgemoor Witch",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 1.94,
+          "sourceCurrency": "EUR",
+          "source": "scryfall"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:31:22.112Z"
+    },
+    "magic:930d3b70-7e8e-4a39-b60d-7d14196912e0": {
+      "cardId": "magic:930d3b70-7e8e-4a39-b60d-7d14196912e0",
+      "game": "magic",
+      "cardName": "Blex, Vexing Pest // Search for Blex",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 2.82,
+          "sourceCurrency": "EUR",
+          "source": "scryfall"
+        }
+      ],
+      "updatedAt": "2026-04-22T15:31:23.641Z"
+    },
+    "magic:265b9185-9033-4e57-a312-adcc91903aec": {
+      "cardId": "magic:265b9185-9033-4e57-a312-adcc91903aec",
+      "game": "magic",
+      "cardName": "Galazeth Prismari",
+      "points": [
+        {
+          "date": "2026-04-22",
+          "eur": 3.47,
+          "sourceCurrency": "EUR",
+          "source": "scryfall"
+        }
+      ],
+      "updatedAt": "2026-04-22T16:40:34.628Z"
+    }
+  },
+  "updatedAt": "2026-04-22T16:40:34.628Z"
+}

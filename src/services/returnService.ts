@@ -13,6 +13,8 @@
 
 import { DataHub } from "@/lib/dataHub";
 import { validateIban } from "@/lib/validations/iban";
+import { getMergedById } from "@/lib/productStore";
+import { persistProductPatch } from "@/lib/productPersist";
 
 const RETURNS_KEY = "tcgacademy_returns";
 const RETURN_WINDOW_DAYS = 14; // Legal return window in Spain
@@ -281,20 +283,19 @@ export function getReturnById(rmaId: string): ReturnRequest | null {
 export function restoreStockForReturn(items: ReturnItem[]): void {
   if (typeof window === "undefined") return;
 
-  const overridesRaw = localStorage.getItem("tcgacademy_product_overrides");
-  const overrides: Record<string, Record<string, unknown>> = overridesRaw
-    ? JSON.parse(overridesRaw)
-    : {};
-
+  // Usa persistProductPatch para que la restauración llegue a la colección
+  // correcta (admin-created → tcgacademy_new_products; estático → overrides).
+  // Antes se escribía siempre a overrides y los productos admin-created
+  // devueltos nunca recuperaban stock. Ver GOTCHA 5.
   for (const item of items) {
-    const key = String(item.productId);
-    if (!overrides[key]) overrides[key] = {};
-    const current = (overrides[key].stock as number) ?? 0;
-    overrides[key].stock = current + item.quantity;
-    overrides[key].inStock = true;
+    const merged = getMergedById(item.productId);
+    const current =
+      typeof merged?.stock === "number" ? merged.stock : 0;
+    persistProductPatch(item.productId, {
+      stock: current + item.quantity,
+      inStock: true,
+    });
   }
-
-  localStorage.setItem("tcgacademy_product_overrides", JSON.stringify(overrides));
 }
 
 /**
@@ -422,6 +423,18 @@ export async function markAsRefunded(
 
   // 5. Restaurar stock.
   restoreStockForReturn(rma.items);
+
+  // 5b. Revertir los puntos de fidelidad ganados en la compra devuelta.
+  //     Sin esto el cliente conservaba puntos por un importe que ya no le
+  //     corresponde — discrepancia entre saldo de puntos y ventas netas.
+  //     Fallo silencioso: la rectificativa ya está emitida y es el documento
+  //     fiscal vinculante. Los puntos se pueden ajustar manualmente si falla.
+  try {
+    const { refundPurchasePoints } = await import("@/services/pointsService");
+    refundPurchasePoints(rma.customerId, rma.totalRefundAmount);
+  } catch {
+    // Non-blocking — el admin puede ajustar saldo desde /admin/usuarios.
+  }
 
   // 6. Actualizar RMA con referencias cruzadas + timestamp refundedAt.
   const refundedAt = new Date().toISOString();
