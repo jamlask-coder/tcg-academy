@@ -551,6 +551,9 @@ export function ProductDetailClient({ product: initialProduct, config, catLabel 
     } finally {
       setGeneratingDesc(false);
     }
+    // persistPatch se declara más abajo (TDZ). Es estable por useCallback
+    // con dep [product.id], así que no añadirlo aquí no causa stale-closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inlineTitle, inlineGame, inlineCategory, product.tags, product.packsPerBox, product.cardsPerPack]);
 
   // Persiste UN campo (o varios) del producto, haciendo MERGE con lo que ya

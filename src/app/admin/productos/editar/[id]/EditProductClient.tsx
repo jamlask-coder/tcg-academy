@@ -32,7 +32,6 @@ export default function EditProductClient({
       setNotFound(true);
       return;
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- hidratación post-SSR obligatoria: el server no puede leer localStorage
     setMerged(resolved);
   }, [productId]);
 

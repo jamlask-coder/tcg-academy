@@ -129,7 +129,6 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("next/link", () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string } & Record<string, unknown>) => {
-    // eslint-disable-next-line jsx-a11y/anchor-is-valid
     return <a href={href} {...rest}>{children}</a>;
   },
 }));
