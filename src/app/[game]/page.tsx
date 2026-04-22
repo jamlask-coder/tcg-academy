@@ -9,7 +9,9 @@ import {
 } from "@/data/products";
 import { CategoryTags, type TagItem } from "@/components/filters/CategoryTags";
 import { CategoryFilteredGrid } from "@/components/filters/CategoryFilteredGrid";
-import { breadcrumbJsonLd, jsonLdProps } from "@/lib/seo";
+import { FaqAccordion } from "@/components/seo/FaqAccordion";
+import { getFaqForGame } from "@/data/gameFaqs";
+import { breadcrumbJsonLd, faqJsonLd, jsonLdProps } from "@/lib/seo";
 import type { Metadata } from "next";
 
 export function generateStaticParams() {
@@ -69,10 +71,13 @@ export default async function GamePage({
     { name: "Inicio", url: "/" },
     { name: config.name, url: `/${game}` },
   ]);
+  const faqs = getFaqForGame(game);
+  const faqLd = faqJsonLd(faqs);
 
   return (
     <div>
       <script {...jsonLdProps(breadcrumbLd)} />
+      <script {...jsonLdProps(faqLd)} />
 
       {/* Category nav */}
       {categories.length > 0 && (
@@ -95,7 +100,7 @@ export default async function GamePage({
       )}
 
       {/* Catálogo */}
-      <section className="mx-auto max-w-[1400px] px-4 py-3 sm:px-6 sm:py-10">
+      <section id="catalogo" className="mx-auto max-w-[1400px] px-4 py-3 sm:px-6 sm:py-10">
         {all.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-gray-200 py-24 text-center">
             <p className="font-medium text-gray-400">Catálogo en construcción</p>
@@ -119,6 +124,16 @@ export default async function GamePage({
             ]}
           />
         )}
+      </section>
+
+      {/* FAQ — SEO long-tail + rich results */}
+      <section className="border-t border-gray-100 bg-gray-50">
+        <div className="mx-auto max-w-[900px] px-4 py-10 sm:px-6 sm:py-14">
+          <h2 className="mb-6 text-xl font-bold text-gray-900 sm:text-2xl">
+            Preguntas frecuentes sobre {config.name}
+          </h2>
+          <FaqAccordion items={faqs} />
+        </div>
       </section>
     </div>
   );

@@ -2,6 +2,7 @@ export const dynamic = "force-static";
 import type { MetadataRoute } from "next";
 import { PRODUCTS, GAME_CONFIG, getAllCategories } from "@/data/products";
 import { STORES } from "@/data/stores";
+import { GUIDES } from "@/data/guides";
 import { SITE_URL } from "@/lib/seo";
 
 const BASE = SITE_URL;
@@ -20,6 +21,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${BASE}/mayoristas/franquicias`, priority: 0.5, changeFrequency: "monthly" },
     { url: `${BASE}/mayoristas/vending`, priority: 0.5, changeFrequency: "monthly" },
     { url: `${BASE}/novedades`, priority: 0.8, changeFrequency: "daily", lastModified: now },
+    { url: `${BASE}/guias`, priority: 0.8, changeFrequency: "weekly", lastModified: now },
     { url: `${BASE}/puntos`, priority: 0.5, changeFrequency: "yearly" },
     { url: `${BASE}/devoluciones`, priority: 0.5, changeFrequency: "yearly" },
     { url: `${BASE}/reclamaciones`, priority: 0.3, changeFrequency: "yearly" },
@@ -68,11 +70,19 @@ export default function sitemap(): MetadataRoute.Sitemap {
     };
   });
 
+  const guideRoutes: MetadataRoute.Sitemap = GUIDES.map((g) => ({
+    url: `${BASE}/guias/${g.slug}`,
+    priority: 0.7,
+    changeFrequency: "monthly",
+    lastModified: new Date(g.updatedAt ?? g.publishedAt),
+  }));
+
   return [
     ...staticRoutes,
     ...storeRoutes,
     ...gameRoutes,
     ...categoryRoutes,
+    ...guideRoutes,
     ...productRoutes,
   ];
 }

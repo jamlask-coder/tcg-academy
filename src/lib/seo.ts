@@ -207,6 +207,34 @@ export function breadcrumbJsonLd(items: BreadcrumbItem[]) {
   };
 }
 
+/** Article — guías y posts de blog. Da elegibilidad a rich results. */
+export interface ArticleLdInput {
+  title: string;
+  description: string;
+  url: string;
+  image?: string;
+  datePublished: string;
+  dateModified?: string;
+}
+
+export function articleJsonLd(input: ArticleLdInput) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: input.title,
+    description: input.description,
+    image: abs(input.image ?? "/og-default.png"),
+    datePublished: input.datePublished,
+    dateModified: input.dateModified ?? input.datePublished,
+    author: { "@id": `${SITE_URL}/#organization` },
+    publisher: { "@id": `${SITE_URL}/#organization` },
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": abs(input.url),
+    },
+  };
+}
+
 /** FAQPage — para pages con preguntas frecuentes. */
 export interface FaqItem {
   question: string;

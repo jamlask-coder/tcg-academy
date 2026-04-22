@@ -1,6 +1,7 @@
 "use client";
 import { memo, useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ShoppingCart, Heart, Check, Trash2, Bell } from "lucide-react";
 import { getStockInfo } from "@/utils/stockStatus";
 import { useCart } from "@/context/CartContext";
@@ -103,7 +104,7 @@ function LocalProductCardInner({ product }: Props) {
     (product.game === "pokemon" || product.game === "riftbound");
 
   const imageAspect = "aspect-square";
-  const imageObjectFit = "object-contain px-2 pt-8 pb-0";
+  const imageObjectFit = "object-contain !px-2 !pt-8 !pb-0";
   // Show second image on hover if available
   const displayImage = hovered && product.images[1] ? product.images[1] : image;
 
@@ -117,13 +118,15 @@ function LocalProductCardInner({ product }: Props) {
       onMouseLeave={() => setHovered(false)}
     >
       {displayImage && !imageBroken ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={displayImage}
           alt={`${product.name} — ${config?.name ?? product.game} | TCG Academy`}
+          fill
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           loading="lazy"
           onError={() => setImageBroken(true)}
-          className={`h-full w-full ${imageObjectFit} transition-all duration-300 ${!product.inStock ? "opacity-50" : ""}`}
+          unoptimized={displayImage.startsWith("data:") || displayImage.startsWith("blob:")}
+          className={`${imageObjectFit} transition-all duration-300 ${!product.inStock ? "opacity-50" : ""}`}
         />
       ) : (
         <div
