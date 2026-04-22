@@ -55,7 +55,6 @@ function SearchPageContent() {
 
   const availableLanguages = useMemo(() => {
     const set = new Set(baseResults.map((p) => p.language).filter(Boolean));
-    set.add("ZH");
     return [...set].sort((a, b) => {
       const ai = LANG_ORDER.indexOf(a.toUpperCase());
       const bi = LANG_ORDER.indexOf(b.toUpperCase());

@@ -24,9 +24,11 @@ import {
   ADMIN_ORDERS,
   ORDER_STORAGE_KEY,
   MOCK_ORDERS,
+  MOCK_USERS,
   type AdminOrder,
   type AdminOrderStatus,
 } from "@/data/mockData";
+import { userIdToHandle } from "@/lib/userHandle";
 
 const B2BCharts = dynamic(
   () => import("@/components/account/B2BCharts").then((m) => m.B2BCharts),
@@ -357,7 +359,7 @@ function AdminDashboard() {
                       {order.id}
                     </p>
                     <Link
-                      href={`/admin/usuarios/${order.userId}`}
+                      href={`/admin/usuarios/${userIdToHandle(order.userId, MOCK_USERS)}`}
                       onClick={(e) => e.stopPropagation()}
                       className="text-xs text-[#2563eb] hover:underline"
                     >

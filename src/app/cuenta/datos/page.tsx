@@ -97,7 +97,7 @@ export default function DatosPage() {
       );
     } else {
       const newAddr: Address = {
-        id: `addr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        id: `addr-${crypto.randomUUID()}`,
         predeterminada: addresses.length === 0,
         ...addrForm,
       } as Address;
@@ -158,13 +158,18 @@ export default function DatosPage() {
       }
     }
 
-    updateProfile({
+    const profileResult = updateProfile({
       name: form.name,
       lastName: form.lastName,
       phone: form.phone,
       nif: nifResult.normalized,
       nifType: nifResult.type === "OTHER" ? undefined : nifResult.type,
     });
+    if (!profileResult.ok) {
+      setEmailError(profileResult.error ?? "No se pudo guardar");
+      setSavingProfile(false);
+      return;
+    }
     setSavingProfile(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);

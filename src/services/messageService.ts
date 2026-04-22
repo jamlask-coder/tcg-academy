@@ -70,7 +70,10 @@ export function sendMessage(
   input: Omit<AppMessage, "id" | "date" | "read"> & Partial<Pick<AppMessage, "id" | "date" | "read">>,
 ): AppMessage {
   const msg: AppMessage = {
-    id: input.id ?? `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    // UUID criptográfico: elimina la ventana de colisión si 2 mensajes se
+    // envían en el mismo milisegundo con misma random seed (p.ej. broadcast
+    // masivo a todos los clientes).
+    id: input.id ?? `msg-${crypto.randomUUID()}`,
     date: input.date ?? new Date().toISOString(),
     read: input.read ?? false,
     fromUserId: input.fromUserId,

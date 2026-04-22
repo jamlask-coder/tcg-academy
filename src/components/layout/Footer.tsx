@@ -95,9 +95,6 @@ export function Footer() {
         <div className="mb-6 grid gap-8 sm:grid-cols-[2fr_1fr_1fr_auto] sm:gap-12">
           {/* Brand */}
           <div>
-            <Link href="/" className="mb-4 hidden items-center gap-2 sm:inline-flex">
-              <span className="text-xl font-black tracking-tight text-white">TCG <span className="text-amber-400">Academy</span></span>
-            </Link>
             {/* Store socials */}
             <div className="mt-4 space-y-2.5">
               {[
@@ -175,10 +172,10 @@ export function Footer() {
             />
             <div className="flex items-center justify-center gap-3">
               {[
+                { src: "/images/payment/paypal.svg", alt: "PayPal", w: 52, h: 16 },
                 { src: "/images/payment/bizum.svg", alt: "Bizum", w: 46, h: 16 },
                 { src: "/images/payment/visa.svg", alt: "Visa", w: 40, h: 14 },
                 { src: "/images/payment/mastercard.svg", alt: "Mastercard", w: 38, h: 24 },
-                { src: "/images/payment/paypal.svg", alt: "PayPal", w: 52, h: 16 },
               ].map(({ src, alt, w, h }) => (
                 <span key={alt} className="flex h-8 items-center justify-center rounded-md border border-white/10 bg-white px-2">
                   <Image src={src} alt={alt} width={w} height={h} className="object-contain" />
@@ -190,10 +187,10 @@ export function Footer() {
           {/* Payment — mobile only (below Tienda/Legal) */}
           <div className="flex items-center justify-center gap-3 sm:hidden">
             {[
+              { src: "/images/payment/paypal.svg", alt: "PayPal", w: 52, h: 16 },
               { src: "/images/payment/bizum.svg", alt: "Bizum", w: 46, h: 16 },
               { src: "/images/payment/visa.svg", alt: "Visa", w: 40, h: 14 },
               { src: "/images/payment/mastercard.svg", alt: "Mastercard", w: 38, h: 24 },
-              { src: "/images/payment/paypal.svg", alt: "PayPal", w: 52, h: 16 },
             ].map(({ src, alt, w, h }) => (
               <span key={alt} className="flex h-8 items-center justify-center rounded-md border border-white/10 bg-white px-2">
                 <Image src={src} alt={alt} width={w} height={h} className="object-contain" />

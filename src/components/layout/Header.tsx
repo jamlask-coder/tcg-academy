@@ -25,7 +25,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { GAME_CONFIG } from "@/data/products";
-import { getMergedProducts } from "@/lib/productStore";
+import { getMergedProducts, getProductUrl } from "@/lib/productStore";
 import { useNotifications } from "@/context/NotificationContext";
 import { useDebounce } from "@/hooks/useDebounce";
 import { MobileDrawer } from "./MobileDrawer";
@@ -155,10 +155,7 @@ function SearchDropdown({
           <div className="divide-y divide-gray-50">
             {results.map((p) => {
               const config = GAME_CONFIG[p.game];
-              const href =
-                p.id > 1_700_000_000_000
-                  ? `/producto?id=${p.id}`
-                  : `/${p.game}/${p.category}/${p.slug}`;
+              const href = getProductUrl(p);
               const img = p.images?.[0];
               return (
                 <Link

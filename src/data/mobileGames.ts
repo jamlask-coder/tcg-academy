@@ -24,11 +24,11 @@ export interface MobileGame {
 }
 
 export const MOBILE_GAMES: MobileGame[] = [
-  { slug: "pokemon", label: "Pokémon", bg: MOBILE_GAMES_BG, sprite: { origW: 273, origX: 1228, renderH: 40 } },
+  { slug: "pokemon", label: "Pokémon", bg: MOBILE_GAMES_BG, sprite: { origW: 273, origX: 1228, renderH: 50 } },
   { slug: "magic", label: "Magic", bg: MOBILE_GAMES_BG, logo: "/images/logos/magic-clean.png" },
   { slug: "one-piece", label: "One Piece", bg: MOBILE_GAMES_BG, logo: "/images/logos/onepiece.png", blend: true },
-  { slug: "riftbound", label: "Riftbound", bg: MOBILE_GAMES_BG, logo: "/images/logos/riftbound-clean.png?v=3", blend: true },
-  { slug: "yugioh", label: "Yu-Gi-Oh!", bg: MOBILE_GAMES_BG, sprite: { origW: 392, origX: 696, renderH: 34 } },
+  { slug: "riftbound", label: "Riftbound", bg: MOBILE_GAMES_BG, logo: "/images/logos/riftbound-clean.png?v=5", blend: true },
+  { slug: "yugioh", label: "Yu-Gi-Oh!", bg: MOBILE_GAMES_BG, sprite: { origW: 392, origX: 696, renderH: 40 } },
   { slug: "dragon-ball", label: "Dragon Ball", bg: MOBILE_GAMES_BG, logo: "/images/logos/dragonball-clean.png?v=2" },
   { slug: "topps", label: "Topps", bg: MOBILE_GAMES_BG, logo: "/images/logos/topps.svg" },
   { slug: "naruto", label: "Naruto", bg: MOBILE_GAMES_BG, logo: "/images/logos/naruto-official.png" },

@@ -66,12 +66,16 @@ import { STORES } from "@/data/stores";
 
 // Proyección ligera del registro central de tiendas para el checkout.
 // Fuente única: src/data/stores.ts — añadir/editar tiendas ahí.
-const TIENDAS = Object.values(STORES).map((s) => ({
-  id: s.id,
-  name: s.name,
-  address: s.address,
-  email: s.email,
-}));
+// Sólo tiendas abiertas son seleccionables como punto de recogida — una tienda
+// "próximamente" no puede aceptar pedidos aún.
+const TIENDAS = Object.values(STORES)
+  .filter((s) => !s.comingSoon)
+  .map((s) => ({
+    id: s.id,
+    name: s.name,
+    address: s.address,
+    email: s.email,
+  }));
 
 // Flujo consolidado: el método de envío se elige en el primer paso "datos"
 // junto con los datos personales. La dirección sólo se pide si NO es recogida
@@ -497,7 +501,7 @@ export default function CheckoutPage() {
         );
         if (!exists) {
           const newAddr = {
-            id: `addr-${Date.now()}`,
+            id: `addr-${crypto.randomUUID()}`,
             label: "Envío",
             nombre: sNombre,
             apellidos: sApellidos,
@@ -1520,6 +1524,12 @@ export default function CheckoutPage() {
                     fill
                     className="object-cover"
                     sizes="48px"
+                    unoptimized={
+                      !!item.image &&
+                      (item.image.startsWith("http") ||
+                        item.image.startsWith("data:") ||
+                        item.image.startsWith("blob:"))
+                    }
                   />
                 </div>
                 <div className="min-w-0 flex-1">

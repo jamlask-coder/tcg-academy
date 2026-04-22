@@ -862,6 +862,18 @@ export function loadInvoices(): InvoiceRecord[] {
 /** Guarda una nueva factura, actualiza el hash de integridad, y genera asiento contable */
 export function saveInvoice(invoice: InvoiceRecord): void {
   const invoices = loadInvoices();
+
+  // Última línea de defensa contra duplicados: si otro tab insertó una
+  // factura con el mismo número entre `generateInvoiceNumber()` y este
+  // `saveInvoice()`, regeneramos antes de persistir. La correlatividad
+  // legal (art. 6 RD 1619/2012) NO admite duplicados ni saltos — preferimos
+  // un número nuevo (que avanza el correlativo) a colisionar con un número
+  // ya emitido.
+  if (invoices.some((inv) => inv.invoiceNumber === invoice.invoiceNumber)) {
+    const newNumber = generateInvoiceNumber();
+    invoice = { ...invoice, invoiceNumber: newNumber };
+  }
+
   persistInvoices([...invoices, invoice]);
 
   // Generar asiento contable automáticamente (partida doble)

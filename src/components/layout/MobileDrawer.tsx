@@ -61,19 +61,18 @@ type NavItem = {
 
 // Profesionales — orden: Vending → B2B → Franquicia
 // Los 3 llevan icono custom (PNG procesado a ámbar) porque los Lucide no
-// transmiten tan bien el concepto.
+// transmiten tan bien el concepto. Assets restaurados desde git pre-f7669b4.
 const PRO_ITEMS: NavItem[] = [
   {
     href: "/mayoristas/vending",
     label: "Vending",
     icon: ShoppingBag,
     customIcon: (
-      // Máquina expendedora tintada en ámbar — concepto de vending directo.
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src="/images/logos/vending-amber.png"
         alt=""
-        className="h-[22px] w-[22px] object-contain"
+        className="h-[18px] w-[18px] object-contain"
       />
     ),
   },
@@ -82,13 +81,11 @@ const PRO_ITEMS: NavItem[] = [
     label: "B2B",
     icon: Briefcase,
     customIcon: (
-      // 3 tienditas conectadas con arcos — concepto de red B2B / red de
-      // comercios conectados (silueta ámbar).
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src="/images/logos/franquicias-amber.png"
+        src="/images/logos/b2b-cart-amber.png"
         alt=""
-        className="h-[22px] w-[22px] object-contain"
+        className="h-[18px] w-[18px] object-contain"
       />
     ),
   },
@@ -97,13 +94,11 @@ const PRO_ITEMS: NavItem[] = [
     label: "Franquicia",
     icon: Building2,
     customIcon: (
-      // Sello "QUALITY SATISFACTION GUARANTEED" — concepto de marca certificada
-      // / franquicia de calidad. Tinte ámbar con textura vintage preservada.
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src="/images/logos/quality-seal-amber.png"
+        src="/images/logos/franquicias-amber.png"
         alt=""
-        className="h-[22px] w-[22px] object-contain"
+        className="h-[18px] w-[18px] object-contain"
       />
     ),
   },
@@ -672,14 +667,11 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
               href="/compramos-tus-cartas"
               onClick={go}
               icon={
-                // Fajo de billetes (blanco → ámbar por tint + alpha según
-                // brillo original; fondo negro quitado por flood-fill por
-                // luminancia).
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src="/images/logos/money-amber.png"
                   alt=""
-                  className="h-[22px] w-[22px] object-contain"
+                  className="h-[18px] w-[18px] object-contain"
                 />
               }
               label="Compramos tus cartas"

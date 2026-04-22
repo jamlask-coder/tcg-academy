@@ -20,7 +20,7 @@ const LOGO_MAP: Record<string, string> = {
   magic: "magic-clean.png",
   pokemon: "pokemon.svg",
   "one-piece": "onepiece.svg",
-  riftbound: "riftbound-clean.png?v=3",
+  riftbound: "riftbound-clean.png?v=5",
   lorcana: "lorcana.png",
   "dragon-ball": "dragonball-clean.png?v=2",
   yugioh: "yugioh.png",
@@ -52,8 +52,6 @@ const SORT_OPTIONS = [
   { value: "price-desc", label: "Precio: mayor a menor" },
 ];
 
-const PAGE_SIZE = 24;
-
 export default function CatalogoPageWrapper() {
   return (
     <Suspense>
@@ -70,7 +68,6 @@ function CatalogoPage() {
     getMergedProducts(),
   );
   const [sort, setSort] = useState("new");
-  const [page, setPage] = useState(1);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [newOnly, setNewOnly] = useState(false);
   // Mobile: start on game picker screen; go to products after selecting a game
@@ -179,7 +176,6 @@ function CatalogoPage() {
   );
   const availableLanguages = useMemo(() => {
     const set = new Set(scopeForSidebar.map((p) => p.language).filter(Boolean));
-    set.add("ZH");
     return [...set].sort((a, b) => {
       const ai = LANG_ORDER.indexOf(a.toUpperCase());
       const bi = LANG_ORDER.indexOf(b.toUpperCase());
@@ -210,12 +206,10 @@ function CatalogoPage() {
     (priceMax !== null ? 1 : 0) +
     (newOnly ? 1 : 0);
 
-  const visible = filtered.slice(0, page * PAGE_SIZE);
-  const hasMore = visible.length < filtered.length;
+  const visible = filtered;
 
   function selectGameMobile(slug: string) {
     updateParam("game", slug);
-    setPage(1);
     setMobilePicker(false);
   }
 
@@ -333,10 +327,7 @@ function CatalogoPage() {
             <div className="relative flex-1">
               <select
                 value={sort}
-                onChange={(e) => {
-                  setSort(e.target.value);
-                  setPage(1);
-                }}
+                onChange={(e) => setSort(e.target.value)}
                 aria-label="Ordenar productos"
                 className="h-11 w-full cursor-pointer appearance-none rounded-xl border-2 border-gray-200 bg-white pr-9 pl-4 text-sm font-medium text-gray-700 transition focus:border-[#2563eb] focus:outline-none"
               >
@@ -367,10 +358,7 @@ function CatalogoPage() {
             <input
               type="checkbox"
               checked={newOnly}
-              onChange={(e) => {
-                setNewOnly(e.target.checked);
-                setPage(1);
-              }}
+              onChange={(e) => setNewOnly(e.target.checked)}
               className="h-4 w-4 accent-[#2563eb]"
             />
             <span className="text-sm font-medium text-gray-700">Solo novedades</span>
@@ -427,23 +415,11 @@ function CatalogoPage() {
               </button>
             </div>
           ) : (
-            <>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {visible.map((p) => (
-                  <LocalProductCard key={p.id} product={p} />
-                ))}
-              </div>
-              {hasMore && (
-                <div className="mt-10 text-center">
-                  <button
-                    onClick={() => setPage((prev) => prev + 1)}
-                    className="rounded-xl border-2 border-[#2563eb] bg-white px-10 py-3.5 font-bold text-[#2563eb] transition hover:bg-[#2563eb] hover:text-white"
-                  >
-                    Cargar más productos
-                  </button>
-                </div>
-              )}
-            </>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {visible.map((p) => (
+                <LocalProductCard key={p.id} product={p} />
+              ))}
+            </div>
           )}
         </div>{/* end main column */}
       </div>{/* end flex layout */}

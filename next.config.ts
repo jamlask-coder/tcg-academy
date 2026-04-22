@@ -19,6 +19,11 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "lorcana-api.com" },
       { protocol: "https", hostname: "tcgplayer-cdn.tcgplayer.com" },
       { protocol: "https", hostname: "images.riftbound.gg" },
+      { protocol: "https", hostname: "cdn11.bigcommerce.com" },
+      { protocol: "https", hostname: "cdn.sanity.io" },
+      { protocol: "https", hostname: "img.yugioh-card.com" },
+      { protocol: "https", hostname: "www.yugioh-card.com" },
+      { protocol: "https", hostname: "pandacollecting.com" },
     ],
   },
   async headers() {
@@ -26,9 +31,10 @@ const nextConfig: NextConfig = {
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "img-src 'self' data: blob: https://static.cardmarket.com https://images.pokemontcg.io https://cards.scryfall.io https://c1.scryfall.com https://svgs.scryfall.io https://images.ygoprodeck.com https://api.tcgdex.net https://assets.tcgdex.net https://files.bandai-tcg-plus.com https://storage.googleapis.com https://tcgplayer-cdn.tcgplayer.com https://lorcana-api.com https://images.riftbound.gg https://apitcg.com https://images.digimoncard.io https://en.digimoncard.com",
+      "img-src 'self' data: blob: https://static.cardmarket.com https://images.pokemontcg.io https://cards.scryfall.io https://c1.scryfall.com https://svgs.scryfall.io https://images.ygoprodeck.com https://api.tcgdex.net https://assets.tcgdex.net https://files.bandai-tcg-plus.com https://storage.googleapis.com https://tcgplayer-cdn.tcgplayer.com https://lorcana-api.com https://images.riftbound.gg https://apitcg.com https://images.digimoncard.io https://en.digimoncard.com https://cdn11.bigcommerce.com https://cdn.sanity.io https://img.yugioh-card.com https://www.yugioh-card.com https://pandacollecting.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "connect-src 'self' https://api.scryfall.com https://api.pokemontcg.io https://api.tcgdex.net https://api.lorcana-api.com https://db.ygoprodeck.com https://api.frankfurter.app https://apitcg.com https://digimoncard.io",
+      "frame-src 'self' https://www.google.com https://maps.google.com",
       "frame-ancestors 'none'",
       "upgrade-insecure-requests",
     ].join("; ");

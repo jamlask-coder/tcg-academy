@@ -5,6 +5,7 @@ import {
   ProductForm,
   type ProductFormValues,
 } from "@/components/admin/ProductForm";
+import { findProductBySlugExcluding } from "@/lib/productStore";
 
 export default function EditProductClient({
   product,
@@ -32,6 +33,15 @@ export default function EditProductClient({
     tags: string[],
     images: string[],
   ) => {
+    // Bloquea si otro producto ya usa este slug. Excluye el producto actual
+    // para permitir guardar sin cambiar el slug.
+    const conflict = findProductBySlugExcluding(data.slug, product.id);
+    if (conflict) {
+      alert(
+        `Ya existe otro producto con el slug "${data.slug}" (${conflict.name}). Cámbialo antes de guardar.`,
+      );
+      return;
+    }
     const overrides = JSON.parse(
       localStorage.getItem("tcgacademy_product_overrides") ?? "{}",
     );

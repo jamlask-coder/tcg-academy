@@ -10,7 +10,6 @@ import {
   MobileFilterButton,
 } from "@/components/filters/SidebarFilters";
 
-const PAGE_SIZE = 24;
 const LANG_ORDER = ["ES", "EN", "JP", "KO", "FR", "DE", "IT", "PT", "ZH"];
 
 function byDateDesc(a: LocalProduct, b: LocalProduct): number {
@@ -25,7 +24,6 @@ function byDateDesc(a: LocalProduct, b: LocalProduct): number {
 
 export default function NovedadesPage() {
   const params = useSearchParams();
-  const [page, setPage] = useState(1);
   const [products, setProducts] = useState<LocalProduct[]>([]);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
@@ -64,7 +62,6 @@ export default function NovedadesPage() {
 
   const availableLanguages = useMemo(() => {
     const set = new Set(baseNovedades.map((p) => p.language).filter(Boolean));
-    set.add("ZH");
     return [...set].sort((a, b) => {
       const ai = LANG_ORDER.indexOf(a.toUpperCase());
       const bi = LANG_ORDER.indexOf(b.toUpperCase());
@@ -99,8 +96,7 @@ export default function NovedadesPage() {
     (priceMin !== null ? 1 : 0) +
     (priceMax !== null ? 1 : 0);
 
-  const visible = novedades.slice(0, page * PAGE_SIZE);
-  const hasMore = visible.length < novedades.length;
+  const visible = novedades;
 
   return (
     <div className="bg-gray-50">
@@ -171,16 +167,6 @@ export default function NovedadesPage() {
                     <LocalProductCard key={p.id} product={p} />
                   ))}
                 </div>
-                {hasMore && (
-                  <div className="mt-8 text-center">
-                    <button
-                      onClick={() => setPage((prev) => prev + 1)}
-                      className="rounded-xl border-2 border-amber-400 px-10 py-3 font-bold text-amber-600 transition hover:bg-amber-400 hover:text-white"
-                    >
-                      Ver más novedades
-                    </button>
-                  </div>
-                )}
               </>
             )}
           </div>

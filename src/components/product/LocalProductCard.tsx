@@ -19,7 +19,7 @@ import { LanguageFlag } from "@/components/ui/LanguageFlag";
 import { DiscountBadgeEdit } from "@/components/ui/DiscountBadgeEdit";
 import { usePrice } from "@/hooks/usePrice";
 import { HoloCard } from "@/components/product/HoloCard";
-import { isLocalProduct } from "@/lib/productStore";
+import { isLocalProduct, getProductUrl } from "@/lib/productStore";
 
 interface Props {
   product: LocalProduct;
@@ -92,13 +92,15 @@ function LocalProductCardInner({ product }: Props) {
     toggleFavorite(product.id);
   };
 
-  // Defer localStorage check to after hydration to avoid SSR mismatch
+  // Defer localStorage check to after hydration to avoid SSR mismatch.
+  // Los productos creados en admin (id > 1.7B) no están en build estático;
+  // van a `/producto/{slug}`. El resto usa la ruta canónica SEO.
   const staticHref = `/${product.game}/${product.category}/${product.slug}`;
   const [href, setHref] = useState(staticHref);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (isLocalProduct(product.id)) setHref(`/producto?id=${product.id}`);
-  }, [product.id, staticHref]);
+    if (isLocalProduct(product.id)) setHref(getProductUrl(product));
+  }, [product]);
   const isCardCategory =
     CARD_CATEGORIES.has(product.category) &&
     (product.game === "pokemon" || product.game === "riftbound");
@@ -125,7 +127,11 @@ function LocalProductCardInner({ product }: Props) {
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           loading="lazy"
           onError={() => setImageBroken(true)}
-          unoptimized={displayImage.startsWith("data:") || displayImage.startsWith("blob:")}
+          unoptimized={
+            displayImage.startsWith("data:") ||
+            displayImage.startsWith("blob:") ||
+            displayImage.startsWith("http")
+          }
           className={`${imageObjectFit} transition-all duration-300 ${!product.inStock ? "opacity-50" : ""}`}
         />
       ) : (
@@ -146,7 +152,7 @@ function LocalProductCardInner({ product }: Props) {
       )}
 
       {/* ── ESQUINA SUPERIOR IZQUIERDA: NUEVO → stock → descuento → corazón ── */}
-      <div className="absolute top-2 left-2 z-10 flex flex-col items-start gap-1">
+      <div className="absolute top-2 left-2 z-10 flex max-w-[calc(100%-2.75rem)] flex-col items-start gap-1">
         {isNewProduct(product) && (
           <span className="animate-badge-pulse inline-flex h-5 items-center rounded-full bg-green-500 px-2 text-[10px] leading-none font-bold text-white shadow-sm">
             NUEVO
@@ -155,9 +161,19 @@ function LocalProductCardInner({ product }: Props) {
         {(() => {
           const si = getStockInfo(product.inStock ? product.stock : 0);
           if (si.level === "unlimited" || si.level === "available") return null;
+          if (si.level === "out") {
+            return (
+              <span className="inline-flex h-5 items-center rounded-full bg-gray-500 px-2 text-[10px] leading-none font-bold text-white shadow-sm">
+                AGOTADO
+              </span>
+            );
+          }
+          const bg = si.level === "last" ? "bg-red-500" : "bg-amber-500";
+          const shortLabel = si.level === "last" ? "¡ÚLTIMAS!" : "POCAS";
           return (
-            <span className={`inline-flex h-5 items-center rounded-full px-2 text-[10px] leading-none font-bold shadow-sm ${si.level === "out" ? "bg-gray-500 text-white" : si.level === "last" ? "bg-red-500 text-white" : "bg-amber-500 text-white"}`}>
-              {si.level === "out" ? "AGOTADO" : si.label.toUpperCase()}
+            <span className={`inline-flex h-5 max-w-full items-center rounded-full px-2 text-[10px] leading-none font-bold whitespace-nowrap text-white shadow-sm ${bg}`}>
+              <span className="sm:hidden">{shortLabel}</span>
+              <span className="hidden sm:inline">{si.label.toUpperCase()}</span>
             </span>
           );
         })()}
@@ -358,10 +374,22 @@ function LocalProductCardInner({ product }: Props) {
             {(() => {
               const si2 = getStockInfo(product.inStock ? product.stock : 0);
               if (si2.level === "unlimited" || si2.level === "available") return null;
+              if (si2.level === "out") {
+                return (
+                  <div className="pointer-events-none absolute top-2 left-2 z-20">
+                    <span className="rounded-full bg-gray-500 px-2 py-0.5 text-[10px] font-bold whitespace-nowrap text-white shadow-sm">
+                      AGOTADO
+                    </span>
+                  </div>
+                );
+              }
+              const bg2 = si2.level === "last" ? "bg-red-500" : "bg-amber-500";
+              const shortLabel2 = si2.level === "last" ? "¡ÚLTIMAS!" : "POCAS";
               return (
-                <div className="pointer-events-none absolute top-2 left-2 z-20">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${si2.level === "out" ? "bg-gray-500 text-white" : si2.level === "last" ? "bg-red-500 text-white" : "bg-amber-500 text-white"}`}>
-                    {si2.level === "out" ? "AGOTADO" : si2.label.toUpperCase()}
+                <div className="pointer-events-none absolute top-2 left-2 z-20 max-w-[calc(100%-2.75rem)]">
+                  <span className={`inline-block max-w-full rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap text-white shadow-sm ${bg2}`}>
+                    <span className="sm:hidden">{shortLabel2}</span>
+                    <span className="hidden sm:inline">{si2.label.toUpperCase()}</span>
                   </span>
                 </div>
               );

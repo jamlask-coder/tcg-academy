@@ -34,7 +34,11 @@ export function pushUserNotification(
     ) as Record<string, Notification[]>;
     const newNotif: Notification = {
       ...notif,
-      id: `dyn-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      // `crypto.randomUUID()` es atómico y criptográficamente único; elimina la
+      // ventana de colisión de `Date.now()+Math.random()` (≈60M combos por ms)
+      // que se abría si se disparaban varias notificaciones al mismo usuario
+      // en el mismo tick (p.ej. tras un bulk mail masivo).
+      id: `dyn-${crypto.randomUUID()}`,
       read: false,
     };
     all[userId] = [newNotif, ...(all[userId] ?? [])];

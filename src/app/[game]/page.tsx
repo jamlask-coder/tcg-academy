@@ -9,7 +9,6 @@ import {
 } from "@/data/products";
 import { CategoryTags, type TagItem } from "@/components/filters/CategoryTags";
 import { CategoryFilteredGrid } from "@/components/filters/CategoryFilteredGrid";
-import { FaqAccordion } from "@/components/seo/FaqAccordion";
 import { getFaqForGame } from "@/data/gameFaqs";
 import { breadcrumbJsonLd, faqJsonLd, jsonLdProps } from "@/lib/seo";
 import type { Metadata } from "next";
@@ -126,15 +125,6 @@ export default async function GamePage({
         )}
       </section>
 
-      {/* FAQ — SEO long-tail + rich results */}
-      <section className="border-t border-gray-100 bg-gray-50">
-        <div className="mx-auto max-w-[900px] px-4 py-10 sm:px-6 sm:py-14">
-          <h2 className="mb-6 text-xl font-bold text-gray-900 sm:text-2xl">
-            Preguntas frecuentes sobre {config.name}
-          </h2>
-          <FaqAccordion items={faqs} />
-        </div>
-      </section>
     </div>
   );
 }

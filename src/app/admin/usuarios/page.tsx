@@ -6,6 +6,7 @@ import { MOCK_USERS, ADMIN_ORDERS, type AdminUser } from "@/data/mockData";
 import type { User } from "@/types/user";
 import { readAdminOrdersMerged } from "@/lib/orderAdapter";
 import { loadPoints } from "@/services/pointsService";
+import { getUserHandle } from "@/lib/userHandle";
 
 const ROLE_COLORS = {
   cliente: "bg-gray-100 text-gray-600",
@@ -42,6 +43,7 @@ export default function AdminUsuariosPage() {
         .filter((entry) => !mockEmails.has(entry.user.email.toLowerCase()))
         .map((entry) => ({
           id: entry.user.id,
+          username: entry.user.username,
           name: entry.user.name,
           lastName: entry.user.lastName,
           email: entry.user.email,
@@ -199,7 +201,7 @@ export default function AdminUsuariosPage() {
                     <tr
                       key={user.id}
                       className="cursor-pointer transition hover:bg-gray-50"
-                      onClick={() => router.push(`/admin/usuarios/${user.id}`)}
+                      onClick={() => router.push(`/admin/usuarios/${getUserHandle(user)}`)}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">

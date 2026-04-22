@@ -173,7 +173,17 @@ export async function POST(req: NextRequest) {
     }
 
     const total = Math.round((subtotal + shippingCost) * 100) / 100;
-    const orderId = generateOrderId();
+
+    // Blindaje anti-colisión: con 6 chars sobre alfabeto 32 (≈1G combos) la
+    // probabilidad es <10⁻⁸ por pedido, pero si alguna vez repite, reintentamos.
+    // Sin este check, un POST simultáneo podría sobrescribir un pedido existente.
+    const db = getDb();
+    let orderId = generateOrderId();
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const existing = await db.getOrder(orderId);
+      if (!existing) break;
+      orderId = generateOrderId();
+    }
 
     // ── Build order record ────────────────────────────────────────────────
     const order: OrderRecord = {
@@ -215,7 +225,6 @@ export async function POST(req: NextRequest) {
 
     // ── Persist ───────────────────────────────────────────────────────────
     const backendMode = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
-    const db = getDb();
 
     if (backendMode === "server") {
       await db.createOrder(order);

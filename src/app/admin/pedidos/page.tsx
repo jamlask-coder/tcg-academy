@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import {
   ADMIN_ORDERS,
+  MOCK_USERS,
   ORDER_STORAGE_KEY,
   type AdminOrder,
   type AdminOrderStatus,
@@ -49,6 +50,7 @@ import {
   type Carrier,
 } from "@/components/admin/ShipModal";
 import { clickableProps } from "@/lib/a11y";
+import { userIdToHandle } from "@/lib/userHandle";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PAGE_SIZE = 50;
@@ -551,7 +553,7 @@ function OrderPanel({
             <div className="grid gap-1.5 sm:grid-cols-3">
               <div className="rounded-lg bg-gray-50 px-2.5 py-1.5 text-xs leading-snug">
                 <p className="mb-0.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase">Cliente</p>
-                <p><Link href={`/admin/usuarios/${order.userId}`} className="font-medium text-[#2563eb] hover:underline">{order.userName}</Link></p>
+                <p><Link href={`/admin/usuarios/${userIdToHandle(order.userId, MOCK_USERS)}`} className="font-medium text-[#2563eb] hover:underline">{order.userName}</Link></p>
                 <p className="truncate font-mono text-[10px] text-gray-500">{order.userEmail}</p>
                 <p className="mt-0.5"><RoleBadge role={order.userRole} /></p>
               </div>
@@ -1849,7 +1851,7 @@ export default function AdminPedidosPage() {
                       </td>
                       <td className="hidden px-3 py-3 text-sm md:table-cell">
                         <Link
-                          href={`/admin/usuarios/${order.userId}`}
+                          href={`/admin/usuarios/${userIdToHandle(order.userId, MOCK_USERS)}`}
                           onClick={(e) => e.stopPropagation()}
                           className="font-medium text-[#2563eb] no-underline hover:no-underline"
                         >

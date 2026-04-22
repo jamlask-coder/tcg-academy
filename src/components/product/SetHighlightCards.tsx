@@ -10,7 +10,7 @@ import { ChevronLeft, ChevronRight, X, Sparkles } from "lucide-react";
 import { CATEGORY_LABELS, GAME_CONFIG, type LocalProduct } from "@/data/products";
 import { PriceHistoryChart } from "@/components/product/PriceHistoryChart";
 import { resolveHighlights, type HighlightCard } from "@/lib/setHighlights";
-import { TCGDEX_EN_SET, TCGDEX_JP_SET, TCGDEX_LANG } from "@/lib/setHighlights/setMaps";
+import { TCGDEX_EN_SET, TCGDEX_JP_SET, TCGDEX_LANG, tcgdexSeriesPath } from "@/lib/setHighlights/setMaps";
 import { clickableProps } from "@/lib/a11y";
 
 // ─── Helpers de nombre (para título "Colección completa de ...") ─────────────
@@ -649,8 +649,7 @@ export function SetHighlightCards({ product }: Props) {
         const setId = isJp
           ? (TCGDEX_JP_SET[setKey] ?? setKey)
           : (TCGDEX_EN_SET[setKey] ?? setKey);
-        const isJpStyle = /^[A-Z]/.test(setId);
-        const series = isJpStyle ? "SV" : "sv";
+        const series = tcgdexSeriesPath(setId);
         try {
           const r = await fetch(`https://api.tcgdex.net/v2/${tLang}/sets/${setId}`);
           const data = r.ok ? ((await r.json()) as TcgdexSet | null) : null;

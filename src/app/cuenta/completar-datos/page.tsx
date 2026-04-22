@@ -47,11 +47,16 @@ function CompletarDatosInner() {
       return;
     }
     setSubmitting(true);
-    updateProfile({
+    const saveResult = updateProfile({
       nif: result.normalized,
       nifType: result.type === "OTHER" ? undefined : result.type,
       phone: phone.trim(),
     });
+    if (!saveResult.ok) {
+      setError(saveResult.error ?? "No se pudo guardar");
+      setSubmitting(false);
+      return;
+    }
     router.replace(returnTo);
   };
 

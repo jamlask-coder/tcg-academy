@@ -38,9 +38,10 @@ function buildLlmsTxt(): string {
     .join("\n");
 
   const stores = Object.values(STORES)
-    .map(
-      (s) =>
-        `- [${s.name}](${SITE_URL}/tiendas/${s.id}) — ${s.address}, ${s.city}. Tel ${s.phone}.`,
+    .map((s) =>
+      s.comingSoon
+        ? `- [${s.name}](${SITE_URL}/tiendas/${s.id}) — ${s.city}. Próximamente (aún no abierta al público).`
+        : `- [${s.name}](${SITE_URL}/tiendas/${s.id}) — ${s.address}, ${s.city}. Tel ${s.phone}.`,
     )
     .join("\n");
 

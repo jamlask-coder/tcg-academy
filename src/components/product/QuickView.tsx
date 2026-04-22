@@ -6,7 +6,7 @@ import { useCart } from "@/context/CartContext";
 import { usePrice } from "@/hooks/usePrice";
 import { GAME_CONFIG } from "@/data/products";
 import type { LocalProduct } from "@/data/products";
-import { isLocalProduct } from "@/lib/productStore";
+import { getProductUrl } from "@/lib/productStore";
 import { getStockInfo } from "@/utils/stockStatus";
 
 interface Props {
@@ -21,9 +21,7 @@ export function QuickView({ product, onClose }: Props) {
   const color = config?.color ?? "#2563eb";
   const image = product.images[0];
 
-  const productHref = isLocalProduct(product.id)
-    ? `/producto/${product.id}`
-    : `/${product.game}/${product.category}/${product.slug}`;
+  const productHref = getProductUrl(product);
 
   // Close on ESC
   useEffect(() => {

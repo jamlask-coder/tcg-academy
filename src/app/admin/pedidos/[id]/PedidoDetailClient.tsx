@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import {
   ADMIN_ORDERS,
+  MOCK_USERS,
   ORDER_STORAGE_KEY,
   type AdminOrder,
   type AdminOrderStatus,
@@ -49,6 +50,7 @@ import {
   type Carrier,
 } from "@/components/admin/ShipModal";
 import { clickableProps } from "@/lib/a11y";
+import { userIdToHandle } from "@/lib/userHandle";
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
@@ -952,7 +954,7 @@ export default function PedidoDetailClient() {
             <div className="px-5 py-4 text-sm text-gray-700">
               <div className="mb-2">
                 <Link
-                  href={`/admin/usuarios/${order.userId}`}
+                  href={`/admin/usuarios/${userIdToHandle(order.userId, MOCK_USERS)}`}
                   className="font-bold text-gray-900 hover:text-[#2563eb] hover:underline"
                 >
                   {order.userName}

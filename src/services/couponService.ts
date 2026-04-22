@@ -167,12 +167,33 @@ export function calcCouponDiscount(
 
 const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I to avoid confusion
 
+/**
+ * Genera un código de cupón único que no colisiona con códigos ya
+ * existentes (admin + user coupons). Con alfabeto de 32 chars y 6 caracteres
+ * aleatorios hay ~1.000M combinaciones; el check de colisión cubre el caso
+ * raro en el que aun así repita. Si agotan 20 intentos (improbable), cae a
+ * sufijo de 8 chars.
+ */
 export function generateCouponCode(prefix = "TCG"): string {
-  let suffix = "";
-  for (let i = 0; i < 6; i++) {
-    suffix += CHARS[Math.floor(Math.random() * CHARS.length)];
+  const existing = new Set<string>();
+  if (typeof window !== "undefined") {
+    for (const c of loadAdminCoupons()) existing.add(c.code.toUpperCase());
+    for (const c of loadAllUserCoupons()) existing.add(c.code.toUpperCase());
   }
-  return `${prefix}${suffix}`;
+
+  const makeSuffix = (len: number) => {
+    let s = "";
+    for (let i = 0; i < len; i++) {
+      s += CHARS[Math.floor(Math.random() * CHARS.length)];
+    }
+    return s;
+  };
+
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const code = `${prefix}${makeSuffix(6)}`;
+    if (!existing.has(code.toUpperCase())) return code;
+  }
+  return `${prefix}${makeSuffix(8)}`;
 }
 
 // ── Formatting helpers ─────────────────────────────────────────────────────────

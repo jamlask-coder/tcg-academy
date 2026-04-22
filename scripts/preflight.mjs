@@ -18,7 +18,7 @@
  * El script es read-only: no modifica ningún archivo, solo reporta.
  */
 
-import { readFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, existsSync, statSync, readdirSync } from "node:fs";
 import { resolve, join } from "node:path";
 
 const ROOT = resolve(process.cwd());
@@ -236,6 +236,37 @@ check("OPCIONAL", "pokemon-key", "POKEMON_TCG_API_KEY (rate limit pokemontcg.io)
 
 check("OPCIONAL", "google-oauth", "NEXT_PUBLIC_GOOGLE_CLIENT_ID", () => {
   return nonEmpty("NEXT_PUBLIC_GOOGLE_CLIENT_ID") || "sin esto, el botón 'Entrar con Google' no funciona";
+});
+
+// ── Assets referenciados en el código deben existir en /public ───────────────
+// Tras el incidente f7669b4 (borrado masivo de PNGs sin limpiar referencias)
+// añadimos esta barrera: cualquier string "/images/..." literal en src/ debe
+// corresponder a un archivo real. Se saltan las referencias dinámicas (con `${}`
+// o variables) porque no son resolvibles estáticamente.
+check("BLOQUEANTE", "assets-dangling", "Ningún <img src> rota (assets en /public existen)", () => {
+  function walk(dir, acc = []) {
+    for (const name of readdirSync(dir, { withFileTypes: true })) {
+      if (name.name === "node_modules" || name.name === ".next" || name.name.startsWith(".")) continue;
+      const full = join(dir, name.name);
+      if (name.isDirectory()) walk(full, acc);
+      else if (/\.(tsx?|jsx?|mjs|mts)$/.test(name.name)) acc.push(full);
+    }
+    return acc;
+  }
+  const files = walk(join(ROOT, "src"));
+  const re = /["'`](\/images\/[^"'`$?{}\s]+)(?:\?[^"'`$]*)?["'`]/g;
+  const missing = new Set();
+  for (const f of files) {
+    let content;
+    try { content = readFileSync(f, "utf8"); } catch { continue; }
+    for (const m of content.matchAll(re)) {
+      const path = m[1];
+      const full = join(ROOT, "public", path);
+      if (!existsSync(full)) missing.add(path);
+    }
+  }
+  if (missing.size === 0) return true;
+  return `${missing.size} asset(s) rotos: ${[...missing].slice(0, 5).join(", ")}${missing.size > 5 ? "…" : ""}`;
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

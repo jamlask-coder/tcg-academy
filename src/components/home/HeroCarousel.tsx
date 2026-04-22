@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import { DataHub } from "@/lib/dataHub";
 import { getHeroImages } from "@/services/heroImageService";
@@ -34,40 +34,48 @@ const DEFAULT_SLIDES: Slide[] = [
     overlayLogo: "/images/hero/tmnt-logo.webp",
     overlayArt: "/images/hero/tmnt-turtles.webp",
     overlayCta: "Ver colección",
+    // CTA — mobile bajo las tortugas (tortugas viven y=12-66%, CTA a
+    // y=86% en la franja libre inferior de cielo/cityscape). Desktop
+    // queda en el lateral izquierdo libre bajo el cityscape.
+    ctaPosition:
+      "top-[86%] left-1/2 -translate-x-1/2 sm:top-[42%] sm:left-[1%] sm:translate-x-0",
   },
   {
-    // v3 desktop: generada con scripts/build-strixhaven-hero.mjs desde el
-    // arte oficial 1885×597. En lugar de recortar el planeswalker shield
-    // (que arriesgaba cortar la "M" de MAGIC), aplica un degradado radial
-    // oscuro sobre esa zona → el shield se funde en sombra y el escudo TCG
-    // Academy del navbar queda limpio encima. Trim 48px superior para
-    // compactar el forest canopy. Resultado 1885×549, aspect 3.434.
-    // v5 = imagen POR VIEWPORT con una FRANJA OSCURA DEDICADA inferior
-    // donde viven escudo TCG y CTA. El escudo NO se solapa con ningún
-    // personaje ni elemento del arte — la franja es creada explícitamente
-    // como zona "footer" limpia. Ver scripts/build-strixhaven-hero.mjs.
-    //   · Desktop: 1885×725 (aspect 2.6 = match container)
-    //   · Mobile : 977×549  (aspect 1.78 = match container 16:9)
-    src: "/images/hero/slide-2-strixhaven-v5.webp",
-    srcMobile: "/images/hero/slide-2-strixhaven-v5-mobile.webp",
+    // v6 (2026-04-22) — rehecho por scripts/build-strixhaven-hero.mjs.
+    //   · Sin darkening radial feo sobre el logo MAGIC.
+    //   · Desktop 1885×725 (aspect 2.6): arte original + extensión
+    //     inferior con mirror-blur del follaje (natural, no franja negra).
+    //     El TCG shield baked se retira — vive ya en la navbar y las
+    //     cards solapaban la zona donde estaba.
+    //   · Mobile 977×549 (aspect 1.78): crop horizontal (logo + título +
+    //     elfa + búho) con franja inferior dedicada (mirror-blur +
+    //     vignette) para alojar el CTA centrado sin pisar nada.
+    src: "/images/hero/slide-2-strixhaven-v6.webp",
+    srcMobile: "/images/hero/slide-2-strixhaven-v6-mobile.webp",
     alt: "Magic: The Gathering — Secrets of Strixhaven",
     href: "/catalogo?game=magic&q=Strixhaven",
     overlayCta: "Ver catálogo",
-    // Móvil: CTA en forest floor bajo "STRIXHAVEN". Desktop: bajo la
-    // columna del título, alineado izq. Las viñetas del script oscurecen
-    // sutilmente ambas zonas para máxima legibilidad del pill ámbar.
+    // CTA en zonas libres por viewport:
+    //   · Mobile: en la franja oscura inferior dedicada (y≈92 %), no
+    //     pisa ni título ni personajes. Cards móvil no solapan el hero.
+    //   · Desktop: en la banda vertical libre entre "THE GATHERING"
+    //     (≈y 28 %) y "SECRETS OF" (≈y 42 %), lado izq bajo el logo
+    //     MAGIC. Queda dentro del 55 % superior visible (cards
+    //     solapan el 45 % inferior).
     ctaPosition:
-      "top-[88%] left-1/2 -translate-x-1/2 sm:top-[86%] sm:left-[8%] sm:translate-x-0",
+      "top-[86%] left-1/2 -translate-x-1/2 sm:top-[33%] sm:left-[7%] sm:translate-x-0",
   },
 ];
 
-const AUTOPLAY_MS = 5500;
+const AUTOPLAY_MS = 2800;
 const FADE_MS = 700;
 
 export function HeroCarousel() {
   const [slides, setSlides] = useState<Slide[]>(DEFAULT_SLIDES);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
 
   // Carga slides del servicio (admin uploads). Si no hay, usa DEFAULT_SLIDES.
   useEffect(() => {
@@ -98,6 +106,26 @@ export function HeroCarousel() {
     [slides.length],
   );
 
+  const prev = useCallback(() => goTo(index - 1), [goTo, index]);
+  const next = useCallback(() => goTo(index + 1), [goTo, index]);
+
+  // Swipe en móvil: umbral 40 px horizontal, ignoramos si el gesto es
+  // más vertical que horizontal (para no capturar scroll).
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current == null || touchStartY.current == null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    touchStartX.current = null;
+    touchStartY.current = null;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx < 0) next();
+    else prev();
+  };
+
   useEffect(() => {
     if (paused || slides.length <= 1) return;
     const id = setInterval(() => {
@@ -111,6 +139,8 @@ export function HeroCarousel() {
       className="relative w-full overflow-hidden bg-[#0a0f1a]"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
       aria-roledescription="carousel"
       aria-label="Novedades destacadas"
     >
@@ -129,7 +159,11 @@ export function HeroCarousel() {
             <>
               {slide.srcMobile ? (
                 <>
-                  {/* Móvil: artwork dedicado con aspect 1.93, legible en 16:9. */}
+                  {/* Móvil: artwork dedicado con aspect 1.93, legible en 16:9.
+                      object-fit inline (no solo className) para evitar FOUC:
+                      antes de cargar Tailwind, next/image con `fill` y sin
+                      object-fit usa el default del navegador (`fill`) que
+                      estira la imagen al aspect del contenedor. */}
                   <Image
                     src={slide.srcMobile}
                     alt={slide.alt}
@@ -137,6 +171,7 @@ export function HeroCarousel() {
                     priority={i === 0}
                     sizes="100vw"
                     className="object-cover object-center sm:hidden"
+                    style={{ objectFit: "cover", objectPosition: "center" }}
                     unoptimized={slide.srcMobile.startsWith("data:")}
                   />
                   {/* Desktop: artwork panorámico. */}
@@ -148,6 +183,7 @@ export function HeroCarousel() {
                     priority={i === 0}
                     sizes="100vw"
                     className={`hidden object-cover sm:block ${slide.imagePosition ?? "object-center"}`}
+                    style={{ objectFit: "cover", objectPosition: "center" }}
                     unoptimized={slide.src.startsWith("data:")}
                   />
                 </>
@@ -159,6 +195,7 @@ export function HeroCarousel() {
                   priority={i === 0}
                   sizes="100vw"
                   className={`object-cover ${slide.imagePosition ?? "object-center"}`}
+                  style={{ objectFit: "cover", objectPosition: "center" }}
                   unoptimized={slide.src.startsWith("data:")}
                 />
               )}
@@ -174,70 +211,82 @@ export function HeroCarousel() {
                   }}
                 />
               )}
-              {/* Artwork (tortugas) — dominante a la derecha en desktop,
-                  reducido arriba-centro en móvil para dejar zona inferior
-                  libre al CTA. object-contain preserva transparencia. */}
+              {/* Artwork (tortugas) — CENTRADAS horizontalmente en
+                  desktop y grandes para llenar la zona central que
+                  antes quedaba vacía. En móvil, arriba-centro. Ambas
+                  ancladas al top para que las cabezas vivan en el 55 %
+                  superior (el 45 % inferior queda tapado por cards). */}
               {slide.overlayArt && (
-                <div className="pointer-events-none absolute inset-0 flex items-start justify-center pt-[14%] sm:items-center sm:justify-end sm:pt-0 sm:pr-[4%]">
-                  <div className="relative h-[58%] w-[68%] sm:h-[94%] sm:w-[46%]">
+                <div className="pointer-events-none absolute inset-0 flex items-start justify-center pt-[12%] sm:pt-0">
+                  <div className="relative h-[54%] w-[64%] sm:h-[62%] sm:w-[58%]">
                     <Image
                       src={slide.overlayArt}
                       alt=""
                       aria-hidden="true"
                       fill
                       priority={i === 0}
-                      sizes="(max-width: 640px) 68vw, 46vw"
-                      className="object-contain object-center drop-shadow-[0_18px_40px_rgba(0,0,0,0.55)] sm:object-right"
+                      sizes="(max-width: 640px) 64vw, 58vw"
+                      className="object-contain object-top drop-shadow-[0_18px_40px_rgba(0,0,0,0.55)]"
+                      style={{ objectFit: "contain", objectPosition: "top" }}
                     />
                   </div>
                 </div>
               )}
-              {/* Logo Magic × TMNT — arriba centrado en móvil, arriba-izq
-                  en desktop. Aspect ~6.7:1. */}
-              {slide.overlayLogo && (
-                <div className="pointer-events-none absolute top-[6%] left-1/2 z-[1] w-[62%] max-w-[280px] -translate-x-1/2 sm:top-[8%] sm:left-[4%] sm:w-[54%] sm:max-w-[760px] sm:translate-x-0">
-                  <div className="relative aspect-[6.7/1] w-full">
-                    <Image
-                      src={slide.overlayLogo}
-                      alt=""
-                      aria-hidden="true"
-                      fill
-                      priority={i === 0}
-                      sizes="(max-width: 640px) 62vw, 54vw"
-                      className="object-contain drop-shadow-[0_2px_14px_rgba(0,0,0,0.7)]"
-                    />
-                  </div>
-                </div>
-              )}
-              {/* CTA ámbar — bajo el logo, en la zona media del hero.
-                  IMPORTANTE: se coloca por encima de la línea donde las
-                  tarjetas de juegos se solapan con el hero (aprox. último
-                  28% en desktop, último 20% en móvil), para que nunca
-                  quede tapado por el recuadro de Pokémon / Magic / etc. */}
-              {slide.overlayCta && (
-                <div
-                  className={`pointer-events-none absolute z-[2] flex ${
-                    slide.ctaPosition ??
-                    "top-[74%] left-1/2 -translate-x-1/2 sm:top-[42%] sm:left-[7%] sm:translate-x-0"
-                  }`}
-                >
-                  <span className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-gradient-to-b from-amber-400 to-orange-500 px-3 py-1.5 text-[10px] font-black tracking-wide text-[#0f172a] uppercase shadow-[0_6px_16px_rgba(251,146,60,0.5)] ring-1 ring-amber-300/60 transition-all duration-200 hover:scale-[1.04] hover:from-amber-300 hover:to-orange-400 hover:shadow-[0_10px_28px_rgba(251,146,60,0.7)] sm:gap-2 sm:px-7 sm:py-3.5 sm:text-base">
-                    {slide.overlayCta}
-                    <svg
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      className="h-3 w-3 sm:h-5 sm:w-5"
-                      aria-hidden="true"
+              {/* Wrapper con el mismo max-width que el grid de cards
+                  (1400 px + padding responsive) — los overlays de logo
+                  y CTA se posicionan RELATIVOS a este wrapper, no al
+                  viewport. Así en pantallas ≥1400 px ambos quedan
+                  alineados con las cards, no pegados a los bordes de
+                  la ventana. */}
+              <div className="pointer-events-none absolute inset-0 flex justify-center">
+                <div className="relative w-full max-w-[1400px] px-4 sm:px-6">
+                  {/* Logo Magic × TMNT — arriba-CENTRO en móvil, arriba-
+                      DERECHA compacto en desktop (esquina). Aspect ~6.7:1. */}
+                  {slide.overlayLogo && (
+                    <div className="absolute top-[5%] left-1/2 z-[1] w-[62%] max-w-[280px] -translate-x-1/2 sm:top-[6%] sm:right-[1%] sm:left-auto sm:w-[22%] sm:max-w-[320px] sm:translate-x-0">
+                      <div className="relative aspect-[6.7/1] w-full">
+                        <Image
+                          src={slide.overlayLogo}
+                          alt=""
+                          aria-hidden="true"
+                          fill
+                          priority={i === 0}
+                          sizes="(max-width: 640px) 62vw, 22vw"
+                          className="object-contain drop-shadow-[0_2px_14px_rgba(0,0,0,0.7)]"
+                          style={{ objectFit: "contain" }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {/* CTA ámbar — abajo-izquierda (desktop) / centrado (móvil)
+                      dentro del wrapper de 1400 px. Lee con contraste
+                      máximo sobre zona oscura de cityscape/follaje. */}
+                  {slide.overlayCta && (
+                    <div
+                      className={`absolute z-[2] flex ${
+                        slide.ctaPosition ??
+                        "top-[58%] left-1/2 -translate-x-1/2 sm:top-[42%] sm:left-[1%] sm:translate-x-0"
+                      }`}
                     >
-                      <path
-                        fillRule="evenodd"
-                        d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H4a1 1 0 110-2h10.586l-4.293-4.293a1 1 0 010-1.414z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </span>
+                      <span className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-gradient-to-b from-amber-400 to-orange-500 px-3 py-1.5 text-[10px] font-black tracking-wide text-[#0f172a] uppercase shadow-[0_6px_16px_rgba(251,146,60,0.5)] ring-1 ring-amber-300/60 transition-all duration-200 hover:scale-[1.04] hover:from-amber-300 hover:to-orange-400 hover:shadow-[0_10px_28px_rgba(251,146,60,0.7)] sm:gap-2 sm:px-7 sm:py-3.5 sm:text-base">
+                        {slide.overlayCta}
+                        <svg
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          className="h-3 w-3 sm:h-5 sm:w-5"
+                          aria-hidden="true"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H4a1 1 0 110-2h10.586l-4.293-4.293a1 1 0 010-1.414z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </>
           );
           return (
@@ -261,6 +310,53 @@ export function HeroCarousel() {
             </div>
           );
         })}
+
+        {/* Flechas prev/next — solo desktop (>=sm). En móvil navegación
+            por swipe gestural. Pegadas a los bordes del viewport con
+            fondo sutil semi-transparente + hover glow ámbar (coherente
+            con la paleta del CTA). */}
+        {slides.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={prev}
+              aria-label="Slide anterior"
+              className="group absolute top-1/2 left-2 z-20 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white/90 ring-1 ring-white/20 backdrop-blur-sm transition-all hover:bg-black/60 hover:text-white hover:ring-amber-300/50 focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:outline-none sm:left-4 sm:flex"
+            >
+              <svg
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="h-5 w-5 transition-transform group-hover:-translate-x-0.5"
+                aria-hidden="true"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M12.707 4.293a1 1 0 010 1.414L8.414 10l4.293 4.293a1 1 0 01-1.414 1.414l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={next}
+              aria-label="Slide siguiente"
+              className="group absolute top-1/2 right-2 z-20 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white/90 ring-1 ring-white/20 backdrop-blur-sm transition-all hover:bg-black/60 hover:text-white hover:ring-amber-300/50 focus-visible:ring-2 focus-visible:ring-amber-300 focus-visible:outline-none sm:right-4 sm:flex"
+            >
+              <svg
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="h-5 w-5 transition-transform group-hover:translate-x-0.5"
+                aria-hidden="true"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M7.293 15.707a1 1 0 010-1.414L11.586 10 7.293 5.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </button>
+          </>
+        )}
 
         {/* Dots — móvil: 2 puntos iguales abajo-derecha pegados a la esquina.
             Desktop: centrados, pill ancho para el activo. */}

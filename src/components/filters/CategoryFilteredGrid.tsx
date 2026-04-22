@@ -29,8 +29,6 @@ interface Props {
   categoryItems?: CategoryItem[];
 }
 
-const PAGE_SIZE = 32;
-
 function byDateDesc(a: LocalProduct, b: LocalProduct): number {
   // Admin products without createdAt fall back to their timestamp-based ID.
   const getTime = (p: LocalProduct) =>
@@ -49,7 +47,6 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
     ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
     : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
   const params = useSearchParams();
-  const [page, setPage] = useState(1);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Merge static (SSG) products with admin-created products from localStorage,
@@ -96,13 +93,12 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
     router.replace(qs ? `${pathname}?${qs}` : pathname);
   };
 
-  // Derive available languages — ordered: ES, EN, JP, KO, …, ZH (último siempre)
+  // Derive available languages from ACTUAL products. No banderas "phantom":
+  // si no hay productos chinos, no aparece el flag ZH (regla del usuario).
   const availableLanguages = useMemo(() => {
     const fromProducts = new Set(
       mergedProducts.map((p) => p.language).filter(Boolean) as string[],
     );
-    // Chino siempre disponible como opción de filtro, aunque aún no haya productos.
-    fromProducts.add("ZH");
     return [...fromProducts].sort((a, b) => {
       const ai = LANG_ORDER.indexOf(a.toUpperCase());
       const bi = LANG_ORDER.indexOf(b.toUpperCase());
@@ -150,8 +146,7 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
     return list;
   }, [mergedProducts, langs, inStock, priceMin, priceMax, query]);
 
-  const visible = filtered.slice(0, page * PAGE_SIZE);
-  const hasMore = visible.length < filtered.length;
+  const visible = filtered;
 
   return (
     <div className="flex items-start gap-6">
@@ -215,40 +210,11 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
             </Link>
           </div>
         ) : (
-          <>
-            <div className={`grid gap-3 ${gridCols}`}>
-              {visible.map((p) => (
-                <LocalProductCard key={p.id} product={p} />
-              ))}
-            </div>
-            {hasMore && (
-              <div className="mt-8 text-center">
-                <button
-                  onClick={() => setPage((prev) => prev + 1)}
-                  className="rounded-xl border-2 px-10 py-3 font-bold transition hover:text-white"
-                  style={{
-                    borderColor: color,
-                    color,
-                  }}
-                  onMouseEnter={(e) => {
-                    (
-                      e.currentTarget as HTMLButtonElement
-                    ).style.backgroundColor = color;
-                    (e.currentTarget as HTMLButtonElement).style.color =
-                      "white";
-                  }}
-                  onMouseLeave={(e) => {
-                    (
-                      e.currentTarget as HTMLButtonElement
-                    ).style.backgroundColor = "transparent";
-                    (e.currentTarget as HTMLButtonElement).style.color = color;
-                  }}
-                >
-                  Cargar más productos
-                </button>
-              </div>
-            )}
-          </>
+          <div className={`grid gap-3 ${gridCols}`}>
+            {visible.map((p) => (
+              <LocalProductCard key={p.id} product={p} />
+            ))}
+          </div>
         )}
       </div>
     </div>

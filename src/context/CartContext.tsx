@@ -1,13 +1,14 @@
 "use client";
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { getMergedById } from "@/lib/productStore";
 import { useAuth } from "@/context/AuthContext";
 import { getRoleLimit, getPurchasedQty } from "@/services/purchaseLimitService";
 import { logger } from "@/lib/logger";
 
 const LEGACY_CART_KEY = "tcga_cart";
+const ANON_CART_KEY = "tcga_cart_anon";
 const cartKeyFor = (userId?: string) =>
-  userId ? `tcga_cart_${userId}` : "tcga_cart_anon";
+  userId ? `tcga_cart_${userId}` : ANON_CART_KEY;
 
 export interface CartItem {
   key: string;
@@ -16,6 +17,37 @@ export interface CartItem {
   price: number;
   quantity: number;
   image: string;
+}
+
+function parseCart(raw: string | null): CartItem[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as CartItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function mergeCartItems(
+  existing: CartItem[],
+  incoming: CartItem[],
+  cap: number,
+): CartItem[] {
+  const map = new Map<string, CartItem>();
+  for (const it of existing) map.set(it.key, { ...it });
+  for (const it of incoming) {
+    const ex = map.get(it.key);
+    if (ex) {
+      map.set(it.key, {
+        ...ex,
+        quantity: Math.min(cap, ex.quantity + it.quantity),
+      });
+    } else {
+      map.set(it.key, { ...it, quantity: Math.min(cap, it.quantity) });
+    }
+  }
+  return [...map.values()];
 }
 
 export interface AddItemResult {
@@ -47,24 +79,45 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const { user, role } = useAuth();
   const storageKey = cartKeyFor(user?.id);
   const [items, setItems] = useState<CartItem[]>([]);
+  // Guarda el último userId visto para detectar la transición anon → logged-in.
+  // En ese instante fusionamos el carrito anónimo con el del usuario, sin
+  // pérdida de productos (cantidades sumadas, tope MAX_QTY_PER_LINE).
+  const prevUserIdRef = useRef<string | undefined>(undefined);
 
-  // Carga/recarga cuando cambia el usuario (login / logout / switch).
-  // Migra la clave legacy "tcga_cart" al slot del usuario actual la primera vez.
+  // Carga/recarga cuando cambia el usuario (login / register / logout / switch).
+  // - Migra la clave legacy "tcga_cart" al slot actual (una sola vez).
+  // - En login/register: fusiona el carrito anónimo con el del usuario para
+  //   que nada de lo que el invitado metió antes de identificarse se pierda.
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
+      // Legacy cart migration (histórica, pre-multiusuario).
       const legacy = localStorage.getItem(LEGACY_CART_KEY);
       if (legacy && !localStorage.getItem(storageKey)) {
         localStorage.setItem(storageKey, legacy);
       }
       if (legacy) localStorage.removeItem(LEGACY_CART_KEY);
+
+      // Transición anon → logged-in: fusionar carritos.
+      const justLoggedIn = !prevUserIdRef.current && Boolean(user?.id);
+      if (justLoggedIn) {
+        const anonItems = parseCart(localStorage.getItem(ANON_CART_KEY));
+        if (anonItems.length > 0) {
+          const userItems = parseCart(localStorage.getItem(storageKey));
+          const merged = mergeCartItems(userItems, anonItems, MAX_QTY_PER_LINE);
+          localStorage.setItem(storageKey, JSON.stringify(merged));
+          localStorage.removeItem(ANON_CART_KEY);
+        }
+      }
+
+      prevUserIdRef.current = user?.id;
       const raw = localStorage.getItem(storageKey);
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setItems(raw ? (JSON.parse(raw) as CartItem[]) : []);
+      setItems(parseCart(raw));
     } catch {
       setItems([]);
     }
-  }, [storageKey]);
+  }, [storageKey, user?.id]);
 
   const save = (next: CartItem[]) => {
     setItems(next);

@@ -39,6 +39,7 @@ const STORES_CONTACT = Object.values(STORES).map((s) => ({
   name: s.id === "calpe" ? "Sede (Calpe)" : s.city.split(",")[0]?.trim() ?? s.name,
   phone: s.phone,
   id: s.id,
+  comingSoon: Boolean(s.comingSoon),
 }));
 
 const WHATSAPP_NUMBER = SITE_CONFIG.phone.replace(/\D/g, "");
@@ -293,7 +294,9 @@ export default function ContactoPage() {
                     <div className="text-sm font-semibold text-gray-800 transition group-hover:text-[#2563eb]">
                       {s.name}
                     </div>
-                    <div className="text-xs text-gray-500">{s.phone}</div>
+                    <div className="text-xs text-gray-500">
+                      {s.comingSoon ? "Próximamente" : s.phone}
+                    </div>
                   </Link>
                 ))}
               </div>

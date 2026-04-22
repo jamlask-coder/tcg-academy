@@ -220,6 +220,10 @@ export function Navbar() {
       ? (menuData.find((g) => g.slug === activeItem) ?? null)
       : null;
 
+  // Home: el hero ya muestra la navegación por juegos — ocultamos la barra
+  // secundaria para no duplicar el contenido.
+  if (pathname === "/") return null;
+
   return (
     <div ref={navRef} role="presentation" className="relative z-40 hidden lg:block" onMouseLeave={handleNavMouseLeave}>
       <nav

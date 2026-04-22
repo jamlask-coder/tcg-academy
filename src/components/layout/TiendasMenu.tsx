@@ -57,20 +57,31 @@ export function TiendasMenu({ onClose }: Props) {
                 <p className="mt-0.5 truncate text-[11px] text-gray-500">
                   {store.city}
                 </p>
-                <p className="mt-0.5 truncate text-[10px] text-gray-400">
-                  {shortAddress(store.address)}
-                </p>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className="flex items-center gap-0.5 text-[10px] text-gray-400">
-                    <Phone size={9} />
-                    {store.phone}
-                  </span>
-                  {store.instagram && (
-                    <span className="text-[10px] text-gray-400">
-                      {store.instagram}
-                    </span>
-                  )}
-                </div>
+                {store.comingSoon ? (
+                  <p
+                    className="mt-0.5 truncate text-[10px] font-semibold"
+                    style={{ color: store.color }}
+                  >
+                    Próximamente
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-0.5 truncate text-[10px] text-gray-400">
+                      {shortAddress(store.address)}
+                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="flex items-center gap-0.5 text-[10px] text-gray-400">
+                        <Phone size={9} />
+                        {store.phone}
+                      </span>
+                      {store.instagram && (
+                        <span className="text-[10px] text-gray-400">
+                          {store.instagram}
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </Link>
           ))}

@@ -6,7 +6,7 @@ import {
   CATEGORY_LABELS,
   type LocalProduct,
 } from "@/data/products";
-import { getMergedProducts } from "@/lib/productStore";
+import { getMergedProducts, getProductUrl } from "@/lib/productStore";
 import { getStockInfo } from "@/utils/stockStatus";
 import {
   Search,
@@ -538,7 +538,7 @@ export default function AdminStockPage() {
                           </div>
                         )}
                         <Link
-                          href={`/producto?id=${p.id}`}
+                          href={getProductUrl(p)}
                           className="line-clamp-1 max-w-[280px] font-medium text-gray-800 hover:text-[#2563eb] hover:underline"
                         >
                           {p.name}

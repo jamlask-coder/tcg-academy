@@ -22,7 +22,12 @@
       "WebFetch(domain:www.pokemillon.com)",
       "WebFetch(domain:battledeck.es)",
       "WebFetch(domain:scryfall.com)",
-      "WebFetch(domain:magic.wizards.com)"
+      "WebFetch(domain:magic.wizards.com)",
+      "Bash(curl -sf http://localhost:3000/)",
+      "WebFetch(domain:ccelcirculo.es)",
+      "WebFetch(domain:nominatim.openstreetmap.org)",
+      "WebFetch(domain:calpe.callejero.net)",
+      "WebFetch(domain:bejar.callejero.net)"
     ]
   }
 }

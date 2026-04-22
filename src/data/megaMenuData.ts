@@ -115,7 +115,7 @@ export const MEGA_MENU_DATA: MegaMenuGame[] = [
     href: "/riftbound",
     color: "#ea580c",
     abbrev: "RB",
-    logoSrc: "/images/logos/riftbound-clean.png?v=3",
+    logoSrc: "/images/logos/riftbound-clean.png?v=5",
     columns: [
       {
         title: "Producto Sellado",

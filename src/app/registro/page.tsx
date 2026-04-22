@@ -109,7 +109,7 @@ export default function RegistroPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { terminos: undefined, comunicaciones: false },
+    defaultValues: { telefono: "+34 ", terminos: undefined, comunicaciones: false },
   });
 
   const watchedPassword = watch("password") ?? "";
@@ -355,7 +355,7 @@ export default function RegistroPage() {
                 <input
                   {...register("telefono")}
                   type="tel"
-                  placeholder="+34 600 000 000"
+                  placeholder="+34600000000"
                   maxLength={20}
                   className={inputCls(false)}
                 />

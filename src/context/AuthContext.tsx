@@ -19,6 +19,7 @@ import { pushUserNotification } from "@/services/notificationService";
 import { sanitizeString } from "@/utils/sanitize";
 import { recordBulkConsent, type ConsentType } from "@/services/consentService";
 import { SITE_CONFIG } from "@/config/siteConfig";
+import { isHandleReserved, generateUniqueUsername } from "@/lib/userHandle";
 
 export interface GoogleSignInPayload {
   email: string;
@@ -46,7 +47,7 @@ interface AuthContextValue {
   register: (data: RegisterData) => Promise<{ ok: boolean; error?: string }>;
   updateProfile: (
     updates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses" | "nif" | "nifType">>,
-  ) => void;
+  ) => { ok: boolean; error?: string };
   changePassword: (
     currentPassword: string,
     newPassword: string,
@@ -62,6 +63,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const STORAGE_KEY = "tcgacademy_user";
 const REGISTERED_KEY = "tcgacademy_registered";
 const USERNAMES_KEY = "tcgacademy_usernames"; // username (lowercase) → email
+const NIFS_KEY = "tcgacademy_nifs";           // NIF (uppercase) → email
 const SESSION_EXPIRY_MS = SITE_CONFIG.sessionExpiryHours * 60 * 60 * 1000;
 const REMEMBER_ME_MS = SITE_CONFIG.rememberMeDays * 24 * 60 * 60 * 1000;
 
@@ -86,6 +88,61 @@ function loadUsernameIndex(): Record<string, string> {
 /** Save the username→email index */
 function saveUsernameIndex(index: Record<string, string>) {
   try { localStorage.setItem(USERNAMES_KEY, JSON.stringify(index)); } catch { /* ignore */ }
+}
+
+/** Normalize NIF: uppercase, strip spaces/dashes. Matches invoice validators. */
+function normalizeNif(nif: string): string {
+  return nif.toUpperCase().replace(/[\s-]/g, "").trim();
+}
+
+/** Load the NIF→email index (política: 1 NIF = 1 usuario). */
+function loadNifIndex(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(NIFS_KEY) ?? "{}") as Record<string, string>;
+  } catch { return {}; }
+}
+
+/** Save the NIF→email index */
+function saveNifIndex(index: Record<string, string>) {
+  try { localStorage.setItem(NIFS_KEY, JSON.stringify(index)); } catch { /* ignore */ }
+}
+
+/**
+ * Reconstruye el índice NIF→email recorriendo todos los usuarios registrados.
+ * Se ejecuta una vez al boot (migración para instalaciones previas que ya
+ * tienen NIFs guardados pero no el índice). Mantiene la semántica "1 NIF = 1
+ * usuario" — el primer email encontrado gana si existía un duplicado previo;
+ * los conflictos se reportan en consola para que el admin los resuelva.
+ */
+function backfillNifIndex(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const registered = JSON.parse(
+      localStorage.getItem(REGISTERED_KEY) ?? "{}",
+    ) as Record<string, { password: string; user: User }>;
+    const index: Record<string, string> = {};
+    const conflicts: Array<{ nif: string; first: string; dup: string }> = [];
+    for (const entry of Object.values(registered)) {
+      const rawNif = entry.user.nif;
+      if (!rawNif) continue;
+      const key = normalizeNif(rawNif);
+      if (!key) continue;
+      if (index[key] && index[key] !== entry.user.email) {
+        conflicts.push({ nif: key, first: index[key], dup: entry.user.email });
+        continue;
+      }
+      index[key] = entry.user.email.toLowerCase();
+    }
+    saveNifIndex(index);
+    if (conflicts.length > 0) {
+      // No bloquea. El admin verá los duplicados en /admin/usuarios y podrá
+      // resolverlos manualmente. Se expone vía logger (no console directo).
+      try {
+        const win = window as unknown as { __tcgaNifConflicts?: typeof conflicts };
+        win.__tcgaNifConflicts = conflicts;
+      } catch { /* ignore */ }
+    }
+  } catch { /* ignore */ }
 }
 
 // ─── Crypto helpers ───────────────────────────────────────────────────────────
@@ -321,6 +378,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
     verify();
+    // Backfill del índice NIF→email para instalaciones que ya tenían NIFs
+    // guardados antes de la política "1 NIF = 1 usuario". Idempotente.
+    backfillNifIndex();
   }, []);
 
   const persist = useCallback((u: User | null, expiresIn?: number) => {
@@ -448,9 +508,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const name = sanitizeString(rawName);
         const lastName = sanitizeString(rawLastName);
 
+        // Auto-genera un username único legible para que el usuario de
+        // Google tenga URL admin limpia (`/admin/usuarios/{handle}`) y no
+        // colisione con MOCK_USERS/reservados ni otros registrados.
+        const usernameIndex = loadUsernameIndex();
+        const autoUsername = generateUniqueUsername({
+          name,
+          lastName,
+          email,
+          isUsed: (h) => !!usernameIndex[h] || isHandleReserved(h),
+        });
+
         const newUser: User = {
           id: newUserId,
           email,
+          username: autoUsername,
           name,
           lastName,
           phone: "",
@@ -467,6 +539,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const hashedPw = await hashPassword(randomPw);
         registered[email] = { password: hashedPw, user: newUser };
         persistRegistered(registered);
+
+        // Registrar el username auto-generado en el índice para que
+        // futuras comprobaciones de unicidad lo detecten.
+        usernameIndex[autoUsername] = email;
+        saveUsernameIndex(usernameIndex);
 
         // Record GDPR consents (Art. 7 — proof of consent)
         const consentEntries: Array<{
@@ -511,8 +588,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (registered[email])
           return { ok: false, error: "Este email ya está registrado" };
 
-        // Check username uniqueness
+        // Check username uniqueness + reserved handles.
+        // `isHandleReserved` cubre system words (admin, api, login…) y
+        // MOCK_USERS usernames (demo accounts que viven en URLs admin).
         if (username) {
+          if (isHandleReserved(username))
+            return { ok: false, error: "Este nombre de usuario está reservado, elige otro" };
           const index = loadUsernameIndex();
           if (index[username])
             return { ok: false, error: "Este nombre de usuario ya está en uso" };
@@ -615,13 +696,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkUsernameAvailable = useCallback((username: string): boolean => {
     const key = normalizeUsername(username);
+    if (!key) return false;
+    // Bloquea handles reservados del sistema + MOCK_USERS (demo accounts).
+    // Sin este check, un cliente real podría registrarse como "admin" o "laura"
+    // y colisionar con URLs de `/admin/usuarios/{handle}`.
+    if (isHandleReserved(key)) return false;
     const index = loadUsernameIndex();
     return !index[key];
   }, []);
 
   const updateProfile = useCallback(
-    (updates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses" | "nif" | "nifType">>) => {
-      if (!user) return;
+    (updates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses" | "nif" | "nifType">>): { ok: boolean; error?: string } => {
+      if (!user) return { ok: false, error: "No has iniciado sesión" };
       const sanitizedUpdates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses" | "nif" | "nifType">> = {};
       if (updates.name !== undefined) sanitizedUpdates.name = sanitizeString(updates.name);
       if (updates.lastName !== undefined) sanitizedUpdates.lastName = sanitizeString(updates.lastName);
@@ -629,6 +715,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (updates.addresses !== undefined) sanitizedUpdates.addresses = updates.addresses;
       if (updates.nif !== undefined) sanitizedUpdates.nif = sanitizeString(updates.nif).toUpperCase();
       if (updates.nifType !== undefined) sanitizedUpdates.nifType = updates.nifType;
+
+      // Política "1 NIF = 1 usuario": si el NIF cambia o se añade por primera
+      // vez, comprobamos que no esté asignado a otro email.
+      const newNif = sanitizedUpdates.nif;
+      if (newNif !== undefined) {
+        const key = normalizeNif(newNif);
+        if (key) {
+          const nifIndex = loadNifIndex();
+          const owner = nifIndex[key];
+          if (owner && owner.toLowerCase() !== user.email.toLowerCase()) {
+            return {
+              ok: false,
+              error: "Este NIF ya está asignado a otra cuenta. Contacta con soporte si crees que es un error.",
+            };
+          }
+        }
+      }
+
       const updated = { ...user, ...sanitizedUpdates };
       persist(updated);
       // Also update in registered store if applicable
@@ -643,6 +747,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         /* ignore */
       }
+
+      // Sincronizar el índice NIF→email tras el guardado.
+      if (newNif !== undefined) {
+        try {
+          const nifIndex = loadNifIndex();
+          // Limpiar NIF anterior del índice si apuntaba a este usuario.
+          if (user.nif) {
+            const oldKey = normalizeNif(user.nif);
+            if (oldKey && nifIndex[oldKey]?.toLowerCase() === user.email.toLowerCase()) {
+              delete nifIndex[oldKey];
+            }
+          }
+          const newKey = normalizeNif(newNif);
+          if (newKey) nifIndex[newKey] = user.email.toLowerCase();
+          saveNifIndex(nifIndex);
+        } catch { /* ignore */ }
+      }
+
+      return { ok: true };
     },
     [user, persist],
   );

@@ -24,6 +24,7 @@ import {
 import type { User } from "@/types/user";
 import { readAdminOrdersMerged } from "@/lib/orderAdapter";
 import { loadPoints } from "@/services/pointsService";
+import { findUserByHandle } from "@/lib/userHandle";
 import { B2BCharts } from "@/components/account/B2BCharts";
 import { SendCouponButton } from "@/components/admin/SendCouponModal";
 import { UserRoleManager } from "@/components/admin/UserRoleManager";
@@ -70,9 +71,10 @@ export default function AdminUsuarioDetailPage() {
   /* eslint-disable react-hooks/set-state-in-effect -- resolución síncrona de datos admin desde varias fuentes */
   useEffect(() => {
     try {
-      // 1. Buscar en MOCK_USERS (usuarios hardcodeados)
-      let baseUser: AdminUser | null =
-        MOCK_USERS.find((u) => u.id === id) ?? null;
+      // `id` del param puede ser username (handle) o id legacy.
+      // 1. Buscar en MOCK_USERS por username primero, luego por id, luego por
+      //    slug derivado de name+lastName (backward-compat).
+      let baseUser: AdminUser | null = findUserByHandle(MOCK_USERS, id) ?? null;
 
       // 2. Si no, buscar en tcgacademy_registered (usuarios seeded o reales)
       if (!baseUser) {
@@ -82,8 +84,9 @@ export default function AdminUsuarioDetailPage() {
             string,
             { password: string; user: User }
           >;
-          const entry = Object.values(registered).find((e) => e.user.id === id);
-          if (entry) baseUser = userToAdminUser(entry.user);
+          const users = Object.values(registered).map((e) => e.user);
+          const match = findUserByHandle(users, id);
+          if (match) baseUser = userToAdminUser(match);
         }
       }
 

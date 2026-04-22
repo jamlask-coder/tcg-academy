@@ -274,10 +274,21 @@ export const TCGDEX_JP_SET: Record<string, string> = {
   swsh5: "S5",
 };
 
-/** Build TCGDex image URL — EN uses lowercase sv/sv03.5, JA uses uppercase SV/SV2a */
+/**
+ * Deriva el segmento `series` de la URL CDN de tcgdex a partir del setId.
+ * tcgdex agrupa assets por prefijo de familia: /ja/SV/SV10/..., /ja/S/S12/...,
+ * /en/sv/sv10/..., /en/swsh/swsh12/... El prefijo alfabético del setId
+ * (antes del primer dígito) coincide con la carpeta. Antes usábamos una regla
+ * basada en mayúsculas que mandaba SWSH JP (`S12`) a `/SV/` → 404 masivos.
+ */
+export function tcgdexSeriesPath(setId: string): string {
+  const m = /^([A-Za-z]+)/.exec(setId);
+  return m ? m[1] : setId;
+}
+
+/** Build TCGDex image URL — EN uses lowercase sv/sv03.5/swsh12, JA uses uppercase SV/SV2a/S12 */
 export function tcgdexImageUrl(lang: string, setId: string, cardNum: string): string {
-  const isJpStyle = /^[A-Z]/.test(setId);
-  const series = isJpStyle ? "SV" : "sv";
+  const series = tcgdexSeriesPath(setId);
   return `https://assets.tcgdex.net/${lang}/${series}/${setId}/${cardNum.padStart(3, "0")}/high.webp`;
 }
 

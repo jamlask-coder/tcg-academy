@@ -24,8 +24,9 @@ import {
   GAME_CONFIG,
   CARD_CATEGORIES,
   LANGUAGE_NAMES,
+  LANGUAGE_FLAGS,
 } from "@/data/products";
-import { getMergedProducts, getMergedById } from "@/lib/productStore";
+import { getMergedProducts, getMergedById, getProductUrl } from "@/lib/productStore";
 import { SetHighlightCards } from "@/components/product/SetHighlightCards";
 import { LanguageFlag } from "@/components/ui/LanguageFlag";
 import { DiscountBadgeEdit } from "@/components/ui/DiscountBadgeEdit";
@@ -490,7 +491,7 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
     const wasOutOfStock = !product.inStock || (typeof product.stock === "number" && product.stock === 0);
     const nowInStock = inlineStock && (inlineStockQty.trim() === "" || parseInt(inlineStockQty) > 0);
     if (wasOutOfStock && nowInStock && getSubsForProduct(product.id).length > 0) {
-      const url = `https://tcgacademy.es/producto?id=${product.id}`;
+      const url = `https://tcgacademy.es${getProductUrl(product)}`;
       const img = product.images[0] ?? "";
       const { sent } = triggerRestockEmails(product.id, inlineTitle, url, img);
       if (sent > 0) alert(`Restock: ${sent} email(s) de aviso enviados.`);
@@ -961,6 +962,73 @@ export function ProductDetailClient({ product, config, catLabel }: Props) {
                         </>
                       );
                     })()}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* 4c. Admin — crear producto derivado / superior / paralelo */}
+          {isAdmin && (() => {
+            const canCreatePack =
+              product.category === "booster-box" && !product.linkedPackId;
+            const canCreateBox =
+              product.category === "sobres" && !product.linkedBoxId;
+            const existingLangs = new Set<string>([
+              (product.language ?? "").toUpperCase(),
+              ...langVariants.map((v) => (v.language ?? "").toUpperCase()),
+            ]);
+            const missingLangs = Object.keys(LANGUAGE_FLAGS).filter(
+              (l) => !existingLangs.has(l),
+            );
+            if (!canCreatePack && !canCreateBox && missingLangs.length === 0) return null;
+
+            const baseBtn =
+              "inline-flex items-center gap-1.5 rounded-full border-2 border-dashed px-3 py-1.5 text-xs font-semibold transition sm:py-1";
+            return (
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/40 p-2.5">
+                <span className="text-[11px] font-bold tracking-wide text-blue-700 uppercase">
+                  Admin
+                </span>
+                {canCreatePack && (
+                  <Link
+                    href={`/admin/productos/nuevo?derivedFrom=${product.id}&mode=pack`}
+                    className={`${baseBtn} border-blue-300 bg-white text-blue-700 hover:border-blue-500 hover:bg-blue-50`}
+                  >
+                    <Plus size={12} /> Sobre suelto
+                  </Link>
+                )}
+                {canCreateBox && (
+                  <Link
+                    href={`/admin/productos/nuevo?derivedFrom=${product.id}&mode=box`}
+                    className={`${baseBtn} border-blue-300 bg-white text-blue-700 hover:border-blue-500 hover:bg-blue-50`}
+                  >
+                    <Plus size={12} /> Caja de sobres
+                  </Link>
+                )}
+                {missingLangs.length > 0 && (
+                  <div className="relative">
+                    <select
+                      aria-label="Duplicar en otro idioma"
+                      defaultValue=""
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v) return;
+                        router.push(
+                          `/admin/productos/nuevo?derivedFrom=${product.id}&mode=lang&lang=${v}`,
+                        );
+                      }}
+                      className={`${baseBtn} cursor-pointer appearance-none border-blue-300 bg-white pr-7 text-blue-700 hover:border-blue-500 hover:bg-blue-50`}
+                    >
+                      <option value="" disabled>
+                        + Otro idioma
+                      </option>
+                      {missingLangs.map((l) => (
+                        <option key={l} value={l}>
+                          {LANGUAGE_FLAGS[l]} {LANGUAGE_NAMES[l] ?? l}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 )}
               </div>

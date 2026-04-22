@@ -693,6 +693,13 @@ export const MOCK_RETURNS: ReturnRequest[] = [
 
 export interface AdminUser {
   id: string;
+  /**
+   * Handle único y legible del usuario, usado en URLs admin
+   * (`/admin/usuarios/{username}`) en lugar del id opaco.
+   * Formato: slug `a-z0-9-`, 3–30 chars, único. Si falta, se deriva
+   * de `name+lastName` vía `getUserHandle()`.
+   */
+  username?: string;
   name: string;
   lastName: string;
   email: string;
@@ -714,6 +721,7 @@ export const MOCK_USERS: AdminUser[] = [
   // ── Demo auth accounts ────────────────────────────────────────────────────
   {
     id: "demo_cliente",
+    username: "laura",
     name: "Laura",
     lastName: "Sánchez García",
     email: "cliente@test.com",
@@ -730,6 +738,7 @@ export const MOCK_USERS: AdminUser[] = [
   },
   {
     id: "demo_mayorista",
+    username: "carlos-lopez",
     name: "Carlos",
     lastName: "López Distribuciones",
     email: "mayorista@test.com",
@@ -747,6 +756,7 @@ export const MOCK_USERS: AdminUser[] = [
   },
   {
     id: "demo_tienda",
+    username: "ana-martinez",
     name: "Ana",
     lastName: "Martínez Vidal",
     email: "tienda@test.com",
@@ -764,6 +774,7 @@ export const MOCK_USERS: AdminUser[] = [
   },
   {
     id: "admin",
+    username: "admin",
     name: "Admin",
     lastName: "TCG",
     email: "admin@tcgacademy.es",
@@ -777,6 +788,7 @@ export const MOCK_USERS: AdminUser[] = [
   // ── Clientes ──────────────────────────────────────────────────────────────
   {
     id: "u5",
+    username: "miguel-torres",
     name: "Miguel",
     lastName: "Torres Blanco",
     email: "miguel.torres@email.com",
@@ -792,6 +804,7 @@ export const MOCK_USERS: AdminUser[] = [
   },
   {
     id: "u6",
+    username: "isabel-fernandez",
     name: "Isabel",
     lastName: "Fernández Morales",
     email: "isabel.f@email.com",
@@ -807,6 +820,7 @@ export const MOCK_USERS: AdminUser[] = [
   },
   {
     id: "u7",
+    username: "javier-ruiz",
     name: "Javier",
     lastName: "Ruiz Martínez",
     email: "javier.ruiz@email.com",
@@ -822,6 +836,7 @@ export const MOCK_USERS: AdminUser[] = [
   },
   {
     id: "u8",
+    username: "carmen-navarro",
     name: "Carmen",
     lastName: "Navarro Ortiz",
     email: "carmen.nav@email.com",
@@ -838,6 +853,7 @@ export const MOCK_USERS: AdminUser[] = [
   // ── Mayoristas ───────────────────────────────────────────────────────────
   {
     id: "u9",
+    username: "pedro-perez",
     name: "Pedro",
     lastName: "Pérez Almansa",
     email: "distribuciones.perez@email.com",
@@ -856,6 +872,7 @@ export const MOCK_USERS: AdminUser[] = [
   },
   {
     id: "u10",
+    username: "ramon-morales",
     name: "Ramón",
     lastName: "Morales Izquierdo",
     email: "tcg.norte@email.com",
@@ -873,6 +890,7 @@ export const MOCK_USERS: AdminUser[] = [
   },
   {
     id: "u11",
+    username: "sofia-ibanez",
     name: "Sofía",
     lastName: "Ibáñez Cano",
     email: "iberian@email.com",
@@ -891,6 +909,7 @@ export const MOCK_USERS: AdminUser[] = [
   // ── Tiendas ───────────────────────────────────────────────────────────────
   {
     id: "u12",
+    username: "tomas-garcia",
     name: "Tomás",
     lastName: "García Serrano",
     email: "cards.madrid@email.com",
@@ -908,6 +927,7 @@ export const MOCK_USERS: AdminUser[] = [
   },
   {
     id: "u13",
+    username: "elena-romero",
     name: "Elena",
     lastName: "Romero Castillo",
     email: "dragon.tcg@email.com",
@@ -925,6 +945,7 @@ export const MOCK_USERS: AdminUser[] = [
   },
   {
     id: "u14",
+    username: "francisco-vidal",
     name: "Francisco",
     lastName: "Vidal Herrero",
     email: "magic.corner@email.com",
