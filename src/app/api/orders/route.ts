@@ -9,6 +9,11 @@ import { sendOrderNotification, getEmailService } from "@/lib/email";
 import { getClientIp } from "@/lib/auth";
 import { validateSpanishNIF } from "@/lib/validations/nif";
 import { orderCreateSchema, zodMessage } from "@/lib/validations/api";
+import {
+  captureSellerSnapshot,
+  type CustomerRoleSnapshot,
+} from "@/types/orderSnapshot";
+import { SITE_CONFIG } from "@/config/siteConfig";
 
 interface OrderItem {
   product_id: number;
@@ -174,6 +179,16 @@ export async function POST(req: NextRequest) {
 
     const total = Math.round((subtotal + shippingCost) * 100) / 100;
 
+    // ── Snapshot totals (congelados al crear el pedido) ───────────────────
+    // Los precios del catálogo son IVA incluido — el IVA contenido en el
+    // subtotal se deriva del tipo general de SITE_CONFIG en este instante.
+    const vatRateAtCreation = SITE_CONFIG.vatRate;
+    const vatDivisor = 1 + vatRateAtCreation / 100;
+    const totalVat = Math.round((subtotal - subtotal / vatDivisor) * 100) / 100;
+    const totalDiscount = Math.round(
+      ((coupon?.discount ?? 0) + (pointsDiscount ?? 0)) * 100,
+    ) / 100;
+
     // Blindaje anti-colisión: con 6 chars sobre alfabeto 32 (≈1G combos) la
     // probabilidad es <10⁻⁸ por pedido, pero si alguna vez repite, reintentamos.
     // Sin este check, un POST simultáneo podría sobrescribir un pedido existente.
@@ -185,7 +200,11 @@ export async function POST(req: NextRequest) {
       orderId = generateOrderId();
     }
 
-    // ── Build order record ────────────────────────────────────────────────
+    // ── Build order record (con snapshots congelados) ────────────────────
+    const nowIso = new Date().toISOString();
+    const sellerSnapshot = captureSellerSnapshot();
+    const customerRoleSnapshot = userRole as CustomerRoleSnapshot;
+
     const order: OrderRecord = {
       id: orderId,
       userId: apiUser?.id,
@@ -198,6 +217,11 @@ export async function POST(req: NextRequest) {
         name: item.name,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
+        imageUrl: item.imageUrl,
+        category: item.category,
+        game: item.game,
+        language: item.language,
+        vatRate: item.vatRate ?? vatRateAtCreation,
       })),
       subtotal: verification.priceResult.verifiedTotal,
       shippingCost,
@@ -205,6 +229,8 @@ export async function POST(req: NextRequest) {
       couponDiscount: coupon?.discount ?? 0,
       pointsDiscount: pointsDiscount ?? 0,
       total,
+      totalVat,
+      totalDiscount,
       status: "pendiente",
       shippingMethod: shipping.method,
       paymentMethod: payment.method,
@@ -219,8 +245,18 @@ export async function POST(req: NextRequest) {
         pais: customer.pais ?? "ES",
       },
       tiendaRecogida: shipping.tiendaRecogida,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      sellerSnapshot,
+      customerRole: customerRoleSnapshot,
+      statusHistory: [
+        {
+          status: "pendiente",
+          changedAt: nowIso,
+          changedBy: apiUser?.id ?? "guest",
+          note: "Pedido creado",
+        },
+      ],
+      createdAt: nowIso,
+      updatedAt: nowIso,
     };
 
     // ── Persist ───────────────────────────────────────────────────────────

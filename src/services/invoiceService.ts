@@ -840,6 +840,23 @@ export async function migrateInvoiceNumbersIfNeeded(): Promise<InvoiceMigrationR
 
 // ─── Almacenamiento (localStorage → reemplazar por BD) ───────────────────────
 
+/**
+ * Detecta facturas legacy con datos mock del emisor ("Calle Ejemplo",
+ * CIF placeholder, razón social vacía). Esas SÍ deben migrarse al emisor
+ * actual porque nunca fueron "snapshots reales" — eran mocks de desarrollo.
+ *
+ * Todas las demás se respetan COMO ESTÁN: son fotografías fiscales del
+ * momento de emisión (Art. 6 RD 1619/2012) y NO pueden reescribirse si
+ * SITE_CONFIG cambia (mudanza de oficina, rebranding, fusión).
+ */
+function isLegacyMockIssuer(issuer: InvoiceRecord["issuer"]): boolean {
+  if (!issuer) return true;
+  if (!issuer.taxId || !issuer.name) return true;
+  const mockMarkers = ["Calle Ejemplo", "ejemplo", "MOCK", "PLACEHOLDER"];
+  const street = issuer.address?.street ?? "";
+  return mockMarkers.some((m) => street.toLowerCase().includes(m.toLowerCase()));
+}
+
 /** Carga todas las facturas del almacenamiento */
 export function loadInvoices(): InvoiceRecord[] {
   if (typeof window === "undefined") return [];
@@ -847,13 +864,17 @@ export function loadInvoices(): InvoiceRecord[] {
     const raw = localStorage.getItem(INVOICE_STORAGE_KEY);
     if (!raw) return [];
     const parsed: InvoiceRecord[] = JSON.parse(raw);
-    // Normalize issuer to current SITE_CONFIG — legacy invoices stored before
-    // the SITE_CONFIG refactor may have mock issuer data ("Calle Ejemplo").
+    // SNAPSHOT INMUTABLE: la factura es una fotografía fiscal del momento
+    // de emisión. NO reescribir el issuer con SITE_CONFIG actual — solo
+    // migrar los mocks legacy de desarrollo (faltaba CIF, calle placeholder).
     const currentIssuer = buildIssuer();
-    const migrated = parsed.map((inv) => ({
-      ...deserializeDates(inv),
-      issuer: currentIssuer,
-    }));
+    const migrated = parsed.map((inv) => {
+      const deserialized = deserializeDates(inv);
+      if (isLegacyMockIssuer(deserialized.issuer)) {
+        return { ...deserialized, issuer: currentIssuer };
+      }
+      return deserialized;
+    });
     return migrated;
   } catch {
     return [];

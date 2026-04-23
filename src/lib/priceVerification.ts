@@ -26,6 +26,12 @@ interface PriceVerificationResult {
     quantity: number;
     unitPrice: number;
     lineTotal: number;
+    /** Snapshot fields — congelados en el pedido para inmutabilidad fiscal. */
+    category?: string;
+    game?: string;
+    language?: string;
+    imageUrl?: string;
+    vatRate?: number;
   }>;
 }
 
@@ -141,6 +147,11 @@ export function verifyCartPrices(
       quantity: item.quantity,
       unitPrice: finalPrice,
       lineTotal,
+      category: product.category,
+      game: product.game,
+      language: product.language,
+      imageUrl: product.images?.[0],
+      vatRate: SITE_CONFIG.vatRate,
     });
   }
 

@@ -5466,7 +5466,7 @@ export const PRODUCTS: LocalProduct[] = [
       "Caja de sobres de Heat Wave SV9a en coreano. Ola de calor con Pokémon de tipo fuego y cartas premium.",
     category: "booster-box",
     game: "pokemon",
-    images: ["/images/products/store/pokemon-kr-heat-wave.webp", "/images/products/store/pokemon-kr-heat-wave-2.webp"],
+    images: ["/images/products/store/pokemon-kr-heat-wave.webp"],
     inStock: true,
     stock: 6,
     isNew: false,

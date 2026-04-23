@@ -6,6 +6,11 @@
  */
 
 import { getSupabaseAdmin } from "@/lib/supabase";
+import type {
+  SellerSnapshot,
+  CustomerRoleSnapshot,
+  OrderStatusHistoryEntry,
+} from "@/types/orderSnapshot";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -24,6 +29,10 @@ export interface OrderRecord {
   couponDiscount?: number;
   pointsDiscount?: number;
   total: number;
+  /** IVA total incluido en `total` — congelado (snapshot). */
+  totalVat?: number;
+  /** Descuento total aplicado — congelado (snapshot). */
+  totalDiscount?: number;
   status: OrderStatus;
   shippingMethod: string;
   paymentMethod: string;
@@ -36,6 +45,12 @@ export interface OrderRecord {
   notes?: string;
   shippingAddress: ShippingAddress;
   tiendaRecogida?: string;
+  /** Foto de la empresa al crear el pedido — NUNCA se re-lee de SITE_CONFIG. */
+  sellerSnapshot?: SellerSnapshot;
+  /** Rol aplicado al calcular precios (cliente/mayorista/tienda/admin). */
+  customerRole?: CustomerRoleSnapshot;
+  /** Histórico de cambios de estado (append-only). */
+  statusHistory?: OrderStatusHistoryEntry[];
   createdAt: string;
   updatedAt: string;
 }
@@ -46,6 +61,18 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number;
   imageUrl?: string;
+  /** Categoría del producto al comprar (sobres, booster-box, etc.). */
+  category?: string;
+  /** Juego (magic, pokemon, yu-gi-oh, ...). */
+  game?: string;
+  /** Idioma del producto (ES, EN, JP, ...). */
+  language?: string;
+  /** IVA aplicado a esta línea (%). Default 21. */
+  vatRate?: number;
+  /** Descuento aplicado (%). */
+  discountPercent?: number;
+  /** Precio unitario antes del descuento — útil para mostrar tachado. */
+  unitPriceBeforeDiscount?: number;
 }
 
 export interface ShippingAddress {
