@@ -33,6 +33,15 @@ const schema = z
     telefono: z.string().max(20).optional(),
     password: z.string().min(6, "Mínimo 6 caracteres").max(128),
     confirmPassword: z.string().min(1, "Confirma tu contraseña"),
+    calle: z.string().min(1, "La calle es obligatoria").max(200),
+    numero: z.string().min(1, "El número es obligatorio").max(20),
+    piso: z.string().max(30).optional(),
+    cp: z
+      .string()
+      .regex(/^\d{5}$/, "Código postal: 5 dígitos"),
+    ciudad: z.string().min(1, "La ciudad es obligatoria").max(100),
+    provincia: z.string().min(1, "La provincia es obligatoria").max(100),
+    pais: z.string().min(2, "País obligatorio").max(2),
     referralCode: z.string().max(20).optional(),
     comoConociste: z.string().max(50).optional(),
     terminos: z.literal(true, { error: "Debes aceptar los términos" }),
@@ -109,7 +118,18 @@ export default function RegistroPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { telefono: "+34 ", terminos: undefined, comunicaciones: false },
+    defaultValues: {
+      telefono: "+34 ",
+      terminos: undefined,
+      comunicaciones: false,
+      calle: "",
+      numero: "",
+      piso: "",
+      cp: "",
+      ciudad: "",
+      provincia: "",
+      pais: "ES",
+    },
   });
 
   const watchedPassword = watch("password") ?? "";
@@ -164,13 +184,13 @@ export default function RegistroPage() {
       address: {
         nombre: data.nombre,
         apellidos: data.apellidos,
-        calle: "",
-        numero: "",
-        piso: "",
-        cp: "",
-        ciudad: "",
-        provincia: "",
-        pais: "ES",
+        calle: data.calle,
+        numero: data.numero,
+        piso: data.piso ?? "",
+        cp: data.cp,
+        ciudad: data.ciudad,
+        provincia: data.provincia,
+        pais: data.pais,
       },
     });
     if (ok) {
@@ -410,6 +430,136 @@ export default function RegistroPage() {
                     {errors.confirmPassword.message}
                   </p>
                 )}
+              </div>
+            </div>
+
+            {/* Dirección de envío */}
+            <div className="space-y-4 rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Dirección de envío</h3>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  La guardamos como principal. Podrás añadir más desde tu cuenta.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-[1fr_120px]">
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    Calle *
+                  </label>
+                  <input
+                    {...register("calle")}
+                    type="text"
+                    placeholder="Ej. Av. del Norte"
+                    maxLength={200}
+                    autoComplete="address-line1"
+                    className={inputCls(!!errors.calle)}
+                  />
+                  {errors.calle && (
+                    <p className="mt-1 text-xs text-red-500">{errors.calle.message}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    Número *
+                  </label>
+                  <input
+                    {...register("numero")}
+                    type="text"
+                    placeholder="40"
+                    maxLength={20}
+                    className={inputCls(!!errors.numero)}
+                  />
+                  {errors.numero && (
+                    <p className="mt-1 text-xs text-red-500">{errors.numero.message}</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                  Piso / puerta <span className="font-normal text-gray-400">(opcional)</span>
+                </label>
+                <input
+                  {...register("piso")}
+                  type="text"
+                  placeholder="2ª planta, puerta B"
+                  maxLength={30}
+                  autoComplete="address-line2"
+                  className={inputCls(false)}
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    CP *
+                  </label>
+                  <input
+                    {...register("cp")}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="03710"
+                    maxLength={5}
+                    autoComplete="postal-code"
+                    className={inputCls(!!errors.cp)}
+                  />
+                  {errors.cp && (
+                    <p className="mt-1 text-xs text-red-500">{errors.cp.message}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    Ciudad *
+                  </label>
+                  <input
+                    {...register("ciudad")}
+                    type="text"
+                    placeholder="Calpe"
+                    maxLength={100}
+                    autoComplete="address-level2"
+                    className={inputCls(!!errors.ciudad)}
+                  />
+                  {errors.ciudad && (
+                    <p className="mt-1 text-xs text-red-500">{errors.ciudad.message}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    Provincia *
+                  </label>
+                  <input
+                    {...register("provincia")}
+                    type="text"
+                    placeholder="Alicante"
+                    maxLength={100}
+                    autoComplete="address-level1"
+                    className={inputCls(!!errors.provincia)}
+                  />
+                  {errors.provincia && (
+                    <p className="mt-1 text-xs text-red-500">{errors.provincia.message}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                    País *
+                  </label>
+                  <select
+                    {...register("pais")}
+                    autoComplete="country"
+                    className={inputCls(!!errors.pais)}
+                  >
+                    <option value="ES">España</option>
+                    <option value="PT">Portugal</option>
+                    <option value="FR">Francia</option>
+                    <option value="IT">Italia</option>
+                    <option value="DE">Alemania</option>
+                    <option value="AD">Andorra</option>
+                  </select>
+                </div>
               </div>
             </div>
 
