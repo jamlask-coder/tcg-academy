@@ -13,6 +13,7 @@ import {
 import { getEmailService } from "@/lib/email";
 import { sanitizeString } from "@/utils/sanitize";
 import { authBodySchema, zodMessage } from "@/lib/validations/api";
+import { verifyTurnstileToken, isTurnstileConfigured } from "@/lib/turnstile";
 
 const isServerMode = () => (process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local") === "server";
 
@@ -38,6 +39,23 @@ export async function POST(req: NextRequest) {
     }
     const body = rawBody;
     const { action } = parsed.data;
+
+    // Verify Turnstile CAPTCHA on register — must run antes del early return
+    // local mode, porque el registro *real* siempre necesita anti-bot si hay
+    // secret configurado. Sin secret (dev local), la función devuelve skipped.
+    if (action === "register" && isTurnstileConfigured()) {
+      const captchaToken: unknown = body.captchaToken;
+      const cap = await verifyTurnstileToken(
+        typeof captchaToken === "string" ? captchaToken : undefined,
+        ip,
+      );
+      if (!cap.ok) {
+        return NextResponse.json(
+          { error: "Verificación anti-bot fallida. Recarga la página." },
+          { status: 400 },
+        );
+      }
+    }
 
     if (!isServerMode()) {
       // Local mode: return acknowledgment, client handles everything

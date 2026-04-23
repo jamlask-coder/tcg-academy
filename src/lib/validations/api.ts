@@ -26,6 +26,8 @@ export const authRegisterSchema = z.object({
   phone: z.string().max(40).optional(),
   username: z.string().max(40).optional(),
   consent: z.array(z.string()).optional(),
+  /** Cloudflare Turnstile token — verificado server-side si hay secret. */
+  captchaToken: z.string().max(4096).optional(),
 });
 
 export const authResetRequestSchema = z.object({

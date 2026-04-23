@@ -73,4 +73,10 @@ export interface RegisterData {
   address: Omit<Address, "id" | "predeterminada" | "label">;
   referralCode?: string;
   marketingConsent?: boolean;
+  /**
+   * Token Cloudflare Turnstile — verificado por el backend cuando
+   * `TURNSTILE_SECRET_KEY` está configurado. En modo local sin sitekey
+   * el widget emite un pseudo-token "dev-skipped" y el backend lo ignora.
+   */
+  captchaToken?: string;
 }

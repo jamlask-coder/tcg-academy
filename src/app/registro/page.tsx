@@ -16,6 +16,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { checkRateLimit } from "@/utils/sanitize";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { TurnstileWidget } from "@/components/auth/TurnstileWidget";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_\.]{3,20}$/;
 
@@ -30,7 +31,14 @@ const schema = z
       .max(20, "Máximo 20 caracteres")
       .regex(USERNAME_REGEX, "Solo letras, números, _ y . (sin espacios)"),
     email: z.string().email("Email inválido").max(254),
-    telefono: z.string().max(20).optional(),
+    telefono: z
+      .string()
+      .min(6, "Teléfono obligatorio")
+      .max(20, "Máximo 20 caracteres")
+      .regex(
+        /^[+\d\s\-()]{6,20}$/,
+        "Solo dígitos, espacios y los símbolos +-()",
+      ),
     password: z.string().min(6, "Mínimo 6 caracteres").max(128),
     confirmPassword: z.string().min(1, "Confirma tu contraseña"),
     calle: z.string().min(1, "La calle es obligatoria").max(200),
@@ -110,6 +118,7 @@ export default function RegistroPage() {
   const [serverError, setServerError] = useState("");
   const [mounted, setMounted] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
+  const [captchaToken, setCaptchaToken] = useState("");
 
   const {
     register,
@@ -164,6 +173,12 @@ export default function RegistroPage() {
       setServerError("Ese nombre de usuario ya está en uso, elige otro.");
       return;
     }
+    if (!captchaToken) {
+      setServerError(
+        "Completa la verificación anti-bot antes de crear la cuenta.",
+      );
+      return;
+    }
     if (!checkRateLimit("registro", 5, 60_000)) {
       setServerError(
         "Demasiados intentos. Espera un minuto antes de volver a intentarlo.",
@@ -177,7 +192,7 @@ export default function RegistroPage() {
       password: data.password,
       name: data.nombre,
       lastName: data.apellidos,
-      phone: data.telefono ?? "",
+      phone: data.telefono,
       gender: data.tratamiento,
       referralCode: data.referralCode?.toUpperCase().trim() || undefined,
       marketingConsent: data.comunicaciones ?? false,
@@ -192,6 +207,7 @@ export default function RegistroPage() {
         provincia: data.provincia,
         pais: data.pais,
       },
+      captchaToken,
     });
     if (ok) {
       router.push("/cuenta");
@@ -370,15 +386,25 @@ export default function RegistroPage() {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                  Teléfono
+                  Teléfono *
                 </label>
                 <input
                   {...register("telefono")}
                   type="tel"
                   placeholder="+34600000000"
                   maxLength={20}
-                  className={inputCls(false)}
+                  autoComplete="tel"
+                  className={inputCls(!!errors.telefono)}
                 />
+                {errors.telefono && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {errors.telefono.message}
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-gray-400">
+                  Lo usaremos para que la empresa de paquetería pueda contactar
+                  contigo.
+                </p>
               </div>
             </div>
 
@@ -670,6 +696,10 @@ export default function RegistroPage() {
               </label>
             </div>
 
+            {/* Anti-bot (Cloudflare Turnstile). En dev local sin sitekey emite
+                un token "skipped" y no renderiza nada. */}
+            <TurnstileWidget onToken={setCaptchaToken} action="register" />
+
             {serverError && (
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {serverError}
@@ -678,7 +708,7 @@ export default function RegistroPage() {
 
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !captchaToken}
               className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-60"
             >
               {isSubmitting ? (
