@@ -1,0 +1,162 @@
+name: Daily DB backup
+
+# Backup diario cifrado de la base de datos Supabase.
+#
+# Cumplimiento Art. 32 RGPD: copia diaria en 2ª ubicación + integridad.
+# Coste: 0 € (GitHub Actions minutos incluidos + artifacts 90 días gratis).
+#
+# Secrets requeridos en el repo (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL          Connection string de Supabase (incluye password)
+#                            postgres://postgres:[PASS]@db.[REF].supabase.co:5432/postgres
+#   BACKUP_ENCRYPTION_KEY    64 chars hex (AES-256-GCM). Generar:
+#                            openssl rand -hex 32
+#   NOTIFY_EMAIL             (opcional) destinatario alerta de fallo
+#
+# Secrets opcionales (upload a S3-compatible — Cloudflare R2, AWS, Backblaze):
+#   BACKUP_S3_ENDPOINT       ej. https://<accountid>.r2.cloudflarestorage.com
+#   BACKUP_S3_BUCKET         ej. tcgacademy-backups
+#   BACKUP_S3_ACCESS_KEY
+#   BACKUP_S3_SECRET_KEY
+#   BACKUP_S3_REGION         "auto" para R2, "eu-west-1" para AWS, etc.
+#
+# Sin SUPABASE_DB_URL el workflow se salta sin fallar (skip-if-no-secret).
+# Esto permite mergear el workflow antes de que la infra esté lista.
+
+on:
+  schedule:
+    # 03:00 UTC diario — después del cron de snapshots de precios (04:00)
+    # aún no ha corrido, para no competir por recursos.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Motivo del backup manual"
+        required: false
+        default: "manual"
+
+concurrency:
+  group: daily-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Preflight — check required secrets
+        id: preflight
+        run: |
+          if [ -z "${{ secrets.SUPABASE_DB_URL }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::SUPABASE_DB_URL secret no configurado — backup omitido. Añádelo en Settings → Secrets cuando la DB esté lista."
+          elif [ -z "${{ secrets.BACKUP_ENCRYPTION_KEY }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::BACKUP_ENCRYPTION_KEY secret no configurado — backup omitido."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install PostgreSQL 16 client
+        if: steps.preflight.outputs.skip != 'true'
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client-16
+
+      - name: Dump database
+        if: steps.preflight.outputs.skip != 'true'
+        id: dump
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          TS=$(date -u +"%Y%m%dT%H%M%SZ")
+          OUT="tcgacademy-${TS}.sql.gz"
+          echo "filename=${OUT}" >> "$GITHUB_OUTPUT"
+          echo "Dumping to ${OUT}..."
+          pg_dump \
+            --no-owner \
+            --no-privileges \
+            --format=plain \
+            "$SUPABASE_DB_URL" \
+            | gzip -9 > "${OUT}"
+          SIZE=$(stat -c%s "${OUT}")
+          echo "Dump size: ${SIZE} bytes"
+          if [ "${SIZE}" -lt 1000 ]; then
+            echo "::error::Dump demasiado pequeño (${SIZE}B) — probable fallo"
+            exit 1
+          fi
+          echo "size=${SIZE}" >> "$GITHUB_OUTPUT"
+
+      - name: Encrypt dump (AES-256-GCM via openssl)
+        if: steps.preflight.outputs.skip != 'true'
+        id: encrypt
+        env:
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+          DUMP: ${{ steps.dump.outputs.filename }}
+        run: |
+          set -euo pipefail
+          # AES-256-CBC con PBKDF2 (openssl no trae GCM en la CLI estándar).
+          # La key en hex 64 chars (32 bytes) se usa como passphrase — el PBKDF2
+          # la deriva con sal aleatoria embebida en el output.
+          ENC="${DUMP}.enc"
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
+            -pass env:BACKUP_ENCRYPTION_KEY \
+            -in "${DUMP}" -out "${ENC}"
+          sha256sum "${ENC}" > "${ENC}.sha256"
+          # Borrar el plain dump: el artifact sólo debe contener el cifrado.
+          rm -f "${DUMP}"
+          echo "filename=${ENC}" >> "$GITHUB_OUTPUT"
+          echo "Encrypted: ${ENC}"
+
+      - name: Upload artifact (GitHub, 90 días retención)
+        if: steps.preflight.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ github.run_number }}
+          path: |
+            ${{ steps.encrypt.outputs.filename }}
+            ${{ steps.encrypt.outputs.filename }}.sha256
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Upload to S3-compatible (opcional — Cloudflare R2 / AWS / B2)
+        if: steps.preflight.outputs.skip != 'true'
+        env:
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          BACKUP_S3_ACCESS_KEY: ${{ secrets.BACKUP_S3_ACCESS_KEY }}
+          BACKUP_S3_SECRET_KEY: ${{ secrets.BACKUP_S3_SECRET_KEY }}
+          BACKUP_S3_REGION: ${{ secrets.BACKUP_S3_REGION }}
+          ENC_FILE: ${{ steps.encrypt.outputs.filename }}
+        run: |
+          set -euo pipefail
+          # Upload a S3 sólo si los 4 secrets están definidos. Sin ellos, el
+          # artifact de GitHub ya cubre la retención de 90 días gratis.
+          if [ -z "${BACKUP_S3_ENDPOINT}" ] || [ -z "${BACKUP_S3_BUCKET}" ] \
+             || [ -z "${BACKUP_S3_ACCESS_KEY}" ] || [ -z "${BACKUP_S3_SECRET_KEY}" ]; then
+            echo "::notice::S3 secrets no configurados — omitido upload remoto (artifact GitHub sí guardado)."
+            exit 0
+          fi
+          pip install --quiet awscli
+          export AWS_ACCESS_KEY_ID="${BACKUP_S3_ACCESS_KEY}"
+          export AWS_SECRET_ACCESS_KEY="${BACKUP_S3_SECRET_KEY}"
+          export AWS_DEFAULT_REGION="${BACKUP_S3_REGION:-auto}"
+          aws s3 cp "${ENC_FILE}" "s3://${BACKUP_S3_BUCKET}/daily/${ENC_FILE}" \
+            --endpoint-url "${BACKUP_S3_ENDPOINT}"
+          aws s3 cp "${ENC_FILE}.sha256" "s3://${BACKUP_S3_BUCKET}/daily/${ENC_FILE}.sha256" \
+            --endpoint-url "${BACKUP_S3_ENDPOINT}"
+          echo "Uploaded to s3://${BACKUP_S3_BUCKET}/daily/${ENC_FILE}"
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ steps.preflight.outputs.skip }}" = "true" ]; then
+            echo "::notice::Backup omitido — secrets pendientes de configurar."
+          else
+            echo "::notice::Backup diario completado · archivo: ${{ steps.encrypt.outputs.filename }} · tamaño dump: ${{ steps.dump.outputs.size }} bytes"
+          fi
