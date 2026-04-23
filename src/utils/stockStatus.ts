@@ -27,6 +27,31 @@ export const STOCK_THRESHOLDS = {
   available: 20,  // >= 20 → stock disponible
 } as const;
 
+/**
+ * SSOT: deriva el "stock efectivo" de un producto cuando los campos
+ * `stock` (número) e `inStock` (bool) pueden divergir. `stock` es
+ * siempre autoritativo si está definido — `inStock` solo manda si
+ * no hay número (stock ilimitado vs agotado).
+ *
+ *  - stock definido (número) → ese número manda. inStock ignorado.
+ *  - stock undefined + inStock true  → undefined (ilimitado)
+ *  - stock undefined + inStock false → 0 (agotado)
+ */
+export function getEffectiveStock(
+  p: { stock?: number; inStock: boolean },
+): number | undefined {
+  if (typeof p.stock === "number") return p.stock;
+  return p.inStock ? undefined : 0;
+}
+
+/** True si el producto se puede comprar ahora mismo (stock > 0 o ilimitado). */
+export function isProductInStock(
+  p: { stock?: number; inStock: boolean },
+): boolean {
+  const eff = getEffectiveStock(p);
+  return eff === undefined || eff > 0;
+}
+
 export function getStockInfo(stock: number | undefined): StockInfo {
   if (stock === undefined) {
     return {

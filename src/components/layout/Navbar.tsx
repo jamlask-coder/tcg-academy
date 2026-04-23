@@ -10,22 +10,23 @@ import { MayoristasMenu } from "./MayoristasMenu";
 import { OtrosMenu } from "./OtrosMenu";
 import { MEGA_MENU_DATA } from "@/data/megaMenuData";
 import { getMergedMegaMenu } from "@/lib/megaMenuOverrides";
+import { loadSubcategories } from "@/data/subcategories";
 import { DataHub } from "@/lib/dataHub";
 import { Container } from "@/components/ui/Container";
 
 // ─── Cardmarket sprite sheet ───────────────────────────────────────────────────
 const CM_SPRITE = "/images/ssGamesBig.png";
 const SPRITE_SHEET_H = 140; // original sprite sheet height in px
-const TARGET_H = 44;        // display height for normal logos
-const TARGET_W = 115;       // normalized visual width for all logos
+const TARGET_H = 46;        // display height for normal logos
+const TARGET_W = 130;       // normalized visual width for all logos
 
 // Per-logo target overrides [maxW, maxH] — increase both to scale the logo up
 const CM_SPRITE_TARGET: Record<string, [number, number]> = {
   // Pokémon: reducido 2026-04-22 — a 128x46 se cortaba la "N" por la derecha
   // y aparecía un artefacto del sprite vecino a la izquierda de la "P".
-  pokemon: [118, 42],
-  magic: [122, 44],
-  "one-piece": [118, 45],
+  pokemon: [134, 46],
+  magic: [140, 48],
+  "one-piece": [134, 48],
 };
 
 // Per-slug width/height overrides for image-based logos (not sprites)
@@ -38,10 +39,13 @@ const WHITE_LOGO_OVERRIDE: Record<string, string> = {
   "one-piece": "/images/logos/onepiece-white.png",
 };
 
-// [origW, origX, vOffset, filter?]
+// [origW, origX, vNudgePx, filter?]
+// vNudgePx = desplazamiento vertical en px aplicado al logo renderizado
+//   (negativo = sube, positivo = baja). Permite corregir el centrado óptico
+//   cuando el arte dentro del sprite tiene padding asimétrico top/bottom.
 // All logos are rendered at TARGET_W wide and TARGET_H tall (object-contain style)
 const CM_SPRITES: Record<string, [number, number, number, string?]> = {
-  magic: [408, 0, 0],
+  magic: [408, 0, -4],
   yugioh: [392, 696, 0],
   pokemon: [273, 1228, 0],
   "dragon-ball": [382, 3288, 0],
@@ -60,7 +64,7 @@ const SHEET_ORIG_W = 6295;
 function CmSpriteLogo({ slug, label }: { slug: string; label: string }) {
   const data = CM_SPRITES[slug];
   if (!data) return null;
-  const [origW, origX, , cssFilter] = data;
+  const [origW, origX, vNudgePx, cssFilter] = data;
 
   const [targetW, targetH] = CM_SPRITE_TARGET[slug] ?? [TARGET_W, TARGET_H];
   // object-contain: scale by whichever axis fills the box first
@@ -93,6 +97,7 @@ function CmSpriteLogo({ slug, label }: { slug: string; label: string }) {
           backgroundSize: `${sheetW}px ${displayH}px`,
           backgroundPosition: `${bgX}px 0px`,
           filter: cssFilter,
+          transform: vNudgePx ? `translateY(${vNudgePx}px)` : undefined,
         }}
       />
     </span>
@@ -153,6 +158,11 @@ const TIENDAS_KEY = "tiendas";
 const MAYORISTAS_KEY = "mayoristas";
 const OTROS_KEY = "otros";
 
+// Juegos cuyo logo abre un dropdown de COLECCIONES al pasar el ratón. Pokémon
+// NO tiene desplegable — el resto de juegos ("Otros TCG") tampoco; ellos usan
+// el menú "Otros" aparte.
+const COLLECTION_PRIMARY_SLUGS = ["magic", "one-piece", "riftbound"];
+
 export function Navbar() {
   const pathname = usePathname();
   const [activeItem, setActiveItem] = useState<string | null>(null);
@@ -163,11 +173,42 @@ export function Navbar() {
   const [activeLogoLeft, setActiveLogoLeft] = useState<number | null>(null);
   const [menuData, setMenuData] = useState(() => MEGA_MENU_DATA);
   useEffect(() => {
-    const reload = () => setMenuData(getMergedMegaMenu());
+    const reload = () => {
+      const base = getMergedMegaMenu();
+      const subs = loadSubcategories();
+      // Para los 4 juegos principales: sustituimos las columnas del mega-menú
+      // por una sola columna "Colecciones" — primero "Todos" (link al juego)
+      // y luego cada colección en el orden definido en admin.
+      const transformed = base.map((g) => {
+        if (!COLLECTION_PRIMARY_SLUGS.includes(g.slug)) return g;
+        const collections = subs[g.slug] ?? [];
+        return {
+          ...g,
+          columns: [
+            {
+              title: "Colecciones",
+              items: [
+                { label: "Todos", href: `/${g.slug}` },
+                ...collections.map((c) => ({
+                  label: c.label,
+                  href: `/${g.slug}?coleccion=${c.id}`,
+                })),
+              ],
+            },
+          ],
+        };
+      });
+      setMenuData(transformed);
+    };
     reload();
-    return DataHub.on("megamenu", reload);
+    const offMega = DataHub.on("megamenu", reload);
+    const offSubs = DataHub.on("subcategories", reload);
+    return () => {
+      offMega();
+      offSubs();
+    };
   }, []);
-  const NAVBAR_GAMES = menuData.slice(0, 6);
+  const NAVBAR_GAMES = menuData.slice(0, 4);
 
   const cancelClose = useCallback(() => {
     if (closeTimerRef.current) {
@@ -218,7 +259,8 @@ export function Navbar() {
     activeItem &&
     activeItem !== TIENDAS_KEY &&
     activeItem !== MAYORISTAS_KEY &&
-    activeItem !== OTROS_KEY
+    activeItem !== OTROS_KEY &&
+    COLLECTION_PRIMARY_SLUGS.includes(activeItem)
       ? (menuData.find((g) => g.slug === activeItem) ?? null)
       : null;
 
@@ -303,7 +345,7 @@ export function Navbar() {
                         style={{
                           background:
                             active || open
-                              ? `radial-gradient(ellipse 60px 40px at center, ${color}DD 0%, ${color}44 60%, transparent 100%)`
+                              ? `radial-gradient(ellipse 78px 48px at center, ${color}DD 0%, ${color}44 60%, transparent 100%)`
                               : "transparent",
                         }}
                         title={label}
@@ -328,7 +370,7 @@ export function Navbar() {
                 onMouseEnter={() => openItem(OTROS_KEY)}
               >
                 <button
-                  aria-label="Otros TCG: Dragon Ball, Naruto, Lorcana, Panini, Digimon"
+                  aria-label="Otros TCG: Yu-Gi-Oh!, Topps, Dragon Ball, Naruto, Lorcana, Panini, Digimon"
                   aria-expanded={activeItem === OTROS_KEY}
                   className={`relative z-10 -mb-px flex items-center gap-1 border-b-2 px-3.5 text-sm font-semibold transition-all ${
                     activeItem === OTROS_KEY

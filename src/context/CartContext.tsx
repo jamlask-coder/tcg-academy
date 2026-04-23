@@ -13,6 +13,24 @@ const ANON_CART_KEY = "tcga_cart_anon";
 const cartKeyFor = (userId?: string) =>
   userId ? `tcga_cart_${userId}` : ANON_CART_KEY;
 
+/**
+ * SSOT DE PRECIO EN CARRITO — NO ROMPER ESTE CONTRATO
+ *
+ * Lo que se guarda en localStorage (`items`) es un snapshot (price/name/image)
+ * que SÓLO sirve como fallback si el producto desaparece del catálogo.
+ *
+ * En cada render, `effectiveItems` (línea ~357) RESUELVE price/name/image
+ * desde `getMergedById` (PRODUCTS + overrides admin). El CartContext expone
+ * `items: effectiveItems` al consumidor — nunca los snapshots crudos.
+ *
+ * REGLA: cualquier consumidor que necesite el precio actual del carrito
+ * debe usar `useCart().items`. Nunca leer `localStorage.getItem("cart")`
+ * directo ni pasar `CartItem.price` del snapshot al backend en checkout —
+ * eso reintroduce divergencia entre lo que ve el usuario y lo que manda.
+ *
+ * El servidor (priceVerification.ts) hace una segunda verificación con
+ * tolerancia 0,02 €: si un cliente obsoleto manda precio viejo, se rechaza.
+ */
 export interface CartItem {
   key: string;
   product_id: number;

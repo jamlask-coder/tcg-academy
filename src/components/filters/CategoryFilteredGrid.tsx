@@ -7,6 +7,7 @@ import type { LocalProduct } from "@/data/products";
 import { CARD_CATEGORIES } from "@/data/products";
 import { LocalProductCard } from "@/components/product/LocalProductCard";
 import { getMergedByGame, getMergedByGameAndCategory } from "@/lib/productStore";
+import { loadSubcategories } from "@/data/subcategories";
 import {
   SidebarFilters,
   MobileFilterButton,
@@ -85,10 +86,28 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
     ? Number(params.get("priceMax"))
     : null;
   const query = (params.get("q") ?? "").trim();
+  const coleccion = (params.get("coleccion") ?? "").trim();
+
+  // Resolvemos el label de la colección (p.ej. "tmnt" → "Tortugas Ninja") para
+  // mostrarlo en la chip. Se lee de localStorage (subcategories) — si no hay
+  // coincidencia caemos al id crudo.
+  const coleccionLabel = useMemo(() => {
+    if (!coleccion) return "";
+    const subs = loadSubcategories();
+    const found = (subs[game] ?? []).find((s) => s.id === coleccion);
+    return found?.label ?? coleccion;
+  }, [coleccion, game]);
 
   const clearQuery = () => {
     const next = new URLSearchParams(params.toString());
     next.delete("q");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  };
+
+  const clearColeccion = () => {
+    const next = new URLSearchParams(params.toString());
+    next.delete("coleccion");
     const qs = next.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname);
   };
@@ -123,7 +142,8 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
     (!inStock ? 1 : 0) +
     (priceMin !== null ? 1 : 0) +
     (priceMax !== null ? 1 : 0) +
-    (query ? 1 : 0);
+    (query ? 1 : 0) +
+    (coleccion ? 1 : 0);
 
   const filtered = useMemo(() => {
     let list = [...mergedProducts];
@@ -131,6 +151,11 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
     if (inStock) list = list.filter((p) => p.inStock);
     if (priceMin !== null) list = list.filter((p) => p.price >= priceMin);
     if (priceMax !== null) list = list.filter((p) => p.price <= priceMax);
+    if (coleccion) {
+      // Productos que pertenecen a una colección se etiquetan con su id en
+      // `tags` (ej. "tmnt" → Tortugas Ninja, "bloomburrow" → Bloomburrow).
+      list = list.filter((p) => (p.tags ?? []).includes(coleccion));
+    }
     if (query) {
       // Multi-token AND search (accent-insensitive) over name + description + category.
       // Works for cross-language queries: "Teenage Mutant Ninja Turtles"
@@ -144,7 +169,7 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
       });
     }
     return list;
-  }, [mergedProducts, langs, inStock, priceMin, priceMax, query]);
+  }, [mergedProducts, langs, inStock, priceMin, priceMax, query, coleccion]);
 
   const visible = filtered;
 
@@ -192,6 +217,27 @@ function GridContent({ products, color, game, category, categoryItems }: Props) 
               </button>
             </span>
             <span className="text-gray-400">{filtered.length} resultados</span>
+          </div>
+        )}
+
+        {/* Active collection chip */}
+        {coleccion && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+            <span>Colección:</span>
+            <span
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold"
+              style={{ backgroundColor: `${color}14`, color }}
+            >
+              {coleccionLabel}
+              <button
+                onClick={clearColeccion}
+                aria-label="Quitar filtro de colección"
+                className="opacity-70 hover:opacity-100"
+              >
+                <X size={12} />
+              </button>
+            </span>
+            <span className="text-gray-400">{filtered.length} productos</span>
           </div>
         )}
 

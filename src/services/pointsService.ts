@@ -211,6 +211,57 @@ export function deductPoints(
   return next;
 }
 
+/**
+ * SSOT Reconciliation — deriva el balance desde el historial y lo guarda.
+ *
+ * Uso: invocar al arrancar la sesión (AuthContext) para detectar divergencias
+ * entre `tcgacademy_pts` (balance stored) y `tcgacademy_pts_history` (source
+ * of truth de transacciones). Si difieren, el historial gana y se corrige
+ * el balance silenciosamente (con evento de log para auditoría).
+ *
+ * El historial es la verdad: cada mutación de puntos debe pasar por addHistory()
+ * antes de tocar el balance. Si un write atómico falla, `saveMap` emite
+ * `tcga:storage:error` — ese evento + este reconciliador son el red de
+ * seguridad para que balance e historial no puedan divergir permanentemente.
+ */
+export function reconcilePointsFromHistory(userId: string): {
+  before: number;
+  after: number;
+  reconciled: boolean;
+} {
+  const storedBalance = loadPoints(userId);
+  const history = getPointsHistory(userId);
+  const derived = Math.max(
+    0,
+    Math.floor(history.reduce((sum, h) => sum + h.pts, 0)),
+  );
+
+  if (storedBalance === derived) {
+    return { before: storedBalance, after: storedBalance, reconciled: false };
+  }
+
+  // Divergencia detectada — historial manda. Corrige balance.
+  const map = loadMap<number>(POINTS_KEY);
+  map[userId] = derived;
+  saveMap(POINTS_KEY, map);
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("tcga:points:reconciled", {
+        detail: {
+          userId,
+          storedBalance,
+          derivedFromHistory: derived,
+          delta: derived - storedBalance,
+          ts: Date.now(),
+        },
+      }),
+    );
+  }
+
+  return { before: storedBalance, after: derived, reconciled: true };
+}
+
 // ─── Conversions ──────────────────────────────────────────────────────────────
 
 /** 10.000 pts = €1.00  →  1 pt = €0.0001 */

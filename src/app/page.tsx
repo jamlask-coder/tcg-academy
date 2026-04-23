@@ -26,11 +26,12 @@ export default function HomePage() {
             sigue apareciendo en la navbar. */}
         <HeroCarousel />
 
-        {/* Transición suave hero → fondo. NO usamos overlap para que ningún
-            CTA del hero quede tapado por las tarjetas de juegos. */}
+        {/* Transición suave hero → fondo. La altura escala con el breakpoint
+            para cubrir toda la zona donde las cards se solapan (así el arte
+            del hero no se corta de golpe contra el top de las cards). */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-b from-transparent to-[#0a0f1a]"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent via-[#0a0f1a]/70 to-[#0a0f1a] sm:h-32 md:h-40 lg:h-52 xl:h-60 2xl:h-64"
         />
 
         {/* Grid de juegos TCG — MÓVIL (12 juegos, 3 cols, mismos logos que drawer)
@@ -148,7 +149,7 @@ export default function HomePage() {
                 progresivo por breakpoint (aspect 2.6/1 crece en desktop).
               · El contenido focal del hero (turtles, logo, CTA) vive en
                 el 55 % superior para no quedar tapado nunca. */}
-        <div className="relative z-10 hidden sm:-mt-24 sm:block sm:pb-10 md:-mt-32 md:pb-14 lg:-mt-44 xl:-mt-52 2xl:-mt-60">
+        <div className="relative z-10 hidden sm:-mt-16 sm:block sm:pb-10 md:-mt-20 md:pb-14 lg:-mt-28 xl:-mt-36 2xl:-mt-44">
           <div className="relative mx-auto w-full max-w-[1400px] px-4 sm:px-6">
             <div className="grid grid-cols-4 gap-5">
               {MOBILE_GAMES.map((game, idx) => {

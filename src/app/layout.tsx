@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Fraunces } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/layout/Providers";
 import { Header } from "@/components/layout/Header";
@@ -16,6 +16,17 @@ import {
 } from "@/lib/seo";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
+
+// Fraunces — serif moderna con opsz + soft, se usa solo en los ítems del
+// navbar (Otros TCG, Eventos, Tiendas, Profesionales) para darles un tono
+// editorial / "academy" coherente con el dorado de TCG Academy.
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-fraunces",
+  weight: ["500", "600", "700"],
+  style: ["italic", "normal"],
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -74,7 +85,7 @@ export default function RootLayout({
         <script {...jsonLdProps(organizationJsonLd())} />
         <script {...jsonLdProps(websiteJsonLd())} />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.className} ${fraunces.variable}`}>
         <Providers>
           <ScrollToTop />
           <FiscalDataGuard>

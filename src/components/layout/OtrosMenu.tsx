@@ -5,6 +5,24 @@ import { useState } from "react";
 
 const OTROS_GAMES = [
   {
+    id: "yugioh",
+    name: "Yu-Gi-Oh!",
+    href: "/yugioh",
+    color: "#b45309",
+    logo: "/images/logos/yugioh.png",
+    logoH: 44,
+    logoMaxW: 130,
+  },
+  {
+    id: "topps",
+    name: "Topps",
+    href: "/topps",
+    color: "#0ea5e9",
+    logo: "/images/logos/topps.svg",
+    logoH: 38,
+    logoMaxW: 100,
+  },
+  {
     id: "dragon-ball",
     name: "Dragon Ball",
     href: "/dragon-ball",
@@ -128,8 +146,8 @@ export function OtrosMenu({ onClose }: Props) {
       className="border-t-2 border-t-gray-300 bg-white shadow-xl"
       style={{ borderRadius: "0 0 12px 12px" }}
     >
-      <div className="mx-auto max-w-[900px] px-6 py-5">
-        <div className="grid grid-cols-6 gap-2">
+      <div className="mx-auto max-w-[720px] px-6 py-5">
+        <div className="grid grid-cols-4 gap-2">
           {OTROS_GAMES.map((game) => (
             <GameCard
               key={game.id}

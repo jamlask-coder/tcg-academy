@@ -167,7 +167,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Calculate final total ─────────────────────────────────────────────
-    let subtotal = verification.priceResult.verifiedTotal;
+    const subtotalBeforeDiscounts = verification.priceResult.verifiedTotal;
+    let subtotal = subtotalBeforeDiscounts;
     const shippingCost = verification.shipping;
 
     if (coupon?.discount && coupon.discount > 0) {
@@ -176,6 +177,7 @@ export async function POST(req: NextRequest) {
     if (pointsDiscount && pointsDiscount > 0) {
       subtotal = Math.max(0, subtotal - pointsDiscount);
     }
+    subtotal = Math.round(subtotal * 100) / 100;
 
     const total = Math.round((subtotal + shippingCost) * 100) / 100;
 
@@ -185,8 +187,11 @@ export async function POST(req: NextRequest) {
     const vatRateAtCreation = SITE_CONFIG.vatRate;
     const vatDivisor = 1 + vatRateAtCreation / 100;
     const totalVat = Math.round((subtotal - subtotal / vatDivisor) * 100) / 100;
+    // SSOT: totalDiscount DERIVADO del subtotal (antes vs después). Antes se
+    // sumaban los componentes (coupon + points) directamente, lo que podía
+    // divergir del descuento real efectivo por redondeos en cada componente.
     const totalDiscount = Math.round(
-      ((coupon?.discount ?? 0) + (pointsDiscount ?? 0)) * 100,
+      (subtotalBeforeDiscounts - subtotal) * 100,
     ) / 100;
 
     // Blindaje anti-colisión: con 6 chars sobre alfabeto 32 (≈1G combos) la

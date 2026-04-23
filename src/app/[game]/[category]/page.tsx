@@ -117,9 +117,10 @@ export default async function CategoryPage({
     <div>
       <script {...jsonLdProps(breadcrumbLd)} />
 
-      {/* Category nav */}
-      <div className="sticky-under-nav hidden border-b border-gray-100 bg-white lg:block">
-        <div className="mx-auto max-w-[1400px] px-4 py-3 sm:px-6">
+      {/* Category nav — pegado directamente a la balda de juegos (sin sticky
+          para evitar el hueco gris que aparecía entre navbar y filtros). */}
+      <div className="hidden border-b border-gray-100 bg-white lg:block">
+        <div className="mx-auto max-w-[1400px] px-4 pt-2 pb-2 sm:px-6">
           <CategoryTags
             items={[
               { id: "todo", label: "Todo", href: `/${game}` },

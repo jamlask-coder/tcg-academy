@@ -145,7 +145,7 @@
 }
 @media (min-width: 1024px) {
   :root {
-    --header-h: 176px;
+    --header-h: 150px; /* trust bar (~36) + main bar h-14 (56) + navbar (58) */
     --cat-bar-h: 56px; /* category tags visible on desktop */
   }
 }
@@ -160,6 +160,66 @@
 /* Smooth scrolling with header offset so anchor links land correctly */
 html {
   scroll-padding-top: var(--header-h);
+}
+
+/* ── Nav fancy (Otros TCG, Eventos, Tiendas, Profesionales) ───────────────
+   Tipografía serif Fraunces (opsz + soft axes) para tono editorial, con
+   hover que funde el texto con un degradado amber + text-shadow sutil.
+   NO cambia tamaño ni estructura — solo familia, peso y color. Así no
+   rompe la maquetación de la navbar.
+   ────────────────────────────────────────────────────────────────────────── */
+.nav-fancy {
+  font-family: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  font-weight: 600;
+  font-style: italic;
+  letter-spacing: 0.01em;
+  font-feature-settings: "ss01", "liga";
+  transition: background 260ms ease, color 200ms ease,
+              text-shadow 260ms ease, letter-spacing 300ms ease;
+}
+.nav-fancy:hover,
+.nav-fancy:focus-visible {
+  color: transparent;
+  background: linear-gradient(
+    100deg,
+    #fde68a 0%,
+    #fbbf24 35%,
+    #f59e0b 55%,
+    #fbbf24 75%,
+    #fde68a 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 18px rgba(251, 191, 36, 0.25);
+  letter-spacing: 0.02em;
+  animation: navFancyShine 3.8s linear infinite;
+}
+.nav-fancy.is-active {
+  color: transparent;
+  background: linear-gradient(
+    100deg,
+    #fde68a 0%,
+    #fbbf24 50%,
+    #fde68a 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 14px rgba(251, 191, 36, 0.35);
+}
+@keyframes navFancyShine {
+  0%   { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-fancy,
+  .nav-fancy:hover {
+    animation: none;
+    transition: color 120ms ease;
+    letter-spacing: 0.01em;
+  }
 }
 
 /* ── Microanimations ────────────────────────────────────────────────────────

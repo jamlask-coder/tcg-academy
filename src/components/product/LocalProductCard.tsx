@@ -3,7 +3,7 @@ import { memo, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ShoppingCart, Heart, Check, Trash2, Bell } from "lucide-react";
-import { getStockInfo } from "@/utils/stockStatus";
+import { getStockInfo, getEffectiveStock, isProductInStock } from "@/utils/stockStatus";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { useFavorites } from "@/context/FavoritesContext";
@@ -60,7 +60,7 @@ function LocalProductCardInner({ product }: Props) {
     user?.email ? isSubscribed(product.id, user.email) : false,
   );
 
-  const isOutOfStock = !product.inStock || (typeof product.stock === "number" && product.stock === 0);
+  const isOutOfStock = !isProductInStock(product);
   const cartKey = `item_${product.id}`;
   const cartItem = items.find((i) => i.key === cartKey);
   const cartQty = cartItem?.quantity ?? 0;
@@ -132,11 +132,11 @@ function LocalProductCardInner({ product }: Props) {
             displayImage.startsWith("blob:") ||
             displayImage.startsWith("http")
           }
-          className={`${imageObjectFit} transition-all duration-300 ${!product.inStock ? "opacity-50" : ""}`}
+          className={`${imageObjectFit} transition-all duration-300 ${isOutOfStock ? "opacity-50" : ""}`}
         />
       ) : (
         <div
-          className={`flex h-full w-full flex-col items-center justify-center gap-3 p-4 ${!product.inStock ? "opacity-50" : ""}`}
+          className={`flex h-full w-full flex-col items-center justify-center gap-3 p-4 ${isOutOfStock ? "opacity-50" : ""}`}
           style={{
             background: "#ffffff",
           }}
@@ -159,7 +159,7 @@ function LocalProductCardInner({ product }: Props) {
           </span>
         )}
         {(() => {
-          const si = getStockInfo(product.inStock ? product.stock : 0);
+          const si = getStockInfo(getEffectiveStock(product));
           if (si.level === "unlimited" || si.level === "available") return null;
           if (si.level === "out") {
             return (
@@ -375,7 +375,7 @@ function LocalProductCardInner({ product }: Props) {
             </div>
             {/* Badge stock — izquierda */}
             {(() => {
-              const si2 = getStockInfo(product.inStock ? product.stock : 0);
+              const si2 = getStockInfo(getEffectiveStock(product));
               if (si2.level === "unlimited" || si2.level === "available") return null;
               if (si2.level === "out") {
                 return (

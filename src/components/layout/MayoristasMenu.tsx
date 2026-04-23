@@ -1,16 +1,18 @@
 "use client";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Building2, Store, Package2, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Container } from "@/components/ui/Container";
 
 interface Props {
   onClose: () => void;
 }
 
+// Iconos amber pixelados — mismos assets que usa el MobileDrawer para
+// representar estas 3 soluciones B2B. Estilo coherente móvil ↔ desktop.
 const OPTIONS = [
   {
-    icon: Building2,
+    iconSrc: "/images/logos/b2b-cart-amber.png",
     title: "Hazte distribuidor B2B",
     desc: "Precios exclusivos para empresas y tiendas. Descuentos especiales.",
     href: "/mayoristas",
@@ -18,7 +20,7 @@ const OPTIONS = [
     badge: "Más popular",
   },
   {
-    icon: Store,
+    iconSrc: "/images/logos/franquicias-amber.png",
     title: "Monta tu tienda TCG",
     desc: "Acompañamiento integral para abrir tu negocio TCG desde cero.",
     href: "/mayoristas/franquicias",
@@ -26,7 +28,7 @@ const OPTIONS = [
     badge: null,
   },
   {
-    icon: Package2,
+    iconSrc: "/images/logos/vending-amber.png",
     title: "Máquinas Vending TCG",
     desc: "Lleva el TCG a centros comerciales y zonas de paso. 24h, 7 días.",
     href: "/mayoristas/vending",
@@ -58,7 +60,7 @@ export function MayoristasMenu({ onClose }: Props) {
           </Link>
         </div>
         <div className="grid grid-cols-3 gap-3">
-          {OPTIONS.map(({ icon: Icon, title, desc, href, color, badge }) => (
+          {OPTIONS.map(({ iconSrc, title, desc, href, color, badge }) => (
             <Link
               key={href}
               href={href}
@@ -73,11 +75,13 @@ export function MayoristasMenu({ onClose }: Props) {
                   {badge}
                 </span>
               )}
-              <div
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-white"
-                style={{ backgroundColor: color }}
-              >
-                <Icon size={18} />
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={iconSrc}
+                  alt=""
+                  className="h-8 w-8 object-contain transition-transform duration-200 group-hover:scale-110"
+                />
               </div>
               <div className="min-w-0 pr-14">
                 <p className="text-sm leading-tight font-semibold text-gray-800 group-hover:text-gray-900">
@@ -90,6 +94,7 @@ export function MayoristasMenu({ onClose }: Props) {
             </Link>
           ))}
         </div>
+
       </Container>
     </motion.div>
   );

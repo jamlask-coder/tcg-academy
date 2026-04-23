@@ -27,8 +27,8 @@ import {
 // Mostramos todos los juegos del mega-menú — así puede editar Pokémon, Magic,
 // One Piece, Yu-Gi-Oh!, Topps, Dragon Ball, Naruto y Riftbound.
 const ALL_GAMES = MEGA_MENU_DATA.map((g) => g.slug);
-// Juegos que actualmente tienen colecciones (subcategorías) — el resto solo
-// editará categorías.
+// Juegos con colecciones: los 3 juegos principales que sí tienen desplegable
+// en la navbar. Pokémon y los de "Otros TCG" no usan colecciones.
 const COLLECTION_GAMES = ["magic", "one-piece", "riftbound"];
 
 type Tab = "categorias" | "colecciones";
@@ -205,6 +205,17 @@ export default function AdminCategoriasPage() {
     showToast("Nombre actualizado");
   };
 
+  const handleMoveSub = (id: string, dir: -1 | 1) => {
+    const current = subMap[game] ?? [];
+    const idx = current.findIndex((s) => s.id === id);
+    if (idx < 0) return;
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= current.length) return;
+    const next = [...current];
+    [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
+    persistSub({ ...subMap, [game]: next });
+  };
+
   // ─── Render ────────────────────────────────────────────────────────────────
   const hasOverride = Boolean(loadMegaMenuOverrides()[game]);
 
@@ -302,6 +313,7 @@ export default function AdminCategoriasPage() {
           onStartEdit={startEditSub}
           onConfirmEdit={confirmEditSub}
           onCancelEdit={() => setEditSubId(null)}
+          onMove={handleMoveSub}
         />
       )}
     </div>
@@ -513,6 +525,7 @@ interface CollectionsEditorProps {
   onStartEdit: (s: Subcategory) => void;
   onConfirmEdit: () => void;
   onCancelEdit: () => void;
+  onMove: (id: string, dir: -1 | 1) => void;
 }
 
 function CollectionsEditor(props: CollectionsEditorProps) {
@@ -530,6 +543,7 @@ function CollectionsEditor(props: CollectionsEditorProps) {
     onStartEdit,
     onConfirmEdit,
     onCancelEdit,
+    onMove,
   } = props;
 
   return (
@@ -549,7 +563,7 @@ function CollectionsEditor(props: CollectionsEditorProps) {
           </p>
         ) : (
           <ul className="divide-y divide-gray-100">
-            {items.map((s) => (
+            {items.map((s, idx) => (
               <li key={s.id} className="flex items-center gap-3 px-5 py-3">
                 {editId === s.id ? (
                   <>
@@ -580,6 +594,22 @@ function CollectionsEditor(props: CollectionsEditorProps) {
                     <span className="flex-1 text-sm font-medium text-gray-800">
                       {s.label}
                     </span>
+                    <button
+                      onClick={() => onMove(s.id, -1)}
+                      disabled={idx === 0}
+                      className="rounded-lg border border-gray-200 p-1.5 text-gray-400 transition hover:border-[#2563eb] hover:text-[#2563eb] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-gray-200 disabled:hover:text-gray-400"
+                      aria-label={`Subir ${s.label}`}
+                    >
+                      <ArrowUp size={13} />
+                    </button>
+                    <button
+                      onClick={() => onMove(s.id, 1)}
+                      disabled={idx === items.length - 1}
+                      className="rounded-lg border border-gray-200 p-1.5 text-gray-400 transition hover:border-[#2563eb] hover:text-[#2563eb] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-gray-200 disabled:hover:text-gray-400"
+                      aria-label={`Bajar ${s.label}`}
+                    >
+                      <ArrowDown size={13} />
+                    </button>
                     <button
                       onClick={() => onStartEdit(s)}
                       className="rounded-lg border border-gray-200 p-1.5 text-gray-400 transition hover:border-[#2563eb] hover:text-[#2563eb]"

@@ -14,6 +14,7 @@ import {
   Package,
   Zap,
   ShieldCheck,
+  BadgeCheck,
   ChevronDown,
   LogOut,
   LayoutDashboard,
@@ -610,7 +611,7 @@ export function Header() {
   return (
     <>
     <header
-      className="sticky top-0 z-50 overflow-visible border-b border-white/10"
+      className="sticky top-0 z-50 overflow-visible"
       style={{
         background:
           "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #1d4ed8 100%)",
@@ -654,6 +655,14 @@ export function Header() {
             <ShieldCheck size={12} className="trust-icon text-amber-300" />
             Pago <strong className="ml-1 text-amber-300">100% seguro</strong>
           </span>
+          <span className="h-3 border-l border-white/20" />
+          <span
+            className="trust-item flex items-center gap-1.5 font-medium"
+            style={{ "--shimmer-delay": "7.5s" } as React.CSSProperties}
+          >
+            <BadgeCheck size={12} className="trust-icon text-amber-300" />
+            Productos <strong className="ml-1 text-amber-300">100% originales</strong>
+          </span>
         </Container>
       </div>
       {/* Topbar — mobile rotating */}
@@ -665,7 +674,7 @@ export function Header() {
           (no con el centro del bloque logo+tagline). pt y pb simétricos para
           que el tagline tenga el mismo aire arriba (hacia TCG Academy) que
           abajo (hacia la imagen). */}
-      <Container className="flex h-14 items-start justify-between gap-3 py-[6px] lg:h-20 lg:items-center lg:justify-center lg:py-0">
+      <Container className="flex h-14 items-start justify-between gap-3 py-[6px] lg:h-14 lg:items-center lg:justify-center lg:py-0">
         {/* Hamburger + Logo */}
         <div className="flex shrink-0 items-start gap-2 lg:items-center">
           <button
@@ -680,7 +689,7 @@ export function Header() {
             href="/"
             className="flex flex-col items-start leading-none lg:flex-row lg:items-center"
           >
-            <span className="text-[1.7rem] font-black tracking-tight text-white lg:text-2xl">
+            <span className="text-[1.9rem] font-black tracking-tight text-white lg:text-3xl">
               TCG <span className="text-amber-300">Academy</span>
             </span>
             {/* Tagline rotativa — sólo móvil, efecto fade+slide + dot "live" */}

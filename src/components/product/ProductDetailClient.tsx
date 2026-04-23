@@ -16,7 +16,7 @@ import { useFavorites } from "@/context/FavoritesContext";
 import { useAuth } from "@/context/AuthContext";
 import { subscribeRestock, isSubscribed, triggerRestockEmails, getSubsForProduct } from "@/services/restockService";
 import { addToRecentlyViewed } from "@/lib/recentlyViewed";
-import { getStockInfo } from "@/utils/stockStatus";
+import { getStockInfo, getEffectiveStock, isProductInStock } from "@/utils/stockStatus";
 import { RecentlyViewedSection } from "@/components/product/RecentlyViewedSection";
 import {
   isNewProduct,
@@ -375,7 +375,7 @@ export function ProductDetailClient({ product: initialProduct, config, catLabel 
   };
   const [activeImg, setActiveImg] = useState(0);
 
-  const isOutOfStock = !product.inStock || (typeof product.stock === "number" && product.stock === 0);
+  const isOutOfStock = !isProductInStock(product);
 
   // Track recently viewed
   useEffect(() => {
@@ -481,7 +481,7 @@ export function ProductDetailClient({ product: initialProduct, config, catLabel 
   const imgContainerRef = useRef<HTMLDivElement>(null);
 
   const handleAddToCart = () => {
-    if (!product.inStock) return;
+    if (!isProductInStock(product)) return;
     triggerFloat("plus");
     const result = addItem(
       product.id,
@@ -630,7 +630,7 @@ export function ProductDetailClient({ product: initialProduct, config, catLabel 
     });
 
     // Trigger restock emails if product went from out-of-stock to in-stock
-    const wasOutOfStock = !product.inStock || (typeof product.stock === "number" && product.stock === 0);
+    const wasOutOfStock = !isProductInStock(product);
     const nowInStock = inlineStock && (inlineStockQty.trim() === "" || parseInt(inlineStockQty) > 0);
     if (wasOutOfStock && nowInStock && getSubsForProduct(product.id).length > 0) {
       const url = `https://tcgacademy.es${getProductUrl(product)}`;
@@ -804,7 +804,7 @@ export function ProductDetailClient({ product: initialProduct, config, catLabel 
               {/* ── ESQUINA SUPERIOR IZQUIERDA: stock → NUEVO → descuento → corazón ── */}
               <div className="absolute top-3 left-3 z-10 flex flex-col items-start gap-1.5">
                 {(() => {
-                  const si = getStockInfo(product.inStock ? product.stock : 0);
+                  const si = getStockInfo(getEffectiveStock(product));
                   if (si.level === "unlimited" || si.level === "available") return null;
                   return (
                     <span

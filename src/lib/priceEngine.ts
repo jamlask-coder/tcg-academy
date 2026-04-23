@@ -67,11 +67,25 @@ export function computeEffectivePrice(
   const disc = discounts[product.id];
   if (disc && isDiscountActive(disc) && disc.pct > 0) {
     const discounted = displayPrice * (1 - disc.pct / 100);
+    // SSOT tachado: cuando coexisten `comparePrice` de fábrica y descuento %
+    // activo, el comparePrice efectivo es el MÁXIMO de ambos. Así la UI
+    // muestra UNA sola referencia tachada (la mayor) en vez de dos precios
+    // ambiguos (~100€~ 90€ + ~120€~ 100€). Sólo aplicable al rol público,
+    // para mayorista/tienda el comparePrice de fábrica no se usa.
+    const factoryCompare =
+      role === "mayorista" || role === "tienda" ? undefined : product.comparePrice;
+    const effectiveCompare =
+      factoryCompare !== undefined && factoryCompare > displayPrice
+        ? factoryCompare
+        : displayPrice;
+    const finalDiscountPct = Math.round(
+      (1 - (Math.round(discounted * 100) / 100) / effectiveCompare) * 100,
+    );
     return {
       displayPrice: Math.round(discounted * 100) / 100,
-      comparePrice: displayPrice,
+      comparePrice: effectiveCompare,
       hasDiscount: true,
-      discountPct: disc.pct,
+      discountPct: finalDiscountPct,
       priceLabel,
     };
   }

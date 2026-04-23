@@ -150,6 +150,14 @@ export const GAME_CONFIG: Record<
       "El nuevo TCG de Cyberpunk. Booster Boxes, Starter Decks y singles.",
     emoji: "🤖",
   },
+  accesorios: {
+    name: "Accesorios",
+    color: "#475569",
+    bgColor: "#f1f5f9",
+    description:
+      "Fundas, toploaders, tapetes, deckboxes, carpetas y dados — compatibles con cualquier TCG.",
+    emoji: "🛡️",
+  },
 };
 
 // ─── Category labels ──────────────────────────────────────────────────────────
@@ -522,7 +530,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "Dragon Shield Matte en negro, el estándar del sector para proteger tus cartas Magic. 100 fundas de tamaño estándar (63,5 × 88 mm), textura mate antirreflectante para mejor sujeción.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/magic-commander-deck-duskmourn-endless-punishment.jpg"],
     inStock: true,
     stock: 35,
@@ -2110,7 +2118,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "Las Dragon Shield Matte son las fundas de referencia para jugadores competitivos de Magic. Acabado mate en el reverso para evitar reflejos, interior transparente y dureza superior. 100 unidades en tamaño estándar (63,5 × 88 mm). Aprobadas para torneos.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/magic-dragon-shield-matte-blue-100.jpg"],
     inStock: true,
     stock: 29,
@@ -2130,7 +2138,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "Las Eclipse Matte de Ultra PRO son fundas de alta calidad con borde de color y reverso mate. Su diseño oculta el reverso de las cartas para mayor uniformidad en el juego. 100 unidades en tamaño estándar. Disponibles en múltiples colores.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/magic-ultra-pro-eclipse-sleeves-100.jpg"],
     inStock: true,
     stock: 30,
@@ -2150,7 +2158,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "Los toploaders BCW de 35 puntos son el estándar de protección rígida para cartas de Magic no gradeadas. Fabricados en PVC rígido transparente, protegen perfectamente cartas de tamaño estándar. Indispensables para almacenar y enviar singles valiosos.",
     category: "toploaders",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/magic-bcw-toploader-35pt-25.jpg"],
     inStock: true,
     stock: 31,
@@ -5954,7 +5962,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "Pack de 25 toploaders transparentes para protección de cartas. Compatible con cartas estándar de Pokémon, Magic, Yu-Gi-Oh! y más.",
     category: "toploaders",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/toploader-25.jpg"],
     inStock: true,
     stock: 36,
@@ -5973,7 +5981,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "Fundas básicas penny sleeves para protección de cartas. Ideales como primera capa de protección antes de toploader.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/penny-sleeves.webp"],
     inStock: true,
     stock: 37,
@@ -6017,7 +6025,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "100 fundas Dragon Shield Matte Dual Fury. Protección premium con acabado mate dual en tonos de furia. Compatible con cartas estándar.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/ds-matte-dual-fury.webp", "/images/products/store/ds-matte-dual-fury-sleeves.webp"],
     inStock: true,
     stock: 39,
@@ -6037,7 +6045,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "100 fundas Dragon Shield Matte Dual Crypt. Protección premium con acabado mate dual en tonos oscuros de cripta.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/ds-matte-dual-crypt.webp", "/images/products/store/ds-matte-dual-crypt-sleeves.webp"],
     inStock: true,
     stock: 40,
@@ -6057,7 +6065,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "100 fundas Dragon Shield Matte Dual Power. Protección premium con acabado mate dual en tonos de poder.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/ds-matte-dual-power.webp", "/images/products/store/ds-matte-dual-power-sleeves.webp"],
     inStock: true,
     stock: 25,
@@ -6077,7 +6085,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "100 fundas Dragon Shield Matte Sparkles Pink Sapphire. Acabado mate con destellos de zafiro rosa.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/ds-matte-pink-sapphire.webp", "/images/products/store/ds-matte-pink-sapphire-sleeves.webp"],
     inStock: true,
     stock: 26,
@@ -6097,7 +6105,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "100 fundas Dragon Shield Matte Sparkles Amazonite. Acabado mate con destellos de amazonita verde.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/ds-matte-amazonite.webp", "/images/products/store/ds-matte-amazonite-sleeves.webp"],
     inStock: true,
     stock: 27,
@@ -6117,7 +6125,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "100 fundas Dragon Shield Matte Orange. Protección premium con acabado mate naranja clásico.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/ds-matte-orange.webp", "/images/products/store/ds-matte-orange-sleeves.webp"],
     inStock: true,
     stock: 28,
@@ -6137,7 +6145,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "100 fundas Dragon Shield Matte Silver. Protección premium con acabado mate plateado clásico.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/ds-matte-silver.webp", "/images/products/store/ds-matte-silver-sleeves.webp"],
     inStock: true,
     stock: 29,
@@ -6157,7 +6165,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "100 fundas Dragon Shield Matte Apple Green. Protección premium con acabado mate verde manzana.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/ds-matte-apple-green.webp", "/images/products/store/ds-matte-apple-green-sleeves.webp"],
     inStock: true,
     stock: 30,
@@ -6177,7 +6185,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "100 fundas Dragon Shield Matte Dual Justice. Protección premium con acabado mate dual en tonos de justicia.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/ds-matte-dual-justice.webp", "/images/products/store/ds-matte-dual-justice-sleeves.webp"],
     inStock: true,
     stock: 31,
@@ -6197,7 +6205,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "100 fundas Dragon Shield Matte Dual Soul. Protección premium con acabado mate dual en tonos de alma.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/ds-matte-dual-soul.webp", "/images/products/store/ds-matte-dual-soul-sleeves.webp"],
     inStock: true,
     stock: 32,
@@ -6217,7 +6225,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "100 fundas Dragon Shield Matte Ivory. Protección premium con acabado mate marfil elegante.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/ds-matte-ivory.webp", "/images/products/store/ds-matte-ivory-sleeves.webp"],
     inStock: true,
     stock: 33,
@@ -6237,7 +6245,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "100 fundas Dragon Shield Matte Gold. Protección premium con acabado mate dorado clásico.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/ds-matte-gold.webp", "/images/products/store/ds-matte-gold-sleeves.webp"],
     inStock: true,
     stock: 34,
@@ -6257,7 +6265,7 @@ export const PRODUCTS: LocalProduct[] = [
     description:
       "100 fundas Dragon Shield Matte Crimson. Protección premium con acabado mate carmesí intenso.",
     category: "sleeves",
-    game: "magic",
+    game: "accesorios",
     images: ["/images/products/store/ds-matte-crimson.webp", "/images/products/store/ds-matte-crimson-sleeves.webp"],
     inStock: true,
     stock: 35,

@@ -32,16 +32,19 @@ function writeLocal(ids: number[]) {
 }
 
 export function FavoritesProvider({ children }: { children: ReactNode }) {
-  const { user, toggleFavorite: authToggle } = useAuth();
+  const { user, toggleFavorite: authToggle, mergeFavorites } = useAuth();
   const [local, setLocal] = useState<number[]>(readLocal);
 
-  // On login: merge local favorites into account, then clear local
+  // On login: merge atomic de favoritos anónimos → cuenta. Antes hacíamos
+  // `for (id of pending) authToggle(id)` pero authToggle tenía closure stale
+  // del user.favorites → solo se añadía el último. mergeFavorites usa Set
+  // sobre el estado vigente (SSOT).
   useEffect(() => {
     if (!user) return;
     const pending = readLocal();
     if (pending.length === 0) return;
     const toAdd = pending.filter((id) => !user.favorites.includes(id));
-    for (const id of toAdd) authToggle(id);
+    if (toAdd.length > 0) mergeFavorites(toAdd);
     writeLocal([]);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocal([]);

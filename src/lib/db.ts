@@ -85,12 +85,16 @@ export interface ShippingAddress {
   pais: string;
 }
 
+/**
+ * SSOT: "enviado" es estado terminal del pipeline admin. "entregado"/"finalizado"
+ * se eliminaron 2026-04-18 (dependían del transportista, generaban ruido). Cualquier
+ * orden legacy con ese valor se normaliza vía orderAdapter.normalizeLegacyOrder.
+ */
 export type OrderStatus =
   | "pendiente"
   | "confirmado"
   | "procesando"
   | "enviado"
-  | "entregado"
   | "cancelado"
   | "devuelto";
 

@@ -60,6 +60,9 @@ interface AuthContextValue {
   changeEmail: (newEmail: string) => Promise<{ ok: boolean; error?: string }>;
   checkUsernameAvailable: (username: string) => boolean;
   toggleFavorite: (productId: number) => void;
+  /** Merge atómico de favoritos (usado al hacer login para fusionar anon→auth
+   *  sin el bug de closure estale que tenía el for-loop con toggleFavorite). */
+  mergeFavorites: (productIds: number[]) => void;
   isFavorite: (productId: number) => boolean;
 }
 
@@ -370,6 +373,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           setUser(parsed);
+          // SSOT: al restaurar sesión, reconcilia puntos desde historial.
+          // Si balance y transacciones divergieron por un write fallido,
+          // el historial gana (ver pointsService.reconcilePointsFromHistory).
+          try {
+            const { reconcilePointsFromHistory } = await import("@/services/pointsService");
+            reconcilePointsFromHistory(parsed.id);
+          } catch { /* non-fatal */ }
         }
       } catch {
         // corrupt storage — clear it
@@ -950,6 +960,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user, persist],
   );
 
+  const mergeFavorites = useCallback(
+    (productIds: number[]) => {
+      if (!user || productIds.length === 0) return;
+      const current = new Set(user.favorites);
+      for (const id of productIds) current.add(id);
+      const merged = Array.from(current);
+      if (merged.length === user.favorites.length) return; // nada que añadir
+      persist({ ...user, favorites: merged });
+    },
+    [user, persist],
+  );
+
   const isFavorite = useCallback(
     (productId: number) => {
       return user?.favorites.includes(productId) ?? false;
@@ -972,6 +994,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         changeEmail,
         checkUsernameAvailable,
         toggleFavorite,
+        mergeFavorites,
         isFavorite,
       }}
     >

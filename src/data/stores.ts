@@ -72,6 +72,7 @@ export const STORES: Record<string, Store> = {
     hours: [
       { day: "Lunes – Sábado", time: "10:00 – 14:00 · 17:30 – 19:30" },
     ],
+    instagram: "@tcg_academy_bejar",
     photos: [
       "/images/stores/bejar/1.webp",
       "/images/stores/bejar/2.webp",

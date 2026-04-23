@@ -7,7 +7,7 @@ import { usePrice } from "@/hooks/usePrice";
 import { GAME_CONFIG } from "@/data/products";
 import type { LocalProduct } from "@/data/products";
 import { getProductUrl } from "@/lib/productStore";
-import { getStockInfo } from "@/utils/stockStatus";
+import { getStockInfo, getEffectiveStock, isProductInStock } from "@/utils/stockStatus";
 
 interface Props {
   product: LocalProduct;
@@ -40,8 +40,9 @@ export function QuickView({ product, onClose }: Props) {
     };
   }, []);
 
+  const canBuy = isProductInStock(product);
   const handleAddToCart = () => {
-    if (!product.inStock) return;
+    if (!canBuy) return;
     addItem(product.id, product.name, displayPrice, image ?? "");
     onClose();
   };
@@ -136,7 +137,7 @@ export function QuickView({ product, onClose }: Props) {
 
             {/* Stock */}
             {(() => {
-              const si = getStockInfo(product.inStock ? product.stock : 0);
+              const si = getStockInfo(getEffectiveStock(product));
               return (
                 <div className={`flex items-center gap-2 text-sm font-semibold ${si.color}`}>
                   <span className="relative flex h-2 w-2">
@@ -154,15 +155,15 @@ export function QuickView({ product, onClose }: Props) {
             <div className="flex flex-col gap-2">
               <button
                 onClick={handleAddToCart}
-                disabled={!product.inStock}
+                disabled={!canBuy}
                 className={`flex h-11 items-center justify-center gap-2 rounded-xl font-bold text-sm transition ${
-                  product.inStock
+                  canBuy
                     ? "bg-[#2563eb] text-white hover:bg-[#1d4ed8]"
                     : "cursor-not-allowed bg-gray-100 text-gray-400"
                 }`}
               >
                 <ShoppingCart size={16} />
-                {product.inStock ? "Añadir al carrito" : "Sin stock"}
+                {canBuy ? "Añadir al carrito" : "Sin stock"}
               </button>
               <Link
                 href={productHref}
