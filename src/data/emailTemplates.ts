@@ -435,6 +435,32 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     `),
   },
   {
+    id: "verificar_email",
+    name: "Verifica tu email",
+    subject: "Confirma tu email — TCG Academy",
+    description:
+      "Se envía al registrarse para verificar que el email es real y del usuario.",
+    variables: ["nombre", "verify_url", "expires_in", "unsubscribe_link"],
+    html: wrapEmail(`
+      <div class="hero">
+        <h1>Confirma tu email ✉️</h1>
+        <p>Un paso más para activar tu cuenta</p>
+      </div>
+      <div class="content">
+        <p>Hola {{nombre}},</p>
+        <p>Acabas de crear una cuenta en TCG Academy. Para asegurarnos de que este email es tuyo, haz clic en el botón de abajo para confirmarlo:</p>
+        <p style="text-align:center; margin: 28px 0;">
+          <a href="{{verify_url}}" class="btn">Verificar mi email</a>
+        </p>
+        <div class="info-box">
+          ⏰ Este enlace caduca en <strong>{{expires_in}}</strong>. Si no lo solicitaste, ignora este email — nadie podrá iniciar sesión en tu nombre.
+        </div>
+        <p style="color:#6b7280; font-size:13px">¿El botón no funciona? Copia y pega este enlace en tu navegador:<br/><a href="{{verify_url}}" style="word-break:break-all; color:#2563eb">{{verify_url}}</a></p>
+        <p><strong>El equipo de ${SITE_CONFIG.name}</strong></p>
+      </div>
+    `),
+  },
+  {
     id: "recuperar_contrasena",
     name: "Recuperar contraseña",
     subject: "Restablece tu contraseña de TCG Academy",

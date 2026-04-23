@@ -60,6 +60,14 @@ export interface User {
   favorites: number[]; // product IDs
   referralCode?: string; // this user's own referral code
   referredBy?: string;   // referral code of the person who referred them
+  /**
+   * Verificación del email por click en enlace enviado al registrarse.
+   * En modo local el flag queda en false (pero el flujo de verificación
+   * funciona para testing). En modo server se bloquea el login si la
+   * feature flag `NEXT_PUBLIC_EMAIL_VERIFICATION_REQUIRED` es "true".
+   */
+  emailVerified?: boolean;
+  emailVerifiedAt?: string; // ISO timestamp
 }
 
 export interface RegisterData {

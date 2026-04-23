@@ -20,6 +20,11 @@ import { sanitizeString } from "@/utils/sanitize";
 import { recordBulkConsent, type ConsentType } from "@/services/consentService";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { isHandleReserved, generateUniqueUsername } from "@/lib/userHandle";
+import {
+  issueVerificationToken,
+  isEmailVerificationRequired,
+} from "@/services/emailVerificationService";
+import { getEmailService } from "@/lib/email";
 
 export interface GoogleSignInPayload {
   email: string;
@@ -455,6 +460,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               entry.password = hashed;
               persistRegistered(registered);
             }
+            // Feature flag: si `NEXT_PUBLIC_EMAIL_VERIFICATION_REQUIRED=true`
+            // bloqueamos el acceso hasta que el usuario verifique el email.
+            if (
+              isEmailVerificationRequired() &&
+              !entry.user.emailVerified
+            ) {
+              return {
+                ok: false,
+                error:
+                  "Tu email no está verificado. Revisa tu bandeja de entrada.",
+              };
+            }
             persist(entry.user, expiresIn);
             return { ok: true };
           }
@@ -684,6 +701,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           consents: consentEntries,
           method: "registration_form",
         });
+
+        // Issue email verification token (preparado — no bloquea login
+        // salvo que NEXT_PUBLIC_EMAIL_VERIFICATION_REQUIRED=true)
+        try {
+          const rawToken = await issueVerificationToken(email);
+          const appUrl =
+            (typeof window !== "undefined" && window.location?.origin) ||
+            process.env.NEXT_PUBLIC_APP_URL ||
+            "http://localhost:3000";
+          const verifyUrl = `${appUrl}/verificar-email?token=${rawToken}&email=${encodeURIComponent(email)}`;
+          const emailService = getEmailService();
+          await emailService.sendTemplatedEmail(
+            "verificar_email",
+            email,
+            {
+              nombre: sanitizedName,
+              verify_url: verifyUrl,
+              expires_in: "7 días",
+            },
+          );
+        } catch {
+          /* no-op: no bloquear el registro si el email falla */
+        }
 
         persist(newUser);
         return { ok: true };

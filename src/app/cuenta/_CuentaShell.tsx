@@ -28,6 +28,7 @@ import {
   Mail,
 } from "lucide-react";
 import { countNewIncidents } from "@/services/incidentService";
+import { EmailVerificationBanner } from "@/components/account/EmailVerificationBanner";
 
 const PUBLIC_PATHS = ["/login", "/registro", "/recuperar-contrasena"];
 
@@ -338,7 +339,10 @@ export default function CuentaShell({
         </div>
 
         {/* Content */}
-        <main className="min-w-0">{children}</main>
+        <main className="min-w-0">
+          <EmailVerificationBanner />
+          {children}
+        </main>
       </div>
     </div>
   );
