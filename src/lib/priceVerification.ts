@@ -195,16 +195,23 @@ export function verifyStockAvailability(
 }
 
 /**
- * Calculate shipping cost based on method and order total.
+ * Calcula el coste de envío aplicando la regla canónica de negocio.
+ *
+ * Invariante (SSOT): la única forma de obtener envío 0 € es recogida en tienda,
+ * superar el umbral `shippingThreshold`, o un cupón `freeShippingCoupon`.
+ * Cualquier pedido con `shipping === 0` y subtotal < threshold sin recogida ni
+ * cupón es un BUG — el test de auditoría #25 lo detecta.
  */
 export function calculateShipping(
   method: string,
   subtotal: number,
+  opts: { freeShippingCoupon?: boolean } = {},
 ): number {
-  if (method === "tienda") return 0;
-  if (subtotal >= SITE_CONFIG.shippingThreshold) return 0; // Free shipping above threshold
-  if (method === "express") return 6.99;
-  return 3.99; // standard
+  if (method === "tienda" || method === "pickup" || method === "recogida") return 0;
+  if (opts.freeShippingCoupon) return 0;
+  if (subtotal >= SITE_CONFIG.shippingThreshold) return 0;
+  if (method === "express") return SITE_CONFIG.expressShippingCost;
+  return SITE_CONFIG.standardShippingCost;
 }
 
 /**

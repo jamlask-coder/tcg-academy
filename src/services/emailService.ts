@@ -166,9 +166,78 @@ export function loadSentEmails(): SentEmailLog[] {
 }
 
 export function logSentEmail(entry: SentEmailLog): void {
+  if (typeof window === "undefined") return;
   const all = loadSentEmails();
   all.unshift(entry);
   localStorage.setItem(SENT_EMAILS_KEY, JSON.stringify(all.slice(0, MAX_LOG)));
+}
+
+// ── Canonical send helper ──────────────────────────────────────────────────────
+//
+// SIEMPRE usar esta función para notificaciones a usuarios/tiendas. NUNCA llamar
+// a `logSentEmail()` directamente desde código fuera de este módulo — el test
+// de auditoría (tests/audit/run-audit.mjs) falla si detecta `logSentEmail(` en
+// otros archivos.
+//
+// Motivación: `logSentEmail()` solo escribe en localStorage. En modo server
+// (NEXT_PUBLIC_BACKEND_MODE=server) eso implica que los emails NO salen nunca.
+// `sendAppEmail()` renderiza la plantilla admin-editable, envía vía Resend si
+// procede, y siempre registra en el log canónico para visibilidad en
+// /admin/emails.
+
+export interface SendAppEmailParams {
+  toEmail: string;
+  toName: string;
+  templateId: string;
+  vars: Record<string, string>;
+  preview?: string;
+}
+
+export async function sendAppEmail(
+  params: SendAppEmailParams,
+): Promise<{ ok: boolean; emailId: string }> {
+  const rendered = renderEmailTemplate(params.templateId, params.vars);
+  if (!rendered) {
+    return { ok: false, emailId: "" };
+  }
+
+  let emailId = `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  let sendOk = true;
+
+  const backendMode =
+    typeof process !== "undefined"
+      ? process.env.NEXT_PUBLIC_BACKEND_MODE
+      : undefined;
+
+  if (backendMode === "server") {
+    try {
+      const { getEmailService } = await import("@/lib/email");
+      const res = await getEmailService().sendEmail(
+        params.toEmail,
+        rendered.subject,
+        rendered.html,
+      );
+      sendOk = res.ok;
+      if (res.emailId) emailId = res.emailId;
+    } catch {
+      sendOk = false;
+    }
+  }
+
+  // Log canónico (admin panel). En server mode el LocalEmailAdapter no se
+  // usa, así que escribimos aquí para conservar auditoría en cliente si
+  // corresponde (y no contamina server-side: logSentEmail salta sin window).
+  logSentEmail({
+    id: emailId,
+    to: params.toEmail,
+    toName: params.toName,
+    subject: rendered.subject,
+    templateId: params.templateId,
+    sentAt: new Date().toISOString(),
+    preview: params.preview ?? rendered.subject,
+  });
+
+  return { ok: sendOk, emailId };
 }
 
 // ── Template rendering ─────────────────────────────────────────────────────────
@@ -251,36 +320,18 @@ export async function sendCouponEmail(
     params.shopUrl ??
     (typeof window !== "undefined" ? window.location.origin : "https://tcgacademy.es");
 
-  const rendered = renderEmailTemplate("nuevo_cupon", {
-    nombre: params.toName,
-    coupon_code: params.couponCode,
-    coupon_description: description,
-    coupon_value: params.couponValue,
-    expires_at: params.expiresAt,
-    shop_url: shopUrl,
-  });
-
-  if (!rendered) return { ok: false, emailId: "" };
-
-  // ── TODO: replace with real API call ──────────────────────────────────────
-  // const res = await fetch('/api/emails/send', {
-  //   method: 'POST',
-  //   headers: { 'Content-Type': 'application/json' },
-  //   body: JSON.stringify({ to: params.toEmail, subject: rendered.subject, html: rendered.html }),
-  // });
-  // if (!res.ok) return { ok: false, emailId: '' };
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const emailId = `em_${Date.now()}`;
-  logSentEmail({
-    id: emailId,
-    to: params.toEmail,
+  return sendAppEmail({
+    toEmail: params.toEmail,
     toName: params.toName,
-    subject: rendered.subject,
     templateId: "nuevo_cupon",
-    sentAt: new Date().toISOString(),
+    vars: {
+      nombre: params.toName,
+      coupon_code: params.couponCode,
+      coupon_description: description,
+      coupon_value: params.couponValue,
+      expires_at: params.expiresAt,
+      shop_url: shopUrl,
+    },
     preview: `Cupón ${params.couponCode}: ${params.couponValue}`,
   });
-
-  return { ok: true, emailId };
 }

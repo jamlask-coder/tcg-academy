@@ -170,7 +170,7 @@ vi.mock("@/components/ui/DiscountBadgeEdit", () => ({
 vi.mock("@/services/restockService", () => ({
   subscribeRestock: vi.fn(),
   isSubscribed: () => false,
-  triggerRestockEmails: () => ({ sent: 0 }),
+  triggerRestockEmails: async () => ({ sent: 0 }),
   getSubsForProduct: () => [],
 }));
 

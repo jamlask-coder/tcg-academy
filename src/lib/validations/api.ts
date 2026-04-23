@@ -53,6 +53,17 @@ export const authLogoutSchema = z.object({
   action: z.literal("logout"),
 });
 
+export const authVerifyEmailSchema = z.object({
+  action: z.literal("verify-email"),
+  email: z.string().email().max(254),
+  token: z.string().min(10).max(256),
+});
+
+export const authResendVerificationSchema = z.object({
+  action: z.literal("resend-verification"),
+  email: z.string().email().max(254),
+});
+
 export const authBodySchema = z.discriminatedUnion("action", [
   authLoginSchema,
   authRegisterSchema,
@@ -60,6 +71,8 @@ export const authBodySchema = z.discriminatedUnion("action", [
   authResetConfirmSchema,
   authChangePasswordSchema,
   authLogoutSchema,
+  authVerifyEmailSchema,
+  authResendVerificationSchema,
 ]);
 
 // ─── Orders ──────────────────────────────────────────────────────────────

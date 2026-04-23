@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { SITE_CONFIG } from "@/config/siteConfig";
+import { calculateShipping } from "@/lib/priceVerification";
 import { useCart } from "@/context/CartContext";
 import { getMergedById } from "@/lib/productStore";
 import { persistProductPatch } from "@/lib/productPersist";
@@ -24,7 +25,7 @@ import {
 import { PaymentMethod, TaxIdType } from "@/types/fiscal";
 import type { CustomerData } from "@/types/fiscal";
 import { recordCouponUsage, markCouponUsed } from "@/services/couponService";
-import { renderEmailTemplate, logSentEmail } from "@/services/emailService";
+import { sendAppEmail } from "@/services/emailService";
 import { sanitizeString, isValidEmail, clampNumber } from "@/utils/sanitize";
 import {
   acquireCheckoutLock,
@@ -205,12 +206,11 @@ export default function CheckoutPage() {
   const isStorePickup = form.envio === "tienda";
   const hasFreeShippingCoupon = pending?.freeShippingCoupon === true;
 
-  const shipping =
-    isStorePickup || hasFreeShippingCoupon
-      ? 0
-      : total >= SITE_CONFIG.shippingThreshold
-        ? 0
-        : 3.99;
+  const shipping = calculateShipping(
+    isStorePickup ? "tienda" : "estandar",
+    total,
+    { freeShippingCoupon: hasFreeShippingCoupon },
+  );
   const couponDiscount = pending?.couponDiscount ?? 0;
   const pointsDiscount = appliedPoints?.euros ?? 0;
   const maxPointsDiscount = Math.floor(total * POINTS_MAX_DISCOUNT_PCT * 100) / 100;
@@ -441,41 +441,51 @@ export default function CheckoutPage() {
             isStorePickup && form.tiendaRecogida
               ? TIENDAS.find((t) => t.id === form.tiendaRecogida)
               : null;
-          const nowIso = new Date().toISOString();
           const productList = items
             .map((i) => `${i.quantity}× ${i.name}`)
             .join(", ");
           const customerContact = `${form.nombre} ${form.apellidos} · ${form.email} · ${form.telefono}`;
+          const intentVars = {
+            nombre: form.nombre || "cliente",
+            order_id: "intención",
+            order_date: new Date().toLocaleDateString("es-ES"),
+            items_html: items
+              .map(
+                (i) =>
+                  `<tr><td>${i.name}</td><td>${i.quantity}</td><td>${(i.price * i.quantity).toFixed(2)}€</td></tr>`,
+              )
+              .join(""),
+            subtotal: total.toFixed(2),
+            shipping: "—",
+            total: safeFinalTotal.toFixed(2),
+            address: tienda
+              ? `Recogida en: ${tienda.name}`
+              : `${form.direccion}, ${form.ciudad} ${form.cp}, ${form.provincia}`,
+            payment_method: form.pago,
+            unsubscribe_link: "#",
+          };
 
           // Email a la tienda / admin con la intención
-          logSentEmail({
-            id: `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-            to: tienda ? tienda.email : SITE_CONFIG.email,
+          await sendAppEmail({
+            toEmail: tienda ? tienda.email : SITE_CONFIG.email,
             toName: tienda ? tienda.name : SITE_CONFIG.name,
-            subject: tienda
-              ? `Intención de recogida — ${form.nombre} ${form.apellidos}`
-              : `Intención de pago diferido — ${form.nombre} ${form.apellidos}`,
             templateId: "confirmacion_pedido",
-            sentAt: nowIso,
+            vars: intentVars,
             preview: `${customerContact} · ${productList} · Total aprox: ${safeFinalTotal.toFixed(2)}€ · ${tienda ? "cobrar al recoger" : form.pago}`,
           });
 
           // Email al cliente confirmando la intención (no es un pedido cerrado)
-          logSentEmail({
-            id: `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-            to: form.email,
+          await sendAppEmail({
+            toEmail: form.email,
             toName: `${form.nombre} ${form.apellidos}`.trim(),
-            subject: tienda
-              ? `Te esperamos en ${tienda.name}`
-              : "Hemos recibido tu solicitud",
             templateId: "confirmacion_pedido",
-            sentAt: nowIso,
+            vars: intentVars,
             preview: tienda
               ? `Pasa por ${tienda.name} para abonar y recoger tu pedido (${safeFinalTotal.toFixed(2)}€). Recomendamos confirmar disponibilidad por teléfono antes de desplazarte.`
               : `Hemos recibido tu solicitud. Te contactaremos para confirmar el pago y los siguientes pasos.`,
           });
         } catch {
-          /* email log es non-critical */
+          /* email send es non-critical */
         }
 
         clearCart();
@@ -766,9 +776,8 @@ export default function CheckoutPage() {
       } catch { /* coupon tracking is non-critical */ }
     }
 
-    // ── PHASE 8: Log confirmation emails (canonical SentEmailLog shape) ──
+    // ── PHASE 8: Send confirmation emails (renders template + Resend en server mode) ──
     try {
-      const nowIso = new Date().toISOString();
       const tienda = isStorePickup && form.tiendaRecogida
         ? TIENDAS.find(t => t.id === form.tiendaRecogida)
         : null;
@@ -788,7 +797,7 @@ export default function CheckoutPage() {
         ? `Recogida en: ${tienda.name} — ${tienda.address ?? ""}`
         : `${form.direccion}, ${form.ciudad} ${form.cp}, ${form.provincia}`;
 
-      const rendered = renderEmailTemplate("confirmacion_pedido", {
+      const confirmVars = {
         nombre: form.nombre || "cliente",
         order_id: id,
         order_date: new Date().toLocaleDateString("es-ES"),
@@ -799,32 +808,26 @@ export default function CheckoutPage() {
         address: addressBlock,
         payment_method: paymentLabel[form.pago] ?? form.pago,
         unsubscribe_link: "#",
-      });
+      };
 
-      if (rendered) {
-        logSentEmail({
-          id: `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          to: form.email,
-          toName: `${form.nombre} ${form.apellidos}`.trim(),
-          subject: rendered.subject,
-          templateId: "confirmacion_pedido",
-          sentAt: nowIso,
-          preview: isStorePickup && tienda
-            ? `Pedido ${id} para recoger en ${tienda.name}. Total: ${safeFinalTotal.toFixed(2)}€ (pago al recoger)`
-            : `Pedido ${id} confirmado. Total: ${safeFinalTotal.toFixed(2)}€`,
-        });
-      }
+      await sendAppEmail({
+        toEmail: form.email,
+        toName: `${form.nombre} ${form.apellidos}`.trim(),
+        templateId: "confirmacion_pedido",
+        vars: confirmVars,
+        preview: isStorePickup && tienda
+          ? `Pedido ${id} para recoger en ${tienda.name}. Total: ${safeFinalTotal.toFixed(2)}€ (pago al recoger)`
+          : `Pedido ${id} confirmado. Total: ${safeFinalTotal.toFixed(2)}€`,
+      });
 
       // Notificación adicional a la tienda para pedidos de recogida
       if (tienda) {
         const productList = items.map(i => `${i.quantity}× ${i.name}`).join(", ");
-        logSentEmail({
-          id: `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          to: tienda.email,
+        await sendAppEmail({
+          toEmail: tienda.email,
           toName: tienda.name,
-          subject: `Nuevo pedido para recoger en ${tienda.name} — ${id}`,
           templateId: "confirmacion_pedido",
-          sentAt: nowIso,
+          vars: confirmVars,
           preview: `Cliente: ${form.nombre} ${form.apellidos} · ${productList} · Total: ${safeFinalTotal.toFixed(2)}€ (cobrar al recoger)`,
         });
       }

@@ -3,9 +3,14 @@
  *
  * Local mode: stores sent emails in localStorage.
  * Server mode: sends real emails via Resend API.
+ *
+ * Las plantillas (subject + HTML) se resuelven desde `src/data/emailTemplates.ts`
+ * — fuente única de verdad admin-editable. Si una plantilla no existe allí,
+ * `sendTemplatedEmail` devuelve {ok:false} (no envía fallback genérico).
  */
 
 import { SITE_CONFIG } from "@/config/siteConfig";
+import { EMAIL_TEMPLATES as ADMIN_EMAIL_TEMPLATES } from "@/data/emailTemplates";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -69,6 +74,20 @@ function logToLocalStorage(entry: SentEmailEntry): void {
   }
 }
 
+// ─── Template resolver (única SSOT: src/data/emailTemplates.ts) ─────────────
+
+function resolveTemplate(
+  templateId: string,
+): { subject: string; html: string } | null {
+  const tpl = ADMIN_EMAIL_TEMPLATES.find((t) => t.id === templateId);
+  if (tpl) return { subject: tpl.subject, html: tpl.html };
+  // Fallback a las plantillas legacy hardcoded (transición). Si no está en
+  // ninguno de los dos, devolvemos null — el adapter falla explícito en vez
+  // de enviar HTML genérico a producción.
+  const legacy = LEGACY_TEMPLATES[templateId];
+  return legacy ?? null;
+}
+
 // ─── Local adapter (localStorage) ───────────────────────────────────────────
 
 export class LocalEmailAdapter implements EmailAdapter {
@@ -83,14 +102,14 @@ export class LocalEmailAdapter implements EmailAdapter {
     to: string,
     vars: TemplatedEmailVars,
   ): Promise<SendResult> {
-    const template = EMAIL_TEMPLATES[templateId];
-    if (template) {
-      const subject = replaceVars(template.subject, vars);
-      const html = replaceVars(template.html, vars);
-      return this.sendEmail(to, subject, html);
+    const template = resolveTemplate(templateId);
+    if (!template) {
+      // No enviamos HTML genérico — fallar explícito facilita detectar
+      // plantillas faltantes en vez de enviar basura al cliente.
+      return { ok: false, emailId: "" };
     }
-    const subject = `[Template: ${templateId}] Email to ${to}`;
-    const html = `<p>Template: ${templateId}</p><pre>${JSON.stringify(vars, null, 2)}</pre>`;
+    const subject = replaceVars(template.subject, vars);
+    const html = replaceVars(template.html, vars);
     return this.sendEmail(to, subject, html);
   }
 }
@@ -100,10 +119,16 @@ export class LocalEmailAdapter implements EmailAdapter {
 export class ResendEmailAdapter implements EmailAdapter {
   private apiKey: string;
   private fromEmail: string;
+  private replyTo: string;
 
   constructor() {
     this.apiKey = process.env.RESEND_API_KEY ?? "";
     this.fromEmail = process.env.RESEND_FROM_EMAIL ?? SITE_CONFIG.email;
+    // reply_to: cuando el dominio FROM (p. ej. hola@tcgacademy.es) no tiene
+    // buzón asociado, ponemos aquí un email real (Gmail de soporte) para que
+    // las respuestas de clientes lleguen a algún sitio. Sin esta variable,
+    // Resend usará el `from` como reply_to y las respuestas se pierden.
+    this.replyTo = process.env.RESEND_REPLY_TO ?? "";
   }
 
   async sendEmail(to: string, subject: string, html: string): Promise<SendResult> {
@@ -112,18 +137,20 @@ export class ResendEmailAdapter implements EmailAdapter {
     }
 
     try {
+      const payload: Record<string, unknown> = {
+        from: `TCG Academy <${this.fromEmail}>`,
+        to: [to],
+        subject,
+        html,
+      };
+      if (this.replyTo) payload.reply_to = this.replyTo;
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.apiKey}`,
         },
-        body: JSON.stringify({
-          from: `TCG Academy <${this.fromEmail}>`,
-          to: [to],
-          subject,
-          html,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -143,7 +170,7 @@ export class ResendEmailAdapter implements EmailAdapter {
     to: string,
     vars: TemplatedEmailVars,
   ): Promise<SendResult> {
-    const template = EMAIL_TEMPLATES[templateId];
+    const template = resolveTemplate(templateId);
     if (!template) {
       return { ok: false, emailId: "" };
     }
@@ -182,7 +209,12 @@ function wrap(content: string): string {
   </div>`;
 }
 
-const EMAIL_TEMPLATES: Record<string, { subject: string; html: string }> = {
+// Plantillas legacy hardcoded — se usan SOLO como fallback si el id no existe
+// en `src/data/emailTemplates.ts`. NO añadir nuevas aquí — ir a data/emailTemplates.ts.
+// Muchos ids (pedido_confirmado, pedido_confirmado_recogida, admin_nuevo_pedido…)
+// ya no tienen equivalente en la SSOT — mantenerlos aquí evita romper a los
+// callers que todavía usen el id viejo hasta que migren.
+const LEGACY_TEMPLATES: Record<string, { subject: string; html: string }> = {
   bienvenida: {
     subject: "¡Bienvenido a TCG Academy, {{nombre}}!",
     html: wrap(`

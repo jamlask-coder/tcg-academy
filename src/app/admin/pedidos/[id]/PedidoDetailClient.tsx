@@ -39,10 +39,10 @@ import {
 } from "@/lib/orderAdapter";
 import { regenerateInvoiceForOrder } from "@/lib/invoiceRecovery";
 import { getMessagesForOrder } from "@/services/messageService";
-import { renderEmailTemplate, logSentEmail } from "@/services/emailService";
+import { sendAppEmail } from "@/services/emailService";
 import { DataHub } from "@/lib/dataHub";
 import { GAME_CONFIG } from "@/data/products";
-import { getMergedById } from "@/lib/productStore";
+import { getMergedById, getMergedProducts, getProductUrl } from "@/lib/productStore";
 import { PaymentInfo } from "@/components/cuenta/PaymentInfo";
 import {
   ShipModal,
@@ -420,7 +420,7 @@ export default function PedidoDetailClient() {
   }, [order, paymentStatus, showToast]);
 
   const handleStatusChange = useCallback(
-    (next: AdminOrderStatus, tracking?: string, carrier: Carrier = "GLS") => {
+    async (next: AdminOrderStatus, tracking?: string, carrier: Carrier = "GLS") => {
       if (!order) return;
       if (next === order.adminStatus && !tracking) return;
       const now = new Date().toISOString();
@@ -456,25 +456,20 @@ export default function PedidoDetailClient() {
       // Email "Pedido enviado" al comprador con tracking + carrier
       if (next === "enviado" && tracking) {
         const effectiveTracking = tracking;
-        const rendered = renderEmailTemplate("pedido_enviado", {
-          nombre: updatedOrder.userName.split(" ")[0] ?? updatedOrder.userName,
-          order_id: updatedOrder.id,
-          tracking_number: effectiveTracking,
-          carrier,
-          tracking_url: buildTrackingUrl(carrier, effectiveTracking),
-          unsubscribe_link: "#",
+        await sendAppEmail({
+          toEmail: updatedOrder.userEmail,
+          toName: updatedOrder.userName,
+          templateId: "pedido_enviado",
+          vars: {
+            nombre: updatedOrder.userName.split(" ")[0] ?? updatedOrder.userName,
+            order_id: updatedOrder.id,
+            tracking_number: effectiveTracking,
+            carrier,
+            tracking_url: buildTrackingUrl(carrier, effectiveTracking),
+            unsubscribe_link: "#",
+          },
+          preview: `Pedido enviado · ${carrier} ${effectiveTracking}`,
         });
-        if (rendered) {
-          logSentEmail({
-            id: `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-            to: updatedOrder.userEmail,
-            toName: updatedOrder.userName,
-            subject: rendered.subject,
-            templateId: "pedido_enviado",
-            sentAt: now,
-            preview: `Pedido enviado · ${carrier} ${effectiveTracking}`,
-          });
-        }
         showToast(`Pedido enviado. Email enviado al comprador (${carrier} ${effectiveTracking})`);
       } else {
         showToast(`Estado actualizado → ${STATUS_CFG[next].label}`);
@@ -653,11 +648,32 @@ export default function PedidoDetailClient() {
           <Section title={`Productos (${order.items.length})`} icon={Package}>
             <div className="space-y-3">
               {order.items.map((item) => {
-                const product = getMergedById(item.id);
                 const gameConfig = GAME_CONFIG[item.game];
+                // Lookup robusto: id exacto + coincidencia de nombre, si no hay match por nombre normalizado entre todos los productos del mismo juego. Fallback: búsqueda en catálogo.
+                const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").replace(/[^\w\sáéíóúñ]/gi, "").trim();
+                const all = getMergedProducts();
+                const byId = getMergedById(item.id);
+                const nameMatches = (p: { name: string }) => norm(p.name).includes(norm(item.name)) || norm(item.name).includes(norm(p.name));
+                let product = byId && nameMatches(byId) ? byId : undefined;
+                if (!product) {
+                  product = all.find((p) => p.game === item.game && nameMatches(p));
+                }
+                if (!product) {
+                  product = all.find((p) => nameMatches(p));
+                }
                 const image = product?.images?.[0];
+                const productUrl = product
+                  ? getProductUrl(product)
+                  : `/catalogo?q=${encodeURIComponent(item.name)}`;
                 return (
-                  <div key={item.id} className="flex items-center gap-4 rounded-xl bg-gray-50 p-3">
+                  <Link
+                    key={item.id}
+                    href={productUrl}
+                    target="_blank"
+                    rel="noopener"
+                    className="group flex cursor-pointer items-center gap-4 rounded-xl bg-gray-50 p-3 transition hover:bg-blue-50"
+                    title={`Abrir ${item.name}`}
+                  >
                     {image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={image} alt={item.name} className="h-14 w-14 flex-shrink-0 rounded-lg bg-white object-cover" onError={(e) => { (e.target as HTMLImageElement).src = "/images/placeholder-product.svg"; }} />
@@ -670,7 +686,10 @@ export default function PedidoDetailClient() {
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-gray-900 line-clamp-1">{item.name}</p>
+                      <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-900 line-clamp-1 group-hover:text-[#2563eb] group-hover:underline">
+                        {item.name}
+                        <ExternalLink size={12} className="flex-shrink-0 text-gray-400 group-hover:text-[#2563eb]" />
+                      </p>
                       <div className="mt-0.5 text-xs text-gray-400">
                         <span className="capitalize">{gameConfig?.name ?? item.game}</span>
                       </div>
@@ -679,7 +698,7 @@ export default function PedidoDetailClient() {
                       <p className="text-sm font-bold text-gray-900">{(item.price * item.qty).toFixed(2)}€</p>
                       <p className="text-xs text-gray-400">{item.qty} × {item.price.toFixed(2)}€</p>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

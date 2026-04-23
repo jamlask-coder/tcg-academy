@@ -33,17 +33,32 @@ export function EmailVerificationBanner() {
     setSending(true);
     setError("");
     try {
-      const rawToken = await issueVerificationToken(user.email);
-      const origin =
-        (typeof window !== "undefined" && window.location?.origin) ||
-        process.env.NEXT_PUBLIC_APP_URL ||
-        "http://localhost:3000";
-      const verifyUrl = `${origin}/verificar-email?token=${rawToken}&email=${encodeURIComponent(user.email)}`;
-      await getEmailService().sendTemplatedEmail("verificar_email", user.email, {
-        nombre: user.name || "",
-        verify_url: verifyUrl,
-        expires_in: "7 días",
-      });
+      const mode = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
+      if (mode === "server") {
+        // Server mode: el API emite el token + envía el email (RESEND_API_KEY
+        // solo existe server-side). 429 si el usuario reenvía demasiado rápido.
+        const res = await fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "resend-verification", email: user.email }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(data.error ?? "resend failed");
+        }
+      } else {
+        const rawToken = await issueVerificationToken(user.email);
+        const origin =
+          (typeof window !== "undefined" && window.location?.origin) ||
+          process.env.NEXT_PUBLIC_APP_URL ||
+          "http://localhost:3000";
+        const verifyUrl = `${origin}/verificar-email?token=${rawToken}&email=${encodeURIComponent(user.email)}`;
+        await getEmailService().sendTemplatedEmail("verificar_email", user.email, {
+          nombre: user.name || "",
+          verify_url: verifyUrl,
+          expires_in: "7 días",
+        });
+      }
       setSent(true);
       setPending(true);
     } catch {

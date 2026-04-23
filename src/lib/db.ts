@@ -142,6 +142,13 @@ export interface ResetTokenRecord {
   expiresAt: string;
 }
 
+export interface EmailVerificationTokenRecord {
+  userId: string;
+  email: string;
+  tokenHash: string;
+  expiresAt: string;
+}
+
 export interface ConsentRecord {
   userId: string;
   type: string;
@@ -456,6 +463,12 @@ export interface DbAdapter {
   getResetToken(userId: string): Promise<ResetTokenRecord | null>;
   deleteResetToken(userId: string): Promise<void>;
 
+  // Email verification tokens
+  createEmailVerificationToken(token: EmailVerificationTokenRecord): Promise<void>;
+  getActiveEmailVerificationToken(email: string): Promise<EmailVerificationTokenRecord | null>;
+  markEmailVerificationTokenUsed(email: string): Promise<void>;
+  markEmailVerified(userId: string): Promise<void>;
+
   // Consents (GDPR)
   createConsent(consent: ConsentRecord): Promise<void>;
   getConsents(userId: string): Promise<ConsentRecord[]>;
@@ -715,6 +728,10 @@ export class LocalDbAdapter implements DbAdapter {
   async createResetToken(_token: ResetTokenRecord): Promise<void> { /* handled client-side */ }
   async getResetToken(_userId: string): Promise<ResetTokenRecord | null> { return null; }
   async deleteResetToken(_userId: string): Promise<void> { /* handled client-side */ }
+  async createEmailVerificationToken(_t: EmailVerificationTokenRecord): Promise<void> { /* handled client-side */ }
+  async getActiveEmailVerificationToken(_email: string): Promise<EmailVerificationTokenRecord | null> { return null; }
+  async markEmailVerificationTokenUsed(_email: string): Promise<void> { /* handled client-side */ }
+  async markEmailVerified(_userId: string): Promise<void> { /* handled client-side */ }
   async createConsent(_consent: ConsentRecord): Promise<void> { /* handled client-side */ }
   async getConsents(_userId: string): Promise<ConsentRecord[]> { return []; }
   async logAudit(_entry: { entityType: string; entityId: string; action: string }): Promise<void> { /* handled client-side */ }
@@ -1042,6 +1059,60 @@ export class ServerDbAdapter implements DbAdapter {
   async deleteResetToken(userId: string): Promise<void> {
     // Mark as used rather than deleting (audit trail)
     const { error } = await this.db.from("reset_tokens").update({ used_at: new Date().toISOString() }).eq("user_id", userId).is("used_at", null);
+    if (error) throw error;
+  }
+
+  // ── Email Verification Tokens ──────────────────────────────────────────
+
+  async createEmailVerificationToken(token: EmailVerificationTokenRecord): Promise<void> {
+    // Invalidar tokens activos previos para este email (reenvíos).
+    await this.db
+      .from("email_verification_tokens")
+      .update({ used_at: new Date().toISOString() })
+      .ilike("email", token.email)
+      .is("used_at", null);
+    const { error } = await this.db.from("email_verification_tokens").insert({
+      user_id: token.userId,
+      email: token.email.toLowerCase(),
+      token_hash: token.tokenHash,
+      expires_at: token.expiresAt,
+    });
+    if (error) throw error;
+  }
+
+  async getActiveEmailVerificationToken(email: string): Promise<EmailVerificationTokenRecord | null> {
+    const { data, error } = await this.db
+      .from("email_verification_tokens")
+      .select("*")
+      .ilike("email", email)
+      .is("used_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+    if (error || !data) return null;
+    return {
+      userId: data.user_id,
+      email: data.email,
+      tokenHash: data.token_hash,
+      expiresAt: data.expires_at,
+    };
+  }
+
+  async markEmailVerificationTokenUsed(email: string): Promise<void> {
+    const { error } = await this.db
+      .from("email_verification_tokens")
+      .update({ used_at: new Date().toISOString() })
+      .ilike("email", email)
+      .is("used_at", null);
+    if (error) throw error;
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    const { error } = await this.db
+      .from("users")
+      .update({ email_verified: true, email_verified_at: new Date().toISOString() })
+      .eq("id", userId);
     if (error) throw error;
   }
 

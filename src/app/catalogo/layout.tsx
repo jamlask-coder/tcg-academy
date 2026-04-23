@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SITE_URL } from "@/lib/seo";
+import { SITE_CONFIG } from "@/config/siteConfig";
 
 export const metadata: Metadata = {
   title: "Catálogo TCG | TCG Academy",
@@ -8,8 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: `${SITE_URL}/catalogo` },
   openGraph: {
     title: "Catálogo TCG | TCG Academy",
-    description:
-      "Todos los productos de TCG disponibles con envío a toda España. IVA incluido y envío gratuito desde 149 €.",
+    description: `Todos los productos de TCG disponibles con envío a toda España. IVA incluido y envío gratuito desde ${SITE_CONFIG.shippingThreshold} €.`,
     url: `${SITE_URL}/catalogo`,
     type: "website",
   },

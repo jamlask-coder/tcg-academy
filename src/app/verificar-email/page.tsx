@@ -8,6 +8,30 @@ import { consumeVerificationToken } from "@/services/emailVerificationService";
 
 type Status = "checking" | "ok" | "expired" | "mismatch" | "missing";
 
+async function consumeTokenByMode(
+  email: string,
+  token: string,
+): Promise<{ ok: boolean; reason?: "missing" | "expired" | "mismatch" }> {
+  const mode = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
+  if (mode !== "server") {
+    return consumeVerificationToken(email, token);
+  }
+  // Server mode → validación contra Supabase vía /api/auth
+  try {
+    const res = await fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "verify-email", email, token }),
+    });
+    if (res.ok) return { ok: true };
+    const errText = (await res.text()).toLowerCase();
+    if (errText.includes("expirad")) return { ok: false, reason: "expired" };
+    return { ok: false, reason: "mismatch" };
+  } catch {
+    return { ok: false, reason: "mismatch" };
+  }
+}
+
 function VerifyInner() {
   const params = useSearchParams();
   const token = params.get("token") ?? "";
@@ -21,7 +45,7 @@ function VerifyInner() {
   useEffect(() => {
     if (initialStatus !== "checking") return;
     let cancelled = false;
-    consumeVerificationToken(email, token).then((res) => {
+    consumeTokenByMode(email, token).then((res) => {
       if (cancelled) return;
       if (res.ok) setStatus("ok");
       else setStatus(res.reason ?? "mismatch");

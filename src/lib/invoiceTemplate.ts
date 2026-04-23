@@ -53,7 +53,7 @@ export interface InvoiceTemplate {
 }
 
 export const DEFAULT_TEMPLATE: InvoiceTemplate = {
-  paddingTop: 8,
+  paddingTop: 14,
   paddingX: 14,
   paddingBottom: 22,
 
@@ -63,20 +63,20 @@ export const DEFAULT_TEMPLATE: InvoiceTemplate = {
   totalBgColor: "#ffffff",
   totalTextColor: "#111827",
 
-  logoSize: 58,
+  logoSize: 140,
   brandName: "TCG Academy",
   brandSub: "Tienda especialista en TCG",
   showBrandSub: true,
 
-  watermarkEnabled: false,
-  watermarkOpacity: 0.07,
-  watermarkSize: 55,
-  watermarkY: 50,
+  watermarkEnabled: true,
+  watermarkOpacity: 0.08,
+  watermarkSize: 110,
+  watermarkY: 55,
 
-  gapAfterHeader: 14,
-  gapAfterParties: 10,
-  gapAfterOrderBar: 12,
-  gapAfterTable: 10,
+  gapAfterHeader: 36,
+  gapAfterParties: 14,
+  gapAfterOrderBar: 18,
+  gapAfterTable: 14,
 
   showOrderBar: true,
   showDiscountsCard: true,

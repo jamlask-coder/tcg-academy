@@ -15,6 +15,7 @@ import { DataHub } from "@/lib/dataHub";
 import { validateIban } from "@/lib/validations/iban";
 import { getMergedById } from "@/lib/productStore";
 import { persistProductPatch } from "@/lib/productPersist";
+import { sendAppEmail } from "@/services/emailService";
 
 const RETURNS_KEY = "tcgacademy_returns";
 const RETURN_WINDOW_DAYS = 14; // Legal return window in Spain
@@ -220,17 +221,27 @@ export function setRefundBankInfo(
 
 /**
  * Update return request status.
+ *
+ * Notifica por email al cliente en las transiciones relevantes:
+ *  - aprobada   → `devolucion_aceptada`
+ *  - rechazada  → `devolucion_rechazada`
+ *  - cerrada    → `devolucion_cancelada` (solo si el status anterior no era
+ *                 "reembolsada" — en ese caso ya se envió el email de reembolso)
+ *
+ * El estado "reembolsada" se gestiona desde `markAsRefunded()` que envía su
+ * propio email tras emitir la factura rectificativa.
  */
-export function updateReturnStatus(
+export async function updateReturnStatus(
   rmaId: string,
   newStatus: ReturnStatus,
   note?: string,
   extras?: Partial<Pick<ReturnRequest, "adminNotes" | "trackingNumber" | "rectificativeInvoiceId">>,
-): ReturnRequest | null {
+): Promise<ReturnRequest | null> {
   const returns = loadReturns();
   const idx = returns.findIndex((r) => r.id === rmaId);
   if (idx === -1) return null;
 
+  const previousStatus = returns[idx].status;
   returns[idx].status = newStatus;
   returns[idx].updatedAt = new Date().toISOString();
   returns[idx].statusHistory.push({
@@ -244,7 +255,65 @@ export function updateReturnStatus(
   if (extras?.rectificativeInvoiceId) returns[idx].rectificativeInvoiceId = extras.rectificativeInvoiceId;
 
   saveReturns(returns);
-  return returns[idx];
+
+  // Notificar al cliente en las transiciones relevantes. Non-critical: si falla,
+  // no revertimos el cambio de estado (el estado es la fuente canónica).
+  const rma = returns[idx];
+  try {
+    if (newStatus === "aprobada" && previousStatus !== "aprobada") {
+      await sendAppEmail({
+        toEmail: rma.customerEmail,
+        toName: rma.customerName,
+        templateId: "devolucion_aceptada",
+        vars: {
+          nombre: rma.customerName.split(" ")[0] ?? rma.customerName,
+          return_id: rma.id,
+          order_id: rma.orderId,
+          refund_amount: rma.totalRefundAmount.toFixed(2),
+          refund_method: rma.refundIban ? "Transferencia bancaria" : "Método original",
+          refund_days: "3-5",
+          unsubscribe_link: "#",
+        },
+        preview: `Devolución ${rma.id} aprobada · ${rma.totalRefundAmount.toFixed(2)}€`,
+      });
+    } else if (newStatus === "rechazada" && previousStatus !== "rechazada") {
+      await sendAppEmail({
+        toEmail: rma.customerEmail,
+        toName: rma.customerName,
+        templateId: "devolucion_rechazada",
+        vars: {
+          nombre: rma.customerName.split(" ")[0] ?? rma.customerName,
+          return_id: rma.id,
+          order_id: rma.orderId,
+          motivo: note ?? extras?.adminNotes ?? "Tras revisión del equipo.",
+          unsubscribe_link: "#",
+        },
+        preview: `Devolución ${rma.id} rechazada`,
+      });
+    } else if (
+      newStatus === "cerrada" &&
+      previousStatus !== "reembolsada" &&
+      previousStatus !== "cerrada"
+    ) {
+      await sendAppEmail({
+        toEmail: rma.customerEmail,
+        toName: rma.customerName,
+        templateId: "devolucion_cancelada",
+        vars: {
+          nombre: rma.customerName.split(" ")[0] ?? rma.customerName,
+          return_id: rma.id,
+          order_id: rma.orderId,
+          motivo: note ?? "Solicitud cerrada sin reembolso.",
+          unsubscribe_link: "#",
+        },
+        preview: `Devolución ${rma.id} cancelada`,
+      });
+    }
+  } catch {
+    /* email non-critical — el estado ya está persistido */
+  }
+
+  return rma;
 }
 
 /**
@@ -458,6 +527,27 @@ export async function markAsRefunded(
     ],
   };
   saveReturns(returns);
+
+  // 7. Notificar al cliente (non-critical).
+  try {
+    await sendAppEmail({
+      toEmail: rma.customerEmail,
+      toName: rma.customerName,
+      templateId: "devolucion_reembolsada",
+      vars: {
+        nombre: rma.customerName.split(" ")[0] ?? rma.customerName,
+        return_id: rma.id,
+        order_id: rma.orderId,
+        refund_amount: rma.totalRefundAmount.toFixed(2),
+        rectificativa_number: rectificativa.invoiceNumber,
+        iban_masked: maskIbanShort(rma.refundIban),
+        unsubscribe_link: "#",
+      },
+      preview: `Reembolso emitido · ${rma.totalRefundAmount.toFixed(2)}€ · ${rectificativa.invoiceNumber}`,
+    });
+  } catch {
+    /* email non-critical — la rectificativa ya es el documento vinculante */
+  }
 
   return {
     ok: true,

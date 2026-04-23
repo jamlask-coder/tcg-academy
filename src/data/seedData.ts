@@ -23,6 +23,7 @@ import { safeRead, robustWrite } from "@/lib/safeStorage";
 import type { AdminOrder, AdminOrderStatus, OrderItem as AdminItem } from "@/data/mockData";
 import { POINTS_PER_EURO, addPoints } from "@/services/pointsService";
 import { derivePaymentStatus } from "@/lib/orderAdapter";
+import { calculateShipping } from "@/lib/priceVerification";
 
 // ─── PRNG determinista (mulberry32) ─────────────────────────────────────────
 
@@ -423,7 +424,7 @@ export function generateSeedOrders(seededUsers: SeededUser[]): SeededOrder[] {
     // Envío: 15% recogida en tienda
     const isPickup = rng() < 0.15;
     const envio = isPickup ? "tienda" : "estandar";
-    const shipping = isPickup || subtotal >= 149 ? 0 : 3.99;
+    const shipping = calculateShipping(envio, subtotal);
     const pago = isPickup ? "tienda" : pick(rng, PAGOS);
 
     // Cupón en ~10%, puntos en ~15% (clientes)

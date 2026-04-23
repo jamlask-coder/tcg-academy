@@ -117,17 +117,17 @@ describe("returnService — createReturnRequest", () => {
 // ─── updateReturnStatus ─────────────────────────────────────────────────────
 
 describe("returnService — updateReturnStatus", () => {
-  it("transición solicitada → aprobada añade entrada al historial", () => {
+  it("transición solicitada → aprobada añade entrada al historial", async () => {
     const rma = createReturnRequest("ORD-1", "u", "c@e.com", "C", sampleItems());
-    const updated = updateReturnStatus(rma.id, "aprobada", "Aprobada por admin");
+    const updated = await updateReturnStatus(rma.id, "aprobada", "Aprobada por admin");
     expect(updated?.status).toBe("aprobada");
     expect(updated?.statusHistory).toHaveLength(2);
     expect(updated?.statusHistory[1].note).toBe("Aprobada por admin");
   });
 
-  it("admite extras: tracking y adminNotes", () => {
+  it("admite extras: tracking y adminNotes", async () => {
     const rma = createReturnRequest("ORD-1", "u", "c@e.com", "C", sampleItems());
-    const updated = updateReturnStatus(rma.id, "en_transito", undefined, {
+    const updated = await updateReturnStatus(rma.id, "en_transito", undefined, {
       trackingNumber: "TRK-999",
       adminNotes: "OK",
     });
@@ -135,18 +135,18 @@ describe("returnService — updateReturnStatus", () => {
     expect(updated?.adminNotes).toBe("OK");
   });
 
-  it("RMA id inexistente devuelve null", () => {
-    expect(updateReturnStatus("RMA-404", "aprobada")).toBeNull();
+  it("RMA id inexistente devuelve null", async () => {
+    expect(await updateReturnStatus("RMA-404", "aprobada")).toBeNull();
   });
 });
 
 // ─── getReturns con filtros ─────────────────────────────────────────────────
 
 describe("returnService — getReturns con filtros", () => {
-  it("filtra por status, orderId y customerId", () => {
+  it("filtra por status, orderId y customerId", async () => {
     const a = createReturnRequest("ORD-1", "u1", "a@e.com", "A", sampleItems());
     createReturnRequest("ORD-2", "u2", "b@e.com", "B", sampleItems());
-    updateReturnStatus(a.id, "aprobada");
+    await updateReturnStatus(a.id, "aprobada");
 
     expect(getReturns({ status: "aprobada" })).toHaveLength(1);
     expect(getReturns({ orderId: "ORD-2" })).toHaveLength(1);
@@ -199,13 +199,13 @@ describe("returnService — restoreStockForReturn", () => {
 // ─── getReturnStats ─────────────────────────────────────────────────────────
 
 describe("returnService — getReturnStats", () => {
-  it("cuenta por estado y suma refund total", () => {
+  it("cuenta por estado y suma refund total", async () => {
     const a = createReturnRequest("ORD-1", "u1", "a@e.com", "A", sampleItems());
     const b = createReturnRequest("ORD-2", "u2", "b@e.com", "B", sampleItems());
     const c = createReturnRequest("ORD-3", "u3", "c@e.com", "C", sampleItems());
-    updateReturnStatus(a.id, "aprobada");
-    updateReturnStatus(b.id, "reembolsada");
-    updateReturnStatus(c.id, "rechazada");
+    await updateReturnStatus(a.id, "aprobada");
+    await updateReturnStatus(b.id, "reembolsada");
+    await updateReturnStatus(c.id, "rechazada");
 
     const stats = getReturnStats();
     expect(stats.total).toBe(3);

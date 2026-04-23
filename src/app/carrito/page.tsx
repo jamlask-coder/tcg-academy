@@ -1,6 +1,7 @@
 "use client";
 import { useCart } from "@/context/CartContext";
 import { SITE_CONFIG } from "@/config/siteConfig";
+import { calculateShipping } from "@/lib/priceVerification";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -72,10 +73,10 @@ export default function CartPage() {
     }
   }, [user]);
 
-  const hasFreeShipping =
-    total >= SITE_CONFIG.shippingThreshold ||
-    appliedCoupon?.discountType === "shipping";
-  const shipping = hasFreeShipping ? 0 : 3.99;
+  const shipping = calculateShipping("estandar", total, {
+    freeShippingCoupon: appliedCoupon?.discountType === "shipping",
+  });
+  const _hasFreeShipping = shipping === 0;
 
   const couponDiscount = appliedCoupon
     ? calcCouponDiscount(appliedCoupon, total)

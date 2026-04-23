@@ -230,8 +230,8 @@ function ReturnCard({
     }
   };
 
-  const handleTransition = (newStatus: ReturnStatus, note: string) => {
-    updateReturnStatus(rma.id, newStatus, note);
+  const handleTransition = async (newStatus: ReturnStatus, note: string) => {
+    await updateReturnStatus(rma.id, newStatus, note);
     onChange();
   };
 

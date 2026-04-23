@@ -36,7 +36,7 @@ import {
 } from "@/lib/orderAdapter";
 import { sendMessage as sendCanonicalMessage } from "@/services/messageService";
 import { pushUserNotification } from "@/services/notificationService";
-import { renderEmailTemplate, logSentEmail } from "@/services/emailService";
+import { sendAppEmail } from "@/services/emailService";
 import {
   buildInvoiceFromOrder,
   printInvoiceWithCSV,
@@ -1240,7 +1240,7 @@ export default function AdminPedidosPage() {
 
   // ── Handlers ──
 
-  const handleUpdateStatus = (
+  const handleUpdateStatus = async (
     id: string,
     status: AdminOrderStatus,
     tracking?: string,
@@ -1363,9 +1363,8 @@ export default function AdminPedidosPage() {
     if (subject) {
       const order = orders.find((o) => o.id === id);
       if (order) {
-        // Map admin status → template id (si existe). Unifica el formato con
-        // /admin/emails: HTML de plantilla + variables reales. Si no hay
-        // plantilla, cae a un registro simple.
+        // Map admin status → template id (si existe). sendAppEmail() renderiza
+        // la plantilla admin-editable y además envía vía Resend en server mode.
         const TEMPLATE_BY_STATUS: Partial<Record<AdminOrderStatus, string>> = {
           enviado: "pedido_enviado",
         };
@@ -1373,46 +1372,48 @@ export default function AdminPedidosPage() {
         let finalSubject = subject;
         const preview = emailBodies[status] ?? "";
 
-        if (templateId) {
+        if (templateId === "pedido_enviado") {
           const effectiveTracking = tracking ?? order.trackingNumber ?? "";
-          const rendered = renderEmailTemplate(templateId, {
-            nombre: order.userName.split(" ")[0] ?? order.userName,
-            order_id: id,
-            tracking_number: effectiveTracking,
-            carrier,
-            tracking_url: effectiveTracking
-              ? buildTrackingUrl(carrier, effectiveTracking)
-              : "",
-            unsubscribe_link: "#",
+          const res = await sendAppEmail({
+            toEmail: order.userEmail,
+            toName: order.userName,
+            templateId,
+            vars: {
+              nombre: order.userName.split(" ")[0] ?? order.userName,
+              order_id: id,
+              tracking_number: effectiveTracking,
+              carrier,
+              tracking_url: effectiveTracking
+                ? buildTrackingUrl(carrier, effectiveTracking)
+                : "",
+              unsubscribe_link: "#",
+            },
+            preview: `Pedido enviado · ${carrier} ${tracking ?? "pendiente"}`,
           });
-          if (rendered) {
-            finalSubject = rendered.subject;
-            // Usar servicio canónico para dejar el log con el mismo shape
-            // que consume /admin/emails.
-            logSentEmail({
-              id: `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-              to: order.userEmail,
-              toName: order.userName,
-              subject: rendered.subject,
-              templateId,
-              sentAt: now,
-              // Dentro de este branch templateId sólo es "pedido_enviado" →
-              // status siempre es "enviado".
-              preview: `Pedido enviado · ${carrier} ${tracking ?? "pendiente"}`,
-            });
+          if (res.ok) {
+            // Mantener finalSubject alineado con el asunto de la plantilla
+            // (para la notificación in-app coherente con el email enviado).
+            finalSubject = `Tu pedido ${id} ha sido enviado`;
           }
         } else {
-          // Sin plantilla (cancelado / incidencia) — log mínimo con shape
-          // canónico de SentEmailLog.
-          logSentEmail({
-            id: `em_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-            to: order.userEmail,
-            toName: order.userName,
-            subject,
-            templateId: status === "cancelado" ? "pedido_cancelado" : "pedido_incidencia",
-            sentAt: now,
-            preview,
-          });
+          // Sin plantilla dedicada (cancelado / incidencia) — usamos la
+          // plantilla genérica que exista; si no, sendAppEmail devuelve ok=false
+          // y el log queda vacío. Mejor un template dedicado en el futuro.
+          const fallbackTemplate =
+            status === "cancelado" ? "pedido_cancelado" : null;
+          if (fallbackTemplate) {
+            await sendAppEmail({
+              toEmail: order.userEmail,
+              toName: order.userName,
+              templateId: fallbackTemplate,
+              vars: {
+                nombre: order.userName.split(" ")[0] ?? order.userName,
+                order_id: id,
+                unsubscribe_link: "#",
+              },
+              preview,
+            });
+          }
         }
 
         // Create in-app notification via canonical service

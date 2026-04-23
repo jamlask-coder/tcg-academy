@@ -204,6 +204,33 @@ export async function POST(req: NextRequest) {
           email: cleanEmail,
         });
 
+        // Issue email verification token + send verification email.
+        // Server-side porque RESEND_API_KEY no está expuesto al cliente.
+        try {
+          const verifBytes = new Uint8Array(32);
+          crypto.getRandomValues(verifBytes);
+          const verifRaw = Array.from(verifBytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+          const verifHashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifRaw));
+          const verifHash = Array.from(new Uint8Array(verifHashBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+          const sevenDays = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
+          await db.createEmailVerificationToken({
+            userId: newUser.id,
+            email: cleanEmail,
+            tokenHash: verifHash,
+            expiresAt: sevenDays,
+          });
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+          const verifyUrl = `${appUrl}/verificar-email?token=${verifRaw}&email=${encodeURIComponent(cleanEmail)}`;
+          await emailService.sendTemplatedEmail("verificar_email", cleanEmail, {
+            nombre: newUser.name,
+            verify_url: verifyUrl,
+            expires_in: "7 días",
+          });
+        } catch {
+          // No bloquear el registro si el email de verificación falla — el
+          // usuario puede reenviarlo desde /cuenta vía EmailVerificationBanner.
+        }
+
         const response = NextResponse.json({
           ok: true,
           user: {
@@ -389,6 +416,97 @@ export async function POST(req: NextRequest) {
           entityId: userId,
           action: "password_changed",
           ipAddress: ip,
+        });
+
+        return NextResponse.json({ ok: true });
+      }
+
+      // ── VERIFY EMAIL ───────────────────────────────────────────────────
+      case "verify-email": {
+        const { email: vEmail, token: vToken } = body;
+        if (!vEmail || !vToken) {
+          return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
+        }
+        const cleanEmail = vEmail.toLowerCase().trim();
+
+        // Rate limit brute-force de tokens por email: 5 intentos / 5 min
+        const verRl = serverRateLimit(`verify-email:${cleanEmail}`, 5, 300_000);
+        if (!verRl.allowed) {
+          return NextResponse.json({ error: "Demasiados intentos." }, { status: 429 });
+        }
+
+        const user = await db.getUserByEmail(cleanEmail);
+        if (!user) {
+          return NextResponse.json({ error: "Enlace no válido" }, { status: 400 });
+        }
+
+        const stored = await db.getActiveEmailVerificationToken(cleanEmail);
+        if (!stored) {
+          return NextResponse.json({ error: "Enlace no válido o ya usado" }, { status: 400 });
+        }
+        if (new Date(stored.expiresAt) < new Date()) {
+          return NextResponse.json({ error: "Enlace expirado" }, { status: 400 });
+        }
+        const hashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(vToken));
+        const hash = Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+        if (hash !== stored.tokenHash) {
+          return NextResponse.json({ error: "Enlace no válido" }, { status: 400 });
+        }
+
+        await db.markEmailVerified(user.id);
+        await db.markEmailVerificationTokenUsed(cleanEmail);
+
+        await db.logAudit({
+          entityType: "user",
+          entityId: user.id,
+          action: "email_verified",
+          ipAddress: ip,
+        });
+
+        return NextResponse.json({ ok: true });
+      }
+
+      // ── RESEND VERIFICATION ────────────────────────────────────────────
+      case "resend-verification": {
+        const { email: rEmail } = body;
+        if (!rEmail) {
+          return NextResponse.json({ error: "Email requerido" }, { status: 400 });
+        }
+        const cleanEmail = rEmail.toLowerCase().trim();
+
+        // Rate limit: 3 reenvíos cada 15 min por email
+        const rsRl = serverRateLimit(`resend-verif:${cleanEmail}`, 3, 900_000);
+        if (!rsRl.allowed) {
+          return NextResponse.json({ error: "Espera unos minutos antes de reintentar." }, { status: 429 });
+        }
+
+        const user = await db.getUserByEmail(cleanEmail);
+        // Nunca revelar si el email existe o no (enumeration).
+        if (!user) {
+          return NextResponse.json({ ok: true });
+        }
+
+        const verifBytes = new Uint8Array(32);
+        crypto.getRandomValues(verifBytes);
+        const verifRaw = Array.from(verifBytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+        const verifHashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifRaw));
+        const verifHash = Array.from(new Uint8Array(verifHashBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+        const sevenDays = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
+
+        await db.createEmailVerificationToken({
+          userId: user.id,
+          email: cleanEmail,
+          tokenHash: verifHash,
+          expiresAt: sevenDays,
+        });
+
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+        const verifyUrl = `${appUrl}/verificar-email?token=${verifRaw}&email=${encodeURIComponent(cleanEmail)}`;
+        const emailService = getEmailService();
+        await emailService.sendTemplatedEmail("verificar_email", cleanEmail, {
+          nombre: user.name,
+          verify_url: verifyUrl,
+          expires_in: "7 días",
         });
 
         return NextResponse.json({ ok: true });

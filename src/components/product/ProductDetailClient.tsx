@@ -611,7 +611,7 @@ export function ProductDetailClient({ product: initialProduct, config, catLabel 
     [product, debouncedTitle, inlineGame, inlineCategory, inlineLanguage],
   );
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     // Pasada DEFENSIVA: garantiza que todos los campos inline actuales
     // queden persistidos, incluso si algún editor (ej. título) no llegó a
     // disparar blur antes del click en Guardar. Como persistPatch hace
@@ -635,7 +635,7 @@ export function ProductDetailClient({ product: initialProduct, config, catLabel 
     if (wasOutOfStock && nowInStock && getSubsForProduct(product.id).length > 0) {
       const url = `https://tcgacademy.es${getProductUrl(product)}`;
       const img = product.images[0] ?? "";
-      const { sent } = triggerRestockEmails(product.id, inlineTitle, url, img);
+      const { sent } = await triggerRestockEmails(product.id, inlineTitle, url, img);
       if (sent > 0) alert(`Restock: ${sent} email(s) de aviso enviados.`);
     }
 

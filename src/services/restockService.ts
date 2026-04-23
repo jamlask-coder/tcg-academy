@@ -3,9 +3,7 @@
 // Subscriptions are stored in localStorage; when stock is restored,
 // emails are triggered via the email service.
 
-import { renderEmailTemplate } from "./emailService";
-import { logSentEmail } from "./emailService";
-import { openHtmlInNewTab } from "./emailService";
+import { sendAppEmail, renderEmailTemplate, openHtmlInNewTab } from "./emailService";
 
 const STORAGE_KEY = "tcga_restock_subs";
 
@@ -65,39 +63,35 @@ export function getSubsForProduct(productId: number): RestockSub[] {
 // ── Trigger restock emails ───────────────────────────────────────────────────
 
 /** Called when a product goes back in stock. Sends emails and clears subs. */
-export function triggerRestockEmails(
+export async function triggerRestockEmails(
   productId: number,
   productName: string,
   productUrl: string,
   productImage: string,
-): { sent: number } {
+): Promise<{ sent: number }> {
   const subs = getSubsForProduct(productId);
   if (subs.length === 0) return { sent: 0 };
 
   for (const sub of subs) {
-    const rendered = renderEmailTemplate("restock_disponible", {
+    const vars = {
       nombre: sub.name || "cliente",
       producto: productName,
       producto_url: productUrl,
       producto_imagen: productImage,
+    };
+
+    const res = await sendAppEmail({
+      toEmail: sub.email,
+      toName: sub.name,
+      templateId: "restock_disponible",
+      vars,
+      preview: `Restock: ${productName}`,
     });
 
-    if (rendered) {
-      // In demo mode, log the email; in production, send via API
-      logSentEmail({
-        id: `restock_${productId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        to: sub.email,
-        toName: sub.name,
-        subject: rendered.subject,
-        templateId: "restock_disponible",
-        sentAt: new Date().toISOString(),
-        preview: `Restock: ${productName}`,
-      });
-
-      // Demo: open first email in new tab so admin can see it
-      if (subs.indexOf(sub) === 0) {
-        openHtmlInNewTab(rendered.html);
-      }
+    // Demo: open first email in new tab so admin can see el HTML renderizado.
+    if (res.ok && subs.indexOf(sub) === 0) {
+      const rendered = renderEmailTemplate("restock_disponible", vars);
+      if (rendered) openHtmlInNewTab(rendered.html);
     }
 
     unsubscribeRestock(productId, sub.email);

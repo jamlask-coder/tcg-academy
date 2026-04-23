@@ -171,7 +171,7 @@ node tests/audit/run-audit.mjs
 
 ```
 npm run check:all          # lint + format + typecheck + build + audit
-node tests/audit/run-audit.mjs   # 20 custom tests
+node tests/audit/run-audit.mjs   # 24 custom tests
 npm run backup             # timestamped backup to backups/
 ```
 
@@ -206,10 +206,21 @@ The app runs in two modes controlled by `NEXT_PUBLIC_BACKEND_MODE` in `.env.loca
 ### To connect real services (server mode)
 1. Set `NEXT_PUBLIC_BACKEND_MODE=server` in `.env.local`
 2. Fill in Supabase credentials → data persists in PostgreSQL
-3. Fill in Resend API key → real emails sent
+3. Fill in Resend API key → real emails sent. **Guía completa DNS + dominio**: `docs/SETUP_EMAIL_RESEND.md`
 4. Fill in Stripe keys → real payment processing
 5. Fill in VeriFactu credentials → invoices sent to AEAT
 6. Security headers already in `next.config.ts` `headers()`
+
+### Emails (Resend)
+- **SSOT plantillas**: `src/data/emailTemplates.ts` (editable en `/admin/emails`).
+- **Legacy fallback**: `src/lib/email.ts::LEGACY_TEMPLATES` (no añadir nuevas ahí).
+- **Helper canónico**: `sendAppEmail()` de `src/services/emailService.ts`. NUNCA
+  llamar `logSentEmail()` directamente (Test 21 de audit lo detecta).
+- **verificar_email**: se emite desde `/api/auth` server-side (server mode) o
+  desde `AuthContext` (local mode). Nunca desde cliente en server mode —
+  RESEND_API_KEY no está expuesto al browser.
+- **From/Reply-To**: `RESEND_FROM_EMAIL` (dominio verificado, sin buzón
+  necesario) / `RESEND_REPLY_TO` (buzón real para respuestas).
 
 ## Sistema de histórico de precios (gráfico evolución Cardmarket)
 

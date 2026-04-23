@@ -703,26 +703,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         // Issue email verification token (preparado — no bloquea login
-        // salvo que NEXT_PUBLIC_EMAIL_VERIFICATION_REQUIRED=true)
-        try {
-          const rawToken = await issueVerificationToken(email);
-          const appUrl =
-            (typeof window !== "undefined" && window.location?.origin) ||
-            process.env.NEXT_PUBLIC_APP_URL ||
-            "http://localhost:3000";
-          const verifyUrl = `${appUrl}/verificar-email?token=${rawToken}&email=${encodeURIComponent(email)}`;
-          const emailService = getEmailService();
-          await emailService.sendTemplatedEmail(
-            "verificar_email",
-            email,
-            {
-              nombre: sanitizedName,
-              verify_url: verifyUrl,
-              expires_in: "7 días",
-            },
-          );
-        } catch {
-          /* no-op: no bloquear el registro si el email falla */
+        // salvo que NEXT_PUBLIC_EMAIL_VERIFICATION_REQUIRED=true).
+        // En server mode el token + email los emite `/api/auth` server-side
+        // (RESEND_API_KEY no está expuesto al cliente). Aquí solo local.
+        const backendMode = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
+        if (backendMode !== "server") {
+          try {
+            const rawToken = await issueVerificationToken(email);
+            const appUrl =
+              (typeof window !== "undefined" && window.location?.origin) ||
+              process.env.NEXT_PUBLIC_APP_URL ||
+              "http://localhost:3000";
+            const verifyUrl = `${appUrl}/verificar-email?token=${rawToken}&email=${encodeURIComponent(email)}`;
+            const emailService = getEmailService();
+            await emailService.sendTemplatedEmail(
+              "verificar_email",
+              email,
+              {
+                nombre: sanitizedName,
+                verify_url: verifyUrl,
+                expires_in: "7 días",
+              },
+            );
+          } catch {
+            /* no-op: no bloquear el registro si el email falla */
+          }
         }
 
         persist(newUser);

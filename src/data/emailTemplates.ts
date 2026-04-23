@@ -435,6 +435,87 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     `),
   },
   {
+    id: "devolucion_rechazada",
+    name: "Devolución rechazada",
+    subject: "Tu devolución #{{return_id}} no ha sido aceptada",
+    description:
+      "Se envía cuando una devolución es rechazada tras revisión. Indica el motivo.",
+    variables: ["nombre", "return_id", "order_id", "motivo", "unsubscribe_link"],
+    html: wrapEmail(`
+      <div class="hero" style="background: linear-gradient(135deg, #dc2626, #ef4444);">
+        <h1>Devolución no aceptada</h1>
+        <p>Tu solicitud ha sido revisada</p>
+      </div>
+      <div class="content">
+        <p>Hola {{nombre}},</p>
+        <p>Sentimos comunicarte que tu solicitud de devolución <strong>#{{return_id}}</strong> del pedido <strong>#{{order_id}}</strong> no ha sido aceptada.</p>
+        <div class="info-box">
+          <p style="margin:0;"><strong>Motivo:</strong></p>
+          <p style="margin:8px 0 0;">{{motivo}}</p>
+        </div>
+        <p>Si crees que se trata de un error o tienes alguna duda, escríbenos a <a href="mailto:devoluciones@tcgacademy.es">devoluciones@tcgacademy.es</a> y revisaremos tu caso.</p>
+        <p>Gracias por tu comprensión.<br/><strong>El equipo de TCG Academy</strong></p>
+      </div>
+    `),
+  },
+  {
+    id: "devolucion_reembolsada",
+    name: "Devolución reembolsada",
+    subject: "Reembolso emitido — devolución #{{return_id}} ✅",
+    description:
+      "Se envía cuando la devolución se marca como reembolsada y se emite factura rectificativa.",
+    variables: [
+      "nombre",
+      "return_id",
+      "order_id",
+      "refund_amount",
+      "rectificativa_number",
+      "iban_masked",
+      "unsubscribe_link",
+    ],
+    html: wrapEmail(`
+      <div class="hero" style="background: linear-gradient(135deg, #059669, #10b981);">
+        <h1>Reembolso emitido ✅</h1>
+        <p>Tu dinero está de camino</p>
+      </div>
+      <div class="content">
+        <p>Hola {{nombre}},</p>
+        <p>Hemos procesado el reembolso de tu devolución <strong>#{{return_id}}</strong> (pedido <strong>#{{order_id}}</strong>).</p>
+        <div class="info-box">
+          <p style="margin:0;"><strong>Importe:</strong> <span style="color:#059669; font-size:20px; font-weight:700;">{{refund_amount}}€</span></p>
+          <p style="margin:8px 0 0;"><strong>IBAN:</strong> {{iban_masked}}</p>
+          <p style="margin:8px 0 0;"><strong>Factura rectificativa:</strong> {{rectificativa_number}}</p>
+        </div>
+        <p>La transferencia puede tardar 1–3 días hábiles en aparecer en tu banco, dependiendo de tu entidad.</p>
+        <p>Gracias por tu paciencia.<br/><strong>El equipo de TCG Academy</strong></p>
+      </div>
+    `),
+  },
+  {
+    id: "devolucion_cancelada",
+    name: "Devolución cancelada",
+    subject: "Devolución #{{return_id}} cancelada",
+    description:
+      "Se envía cuando se cancela una devolución (por el cliente o el admin).",
+    variables: ["nombre", "return_id", "order_id", "motivo", "unsubscribe_link"],
+    html: wrapEmail(`
+      <div class="hero" style="background: linear-gradient(135deg, #6b7280, #9ca3af);">
+        <h1>Devolución cancelada</h1>
+        <p>La solicitud ya no está activa</p>
+      </div>
+      <div class="content">
+        <p>Hola {{nombre}},</p>
+        <p>Te confirmamos que la devolución <strong>#{{return_id}}</strong> del pedido <strong>#{{order_id}}</strong> ha sido cancelada.</p>
+        <div class="info-box">
+          <p style="margin:0;"><strong>Motivo:</strong></p>
+          <p style="margin:8px 0 0;">{{motivo}}</p>
+        </div>
+        <p>Si quieres volver a iniciar una devolución, puedes hacerlo desde tu cuenta o escribiéndonos a <a href="mailto:devoluciones@tcgacademy.es">devoluciones@tcgacademy.es</a>.</p>
+        <p><strong>El equipo de TCG Academy</strong></p>
+      </div>
+    `),
+  },
+  {
     id: "verificar_email",
     name: "Verifica tu email",
     subject: "Confirma tu email — TCG Academy",

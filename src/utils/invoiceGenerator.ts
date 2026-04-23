@@ -58,6 +58,8 @@ export interface InvoiceData {
   // Cliente
   clientName: string;
   clientCIF?: string;
+  clientPhone?: string;
+  clientEmail?: string;
   clientAddress?: string;
   clientCity?: string;
   clientProvince?: string;
@@ -117,13 +119,11 @@ export function generateInvoiceHTML(
     invoiceNumber,
     orderId,
     date,
-    operationDate,
-    dueDate,
     paymentMethod,
     paymentStatus,
     verifactuHash,
     verifactuQR,
-    verifactuStatus,
+    verifactuStatus: _verifactuStatus,
     issuerName,
     issuerCIF,
     issuerAddress,
@@ -132,6 +132,8 @@ export function generateInvoiceHTML(
     issuerEmail,
     clientName,
     clientCIF,
+    clientPhone,
+    clientEmail,
     clientAddress,
     clientCity,
     clientProvince,
@@ -145,9 +147,6 @@ export function generateInvoiceHTML(
   } = data;
 
   const formattedDate = fmtDate(date);
-  const formattedOperation =
-    operationDate && operationDate !== date ? fmtDate(operationDate) : null;
-  const formattedDue = dueDate ? fmtDate(dueDate) : null;
 
   // Per-line calculations
   const lines = items.map((item) => {
@@ -207,20 +206,32 @@ export function generateInvoiceHTML(
     })
     .join("");
 
-  const statusChip = paymentStatus
-    ? PAYMENT_STATUS_LABEL[paymentStatus]
-    : null;
+  // Status chip: mostrar SÓLO en estados NO-pagado (pagado es lo común y limpia el layout).
+  const statusChip =
+    paymentStatus && paymentStatus !== "paid"
+      ? PAYMENT_STATUS_LABEL[paymentStatus]
+      : null;
+
+  // Ocultar prefijo interno `FAC-` al renderizar (el hash-chain lo sigue usando internamente).
+  const displayNumber = invoiceNumber.replace(/^FAC-/, "");
 
   // Client info — filter empty lines
   const clientLines = [
-    clientCIF ? `NIF/CIF: ${escapeHtml(clientCIF)}` : null,
+    clientCIF ? `NIF: ${escapeHtml(clientCIF)}` : null,
+    clientPhone ? escapeHtml(clientPhone) : null,
+    clientEmail ? escapeHtml(clientEmail) : null,
     clientAddress ? escapeHtml(clientAddress) : null,
     clientCity ? escapeHtml(clientCity) : null,
-    clientProvince ? escapeHtml(clientProvince) : null,
-    clientCountry ? escapeHtml(clientCountry) : null,
+    [clientProvince, clientCountry]
+      .filter(Boolean)
+      .map((v) => escapeHtml(v as string))
+      .join(", ") || null,
   ]
     .filter(Boolean)
     .join("<br>");
+
+  // Tipo IVA a mostrar en cabecera de columna (si multi-rate, usa el del primer line o default)
+  const headerVatRate = intracomunitario ? 0 : (lines[0]?.vatRate ?? SITE_CONFIG.vatRate);
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -241,76 +252,73 @@ export function generateInvoiceHTML(
       overflow: hidden;
     }
 
-    /* ── HEADER — logo left, "FACTURA Nº" right ── */
-    .hdr { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: ${tpl.gapAfterHeader}px; }
-    .hdr-left { display: flex; align-items: center; gap: 12px; }
-    .brand-logo { width: ${tpl.logoSize}px; height: ${tpl.logoSize}px; object-fit: contain; flex-shrink: 0; }
-    .brand-name { font-size: 15pt; font-weight: 900; letter-spacing: -0.5px; line-height: 1; color: #111827; }
-    .brand-name .academy { color: ${tpl.accentColor}; }
-    .brand-sub { font-size: 6pt; color: #9ca3af; text-transform: uppercase; letter-spacing: 2px; margin-top: 3px; }
-    .hdr-right { text-align: right; }
-    .hdr-right .title { font-size: 32pt; font-weight: 900; color: ${tpl.primaryColor}; letter-spacing: -1px; line-height: 0.95; }
-    .hdr-right .number { font-size: 13pt; font-weight: 800; color: ${tpl.primaryColor}; margin-top: 2px; }
-
-    /* ── DATOS CLIENTE / NEGOCIO ── */
-    .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-bottom: ${tpl.gapAfterParties}px; }
-    .party-label { font-size: 7.5pt; font-weight: 800; color: #6b7280; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
-    .party-right { text-align: right; }
-    .party-detail { font-size: 8.5pt; color: #4b5563; line-height: 1.55; }
-    .party-detail strong { color: #111827; font-weight: 700; font-size: 9.5pt; display: block; margin-bottom: 2px; }
-
-    /* ── ORDER DETAILS BAR ── */
-    .order-bar {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0;
-      background: #f9fafb;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 10px 14px;
-      margin-bottom: ${tpl.gapAfterOrderBar}px;
+    /* ── Marca de agua ── */
+    .watermark {
+      position: absolute;
+      top: ${tpl.watermarkY}%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: ${tpl.watermarkSize}%;
+      opacity: ${tpl.watermarkOpacity};
+      pointer-events: none;
+      user-select: none;
+      z-index: 0;
     }
-    .order-bar .cell { border-right: 1px solid #e5e7eb; padding: 0 10px; }
-    .order-bar .cell:last-child { border-right: 0; }
-    .order-bar .cell:first-child { padding-left: 0; }
-    .order-bar .cell .lbl { font-size: 6.5pt; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 2px; }
-    .order-bar .cell .val { font-size: 8.5pt; color: #111827; font-weight: 700; }
-    .order-bar .cell .val.mono { font-family: 'Courier New', monospace; font-size: 8pt; }
-    .status-chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 7.5pt; font-weight: 700; }
+    .invoice-wrap > *:not(.watermark) { position: relative; z-index: 1; }
+
+    /* ── HEADER — logo left, company info right ── */
+    .hdr { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; margin-bottom: ${tpl.gapAfterHeader}px; }
+    .brand-logo { height: ${tpl.logoSize}px; width: auto; max-width: 320px; object-fit: contain; flex-shrink: 0; }
+    .company-info { text-align: left; font-size: 10.5pt; color: #111827; line-height: 1.55; }
+    .company-info strong { color: #111827; font-weight: 700; font-size: 11.5pt; display: block; margin-bottom: 3px; }
+
+    /* ── FACTURA Nº — título bajo cabecera ── */
+    .invoice-title { font-size: 14pt; font-weight: 800; color: #111827; letter-spacing: -0.2px; margin-bottom: ${tpl.gapAfterParties}px; margin-top: 4px; }
+
+    /* ── Bloque cliente + pedido en 2 columnas ── */
+    .parties { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; margin-bottom: ${tpl.gapAfterOrderBar}px; }
+    .client-block { flex: 1 1 auto; font-size: 9pt; color: #111827; line-height: 1.5; }
+    .client-block strong { color: #111827; font-weight: 700; font-size: 10pt; display: block; margin-bottom: 2px; }
+    .order-block { flex: 0 0 auto; font-size: 9pt; color: #111827; line-height: 1.55; text-align: left; min-width: 42%; }
+    .order-block .line { white-space: nowrap; }
+    .order-block .lbl { font-weight: 700; }
+    .order-block .val.mono { font-family: 'Courier New', monospace; }
+    .status-chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 7.5pt; font-weight: 700; margin-left: 4px; }
 
     /* ── Intracom note ── */
     .intracom-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 8px 12px; font-size: 8.5pt; color: #1e40af; margin-bottom: 12px; }
 
     /* ── ITEMS TABLE ── */
     table.items { width: 100%; border-collapse: collapse; margin-bottom: ${tpl.gapAfterTable}px; font-size: 9pt; table-layout: fixed; }
-    table.items thead tr { background: ${tpl.primaryColor}; color: white; }
+    table.items thead tr { background: #000000; color: #ffffff; }
     table.items thead th {
-      padding: 8px 10px;
-      text-align: left;
+      padding: 9px 10px;
+      text-align: center;
       font-weight: 700;
-      font-size: 8.5pt;
-      letter-spacing: 0.2px;
+      font-size: 9pt;
+      letter-spacing: 0;
+      color: #ffffff;
     }
-    table.items thead th.center { text-align: center; }
-    table.items thead th.right { text-align: right; }
-    table.items tbody tr { border-bottom: 1px solid #e5e7eb; }
-    table.items tbody td { padding: 7px 10px; vertical-align: middle; }
+    table.items thead th.left { text-align: left; }
+    table.items thead th.right { text-align: center; }
+    table.items tbody tr { border-bottom: 1px solid #d1d5db; }
+    table.items tbody td { padding: 8px 10px; vertical-align: middle; }
     table.items tbody td.desc { font-weight: 500; word-break: break-word; }
     table.items tbody td.center { text-align: center; }
     table.items tbody td.right { text-align: right; }
     table.items tbody td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
     table.items tbody td.bold { font-weight: 700; }
-    table.items tbody td.qty-col { color: #374151; }
-    table.items tbody tr.shipping-row td { color: #6b7280; font-style: italic; }
-    table.items tbody tr.shipping-row td.bold { font-style: normal; }
+    table.items tbody td.qty-col { color: #111827; }
+    table.items tbody tr.shipping-row td { color: #374151; }
+    table.items tbody tr.shipping-row td.dash { color: #6b7280; }
 
-    /* Column widths: Producto wide, Cantidad narrow */
-    col.col-desc   { width: 38%; }
-    col.col-qty    { width: 8%; }
-    col.col-unit   { width: 13%; }
-    col.col-total  { width: 13%; }
-    col.col-iva    { width: 9%; }
-    col.col-ttotal { width: 19%; }
+    /* Column widths (fiel al DOCX): Producto 44%, Cantidad 11%, P.unit 14%, Tot.s/IVA 11%, IVA 8%, Total 12% */
+    col.col-desc   { width: 44%; }
+    col.col-qty    { width: 11%; }
+    col.col-unit   { width: 14%; }
+    col.col-total  { width: 11%; }
+    col.col-iva    { width: 8%; }
+    col.col-ttotal { width: 12%; }
 
     /* ── DISCOUNTS CARD ── */
     .discounts-card {
@@ -335,44 +343,41 @@ export function generateInvoiceHTML(
     .vat-breakdown td { padding: 2px 10px 2px 0; }
 
     /* ── TOTALS block ── */
-    .totals { margin-left: auto; width: 56%; font-size: 9.5pt; font-variant-numeric: tabular-nums; }
-    .totals .row { display: flex; justify-content: space-between; padding: 5px 2px; border-bottom: 1px solid #f1f5f9; }
-    .totals .row span:first-child { color: #6b7280; }
-    .totals .row span:last-child { font-weight: 600; color: #111827; }
+    .totals { margin-left: auto; width: 46%; font-size: 10pt; font-variant-numeric: tabular-nums; background: transparent; }
+    .totals .row { display: flex; justify-content: space-between; padding: 6px 4px; }
+    .totals .row span:first-child { color: #111827; font-weight: 600; }
+    .totals .row span:last-child { font-weight: 700; color: #111827; }
     .totals .row.final {
-      background: ${tpl.totalBgColor};
-      border: 2px solid ${tpl.totalBorderColor};
-      border-radius: 6px;
-      padding: 10px 14px;
-      margin-top: 10px;
-      font-size: 12pt;
-      font-weight: 900;
-      color: ${tpl.totalTextColor};
-      display: flex;
-      justify-content: flex-end;
-      align-items: baseline;
-      gap: 14px;
+      border-top: 2px solid #000000;
+      border-bottom: 2px solid #000000;
+      padding: 10px 4px;
+      margin-top: 4px;
+      font-size: 13pt;
+      font-weight: 800;
+      color: #000000;
+      letter-spacing: 0.3px;
     }
-    .totals .row.final span:first-child { color: ${tpl.totalTextColor}; }
+    .totals .row.final span:first-child { color: #000000; font-weight: 800; }
+    .totals .row.final span:last-child { color: #000000; font-weight: 800; }
     .totals .row.discount span:last-child { color: #16a34a; }
 
     /* ── LEGAL ── */
-    .legal { margin-top: 18px; padding-top: 8px; border-top: 1px solid #e5e7eb; font-size: 7pt; color: #9ca3af; text-align: center; line-height: 1.5; }
+    .legal { margin-top: 22px; padding-top: 10px; border-top: 1px solid #e5e7eb; font-size: 7.5pt; color: #9ca3af; text-align: center; line-height: 1.5; font-style: italic; }
 
-    /* ── VeriFactu CSV — fixed at bottom ── */
+    /* ── VeriFactu CSV — discreto, al pie ── */
     .verifactu {
       position: absolute;
       bottom: 6mm;
       left: ${tpl.paddingX}mm;
       right: ${tpl.paddingX}mm;
-      padding-top: 6px;
-      border-top: 1px solid #e5e7eb;
-      font-size: 6.5pt;
-      color: #6b7280;
-      line-height: 1.5;
+      font-size: 6pt;
+      color: #9ca3af;
+      line-height: 1.4;
+      text-align: center;
+      z-index: 2;
     }
-    .verifactu strong { color: #374151; }
-    .verifactu .qr { font-family: monospace; word-break: break-all; color: #9ca3af; }
+    .verifactu .csv-label { color: #6b7280; font-weight: 600; }
+    .verifactu .csv-hash { font-family: 'Courier New', monospace; word-break: break-all; }
 
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -383,77 +388,41 @@ export function generateInvoiceHTML(
 <body>
 <div class="invoice-wrap">
 
-  <!-- HEADER -->
+  ${tpl.watermarkEnabled ? `<img class="watermark" src="/images/invoice-watermark.png" alt="" aria-hidden="true" />` : ""}
+
+  <!-- HEADER: logo izquierda + datos empresa derecha -->
   <div class="hdr">
-    <div class="hdr-left">
-      <img class="brand-logo" src="/images/logo-tcg-shield.png" alt="${escapeHtml(tpl.brandName)}" />
-      <div>
-        <div class="brand-name">${escapeHtml(tpl.brandName)
-          .split(" ")
-          .map(
-            (w, i) =>
-              i === 0
-                ? `<span>${w}</span>`
-                : ` <span class="academy">${w}</span>`,
-          )
-          .join("")}</div>
-        ${tpl.showBrandSub ? `<div class="brand-sub">${escapeHtml(tpl.brandSub)}</div>` : ""}
-      </div>
-    </div>
-    <div class="hdr-right">
-      <div class="title">${escapeHtml(tpl.labelTitle)}</div>
-      <div class="number">Nº ${escapeHtml(invoiceNumber)}</div>
+    <img class="brand-logo" src="/images/invoice-logo.png" alt="${escapeHtml(tpl.brandName)}" />
+    <div class="company-info">
+      <strong>${escapeHtml(issuerName)}</strong>
+      CIF: ${escapeHtml(issuerCIF)}<br>
+      ${escapeHtml(issuerPhone)}<br>
+      ${escapeHtml(issuerEmail)}<br>
+      ${escapeHtml(issuerAddress)}<br>
+      ${escapeHtml(issuerCity)}
     </div>
   </div>
 
-  <!-- DATOS CLIENTE / NEGOCIO -->
+  <!-- FACTURA Nº -->
+  <div class="invoice-title">${escapeHtml(tpl.labelTitle)} Nº ${escapeHtml(displayNumber)}</div>
+
+  <!-- CLIENTE (izq) + PEDIDO (der) en 2 columnas -->
   <div class="parties">
-    <div>
-      <div class="party-label">${escapeHtml(tpl.labelClient)}</div>
-      <div class="party-detail">
-        <strong>${escapeHtml(clientName)}</strong>
-        ${clientLines}
-      </div>
+    <div class="client-block">
+      <strong>${escapeHtml(clientName)}</strong>
+      ${clientLines}
     </div>
-    <div class="party-right">
-      <div class="party-label">${escapeHtml(tpl.labelIssuer)}</div>
-      <div class="party-detail">
-        <strong>${escapeHtml(issuerName)}</strong>
-        CIF: ${escapeHtml(issuerCIF)}<br>
-        ${escapeHtml(issuerAddress)}<br>
-        ${escapeHtml(issuerCity)}<br>
-        Tel: ${escapeHtml(issuerPhone)}<br>
-        ${escapeHtml(issuerEmail)}
-      </div>
-    </div>
+    ${
+      tpl.showOrderBar
+        ? `
+    <div class="order-block">
+      <div class="line"><span class="lbl">Pedido:</span> <span class="val">${orderId ? escapeHtml(orderId) : "—"}</span></div>
+      <div class="line"><span class="lbl">Fecha de pedido:</span> <span class="val">${formattedDate}</span></div>
+      <div class="line"><span class="lbl">${escapeHtml(tpl.labelPaymentMethod)}:</span> <span class="val">${paymentMethod ? escapeHtml(paymentMethod) : "—"}${statusChip ? `<span class="status-chip" style="background:${statusChip.bg};color:${statusChip.color}">${statusChip.label}</span>` : ""}</span></div>
+    </div>`
+        : ""
+    }
   </div>
-
-  ${
-    tpl.showOrderBar
-      ? `
-  <div class="order-bar">
-    <div class="cell">
-      <div class="lbl">${escapeHtml(tpl.labelOrderNum)}</div>
-      <div class="val mono">${orderId ? escapeHtml(orderId) : "—"}</div>
-    </div>
-    <div class="cell">
-      <div class="lbl">${escapeHtml(tpl.labelEmissionDate)}</div>
-      <div class="val">${formattedDate}</div>
-    </div>
-    <div class="cell">
-      <div class="lbl">${formattedOperation ? escapeHtml(tpl.labelOperationDate) : "Vencimiento"}</div>
-      <div class="val">${formattedOperation ?? formattedDue ?? "Al contado"}</div>
-    </div>
-    <div class="cell">
-      <div class="lbl">${escapeHtml(tpl.labelPaymentMethod)}</div>
-      <div class="val">
-        ${paymentMethod ? escapeHtml(paymentMethod) : "—"}
-        ${statusChip ? `<span class="status-chip" style="background:${statusChip.bg};color:${statusChip.color};margin-left:4px">${statusChip.label}</span>` : ""}
-      </div>
-    </div>
-  </div>`
-      : ""
-  }
 
   ${intracomunitario ? `<div class="intracom-note"><strong>Operación intracomunitaria exenta de IVA</strong> — Art. 25 LIVA. CIF intracomunitario: ${escapeHtml(clientCIF ?? "")}</div>` : ""}
 
@@ -469,12 +438,12 @@ export function generateInvoiceHTML(
     </colgroup>
     <thead>
       <tr>
-        <th>Producto</th>
-        <th class="center">Cantidad</th>
-        <th class="right">Precio unitario</th>
-        <th class="right">Total (s/IVA)</th>
-        <th class="right">IVA</th>
-        <th class="right">Total</th>
+        <th class="left">Producto</th>
+        <th>Cantidad</th>
+        <th>Precio unit. s/IVA</th>
+        <th>Total s/IVA</th>
+        <th>IVA (${headerVatRate}%)</th>
+        <th>Total</th>
       </tr>
     </thead>
     <tbody>
@@ -484,21 +453,13 @@ export function generateInvoiceHTML(
           ? `
       <tr class="shipping-row">
         <td class="desc">Gastos de envío</td>
-        <td class="center qty-col">1</td>
-        <td class="right num">${shippingBase.toFixed(2)} €</td>
+        <td class="center dash">----</td>
+        <td class="right dash">----</td>
         <td class="right num">${shippingBase.toFixed(2)} €</td>
         <td class="right num">${shippingVAT.toFixed(2)} €</td>
         <td class="right num bold">${shipping.toFixed(2)} €</td>
       </tr>`
-          : `
-      <tr class="shipping-row">
-        <td class="desc">Gastos de envío</td>
-        <td class="center qty-col">—</td>
-        <td class="right num">—</td>
-        <td class="right num">—</td>
-        <td class="right num">—</td>
-        <td class="right bold" style="color:#16a34a;letter-spacing:0.5px">GRATIS</td>
-      </tr>`
+          : ""
       }
     </tbody>
   </table>
@@ -543,10 +504,10 @@ export function generateInvoiceHTML(
 
   <div class="totals">
     <div class="row"><span>Base imponible</span><span>${subtotalBase.toFixed(2)} €</span></div>
-    <div class="row"><span>IVA (${intracomunitario ? "0% — exento" : `${SITE_CONFIG.vatRate}%`})</span><span>${subtotalVAT.toFixed(2)} €</span></div>
+    <div class="row"><span>IVA ${intracomunitario ? "0% — exento" : `${SITE_CONFIG.vatRate}%`}</span><span>${subtotalVAT.toFixed(2)} €</span></div>
     ${couponDiscount > 0 ? `<div class="row discount"><span>Dto. cupón${couponCode ? ` (${escapeHtml(couponCode)})` : ""}</span><span>-${couponDiscount.toFixed(2)} €</span></div>` : ""}
     ${pointsDiscount > 0 ? `<div class="row discount"><span>Dto. canje de puntos</span><span>-${pointsDiscount.toFixed(2)} €</span></div>` : ""}
-    <div class="row final"><span>Total con IVA</span><span>${totalFinal.toFixed(2)} €</span></div>
+    <div class="row final"><span>TOTAL</span><span>${totalFinal.toFixed(2)} €</span></div>
   </div>
 
   ${
@@ -559,10 +520,7 @@ export function generateInvoiceHTML(
     tpl.showVerifactu && (verifactuHash || verifactuQR)
       ? `
   <div class="verifactu">
-    <strong>Verificación VeriFactu (CSV) &mdash;</strong>
-    ${verifactuHash ? ` SHA-256: <span style="font-family:monospace">${verifactuHash}</span>` : ""}
-    ${verifactuStatus ? ` &middot; Estado: ${escapeHtml(verifactuStatus)}` : ""}
-    ${verifactuQR ? `<br>QR: <span class="qr">${escapeHtml(verifactuQR)}</span>` : ""}
+    ${verifactuHash ? `<span class="csv-label">CSV:</span> <span class="csv-hash">${verifactuHash}</span>` : ""}
   </div>`
       : ""
   }
@@ -693,6 +651,7 @@ export function buildInvoiceFromOrder(
       nombre?: string;
       apellidos?: string;
       email?: string;
+      telefono?: string;
       direccion?: string;
       ciudad?: string;
       cp?: string;
@@ -731,6 +690,8 @@ export function buildInvoiceFromOrder(
       `${addr.nombre ?? ""} ${addr.apellidos ?? ""}`.trim() ||
       "—",
     clientCIF: order.clientCIF,
+    clientPhone: addr.telefono,
+    clientEmail: addr.email,
     clientAddress: addr.direccion,
     clientCity: addr.cp
       ? `${addr.cp} ${addr.ciudad ?? ""}`.trim()
