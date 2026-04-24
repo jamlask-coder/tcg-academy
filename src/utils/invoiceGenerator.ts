@@ -267,8 +267,8 @@ export function generateInvoiceHTML(
     .invoice-wrap > *:not(.watermark) { position: relative; z-index: 1; }
 
     /* ── HEADER — logo left, company info right ── */
-    .hdr { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; margin-bottom: ${tpl.gapAfterHeader}px; }
-    .brand-logo { height: ${tpl.logoSize}px; width: auto; max-width: 320px; object-fit: contain; flex-shrink: 0; }
+    .hdr { display: flex; justify-content: space-between; align-items: center; gap: 32px; margin-bottom: ${tpl.gapAfterHeader}px; }
+    .brand-logo { height: ${tpl.logoSize}px; width: auto; max-width: 320px; object-fit: contain; flex-shrink: 0; display: block; }
     .company-info { text-align: left; font-size: 10.5pt; color: #111827; line-height: 1.55; }
     .company-info strong { color: #111827; font-weight: 700; font-size: 11.5pt; display: block; margin-bottom: 3px; }
 
