@@ -39,12 +39,33 @@ export interface SentEmailEntry {
 
 // ─── Adapter interface ──────────────────────────────────────────────────────
 
+/**
+ * Attachment binario para el email. `content` es el payload en base64 SIN
+ * prefijo `data:` (formato esperado por Resend). En modo local no se envía,
+ * solo se registra en el log para auditoría.
+ */
+export interface EmailAttachment {
+  filename: string;
+  content: string; // base64
+  contentType?: string; // p. ej. "application/pdf"
+}
+
+export interface SendEmailOptions {
+  attachments?: EmailAttachment[];
+}
+
 export interface EmailAdapter {
-  sendEmail(to: string, subject: string, html: string): Promise<SendResult>;
+  sendEmail(
+    to: string,
+    subject: string,
+    html: string,
+    opts?: SendEmailOptions,
+  ): Promise<SendResult>;
   sendTemplatedEmail(
     templateId: string,
     to: string,
     vars: TemplatedEmailVars,
+    opts?: SendEmailOptions,
   ): Promise<SendResult>;
 }
 
@@ -91,9 +112,24 @@ function resolveTemplate(
 // ─── Local adapter (localStorage) ───────────────────────────────────────────
 
 export class LocalEmailAdapter implements EmailAdapter {
-  async sendEmail(to: string, subject: string, html: string): Promise<SendResult> {
+  async sendEmail(
+    to: string,
+    subject: string,
+    html: string,
+    opts?: SendEmailOptions,
+  ): Promise<SendResult> {
     const emailId = generateEmailId();
-    logToLocalStorage({ id: emailId, to, subject, html, sentAt: new Date().toISOString() });
+    const attachInfo =
+      opts?.attachments && opts.attachments.length > 0
+        ? `<p style="margin-top:16px;padding:10px;background:#f3f4f6;border-radius:8px;font-size:12px;color:#6b7280">📎 Adjuntos (modo local — no se envían): ${opts.attachments.map((a) => a.filename).join(", ")}</p>`
+        : "";
+    logToLocalStorage({
+      id: emailId,
+      to,
+      subject,
+      html: html + attachInfo,
+      sentAt: new Date().toISOString(),
+    });
     return { ok: true, emailId };
   }
 
@@ -101,6 +137,7 @@ export class LocalEmailAdapter implements EmailAdapter {
     templateId: string,
     to: string,
     vars: TemplatedEmailVars,
+    opts?: SendEmailOptions,
   ): Promise<SendResult> {
     const template = resolveTemplate(templateId);
     if (!template) {
@@ -110,7 +147,7 @@ export class LocalEmailAdapter implements EmailAdapter {
     }
     const subject = replaceVars(template.subject, vars);
     const html = replaceVars(template.html, vars);
-    return this.sendEmail(to, subject, html);
+    return this.sendEmail(to, subject, html, opts);
   }
 }
 
@@ -131,7 +168,12 @@ export class ResendEmailAdapter implements EmailAdapter {
     this.replyTo = process.env.RESEND_REPLY_TO ?? "";
   }
 
-  async sendEmail(to: string, subject: string, html: string): Promise<SendResult> {
+  async sendEmail(
+    to: string,
+    subject: string,
+    html: string,
+    opts?: SendEmailOptions,
+  ): Promise<SendResult> {
     if (!this.apiKey) {
       return { ok: false, emailId: "" };
     }
@@ -144,6 +186,14 @@ export class ResendEmailAdapter implements EmailAdapter {
         html,
       };
       if (this.replyTo) payload.reply_to = this.replyTo;
+      if (opts?.attachments && opts.attachments.length > 0) {
+        // Formato Resend: https://resend.com/docs/api-reference/emails/send-email
+        payload.attachments = opts.attachments.map((a) => ({
+          filename: a.filename,
+          content: a.content, // base64 sin prefijo data:
+          content_type: a.contentType ?? "application/octet-stream",
+        }));
+      }
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
@@ -169,6 +219,7 @@ export class ResendEmailAdapter implements EmailAdapter {
     templateId: string,
     to: string,
     vars: TemplatedEmailVars,
+    opts?: SendEmailOptions,
   ): Promise<SendResult> {
     const template = resolveTemplate(templateId);
     if (!template) {
@@ -176,7 +227,7 @@ export class ResendEmailAdapter implements EmailAdapter {
     }
     const subject = replaceVars(template.subject, vars);
     const html = replaceVars(template.html, vars);
-    return this.sendEmail(to, subject, html);
+    return this.sendEmail(to, subject, html, opts);
   }
 }
 

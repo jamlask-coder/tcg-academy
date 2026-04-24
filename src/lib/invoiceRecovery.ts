@@ -21,7 +21,12 @@
  */
 
 import { InvoiceStatus, VerifactuStatus } from "@/types/fiscal";
-import { loadInvoices, saveInvoice, createInvoice } from "@/services/invoiceService";
+import {
+  loadInvoices,
+  saveInvoice,
+  createInvoice,
+  verifyDeepIntegrity,
+} from "@/services/invoiceService";
 import { tripleCheckInvoice } from "@/lib/fiscalAudit";
 import { getDeadLetterQueue, resolveDeadLetter } from "@/lib/circuitBreaker";
 import { safeRead, safeWrite } from "@/lib/safeStorage";
@@ -343,6 +348,55 @@ export function detectAllIssues(): FiscalIssue[] {
   });
 
   return issues;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ESCANEO PROFUNDO (ASYNC) — recalcula hashes de contenido y cadena
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Complemento async de `detectAllIssues`. Recalcula hashes SHA-256 por factura
+ * (no se puede hacer en sync) y emite issues de tipo `chain_broken` adicionales
+ * cuando se detecta tampering del contenido tras emitir.
+ *
+ * Se invoca en paralelo al escaneo síncrono desde el autopilot/dashboard.
+ */
+export async function detectHashIntegrityIssues(): Promise<FiscalIssue[]> {
+  const invoices = loadInvoices();
+  const deepIssues = await verifyDeepIntegrity(invoices);
+  const now = new Date();
+
+  return deepIssues.map((d) => {
+    const type: IssueType =
+      d.kind === "triple_check_failed" ? "integrity_error" : "chain_broken";
+    const title =
+      d.kind === "content_hash_mismatch"
+        ? `${d.invoiceNumber} — hash de contenido manipulado`
+        : d.kind === "chain_hash_mismatch"
+          ? `${d.invoiceNumber} — cadena VeriFactu incoherente`
+          : `${d.invoiceNumber} — triple conteo roto`;
+    return {
+      id: `deep_${d.kind}_${d.invoiceId}`,
+      type,
+      severity: "critical" as IssueSeverity,
+      title,
+      detail: d.detail,
+      invoiceId: d.invoiceId,
+      invoiceNumber: d.invoiceNumber,
+      detectedAt: now.toISOString(),
+      actions: [
+        {
+          id: "manual",
+          label: "Investigar",
+          description:
+            "Revisar manualmente — posible manipulación de datos fiscales",
+          type: "manual",
+          requiresConfirmation: true,
+        },
+      ],
+      resolved: false,
+    };
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

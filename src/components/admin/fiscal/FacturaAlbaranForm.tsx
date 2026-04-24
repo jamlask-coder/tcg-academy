@@ -48,6 +48,12 @@ import { createDeliveryNote } from "@/services/deliveryNoteService";
 import { getMergedProducts } from "@/lib/productStore";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import {
+  generateInvoiceHTML,
+  printInvoice,
+  type InvoiceData,
+} from "@/utils/invoiceGenerator";
+import { Send } from "lucide-react";
+import {
   InvoiceType,
   PaymentMethod,
   TaxIdType,
@@ -517,7 +523,11 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
   );
 
   const totals = useMemo(() => {
+    // Cálculo CON el descuento general ya aplicado (va por línea).
     let base = 0, vat = 0, total = 0;
+    // Cálculo SIN el descuento general — para poder mostrar al usuario el
+    // importe exacto que está descontando y cómo cambia el total.
+    let totalBefore = 0;
     for (const l of lines) {
       const adjusted: DraftLine = {
         ...l,
@@ -527,6 +537,9 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
       base += c.taxableBase;
       vat += c.vatAmt;
       total += c.total;
+
+      const cBefore = calcLine(l); // mismo cálculo pero con el descuento propio de la línea
+      totalBefore += cBefore.total;
     }
     let shippingBase = 0, shippingVat = 0, shippingTotal = 0;
     if (shippingEnabled && shippingAmount > 0) {
@@ -545,17 +558,115 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
     }
     const coupon = Math.max(0, roundTo2(couponAmount));
     const subtotal = roundTo2(total + shippingTotal);
+    // Subtotal pre-descuento general (sí incluye descuentos por línea y envío).
+    const subtotalBeforeGlobal = roundTo2(totalBefore + shippingTotal);
+    const globalDiscountAmount = Math.max(
+      0,
+      roundTo2(subtotalBeforeGlobal - subtotal),
+    );
     const finalTotal = Math.max(0, roundTo2(subtotal - coupon));
     return {
       base: roundTo2(base + shippingBase),
       vat: roundTo2(vat + shippingVat),
       linesTotal: roundTo2(total),
+      // Subtotal de líneas SIN aplicar el descuento general — es el que se
+      // muestra arriba ("Subtotal productos") para que el admin vea el importe
+      // real de lo facturado antes de rebajas globales. El descuento general
+      // aparece más abajo como resta explícita.
+      linesTotalBeforeGlobal: roundTo2(totalBefore),
       shippingTotal: roundTo2(shippingTotal),
       subtotal,
+      subtotalBeforeGlobal,
+      globalDiscountAmount,
       coupon,
       finalTotal,
     };
   }, [lines, globalDiscountPct, couponAmount, shippingEnabled, shippingAmount]);
+
+  // ── Preview HTML — render real del PDF final (mismo generador que imprime).
+  // Se recalcula solo cuando el modal está abierto para no gastar CPU mientras
+  // edita. Incluye envío y cupón como items (igual que en createInvoice).
+  const previewHtml = useMemo(() => {
+    if (!showPreview) return "";
+    const activeLines = lines.filter(
+      (l) => l.description.trim() && l.unitPriceWithVAT > 0,
+    );
+    // El `l.discount` específico de la línea sí se bakea en el precio unitario
+    // (es un descuento atado a ese producto concreto). El descuento general
+    // (`globalDiscountPct`) NUNCA se bakea: se pasa aparte en `globalDiscount`
+    // para que el PDF lo muestre como línea separada, al igual que el cupón.
+    // Art. 6.1.f RD 1619/2012: los descuentos deben constar separadamente y
+    // no incluidos en el precio unitario.
+    const items = activeLines.map((l) => ({
+      name: l.description,
+      quantity: l.quantity,
+      unitPriceWithVAT: roundTo2(
+        l.unitPriceWithVAT * (1 - Math.min(100, l.discount) / 100),
+      ),
+      vatRate: l.vatRate,
+    }));
+    const countryMeta =
+      COUNTRY_OPTIONS.find((c) => c.code === clientCountryCode) ??
+      COUNTRY_OPTIONS[0];
+    const data: InvoiceData = {
+      invoiceNumber: isAlbaran
+        ? `ALB-${new Date(invoiceDate).getFullYear()}-PREVIEW`
+        : `FAC-${new Date(invoiceDate).getFullYear()}-PREVIEW`,
+      date: new Date(invoiceDate).toISOString(),
+      paymentMethod:
+        PAYMENT_OPTIONS.find((p) => p.value === paymentMethod)?.label ?? "",
+      paymentStatus: "paid",
+      issuerName: SITE_CONFIG.legalName,
+      issuerCIF: SITE_CONFIG.cif,
+      issuerAddress: SITE_CONFIG.address,
+      issuerCity: "",
+      issuerPhone: SITE_CONFIG.phone,
+      issuerEmail: SITE_CONFIG.email,
+      clientName: clientName || "—",
+      clientCIF: clientTaxId || undefined,
+      clientEmail: clientEmail || undefined,
+      clientAddress:
+        effectiveInvoiceType === InvoiceType.COMPLETA
+          ? `${clientStreet}${clientPostal ? `, ${clientPostal}` : ""}`
+          : undefined,
+      clientCity: clientCity || undefined,
+      clientProvince: clientProvince || undefined,
+      clientCountry: countryMeta.name,
+      items,
+      shipping: shippingEnabled && shippingAmount > 0 ? shippingAmount : undefined,
+      couponDiscount: couponAmount > 0 ? couponAmount : undefined,
+      globalDiscount:
+        globalDiscountPct > 0 && totals.globalDiscountAmount > 0
+          ? { pct: globalDiscountPct, amount: totals.globalDiscountAmount }
+          : undefined,
+      isDeliveryNote: isAlbaran,
+    };
+    const html = generateInvoiceHTML(data);
+    // srcDoc no tiene origin → las URLs relativas (logo, watermark) rompen.
+    // Inyectar <base> resuelve las rutas igual que en printInvoice().
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    return html.replace("<head>", `<head><base href="${origin}/">`);
+  }, [
+    showPreview,
+    lines,
+    globalDiscountPct,
+    totals.globalDiscountAmount,
+    shippingEnabled,
+    shippingAmount,
+    couponAmount,
+    invoiceDate,
+    paymentMethod,
+    clientName,
+    clientTaxId,
+    clientEmail,
+    clientStreet,
+    clientPostal,
+    clientCity,
+    clientProvince,
+    clientCountryCode,
+    effectiveInvoiceType,
+    isAlbaran,
+  ]);
 
   function handlePreview(e: React.FormEvent) {
     e.preventDefault();
@@ -637,11 +748,15 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
     setShowPreview(true);
   }
 
-  async function confirmAndCreate() {
+  async function confirmAndCreate(opts: { sendByEmail: boolean } = { sendByEmail: false }) {
     setError(null);
     setSaving(true);
     try {
       const activeLines = lines.filter((l) => l.description.trim() && l.unitPriceWithVAT > 0);
+      // El descuento general (`globalDiscountPct`) ya NO se bakea en el `discount`
+      // por línea — se persiste como un item negativo separado al final
+      // (mismo patrón que el cupón). Así queda auditable en el InvoiceRecord y
+      // el PDF lo muestra como línea independiente (Art. 6.1.f RD 1619/2012).
       const builtItems: InvoiceLineItem[] = activeLines.map((l, i) =>
         buildLineItem({
           lineNumber: i + 1,
@@ -650,7 +765,7 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
           quantity: l.quantity,
           unitPriceWithVAT: l.unitPriceWithVAT,
           vatRate: l.vatRate,
-          discount: Math.min(100, l.discount + globalDiscountPct),
+          discount: Math.min(100, l.discount),
         }),
       );
 
@@ -663,6 +778,21 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
             quantity: 1,
             unitPriceWithVAT: roundTo2(shippingAmount),
             vatRate: 21,
+            discount: 0,
+          }),
+        );
+      }
+
+      if (globalDiscountPct > 0 && totals.globalDiscountAmount > 0) {
+        const gdVat = (activeLines[0]?.vatRate ?? 21) as 0 | 4 | 10 | 21;
+        builtItems.push(
+          buildLineItem({
+            lineNumber: builtItems.length + 1,
+            productId: "global-discount",
+            description: `Descuento general (${globalDiscountPct}%)`,
+            quantity: 1,
+            unitPriceWithVAT: -roundTo2(totals.globalDiscountAmount),
+            vatRate: gdVat,
             discount: 0,
           }),
         );
@@ -745,6 +875,108 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
       });
 
       saveInvoice(invoice);
+
+      // Construir InvoiceData una sola vez (se usa para openPdf y email).
+      const pdfData: InvoiceData = {
+        invoiceNumber: invoice.invoiceNumber,
+        date: new Date(invoice.invoiceDate).toISOString(),
+        paymentMethod:
+          PAYMENT_OPTIONS.find((p) => p.value === paymentMethod)?.label ?? "",
+        paymentStatus: "paid",
+        verifactuHash: invoice.verifactuHash ?? undefined,
+        issuerName: SITE_CONFIG.legalName,
+        issuerCIF: SITE_CONFIG.cif,
+        issuerAddress: SITE_CONFIG.address,
+        issuerCity: "",
+        issuerPhone: SITE_CONFIG.phone,
+        issuerEmail: SITE_CONFIG.email,
+        clientName: clientName || "—",
+        clientCIF: clientTaxId || undefined,
+        clientEmail: clientEmail || undefined,
+        clientAddress:
+          effectiveInvoiceType === InvoiceType.COMPLETA
+            ? `${clientStreet}${clientPostal ? `, ${clientPostal}` : ""}`
+            : undefined,
+        clientCity: clientCity || undefined,
+        clientProvince: clientProvince || undefined,
+        clientCountry:
+          (COUNTRY_OPTIONS.find((c) => c.code === clientCountryCode) ??
+            COUNTRY_OPTIONS[0]).name,
+        items: invoice.items
+          .filter((li) => li.productId !== "coupon")
+          .map((li) => ({
+            name: li.description,
+            quantity: li.quantity,
+            // InvoiceLineItem.unitPrice es SIN IVA; el generador espera
+            // CON IVA, así que rehidratamos desde base+cuota de la línea.
+            unitPriceWithVAT:
+              li.quantity > 0
+                ? (li.taxableBase + li.vatAmount) / li.quantity
+                : 0,
+            vatRate: li.vatRate,
+          })),
+        couponDiscount: couponAmount > 0 ? couponAmount : undefined,
+      };
+
+      // Descarga local del PDF para el admin (ambos botones la disparan).
+      // Abre el diálogo imprimir/guardar PDF del navegador desde un iframe
+      // oculto — no cambia el hash VeriFactu ni la cadena; solo visualiza.
+      try {
+        await printInvoice(pdfData);
+      } catch (pdfErr) {
+        logger.warn(
+          "Fallo al abrir PDF tras guardar factura",
+          "fiscal.nueva-factura",
+          {
+            error: pdfErr instanceof Error ? pdfErr.message : String(pdfErr),
+            invoice: invoice.invoiceNumber,
+          },
+        );
+      }
+
+      if (opts.sendByEmail && clientEmail.trim()) {
+        try {
+          const siteOrigin =
+            typeof window !== "undefined" ? window.location.origin : "";
+
+          // Generar PDF de la factura ya firmada (con hash VeriFactu real)
+          // y adjuntarlo al email. Import dinámico para no cargar
+          // jspdf/html2canvas a quien no adjunta.
+          const { generateInvoicePdfBase64 } = await import("@/lib/invoicePdf");
+          const pdfBase64 = await generateInvoicePdfBase64(pdfData);
+
+          await sendAppEmail({
+            toEmail: clientEmail.trim(),
+            toName: clientName.trim() || "Cliente",
+            templateId: "factura_disponible",
+            vars: {
+              nombre: (clientName.trim().split(/\s+/)[0] || clientName.trim()) || "cliente",
+              invoice_id: invoice.invoiceNumber,
+              order_id: invoice.invoiceNumber,
+              invoice_date: new Date(invoice.invoiceDate).toLocaleDateString("es-ES"),
+              total: totals.finalTotal.toFixed(2),
+              download_url: `${siteOrigin}/cuenta/facturas`,
+              unsubscribe_link: `${siteOrigin}/cuenta/privacidad`,
+            },
+            attachments: [
+              {
+                filename: `${invoice.invoiceNumber}.pdf`,
+                content: pdfBase64,
+                contentType: "application/pdf",
+              },
+            ],
+          });
+        } catch (mailErr) {
+          logger.warn(
+            "Fallo al enviar email de factura al cliente",
+            "fiscal.nueva-factura",
+            {
+              error: mailErr instanceof Error ? mailErr.message : String(mailErr),
+              invoice: invoice.invoiceNumber,
+            },
+          );
+        }
+      }
 
       if (!linkedUserId && clientEmail.trim()) {
         try {
@@ -922,11 +1154,6 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
             <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-700">
               <User size={15} /> Datos del cliente
             </h2>
-            {effectiveInvoiceType === InvoiceType.COMPLETA && !isAlbaran && (
-              <span className="text-[11px] text-gray-400">
-                <span className="text-red-500">*</span> obligatorio (Art. 6.1 RD 1619/2012)
-              </span>
-            )}
           </div>
 
           {!clientFormOpen && (
@@ -1001,25 +1228,13 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
                     <strong>{clientName}</strong> ({clientEmail})
                   </span>
                 </div>
-                <div className="flex items-center gap-3">
-                  {hasUserChanges && (
-                    <button
-                      type="button"
-                      onClick={saveChangesToUser}
-                      className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-                    >
-                      <Save size={13} />
-                      Guardar cambios
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={resetClient}
-                    className="text-xs font-semibold text-emerald-800 underline hover:text-emerald-900"
-                  >
-                    Cambiar cliente
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={resetClient}
+                  className="text-xs font-semibold text-emerald-800 underline hover:text-emerald-900"
+                >
+                  Cambiar cliente
+                </button>
               </div>
               {userSaveMsg && (
                 <p className="mt-1.5 text-xs text-emerald-700">{userSaveMsg}</p>
@@ -1027,8 +1242,8 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
               {hasUserChanges && !userSaveMsg && (
                 <p className="mt-1.5 text-[11px] text-emerald-700/80">
                   Has modificado datos del cliente. Pulsa{" "}
-                  <strong>Guardar cambios</strong> para aplicarlos al registro
-                  del usuario (ID-Usuario #{linkedUserId}).
+                  <strong>Guardar cambios</strong> al final del bloque para
+                  aplicarlos al registro del usuario (ID-Usuario #{linkedUserId}).
                 </p>
               )}
             </div>
@@ -1257,6 +1472,19 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
             )}
           </div>
           )}
+
+          {clientFormOpen && linkedUserId && hasUserChanges && (
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={saveChangesToUser}
+                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+              >
+                <Save size={13} />
+                Guardar cambios en ficha del cliente
+              </button>
+            </div>
+          )}
         </div>
 
         {/* — Sección 3: Líneas ────────────────────────────────────────────── */}
@@ -1356,12 +1584,17 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
                           type="number"
                           min={0}
                           max={100}
-                          value={line.discount}
-                          onChange={(e) =>
+                          value={line.discount === 0 ? "" : line.discount}
+                          onChange={(e) => {
+                            const raw = e.target.value;
                             updateLine(line.id, {
-                              discount: Math.min(100, Math.max(0, Number(e.target.value))),
-                            })
-                          }
+                              discount:
+                                raw === ""
+                                  ? 0
+                                  : Math.min(100, Math.max(0, Number(raw) || 0)),
+                            });
+                          }}
+                          placeholder="0"
                           className="h-8 w-full rounded-md border border-gray-200 px-1 text-center text-xs focus:border-blue-400 focus:outline-none"
                         />
                       </td>
@@ -1398,7 +1631,7 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
             <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3 text-sm">
               <span className="font-medium text-gray-600">Subtotal productos</span>
               <span className="font-semibold tabular-nums text-gray-800">
-                {totals.linesTotal.toFixed(2)} €
+                {totals.linesTotalBeforeGlobal.toFixed(2)} €
               </span>
             </div>
           )}
@@ -1409,7 +1642,13 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
                 <input
                   type="checkbox"
                   checked={shippingEnabled}
-                  onChange={(e) => setShippingEnabled(e.target.checked)}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setShippingEnabled(next);
+                    if (next && shippingAmount === 0) {
+                      setShippingAmount(SITE_CONFIG.standardShippingCost);
+                    }
+                  }}
                   className="h-4 w-4 rounded border-gray-300 accent-blue-600"
                 />
                 <Truck size={14} className="text-gray-500" />
@@ -1422,10 +1661,11 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
                     type="number"
                     min={0}
                     step={0.01}
-                    value={shippingAmount}
-                    onChange={(e) =>
-                      setShippingAmount(Math.max(0, Number(e.target.value) || 0))
-                    }
+                    value={shippingAmount === 0 ? "" : shippingAmount}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setShippingAmount(raw === "" ? 0 : Math.max(0, Number(raw) || 0));
+                    }}
                     placeholder="0,00"
                     className="h-8 w-28 rounded-md border border-gray-200 px-2 text-right text-xs focus:border-blue-400 focus:outline-none"
                   />
@@ -1447,7 +1687,7 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
                 <div className="flex items-center justify-between font-semibold text-gray-800">
                   <span>Subtotal con envío</span>
                   <span className="tabular-nums">
-                    {totals.subtotal.toFixed(2)} €
+                    {totals.subtotalBeforeGlobal.toFixed(2)} €
                   </span>
                 </div>
               </div>
@@ -1471,12 +1711,15 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
                   min={0}
                   max={100}
                   step={1}
-                  value={globalDiscountPct}
-                  onChange={(e) =>
+                  value={globalDiscountPct === 0 ? "" : globalDiscountPct}
+                  onChange={(e) => {
+                    const raw = e.target.value;
                     setGlobalDiscountPct(
-                      Math.min(100, Math.max(0, Number(e.target.value) || 0)),
-                    )
-                  }
+                      raw === ""
+                        ? 0
+                        : Math.min(100, Math.max(0, Number(raw) || 0)),
+                    );
+                  }}
                   placeholder="0"
                   className="h-9 w-full rounded-lg border border-gray-200 pl-3 pr-8 text-sm focus:border-blue-400 focus:outline-none"
                 />
@@ -1497,10 +1740,11 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
                 type="number"
                 min={0}
                 step={0.01}
-                value={couponAmount}
-                onChange={(e) =>
-                  setCouponAmount(Math.max(0, Number(e.target.value) || 0))
-                }
+                value={couponAmount === 0 ? "" : couponAmount}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setCouponAmount(raw === "" ? 0 : Math.max(0, Number(raw) || 0));
+                }}
                 placeholder="0,00"
                 className="h-9 w-full rounded-lg border border-gray-200 px-3 text-sm focus:border-blue-400 focus:outline-none"
               />
@@ -1510,12 +1754,30 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
             </div>
           </div>
 
-          {totals.coupon > 0 && (
-            <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3 text-sm text-rose-600">
-              <span>Descuento cupón / promoción</span>
-              <span className="font-medium tabular-nums">
-                −{totals.coupon.toFixed(2)} €
-              </span>
+          {(totals.globalDiscountAmount > 0 || totals.coupon > 0) && (
+            <div className="mt-4 space-y-1.5 border-t border-gray-100 pt-3 text-sm">
+              <div className="flex items-center justify-between text-gray-600">
+                <span>Subtotal (sin descuentos generales)</span>
+                <span className="tabular-nums">
+                  {totals.subtotalBeforeGlobal.toFixed(2)} €
+                </span>
+              </div>
+              {totals.globalDiscountAmount > 0 && (
+                <div className="flex items-center justify-between text-rose-600">
+                  <span>Descuento general ({globalDiscountPct}%)</span>
+                  <span className="font-medium tabular-nums">
+                    −{totals.globalDiscountAmount.toFixed(2)} €
+                  </span>
+                </div>
+              )}
+              {totals.coupon > 0 && (
+                <div className="flex items-center justify-between text-rose-600">
+                  <span>Descuento cupón / promoción</span>
+                  <span className="font-medium tabular-nums">
+                    −{totals.coupon.toFixed(2)} €
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -1565,8 +1827,8 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
           aria-modal="true"
           aria-labelledby="preview-title"
         >
-          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-            <div className="sticky top-0 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
+          <div className="flex h-[95vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
               <h3 id="preview-title" className="flex items-center gap-2 text-base font-bold text-gray-900">
                 <Eye size={16} className="text-blue-600" />
                 Previsualización de {labels.docNoun}
@@ -1582,138 +1844,21 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
               </button>
             </div>
 
-            <div className="px-6 py-5 space-y-5">
-              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                    {isAlbaran ? "Fecha / Pago" : "Tipo / Fecha / Pago / Origen"}
-                  </p>
-                  <p className="mt-1 text-gray-800">
-                    {!isAlbaran && (
-                      <>
-                        <span className="capitalize">{invoiceType}</span> ·{" "}
-                      </>
-                    )}
-                    {new Date(invoiceDate).toLocaleDateString("es-ES")} ·{" "}
-                    {PAYMENT_OPTIONS.find((p) => p.value === paymentMethod)?.label}
-                    {!isAlbaran && (
-                      <>
-                        {" "}·{" "}
-                        {ORIGIN_OPTIONS.find((o) => o.value === origin)?.label}
-                      </>
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                    Cliente
-                  </p>
-                  <p className="mt-1 text-gray-800">{clientName || "—"}</p>
-                  <p className="text-xs text-gray-500">
-                    {clientTaxId || "—"} ·{" "}
-                    {COUNTRY_OPTIONS.find((c) => c.code === clientCountryCode)?.name}
-                  </p>
-                  {effectiveInvoiceType === InvoiceType.COMPLETA && (
-                    <p className="text-xs text-gray-500">
-                      {clientStreet}, {clientPostal} {clientCity} ({clientProvince})
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="overflow-hidden rounded-xl border border-gray-200">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50 text-gray-500">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-semibold">Descripción</th>
-                      <th className="px-2 py-2 w-12 text-center font-semibold">Cant.</th>
-                      <th className="px-2 py-2 w-20 text-right font-semibold">Precio</th>
-                      <th className="px-2 py-2 w-16 text-center font-semibold">IVA</th>
-                      <th className="px-2 py-2 w-12 text-center font-semibold">Dto.</th>
-                      <th className="px-3 py-2 w-24 text-right font-semibold">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {lines
-                      .filter((l) => l.description.trim() && l.unitPriceWithVAT > 0)
-                      .map((l) => {
-                        const adjusted: DraftLine = {
-                          ...l,
-                          discount: Math.min(100, l.discount + globalDiscountPct),
-                        };
-                        const c = calcLine(adjusted);
-                        return (
-                          <tr key={l.id}>
-                            <td className="px-3 py-2 text-gray-800">{l.description}</td>
-                            <td className="px-2 py-2 text-center text-gray-600">{l.quantity}</td>
-                            <td className="px-2 py-2 text-right text-gray-600">
-                              {l.unitPriceWithVAT.toFixed(2)} €
-                            </td>
-                            <td className="px-2 py-2 text-center text-gray-600">{l.vatRate}%</td>
-                            <td className="px-2 py-2 text-center text-gray-600">
-                              {adjusted.discount > 0 ? `${adjusted.discount}%` : "—"}
-                            </td>
-                            <td className="px-3 py-2 text-right font-semibold text-gray-800">
-                              {c.total.toFixed(2)} €
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    {shippingEnabled && shippingAmount > 0 && (
-                      <tr className="bg-gray-50/60">
-                        <td className="px-3 py-2 text-gray-700">Envío</td>
-                        <td className="px-2 py-2 text-center text-gray-600">1</td>
-                        <td className="px-2 py-2 text-right text-gray-600">
-                          {shippingAmount.toFixed(2)} €
-                        </td>
-                        <td className="px-2 py-2 text-center text-gray-600">21%</td>
-                        <td className="px-2 py-2 text-center text-gray-600">—</td>
-                        <td className="px-3 py-2 text-right font-semibold text-gray-700">
-                          {shippingAmount.toFixed(2)} €
-                        </td>
-                      </tr>
-                    )}
-                    {couponAmount > 0 && (
-                      <tr className="bg-rose-50/50">
-                        <td className="px-3 py-2 text-rose-700">Descuento cupón</td>
-                        <td className="px-2 py-2 text-center text-rose-700">1</td>
-                        <td className="px-2 py-2 text-right text-rose-700">
-                          −{couponAmount.toFixed(2)} €
-                        </td>
-                        <td className="px-2 py-2 text-center text-rose-700">—</td>
-                        <td className="px-2 py-2 text-center text-rose-700">—</td>
-                        <td className="px-3 py-2 text-right font-semibold text-rose-700">
-                          −{couponAmount.toFixed(2)} €
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex justify-end">
-                <div className="w-64 rounded-xl border border-gray-200 bg-gray-50/60 p-3 text-sm">
-                  <div className="flex justify-between text-gray-500">
-                    <span>Base imponible</span>
-                    <span>{totals.base.toFixed(2)} €</span>
-                  </div>
-                  <div className="flex justify-between py-1 text-gray-500">
-                    <span>IVA</span>
-                    <span>{totals.vat.toFixed(2)} €</span>
-                  </div>
-                  <div className="mt-1 flex justify-between border-t border-gray-200 pt-1.5 text-base font-bold text-gray-900">
-                    <span>Total</span>
-                    <span>{totals.finalTotal.toFixed(2)} €</span>
-                  </div>
-                </div>
-              </div>
-
-              {error && (
-                <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>
-              )}
+            <div className="min-h-0 flex-1 bg-gray-100 p-4">
+              <iframe
+                title={`Vista previa de ${labels.docNoun}`}
+                srcDoc={previewHtml}
+                className="block h-full w-full rounded-lg border border-gray-200 bg-white shadow-inner"
+              />
             </div>
 
-            <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-gray-100 bg-white px-6 py-4">
+            {error && (
+              <p className="mx-6 mb-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">
+                {error}
+              </p>
+            )}
+
+            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-gray-100 bg-white px-6 py-4">
               <button
                 type="button"
                 onClick={() => setShowPreview(false)}
@@ -1723,15 +1868,46 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
                 <ArrowLeft size={15} />
                 Volver a editar
               </button>
-              <button
-                type="button"
-                onClick={confirmAndCreate}
-                disabled={saving}
-                className="flex items-center gap-2 rounded-xl bg-green-600 px-6 py-2.5 text-sm font-bold text-white transition hover:bg-green-700 disabled:opacity-60"
-              >
-                <CheckCircle2 size={15} />
-                {saving ? labels.savingLabel : labels.confirmButton}
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="mr-2 text-right text-xs leading-tight text-gray-500">
+                  <div>
+                    Total{" "}
+                    <span className="font-bold text-gray-800">
+                      {totals.finalTotal.toFixed(2)} €
+                    </span>
+                  </div>
+                  <div>IVA incl.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void confirmAndCreate({ sendByEmail: false })}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-black disabled:opacity-60"
+                >
+                  <CheckCircle2 size={15} />
+                  {saving
+                    ? labels.savingLabel
+                    : isAlbaran
+                      ? "Confirmar y guardar albarán"
+                      : "Confirmar y guardar PDF"}
+                </button>
+                {!isAlbaran && (
+                  <button
+                    type="button"
+                    onClick={() => void confirmAndCreate({ sendByEmail: true })}
+                    disabled={saving || !clientEmail.trim()}
+                    title={
+                      !clientEmail.trim()
+                        ? "Introduce un email de cliente para poder enviar"
+                        : `Confirmar y enviar a ${clientEmail}`
+                    }
+                    className="flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-green-700 disabled:opacity-60"
+                  >
+                    <Send size={14} />
+                    {saving ? "Enviando…" : "Confirmar y enviar al cliente"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -185,12 +185,21 @@ export function logSentEmail(entry: SentEmailLog): void {
 // procede, y siempre registra en el log canónico para visibilidad en
 // /admin/emails.
 
+export interface SendAppEmailAttachment {
+  filename: string;
+  content: string; // base64 SIN prefijo data:
+  contentType?: string;
+}
+
 export interface SendAppEmailParams {
   toEmail: string;
   toName: string;
   templateId: string;
   vars: Record<string, string>;
   preview?: string;
+  /** Adjuntos opcionales (p. ej. PDF de la factura). En modo local no se
+   *  envían físicamente, pero quedan listados en el log de /admin/emails. */
+  attachments?: SendAppEmailAttachment[];
 }
 
 export async function sendAppEmail(
@@ -216,6 +225,9 @@ export async function sendAppEmail(
         params.toEmail,
         rendered.subject,
         rendered.html,
+        params.attachments && params.attachments.length > 0
+          ? { attachments: params.attachments }
+          : undefined,
       );
       sendOk = res.ok;
       if (res.emailId) emailId = res.emailId;

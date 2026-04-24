@@ -70,7 +70,7 @@ export const DEFAULT_TEMPLATE: InvoiceTemplate = {
 
   watermarkEnabled: true,
   watermarkOpacity: 0.08,
-  watermarkSize: 110,
+  watermarkSize: 55,
   watermarkY: 55,
 
   gapAfterHeader: 36,

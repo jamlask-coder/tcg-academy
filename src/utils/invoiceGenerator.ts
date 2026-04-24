@@ -74,6 +74,14 @@ export interface InvoiceData {
   couponCode?: string;
   couponDiscount?: number;
   pointsDiscount?: number;
+  /**
+   * Descuento general aplicado a todas las líneas (como el cupón, se muestra
+   * en el bloque "Descuentos aplicados" y se resta del total). Los precios
+   * unitarios de `items` deben ser los ORIGINALES (sin bakear el descuento
+   * general dentro). Así cumple Art. 6.1.f RD 1619/2012: el descuento consta
+   * separadamente y no incluido en el precio unitario.
+   */
+  globalDiscount?: { pct: number; amount: number };
 
   /**
    * Si `true`, el documento se renderiza como ALBARÁN:
@@ -178,8 +186,11 @@ export function generateInvoiceHTML(
     couponCode,
     couponDiscount = 0,
     pointsDiscount = 0,
+    globalDiscount,
     isDeliveryNote = false,
   } = data;
+  const globalDiscountPct = globalDiscount?.pct ?? 0;
+  const globalDiscountAmount = globalDiscount?.amount ?? 0;
 
   const formattedDate = fmtDate(date);
 
@@ -203,7 +214,7 @@ export function generateInvoiceHTML(
   // Totals
   const subtotalBase = lines.reduce((s, l) => s + l.base, 0) + shippingBase;
   const subtotalVAT = lines.reduce((s, l) => s + l.vatAmount, 0) + shippingVAT;
-  const discounts = couponDiscount + pointsDiscount;
+  const discounts = couponDiscount + pointsDiscount + globalDiscountAmount;
   const totalFinal =
     lines.reduce((s, l) => s + l.totalWithVAT, 0) + shipping - discounts;
 
@@ -226,11 +237,17 @@ export function generateInvoiceHTML(
   );
 
   // Columnas: Producto | Cantidad | P. Unit s/IVA | Total s/IVA | IVA (importe) | Total c/IVA
+  // Las líneas negativas (cupón, descuento general, canje de puntos) reciben
+  // la clase `discount-row` para mostrarse con fondo verde translúcido y
+  // texto verde — patrón visual explícito para que no se confundan con
+  // líneas de producto.
   const lineRows = lines
     .map((l) => {
       const unitNoVat = l.unitPriceWithVAT / (1 + l.vatRate / 100);
+      const isDiscount = l.unitPriceWithVAT < 0;
+      const rowClass = isDiscount ? ' class="discount-row"' : "";
       return `
-    <tr>
+    <tr${rowClass}>
       <td class="desc">${escapeHtml(l.name)}</td>
       <td class="center qty-col">${l.quantity}</td>
       <td class="right num">${unitNoVat.toFixed(2)}&nbsp;€</td>
@@ -309,10 +326,11 @@ export function generateInvoiceHTML(
       overflow: hidden;
     }
 
-    /* Cierre visual fino inmediatamente debajo de la tabla de items. */
+    /* Espacio después de la tabla de items. El cierre de línea ya lo hace
+       el border-bottom de la última fila (más fiable: no queda "colgado"
+       cuando la tabla tiene pocas filas). Aquí sólo aportamos el gap. */
     .items-close {
       height: 0;
-      border-bottom: 1px solid #cbd5e1;
       margin: 0 0 14px 0;
     }
 
@@ -346,15 +364,44 @@ export function generateInvoiceHTML(
       z-index: 0;
       font-family: 'Inter', Arial, sans-serif;
     }
-    .invoice-wrap > *:not(.watermark):not(.watermark-albaran) { position: relative; z-index: 1; }
+    .invoice-wrap > *:not(.watermark):not(.watermark-albaran):not(.page-footer) { position: relative; z-index: 1; }
 
-    /* ── HEADER — logo left, company info right ── */
-    .hdr { display: flex; justify-content: space-between; align-items: center; gap: 32px; margin-bottom: ${tpl.gapAfterHeader}px; padding-bottom: 14px; border-bottom: 2px solid var(--brand-navy); }
+    /* ── HEADER — logo left, company info right ──
+       Los dos bloques tienen anchos FIJOS en % para que la dirección fiscal
+       (que puede ser larga) no empuje el logo. Si el texto de la empresa es
+       más largo que su caja, hace wrap DENTRO (overflow-wrap:break-word),
+       nunca hacia el logo. Así el logo siempre se ve íntegro y los datos
+       empresariales siempre arrancan en la misma posición X. */
+    .hdr {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 24px;
+      margin-bottom: ${tpl.gapAfterHeader}px;
+      padding-bottom: 14px;
+      border-bottom: 2px solid var(--brand-navy);
+    }
     /* margin-left negativo: el logo queda ópticamente más a la izquierda sin
        reducir el margen lateral del cuerpo de la factura (que el usuario quiere
        algo más ancho). */
-    .brand-logo { height: ${tpl.logoSize}px; width: auto; max-width: 380px; object-fit: contain; flex-shrink: 0; display: block; margin-left: -12mm; }
-    .company-info { text-align: left; font-size: 10.5pt; color: #111827; line-height: 1.55; }
+    .brand-logo {
+      height: ${tpl.logoSize}px;
+      width: auto;
+      max-width: 100%;
+      object-fit: contain;
+      flex: 0 0 42%;
+      display: block;
+      margin-left: -12mm;
+    }
+    .company-info {
+      flex: 0 0 48%;
+      text-align: left;
+      font-size: 10.5pt;
+      color: #111827;
+      line-height: 1.55;
+      overflow-wrap: break-word;
+      word-wrap: break-word;
+    }
     .company-info strong { color: var(--brand-navy); font-weight: 700; font-size: 11.5pt; display: block; margin-bottom: 3px; letter-spacing: 0.1px; }
 
     /* ── FACTURA Nº — título bajo cabecera ── */
@@ -399,9 +446,15 @@ export function generateInvoiceHTML(
     table.items thead th.left { text-align: left; }
     table.items thead th.right { text-align: center; }
     table.items tbody tr { border-bottom: 1px solid #e5e7eb; }
-    table.items tbody tr:nth-child(even) { background: #f8fafc; }
-    table.items tbody tr:last-child { border-bottom: 0; }
-    table.items tbody td { padding: 5px 10px; vertical-align: middle; }
+    /* Zebra con alfa — así la marca de agua se transluce a través de las
+       filas con fondo (requisito del usuario: ningún fondo sólido debe
+       tapar el logo). */
+    table.items tbody tr:nth-child(even) { background: rgba(248, 250, 252, 0.55); }
+    /* La última fila conserva su border-bottom para cerrar la tabla
+       visualmente — 1px algo mas oscuro que las separaciones internas.
+       Asi no queda ese hueco suelto abajo a la izquierda. */
+    table.items tbody tr:last-child { border-bottom: 1px solid #cbd5e1; }
+    table.items tbody td { padding: 7px 10px; vertical-align: middle; line-height: 1.35; min-height: 22px; }
     table.items tbody td.desc { font-weight: 500; word-break: break-word; }
     table.items tbody td.center { text-align: center; }
     table.items tbody td.right { text-align: right; }
@@ -409,7 +462,18 @@ export function generateInvoiceHTML(
     table.items tbody td.bold { font-weight: 700; }
     table.items tbody td.qty-col { color: #111827; }
     table.items tbody tr.shipping-row td { color: #374151; }
-    table.items tbody tr.shipping-row td.dash { color: #6b7280; }
+    table.items tbody tr.shipping-row td.dash { color: #6b7280; text-align: center; }
+    /* "Gastos de envío" no debe partirse en dos líneas — si la columna desc
+       es estrecha, preferimos que se muestre completo sin wrap. */
+    table.items tbody tr.shipping-row td.desc { white-space: nowrap; }
+    /* Filas de descuento (líneas negativas: cupón, descuento general, puntos).
+       Verde tenue con alfa — recupera el tono visual previo SIN ocultar la
+       marca de agua. Debe ir DESPUÉS de :nth-child(even) para ganar en
+       cascada sin recurrir a !important. */
+    table.items tbody tr.discount-row { background: rgba(220, 252, 231, 0.55); }
+    table.items tbody tr.discount-row td { color: #166534; }
+    table.items tbody tr.discount-row td.num { color: #15803d; font-weight: 600; }
+    table.items tbody tr.discount-row td.desc { color: #14532d; font-weight: 600; }
 
     /* Column widths — "Cantidad" necesita sitio para no superponerse con
        "Precio unit. s/IVA". Las numéricas respiran para evitar cortes "€". */
@@ -420,9 +484,11 @@ export function generateInvoiceHTML(
     col.col-iva    { width: 12%; }
     col.col-ttotal { width: 16%; }
 
-    /* ── DISCOUNTS CARD ── */
+    /* ── DISCOUNTS CARD ──
+       Fondo verde con alfa 0.55 para que la marca de agua se transluzca
+       a través. El borde sí es sólido para seguir definiendo la caja. */
     .discounts-card {
-      background: #f0fdf4;
+      background: rgba(240, 253, 244, 0.55);
       border: 1px solid #bbf7d0;
       border-radius: 8px;
       padding: 10px 14px;
@@ -449,7 +515,9 @@ export function generateInvoiceHTML(
     .totals .row span:first-child { color: #111827; font-weight: 600; }
     .totals .row span:last-child { font-weight: 700; color: #111827; }
     .totals .row.final {
-      background: linear-gradient(180deg, var(--brand-navy) 0%, var(--brand-navy-deep) 100%);
+      /* Alfa 0.92 — mantiene contraste para texto blanco pero permite ver
+         la marca de agua justo detrás del bloque TOTAL. */
+      background: linear-gradient(180deg, rgba(30, 58, 138, 0.92) 0%, rgba(15, 30, 74, 0.92) 100%);
       padding: 7px 12px;
       margin-top: 0;
       font-size: 12pt;
@@ -463,9 +531,13 @@ export function generateInvoiceHTML(
     .totals .row.final span:last-child { color: #ffffff; font-weight: 700; }
     .totals .row.discount span:last-child { color: #16a34a; }
 
-    /* ── FOOTER fijado al pie de cada página ────────────────────────────── */
+    /* ── FOOTER fijado al pie de la página ───────────────────────────────
+       En pantalla (preview en iframe): position:absolute anclado al fondo
+       del .invoice-wrap — así queda realmente al pie del documento y no
+       flotando sobre el viewport. En impresión/PDF: position:fixed para
+       que se repita en cada página (@media print abajo). */
     .page-footer {
-      position: fixed;
+      position: absolute;
       bottom: 5mm;
       left: ${tpl.paddingX}mm;
       right: ${tpl.paddingX}mm;
@@ -508,6 +580,9 @@ export function generateInvoiceHTML(
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .no-print { display: none; }
+      /* En impresión sí queremos fixed para que el footer se repita en
+         cada página (facturas de más de 1 página). */
+      .page-footer { position: fixed; }
     }
   </style>
 </head>
@@ -603,6 +678,11 @@ export function generateInvoiceHTML(
   <div class="discounts-card">
     <div class="title">Descuentos aplicados</div>
     ${
+      globalDiscountAmount > 0
+        ? `<div class="line"><span>Descuento general${globalDiscountPct > 0 ? ` (${globalDiscountPct}%)` : ""}</span><span class="amt">-${globalDiscountAmount.toFixed(2)}&nbsp;€</span></div>`
+        : ""
+    }
+    ${
       couponDiscount > 0
         ? `<div class="line"><span>Cupón${couponCode ? ` <strong>${escapeHtml(couponCode)}</strong>` : ""}</span><span class="amt">-${couponDiscount.toFixed(2)}&nbsp;€</span></div>`
         : ""
@@ -638,33 +718,35 @@ export function generateInvoiceHTML(
   <div class="totals">
     <div class="row"><span>Base imponible</span><span>${subtotalBase.toFixed(2)}&nbsp;€</span></div>
     <div class="row"><span>IVA ${intracomunitario ? "0% — exento" : `${SITE_CONFIG.vatRate}%`}</span><span>${subtotalVAT.toFixed(2)}&nbsp;€</span></div>
+    ${globalDiscountAmount > 0 ? `<div class="row discount"><span>Descuento general${globalDiscountPct > 0 ? ` (${globalDiscountPct}%)` : ""}</span><span>-${globalDiscountAmount.toFixed(2)}&nbsp;€</span></div>` : ""}
     ${couponDiscount > 0 ? `<div class="row discount"><span>Dto. cupón${couponCode ? ` (${escapeHtml(couponCode)})` : ""}</span><span>-${couponDiscount.toFixed(2)}&nbsp;€</span></div>` : ""}
     ${pointsDiscount > 0 ? `<div class="row discount"><span>Dto. canje de puntos</span><span>-${pointsDiscount.toFixed(2)}&nbsp;€</span></div>` : ""}
     <div class="row final"><span>TOTAL</span><span>${totalFinal.toFixed(2)}&nbsp;€</span></div>
   </div>
 
-</div>
-
-<!-- PIE DE PÁGINA — se repite en cada página impresa (position: fixed). ──
-     Aquí viven el legal, el CSV VeriFactu y la paginación. -->
-<div class="page-footer">
-  <div class="footer-grid">
-    <div class="footer-col">
-      ${
-        tpl.showLegal
-          ? `<div class="legal">${escapeHtml(tpl.legalText)}${intracomunitario ? "<br>Operación exenta de IVA. Inversión del sujeto pasivo (art. 25 LIVA, Ley 37/1992)." : ""}</div>`
-          : ""
-      }
-      ${
-        tpl.showVerifactu && verifactuHash
-          ? `<div class="csv-row"><span class="csv-label">CSV:</span> <span class="csv-hash">${verifactuHash}</span></div>`
-          : ""
-      }
-    </div>
-    <div class="footer-col right">
-      <span class="page-num">Página 1 de 1</span>
+  <!-- PIE DE PÁGINA — se repite en cada página impresa (position: fixed). ──
+       Va DENTRO de .invoice-wrap para que position:absolute bottom:5mm se
+       ancle al wrap (con position:relative), no al viewport del iframe. -->
+  <div class="page-footer">
+    <div class="footer-grid">
+      <div class="footer-col">
+        ${
+          tpl.showLegal
+            ? `<div class="legal">${escapeHtml(tpl.legalText)}${intracomunitario ? "<br>Operación exenta de IVA. Inversión del sujeto pasivo (art. 25 LIVA, Ley 37/1992)." : ""}</div>`
+            : ""
+        }
+        ${
+          tpl.showVerifactu && verifactuHash
+            ? `<div class="csv-row"><span class="csv-label">CSV:</span> <span class="csv-hash">${verifactuHash}</span></div>`
+            : ""
+        }
+      </div>
+      <div class="footer-col right">
+        <span class="page-num">Página 1 de 1</span>
+      </div>
     </div>
   </div>
+
 </div>
 
 </body>

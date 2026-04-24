@@ -319,6 +319,14 @@ export default function FacturasPage() {
         cmp =
           new Date(a.invoiceDate).getTime() - new Date(b.invoiceDate).getTime();
       else cmp = a.totals.totalInvoice - b.totals.totalInvoice;
+      // Desempate: si dos facturas comparten la clave primaria (p. ej. mismo
+      // día en invoiceDate, mismo total), la más recientemente CREADA manda.
+      // Sin esto, al emitir dos facturas el mismo día se quedaba ordenada la
+      // primera que se insertó, no la última — contraintuitivo para el admin.
+      if (cmp === 0) {
+        cmp =
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }
       return sortAsc ? cmp : -cmp;
     });
   }, [

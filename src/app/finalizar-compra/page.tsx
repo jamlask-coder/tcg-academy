@@ -64,7 +64,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { STORES } from "@/data/stores";
+import { isFiscalProfileComplete } from "@/lib/validations/profileComplete";
 
 // Proyección ligera del registro central de tiendas para el checkout.
 // Fuente única: src/data/stores.ts — añadir/editar tiendas ahí.
@@ -98,7 +100,29 @@ interface PendingCheckout {
 export default function CheckoutPage() {
   const { items, total, count, clearCart } = useCart();
   const { user, updateProfile } = useAuth();
+  const router = useRouter();
   const [step, setStep] = useState<Step>("datos");
+
+  // ── Guard de perfil fiscal completo ─────────────────────────────────────
+  // Si el usuario está logueado pero le faltan datos legalmente obligatorios
+  // (típico de cuentas creadas vía Google OAuth — ver AuthContext.loginWithGoogle),
+  // lo mandamos a completar-datos antes de poder tocar el formulario. Un
+  // invitado (user=null) sigue el flujo normal (rellena todo en el form).
+  // Base legal: Art. 6.1.d / 6.1.e RD 1619/2012.
+  const [profileGuardReady, setProfileGuardReady] = useState(false);
+  useEffect(() => {
+    if (!user) {
+      setProfileGuardReady(true);
+      return;
+    }
+    const completeness = isFiscalProfileComplete(user);
+    if (!completeness.ok) {
+      const ret = encodeURIComponent("/finalizar-compra");
+      router.replace(`/cuenta/completar-datos?return=${ret}`);
+      return;
+    }
+    setProfileGuardReady(true);
+  }, [user, router]);
   const [pending] = useState<PendingCheckout | null>(() => {
     try {
       const raw =
@@ -862,6 +886,16 @@ export default function CheckoutPage() {
         </Link>
       </div>
     );
+
+  // Si estamos redirigiendo al usuario a completar-datos, no renderizamos el
+  // formulario (evita un flash del checkout con datos vacíos).
+  if (!profileGuardReady && step !== "confirmado") {
+    return (
+      <div className="mx-auto flex min-h-[300px] max-w-[600px] items-center justify-center px-4 py-12 text-center text-sm text-gray-500">
+        Verificando tus datos…
+      </div>
+    );
+  }
 
   if (step === "confirmado") {
     const pickupStore = form.tiendaRecogida ? TIENDAS.find(t => t.id === form.tiendaRecogida) : null;

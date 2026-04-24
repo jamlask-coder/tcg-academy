@@ -47,6 +47,7 @@ import { DataHub } from "@/lib/dataHub";
 import { getOrdersByUser } from "@/lib/orderAdapter";
 import { validateSpanishNIF } from "@/lib/validations/nif";
 import { moneyRound as roundTo2, baseFromPriceWithVAT } from "@/lib/money";
+import { tripleCheckInvoice } from "@/lib/fiscalAudit";
 
 // ─── Datos del emisor (TCG Academy) ──────────────────────────────────────────
 
@@ -331,17 +332,24 @@ export function calculateTotals(items: InvoiceLineItem[]): InvoiceTotals {
   }
 
   // ── VERIFICACIÓN: cada línea es internamente consistente ──
+  // Tolerancia de 1 céntimo (admitida por AEAT para redondeos): buildLineItem
+  // calcula el IVA por método top-down (total − base) y calculateVAT por
+  // bottom-up (base × rate). Ambos métodos pueden discrepar exactamente
+  // 1 céntimo en casos borde (ej: cupón −10 € al 21% → top-down −1,74 vs
+  // bottom-up −1,73). Usamos estrictamente mayor que 0,011 (buffer FP) para
+  // no generar falsos positivos mientras seguimos detectando cualquier
+  // manipulación real (que será de varios céntimos o más).
   for (const item of items) {
     const expectedBase = roundTo2(
       roundTo2(item.unitPrice * item.quantity) - item.discountAmount,
     );
-    if (Math.abs(expectedBase - item.taxableBase) >= 0.01) {
+    if (Math.abs(expectedBase - item.taxableBase) > 0.011) {
       throw new Error(
         `INTEGRIDAD FISCAL: Línea "${item.description}" base esperada ${expectedBase} ≠ registrada ${item.taxableBase}`,
       );
     }
     const expectedVAT = calculateVAT(item.taxableBase, item.vatRate);
-    if (Math.abs(expectedVAT - item.vatAmount) >= 0.01) {
+    if (Math.abs(expectedVAT - item.vatAmount) > 0.011) {
       throw new Error(
         `INTEGRIDAD FISCAL: Línea "${item.description}" IVA esperado ${expectedVAT} ≠ registrado ${item.vatAmount}`,
       );
@@ -982,6 +990,19 @@ export function getInvoicesByUser(userId: string): InvoiceRecord[] {
 
 /** Guarda una nueva factura, actualiza el hash de integridad, y genera asiento contable */
 export function saveInvoice(invoice: InvoiceRecord): void {
+  // BLINDAJE ANTI-CORRUPCIÓN: triple-check antes de persistir.
+  // Si las 3 vías de cálculo (líneas / recálculo desde unitPrice / desglose
+  // fiscal) no coinciden, la factura está corrupta y NO se persiste jamás.
+  // Mejor fallar ruidosamente aquí que emitir una factura con totales
+  // incoherentes que luego dispare alertas en el autopilot fiscal.
+  const check = tripleCheckInvoice(invoice);
+  if (!check.allMatch) {
+    throw new Error(
+      `Factura ${invoice.invoiceNumber} rechazada por blindaje fiscal: ` +
+        `los 3 métodos de cálculo difieren. ${check.discrepancies.join(" | ")}`,
+    );
+  }
+
   const invoices = loadInvoices();
 
   // Última línea de defensa contra duplicados: si otro tab insertó una
@@ -1105,6 +1126,79 @@ export async function verifyIntegrity(
   const content = invoices.map((inv) => inv.verifactuChainHash ?? "").join("");
   const expected = await sha256(content);
   return stored === expected;
+}
+
+/**
+ * Resultado de la verificación profunda por factura.
+ */
+export interface DeepIntegrityIssue {
+  invoiceId: string;
+  invoiceNumber: string;
+  kind: "content_hash_mismatch" | "chain_hash_mismatch" | "triple_check_failed";
+  detail: string;
+}
+
+/**
+ * BLINDAJE PROFUNDO: recalcula el hash de contenido y el hash encadenado de
+ * cada factura del libro y los compara con los hashes almacenados.
+ *
+ * Detecta tres tipos de corrupción posterior a la emisión:
+ *  - content_hash_mismatch: alguien editó campos fiscales de una factura
+ *  - chain_hash_mismatch:   se insertó/eliminó/reordenó una factura en el libro
+ *  - triple_check_failed:   los totales no cuadran ni siquiera consigo mismos
+ *
+ * Se llama desde `invoiceRecovery.runScan()` (autopilot fiscal). No lanza —
+ * devuelve la lista de issues para que el dashboard los presente.
+ */
+export async function verifyDeepIntegrity(
+  invoices: InvoiceRecord[],
+): Promise<DeepIntegrityIssue[]> {
+  const issues: DeepIntegrityIssue[] = [];
+
+  let prevChain: string | null = null;
+  for (const inv of invoices) {
+    // 1. Triple check (vuelve a correr la misma comprobación que bloquea saveInvoice)
+    const check = tripleCheckInvoice(inv);
+    if (!check.allMatch) {
+      issues.push({
+        invoiceId: inv.invoiceId,
+        invoiceNumber: inv.invoiceNumber,
+        kind: "triple_check_failed",
+        detail: check.discrepancies.join(" | "),
+      });
+    }
+
+    // 2. Hash de contenido — se recalcula desde los campos y se compara con
+    //    el almacenado. Si difiere → alguien editó la factura tras emitirla.
+    if (inv.verifactuHash) {
+      const expectedHash = await generateInvoiceHash(inv);
+      if (expectedHash !== inv.verifactuHash) {
+        issues.push({
+          invoiceId: inv.invoiceId,
+          invoiceNumber: inv.invoiceNumber,
+          kind: "content_hash_mismatch",
+          detail: `hash recalculado ${expectedHash.slice(0, 12)}… ≠ almacenado ${inv.verifactuHash.slice(0, 12)}…`,
+        });
+      }
+    }
+
+    // 3. Hash encadenado — debe ser SHA-256(hashActual + hashAnteriorDelLibro).
+    if (inv.verifactuHash && inv.verifactuChainHash) {
+      const expectedChain = await chainInvoiceHash(inv.verifactuHash, prevChain);
+      if (expectedChain !== inv.verifactuChainHash) {
+        issues.push({
+          invoiceId: inv.invoiceId,
+          invoiceNumber: inv.invoiceNumber,
+          kind: "chain_hash_mismatch",
+          detail: `cadena esperada ${expectedChain.slice(0, 12)}… ≠ almacenada ${inv.verifactuChainHash.slice(0, 12)}…`,
+        });
+      }
+    }
+
+    prevChain = inv.verifactuChainHash ?? prevChain;
+  }
+
+  return issues;
 }
 
 function getLastChainHash(): string | null {

@@ -14,7 +14,7 @@ export const SITE_CONFIG = {
   // Logistics
   carrier: "GLS",
   shippingThreshold: 149, // free shipping above this (€)
-  standardShippingCost: 3.99, // coste envío estándar (IVA incl.) cuando subtotal < threshold
+  standardShippingCost: 4.95, // coste envío estándar (IVA incl.) cuando subtotal < threshold
   expressShippingCost: 6.99, // coste envío express (IVA incl.)
   dispatchHours: 24, // "enviamos en menos de X horas"
 

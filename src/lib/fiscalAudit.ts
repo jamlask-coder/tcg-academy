@@ -25,7 +25,6 @@ import type { InvoiceRecord } from "@/types/fiscal";
 import { InvoiceStatus, InvoiceType } from "@/types/fiscal";
 import type { Quarter } from "@/types/tax";
 import {
-  calculateVAT,
   filterByPeriod,
   getTaxPeriod,
   generateQuarterlyReport,
@@ -44,11 +43,25 @@ function r2(n: number): number {
 }
 
 /**
- * Compara dos importes con tolerancia de 0 céntimos.
- * En fiscal, NO hay tolerancia: 0.01€ es una discrepancia.
+ * Compara dos importes con tolerancia acotada por redondeos.
+ *
+ * El método 1 (line.vatAmount persistido, top-down: total−base) y el método 2
+ * (recálculo top-down desde unitPrice) pueden divergir hasta 1 céntimo por
+ * línea: cuando se reconstruye `lineGross = unitPrice × (1 + vat%)`, el
+ * redondeo de `unitPrice` (que ya trae redondeo de `baseFromPriceWithVAT`)
+ * arrastra 1 céntimo. No es fraude, es matemática. Manipulaciones reales
+ * mueven euros, no sub-céntimos — esta tolerancia sigue detectándolas.
+ */
+function roundingMatch(a: number, b: number, tolerance: number): boolean {
+  return Math.abs(r2(a) - r2(b)) <= tolerance + 0.001; // buffer FP
+}
+
+/**
+ * Match exacto (sin tolerancia) — usado fuera de `tripleCheckInvoice` cuando
+ * los dos valores vienen de la misma fuente de datos y DEBEN cuadrar a 0.
  */
 function exactMatch(a: number, b: number): boolean {
-  return Math.abs(r2(a) - r2(b)) < 0.001; // < 0.1 céntimo
+  return roundingMatch(a, b, 0);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -102,15 +115,22 @@ export function tripleCheckInvoice(invoice: InvoiceRecord): TripleCheckResult {
   }
 
   // ── Método 2: Recalcular desde cero (precio bruto → base → IVA) ──
+  // Usamos el MISMO algoritmo que `buildLineItem` (top-down: vatAmount =
+  // finalGross − base) para que, si los datos no han sido manipulados, m1==m2
+  // de forma exacta. Si usáramos bottom-up (base×rate) aparecerían
+  // discrepancias inherentes de 1 céntimo por línea debidas al método de
+  // redondeo, no a fraude — y el triple check daría falsos positivos.
+  // calculateVAT se sigue usando como ancla normativa en el método 3 +
+  // integrity check línea-a-línea en `invoiceService.saveInvoice`.
   let m2Base = 0;
   let m2VAT = 0;
   let m2Total = 0;
   for (const line of invoice.items) {
-    // Recalcular base desde unitPrice (sin IVA) × qty - descuento
     const lineSubtotal = r2(line.unitPrice * line.quantity);
     const lineDiscount = r2(lineSubtotal * (line.discount / 100));
     const lineBase = r2(lineSubtotal - lineDiscount);
-    const lineVAT = calculateVAT(lineBase, line.vatRate);
+    const lineGross = r2(lineBase * (1 + line.vatRate / 100));
+    const lineVAT = r2(lineGross - lineBase);
     const lineSurcharge = r2(lineBase * (line.surchargeRate / 100));
     const lineTotal = r2(lineBase + lineVAT + lineSurcharge);
 
@@ -130,45 +150,55 @@ export function tripleCheckInvoice(invoice: InvoiceRecord): TripleCheckResult {
   }
 
   // ── Comparar los 3 métodos ──
+  // Tolerancia: hasta 1 céntimo × número de líneas (arrastre de redondeo
+  // al reconstruir `unitPrice × (1+vat%)` en el método 2). Un fraude real
+  // mueve €€€, nunca céntimos, así que esta tolerancia no esconde nada
+  // peligroso. El método 1 vs método 3 sí admite tolerancia 0 porque
+  // operan exactamente sobre los mismos datos persistidos.
+  const lineCount = invoice.items.length;
+  const tolLine = lineCount * 0.01; // artefacto del recálculo top-down
+  const tolZero = 0; // checks que SÍ deben cuadrar exacto
+
   const checkPair = (
     label: string,
     a: number,
     b: number,
     aName: string,
     bName: string,
+    tolerance: number,
   ) => {
-    if (!exactMatch(a, b)) {
+    if (!roundingMatch(a, b, tolerance)) {
       discrepancies.push(
         `${label}: ${aName}=${a.toFixed(2)} vs ${bName}=${b.toFixed(2)} (diff: ${r2(Math.abs(a - b)).toFixed(2)})`,
       );
     }
   };
 
-  // Base imponible
-  checkPair("Base", m1Base, m2Base, "Líneas", "Recálculo");
-  checkPair("Base", m1Base, m3Base, "Líneas", "Desglose");
-  checkPair("Base", m2Base, m3Base, "Recálculo", "Desglose");
+  // Base imponible — Recálculo puede arrastrar redondeo; Desglose no.
+  checkPair("Base", m1Base, m2Base, "Líneas", "Recálculo", tolLine);
+  checkPair("Base", m1Base, m3Base, "Líneas", "Desglose", tolZero);
+  checkPair("Base", m2Base, m3Base, "Recálculo", "Desglose", tolLine);
 
   // Cuota IVA
-  checkPair("IVA", m1VAT, m2VAT, "Líneas", "Recálculo");
-  checkPair("IVA", m1VAT, m3VAT, "Líneas", "Desglose");
+  checkPair("IVA", m1VAT, m2VAT, "Líneas", "Recálculo", tolLine);
+  checkPair("IVA", m1VAT, m3VAT, "Líneas", "Desglose", tolZero);
 
   // Total factura
-  checkPair("Total", m1Total, m2Total, "Líneas", "Recálculo");
-  checkPair("Total", m1Total, m3Total, "Líneas", "Desglose");
+  checkPair("Total", m1Total, m2Total, "Líneas", "Recálculo", tolLine);
+  checkPair("Total", m1Total, m3Total, "Líneas", "Desglose", tolZero);
 
-  // También verificar contra invoice.totals
-  if (!exactMatch(m1Base, invoice.totals.totalTaxableBase)) {
+  // También verificar contra invoice.totals (datos persistidos, tolerancia 0)
+  if (!roundingMatch(m1Base, invoice.totals.totalTaxableBase, tolZero)) {
     discrepancies.push(
       `Base vs Totals: Líneas=${m1Base.toFixed(2)} vs totals.totalTaxableBase=${invoice.totals.totalTaxableBase.toFixed(2)}`,
     );
   }
-  if (!exactMatch(m1VAT, invoice.totals.totalVAT)) {
+  if (!roundingMatch(m1VAT, invoice.totals.totalVAT, tolZero)) {
     discrepancies.push(
       `IVA vs Totals: Líneas=${m1VAT.toFixed(2)} vs totals.totalVAT=${invoice.totals.totalVAT.toFixed(2)}`,
     );
   }
-  if (!exactMatch(m1Total, invoice.totals.totalInvoice)) {
+  if (!roundingMatch(m1Total, invoice.totals.totalInvoice, tolZero)) {
     discrepancies.push(
       `Total vs Totals: Líneas=${m1Total.toFixed(2)} vs totals.totalInvoice=${invoice.totals.totalInvoice.toFixed(2)}`,
     );

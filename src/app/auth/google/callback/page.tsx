@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth, type GoogleSignInPayload } from "@/context/AuthContext";
+import { isFiscalProfileComplete } from "@/lib/validations/profileComplete";
+import type { User } from "@/types/user";
 
 const NONCE_KEY = "google_oauth_nonce";
 const REDIRECT_KEY = "google_oauth_redirect";
@@ -99,16 +101,30 @@ export default function GoogleCallbackPage() {
         return;
       }
       // Role-aware redirect: if just-logged-in user is admin, override to /admin.
+      // Y antes de cualquier otro destino, si el perfil fiscal no está
+      // completo (típico en cuentas recién creadas vía Google OAuth), le
+      // enviamos a /cuenta/completar-datos para recoger NIF + teléfono +
+      // domicilio fiscal (obligatorios por Art. 6 RD 1619/2012).
       let finalRedirect = redirectTo;
+      let loggedUser: User | null = null;
       try {
         const raw = localStorage.getItem("tcgacademy_user");
         if (raw) {
-          const parsed = JSON.parse(raw) as { role?: string };
-          if (parsed.role === "admin") finalRedirect = "/admin";
+          loggedUser = JSON.parse(raw) as User;
+          if (loggedUser.role === "admin") finalRedirect = "/admin";
         }
       } catch {
         /* ignore */
       }
+
+      if (loggedUser && loggedUser.role !== "admin") {
+        const completeness = isFiscalProfileComplete(loggedUser);
+        if (!completeness.ok) {
+          const ret = encodeURIComponent(finalRedirect);
+          finalRedirect = `/cuenta/completar-datos?return=${ret}`;
+        }
+      }
+
       router.replace(finalRedirect);
     };
     void run();

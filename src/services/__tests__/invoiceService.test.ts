@@ -6,6 +6,8 @@ import {
   generateInvoiceHash,
   validateInvoice,
   buildLineItem,
+  saveInvoice,
+  verifyDeepIntegrity,
   INVOICE_ORIGIN_WEB,
 } from "@/services/invoiceService";
 import { TaxIdType, VerifactuStatus, InvoiceStatus, InvoiceType } from "@/types/fiscal";
@@ -306,5 +308,96 @@ describe("invoiceService — buildLineItem básicos (sin recargo)", () => {
     expect(line.taxableBase).toBe(100);
     expect(line.vatAmount).toBe(0);
     expect(line.totalLine).toBe(100);
+  });
+});
+
+// ─── Blindaje anti-corrupción: saveInvoice rechaza facturas inconsistentes ───
+
+describe("invoiceService — blindaje saveInvoice (triple check)", () => {
+  it("rechaza factura con totales manipulados", () => {
+    const corrupt = makeInvoice({
+      totals: {
+        totalTaxableBase: 100,
+        totalVAT: 21,
+        totalSurcharge: 0,
+        totalInvoice: 121,
+        totalPaid: 121,
+        totalPending: 0,
+        currency: "EUR",
+      },
+      // Desglose incoherente: base 999 en vez de 100
+      taxBreakdown: [
+        {
+          vatRate: 21,
+          taxableBase: 999,
+          vatAmount: 209.79,
+          surchargeRate: 0,
+          surchargeAmount: 0,
+          total: 1208.79,
+        },
+      ],
+    });
+
+    expect(() => saveInvoice(corrupt)).toThrow(/blindaje fiscal/);
+  });
+
+  it("acepta factura coherente en los 3 métodos", () => {
+    const ok = makeInvoice();
+    // No debe lanzar (aunque saveInvoice toca localStorage, en jsdom no falla)
+    expect(() => saveInvoice(ok)).not.toThrow();
+  });
+});
+
+describe("invoiceService — verifyDeepIntegrity", () => {
+  it("no reporta issues para factura coherente sin cadena previa", async () => {
+    const ok = makeInvoice({
+      verifactuHash: await generateInvoiceHash(makeInvoice()),
+      verifactuChainHash: null,
+    });
+    const issues = await verifyDeepIntegrity([ok]);
+    // Puede reportar chain_hash_mismatch si el chain es null; el caso real es
+    // que si hash coincide y no hay chain, no debe fallar content_hash.
+    const contentIssues = issues.filter(
+      (i) => i.kind === "content_hash_mismatch",
+    );
+    expect(contentIssues).toHaveLength(0);
+  });
+
+  it("detecta content_hash_mismatch si alguien edita campos tras emitir", async () => {
+    const original = makeInvoice();
+    const originalHash = await generateInvoiceHash(original);
+    // Simulamos manipulación: guardamos el hash original pero editamos el total
+    const tampered: InvoiceRecord = {
+      ...original,
+      verifactuHash: originalHash,
+      totals: { ...original.totals, totalInvoice: 99999 },
+      // Mantenemos coherencia interna para pasar triple-check
+      items: [
+        buildLineItem({
+          lineNumber: 1,
+          productId: "p1",
+          description: "Booster Box",
+          quantity: 1,
+          unitPriceWithVAT: 99999,
+          vatRate: 21,
+        }),
+      ],
+      taxBreakdown: [
+        {
+          vatRate: 21,
+          taxableBase: 82644.63,
+          vatAmount: 17354.37,
+          surchargeRate: 0,
+          surchargeAmount: 0,
+          total: 99999,
+        },
+      ],
+    };
+
+    const issues = await verifyDeepIntegrity([tampered]);
+    const contentIssues = issues.filter(
+      (i) => i.kind === "content_hash_mismatch",
+    );
+    expect(contentIssues.length).toBeGreaterThan(0);
   });
 });
