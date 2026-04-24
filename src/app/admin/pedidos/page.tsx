@@ -1829,7 +1829,7 @@ export default function AdminPedidosPage() {
                         <Link
                           href={`/admin/pedidos/${order.id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="font-mono font-bold text-[#2563eb] no-underline hover:no-underline"
+                          className="font-mono text-[#2563eb] no-underline hover:no-underline"
                         >
                           {order.id}
                         </Link>
@@ -1850,7 +1850,7 @@ export default function AdminPedidosPage() {
                         <Link
                           href={`/admin/usuarios/${userIdToHandle(order.userId, MOCK_USERS)}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="font-medium text-[#2563eb] no-underline hover:no-underline"
+                          className="text-[#2563eb] no-underline hover:no-underline"
                         >
                           {order.userName}
                         </Link>
@@ -1859,7 +1859,7 @@ export default function AdminPedidosPage() {
                       <td className="hidden px-3 py-3 text-sm whitespace-nowrap text-gray-500 sm:table-cell">
                         {fmtDate(order.date)}
                       </td>
-                      <td className="px-3 py-3 text-right text-sm font-bold whitespace-nowrap text-gray-900">
+                      <td className="px-3 py-3 text-right text-sm whitespace-nowrap text-gray-900">
                         {order.total.toFixed(2)}€
                       </td>
                       <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
