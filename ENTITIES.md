@@ -55,6 +55,70 @@ Si la entidad ya existe aquí → reutiliza. Si no → añade entrada al registr
 
 ---
 
+## Las 2 matrículas del sistema
+
+Todo el negocio gira alrededor de 2 IDs únicos. Son la matrícula que conecta datos — jamás se duplican ni se reasignan.
+
+### 🆔 `ID-Producto` = `LocalProduct.id` (number)
+
+Definido en `src/data/products.ts`. Admin-creados se generan con `generateLocalProductId()` (`Date.now()*1000 + random`) — garantiza unicidad.
+
+**Campos que cuelgan del ID-Producto** (rellenados al crear/editar producto):
+
+| Grupo | Campos |
+|---|---|
+| **Identificación** | `id`, `slug`, `name`, `game`, `category`, `language`, `tags[]` |
+| **Precios** | `price` (PV público), `wholesalePrice`, `storePrice`, `costPrice` (solo admin), `comparePrice` (tachado), `vatRate` |
+| **Stock** | `inStock`, `stock`, `maxPerClient`, `maxPerWholesaler`, `maxPerStore` |
+| **Contenido** | `description`, `images[]` |
+| **Badges** | `isNew`, `isFeatured`, `createdAt` (para badge NUEVO 45d) |
+| **Packs vinculados** | `linkedPackId`, `linkedBoxId`, `packsPerBox`, `cardsPerPack` |
+
+Escritura: `src/lib/productStore.ts` (merge entre estáticos + overrides + admin-creados).
+
+### 🆔 `ID-Usuario` = `User.id` (string)
+
+Definido en `src/types/user.ts`. Formatos: `"u14"` (mock), `"demo_cliente"` (demo), `"usr_<timestamp>"` (nuevos registros).
+
+**Campos que cuelgan del ID-Usuario** (rellenados al registrarse / editar cuenta):
+
+| Grupo | Campos |
+|---|---|
+| **Identificación** | `id`, `email`, `username` (@handle), `name`, `lastName`, `phone`, `gender`, `birthDate`, `createdAt` |
+| **Fiscal** | `nif`, `nifType` (DNI/NIE/CIF) |
+| **Rol** | `role` (cliente / mayorista / tienda / admin) |
+| **Direcciones** | `addresses[]` (Address: calle, nº, piso, CP, ciudad, provincia, país, teléfono, predeterminada) |
+| **Facturación** | `billing` (NIF, razón social, dirección fiscal) |
+| **Empresa B2B** | `empresa` (CIF, razón social, dirección, persona contacto, email facturación) — solo mayorista/tienda |
+| **Relaciones** | `favorites[]` (→ ID-Producto), `referralCode`, `referredBy` |
+| **Verificación** | `emailVerified`, `emailVerifiedAt` |
+
+Escritura: `src/context/AuthContext.tsx` + `src/services/userAdminService.ts`.
+
+### 🔗 Cómo se conectan las demás entidades (claves foráneas)
+
+| Entidad | Campo FK | Apunta a |
+|---|---|---|
+| **Order** | `userId` | ID-Usuario |
+| **Order.items[]** | `id` | ID-Producto |
+| **Invoice** | `userId` | ID-Usuario |
+| **Invoice.lines[]** | `productId` (via order snapshot) | ID-Producto |
+| **Return** | `orderId` → `userId` | ID-Usuario (indirecto) |
+| **Incident** | `orderId` | Order → ID-Usuario |
+| **Points history** | `userId`, `orderId` | ID-Usuario + Order |
+| **User.favorites[]** | array de | ID-Producto |
+| **Cart.items[]** | `productId` | ID-Producto |
+| **Review** | `userId` + `productId` | ambos |
+| **UserCoupon** | `userId` | ID-Usuario |
+| **Message** | `fromUserId`, `toUserId`, `orderId?` | ID-Usuario + Order |
+| **Association (grupo)** | `memberIds[]`, `ownerId` | ID-Usuario |
+| **PriceHistory** | `cardId` | ID-Producto |
+| **Restock sub** | `userId` + `productId` | ambos |
+
+**Regla**: nunca copiar datos del Usuario o Producto dentro de otra entidad. Solo guardar el ID y resolver por lookup (`getMergedById(id)` / `findUserById(id)`). Excepción: pedidos/facturas usan `captureSellerSnapshot()` para congelar datos fiscales por obligación legal (inmutabilidad).
+
+---
+
 ## Reglas inviolables
 
 1. **SITE_CONFIG es SSOT vivo** — cambia ahí y se propaga. Nunca hardcodear 21, 149, 24h, VAT.
