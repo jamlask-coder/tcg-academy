@@ -43,7 +43,7 @@ import {
   generateInvoiceNumber,
 } from "@/utils/invoiceGenerator";
 import { logAudit } from "@/services/auditService";
-import { getMergedById } from "@/lib/productStore";
+import { getMergedById, getMergedProducts, getProductUrl } from "@/lib/productStore";
 import { persistProductPatch } from "@/lib/productPersist";
 import { parseFiscalAddress } from "@/lib/fiscalAddress";
 import {
@@ -521,33 +521,55 @@ function OrderPanel({
                 Productos
               </p>
               <div className="space-y-0">
-                {order.items.map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 border-b border-gray-50 py-1.5 last:border-0"
-                  >
-                    <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-gray-100 text-sm">
-                      {item.game === "magic"
-                        ? "🧙"
-                        : item.game === "pokemon"
-                          ? "⚡"
-                          : item.game === "naruto"
-                            ? "🍃"
-                            : "🃏"}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium text-gray-800">
-                        {item.name}
-                      </p>
-                      <p className="text-[10px] text-gray-400">
-                        {item.qty}× · {item.price.toFixed(2)}€/ud
-                      </p>
-                    </div>
-                    <span className="flex-shrink-0 text-xs font-bold text-gray-900">
-                      {(item.price * item.qty).toFixed(2)}€
-                    </span>
-                  </div>
-                ))}
+                {order.items.map((item, i) => {
+                  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").replace(/[^\w\sáéíóúñ]/gi, "").trim();
+                  const all = getMergedProducts();
+                  const byId = getMergedById(item.id);
+                  const nameMatches = (p: { name: string }) => norm(p.name).includes(norm(item.name)) || norm(item.name).includes(norm(p.name));
+                  let product = byId && nameMatches(byId) ? byId : undefined;
+                  if (!product) product = all.find((p) => p.game === item.game && nameMatches(p));
+                  if (!product) product = all.find((p) => nameMatches(p));
+                  const image = product?.images?.[0];
+                  const productUrl = product
+                    ? getProductUrl(product)
+                    : `/catalogo?q=${encodeURIComponent(item.name)}`;
+                  return (
+                    <Link
+                      key={i}
+                      href={productUrl}
+                      target="_blank"
+                      rel="noopener"
+                      onClick={(e) => e.stopPropagation()}
+                      title={`Abrir ${item.name}`}
+                      className="group flex items-center gap-2 border-b border-gray-50 py-1.5 transition last:border-0 hover:bg-blue-50/40"
+                    >
+                      {image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={image}
+                          alt={item.name}
+                          className="h-8 w-8 flex-shrink-0 rounded bg-white object-cover ring-1 ring-gray-200"
+                          onError={(e) => { (e.target as HTMLImageElement).src = "/images/placeholder-product.svg"; }}
+                        />
+                      ) : (
+                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded bg-gray-100 text-sm">
+                          {item.game === "magic" ? "🧙" : item.game === "pokemon" ? "⚡" : item.game === "naruto" ? "🍃" : "🃏"}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs text-gray-800 group-hover:text-[#2563eb] group-hover:underline">
+                          {item.name}
+                        </p>
+                        <p className="text-[10px] text-gray-400">
+                          {item.qty}× · {item.price.toFixed(2)}€/ud
+                        </p>
+                      </div>
+                      <span className="flex-shrink-0 text-xs text-gray-900">
+                        {(item.price * item.qty).toFixed(2)}€
+                      </span>
+                    </Link>
+                  );
+                })}
               </div>
             </div>
 
