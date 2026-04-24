@@ -48,6 +48,7 @@ import { createDeliveryNote } from "@/services/deliveryNoteService";
 import { getMergedProducts } from "@/lib/productStore";
 import { deductStockForInvoiceItems } from "@/lib/stockMovement";
 import { SITE_CONFIG } from "@/config/siteConfig";
+import { getIssuerAddress } from "@/lib/fiscalAddress";
 import {
   generateInvoiceHTML,
   printInvoice,
@@ -649,8 +650,8 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
       paymentStatus: "paid",
       issuerName: SITE_CONFIG.legalName,
       issuerCIF: SITE_CONFIG.cif,
-      issuerAddress: SITE_CONFIG.address,
-      issuerCity: "",
+      issuerAddress: getIssuerAddress().street,
+      issuerCity: getIssuerAddress().cityLine,
       issuerCountry: SITE_CONFIG.country,
       issuerPhone: SITE_CONFIG.phone,
       issuerEmail: SITE_CONFIG.email,
@@ -933,8 +934,8 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
         verifactuHash: invoice.verifactuHash ?? undefined,
         issuerName: SITE_CONFIG.legalName,
         issuerCIF: SITE_CONFIG.cif,
-        issuerAddress: SITE_CONFIG.address,
-        issuerCity: "",
+        issuerAddress: getIssuerAddress().street,
+        issuerCity: getIssuerAddress().cityLine,
         issuerCountry: SITE_CONFIG.country,
         issuerPhone: SITE_CONFIG.phone,
         issuerEmail: SITE_CONFIG.email,

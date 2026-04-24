@@ -608,8 +608,8 @@ export default function EditorFacturaPage() {
               <Slider
                 value={tpl.logoSize}
                 onChange={(v) => update("logoSize", v)}
-                min={32}
-                max={120}
+                min={80}
+                max={300}
                 suffix="px"
               />
             </Row>

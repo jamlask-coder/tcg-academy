@@ -159,6 +159,7 @@ export default function LibroAlbaranesPage() {
       issuerCIF: SITE_CONFIG.cif,
       issuerAddress,
       issuerCity,
+      issuerCountry: SITE_CONFIG.country,
       issuerPhone: SITE_CONFIG.phone,
       issuerEmail: SITE_CONFIG.email,
       clientName: recipient.name ?? "—",

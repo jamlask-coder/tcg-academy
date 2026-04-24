@@ -14,7 +14,7 @@
  */
 
 import { SITE_CONFIG } from "@/config/siteConfig";
-import { getIssuerAddress, abbreviateAddressLine } from "@/lib/fiscalAddress";
+import { getIssuerAddress } from "@/lib/fiscalAddress";
 import {
   loadInvoiceTemplate,
   DEFAULT_TEMPLATE,
@@ -281,7 +281,7 @@ export function generateInvoiceHTML(
     clientCIF ? `NIF: ${escapeHtml(clientCIF)}` : null,
     clientPhone ? escapeHtml(clientPhone) : null,
     clientEmail ? escapeHtml(clientEmail) : null,
-    clientAddress ? escapeHtml(abbreviateAddressLine(clientAddress)) : null,
+    clientAddress ? escapeHtml(clientAddress) : null,
     // Población y provincia juntas en una línea ("Calp, Alicante"); país solo
     // en la siguiente ("España"). Más legible y coherente con cómo se escribe
     // una dirección postal española.
@@ -443,7 +443,7 @@ export function generateInvoiceHTML(
     .hdr {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       gap: 24px;
       margin-top: -6mm;
       margin-bottom: ${tpl.gapAfterHeader}px;
@@ -451,8 +451,7 @@ export function generateInvoiceHTML(
       border-bottom: 2px solid var(--brand-navy);
     }
     /* margin-left negativo: el logo queda ópticamente más a la izquierda sin
-       reducir el margen lateral del cuerpo de la factura (que el usuario quiere
-       algo más ancho). */
+       reducir el margen lateral del cuerpo de la factura. */
     .brand-logo {
       height: ${tpl.logoSize}px;
       width: auto;
@@ -460,17 +459,23 @@ export function generateInvoiceHTML(
       object-fit: contain;
       flex: 0 0 42%;
       display: block;
-      margin-left: -12mm;
+      margin-left: -15mm;
     }
+    /* flex: 0 0 auto → la caja se encoge al ancho del contenido (antes era
+       48% fija, lo que dejaba hueco a la derecha porque el texto era
+       left-align dentro de una caja ancha). Con width auto, space-between
+       empuja la caja al borde derecho y el texto queda pegado a la derecha.
+       margin-right: -15mm la aproxima aún más al borde del folio. */
     .company-info {
-      flex: 0 0 48%;
+      flex: 0 0 auto;
       text-align: left;
       font-size: 10.5pt;
       color: #111827;
       line-height: 1.5;
       overflow-wrap: break-word;
       word-wrap: break-word;
-      margin-right: -4mm;
+      margin-right: 0;
+      max-width: 90mm;
     }
     .company-info strong { color: var(--brand-navy); font-weight: 700; font-size: 11.5pt; display: block; margin-bottom: 3px; letter-spacing: 0.1px; }
 
@@ -531,7 +536,7 @@ export function generateInvoiceHTML(
     table.items tbody td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
     table.items tbody td.bold { font-weight: 700; }
     table.items tbody td.qty-col { color: #111827; }
-    table.items tbody tr.shipping-row td { color: #374151; }
+    table.items tbody tr.shipping-row td { color: #374151; font-style: italic; }
     table.items tbody tr.shipping-row td.dash { color: #6b7280; }
     /* "Gastos de envío" no debe partirse en dos líneas — si la columna desc
        es estrecha, preferimos que se muestre completo sin wrap. */
@@ -688,7 +693,7 @@ export function generateInvoiceHTML(
       CIF: ${escapeHtml(issuerCIF)}<br>
       ${escapeHtml(issuerPhone)}<br>
       ${escapeHtml(issuerEmail)}<br>
-      ${escapeHtml(abbreviateAddressLine(issuerAddress))}<br>
+      ${escapeHtml(issuerAddress)}<br>
       ${escapeHtml(issuerCity)}${issuerCountry ? `<br>${escapeHtml(issuerCountry)}` : ""}
     </div>
   </div>

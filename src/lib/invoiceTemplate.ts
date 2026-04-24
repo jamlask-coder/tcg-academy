@@ -63,7 +63,7 @@ export const DEFAULT_TEMPLATE: InvoiceTemplate = {
   totalBgColor: "#ffffff",
   totalTextColor: "#111827",
 
-  logoSize: 180,
+  logoSize: 190,
   brandName: "TCG Academy",
   brandSub: "Tienda especialista en TCG",
   showBrandSub: true,
