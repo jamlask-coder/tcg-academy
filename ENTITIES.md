@@ -117,6 +117,29 @@ Escritura: `src/context/AuthContext.tsx` + `src/services/userAdminService.ts`.
 
 **Regla**: nunca copiar datos del Usuario o Producto dentro de otra entidad. Solo guardar el ID y resolver por lookup (`getMergedById(id)` / `findUserById(id)`). Excepción: pedidos/facturas usan `captureSellerSnapshot()` para congelar datos fiscales por obligación legal (inmutabilidad).
 
+### 🎯 Vista 360° del Usuario (cómo "todo está dentro" de ID-Usuario)
+
+Todos los datos de un usuario (pedidos, facturas, puntos, favoritos, cupones, mensajes…) están **reachable** desde su `id`. Viven en su propia entidad con `userId` como clave foránea — así evitamos duplicar. Dado un `userId`, estas son las funciones canónicas para obtener cada pieza:
+
+| Lo que quiero del usuario | Cómo se obtiene |
+|---|---|
+| **Ficha del usuario** | `findUserByHandle(handle)` / `MOCK_USERS.find(u => u.id === userId)` |
+| **Todos sus pedidos** | `readAdminOrdersMerged().filter(o => o.userId === userId)` |
+| **Todas sus facturas** | `loadInvoices().filter(i => i.userId === userId)` |
+| **Saldo de puntos** | `loadPoints(userId)` (`pointsService`) |
+| **Historial de puntos** | `getPointsHistory(userId)` |
+| **Favoritos** | `user.favorites[]` (directo en el User) |
+| **Cupones asignados** | `getUserCoupons(userId)` (`couponService`) |
+| **Mensajes** | `getMessagesForUser(userId)` |
+| **Grupo/asociaciones** | `getAssociations(userId)` |
+| **Referidos directos** | `getDirectReferrals(userId)` |
+| **Devoluciones** | pedidos del usuario → `returns.filter(r => order.userId === userId)` |
+| **Incidencias** | pedidos del usuario → `incidents.filter(i => order.userId === userId)` |
+| **Restock subs** | `tcga_restock_subs` keyed por `userId` |
+| **Límites de compra restantes** | `getRemainingForUser({userId, productId})` |
+
+**Por qué NO se guardan "dentro" del objeto User**: si metiésemos el array de pedidos dentro de `User`, cada cambio de estado de un pedido obligaría a reescribir el usuario entero → race conditions, tamaño hinchado, PII mezclada. La regla DB correcta es: **User tiene su ficha; lo demás se consulta por FK**. Eso es exactamente lo que la web ya hace.
+
 ---
 
 ## Reglas inviolables
