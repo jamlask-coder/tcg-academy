@@ -460,7 +460,7 @@ const PARTIAL: EntityRegistryEntry[] = [
   {
     key: "userActivity",
     description: "Historial de navegación/búsqueda: recientes vistos, búsquedas, pedidos recientes",
-    storageKeys: ["tcgacademy_recent_views", "tcgacademy_recently_viewed", "tcgacademy_search_history", "tcgacademy_recent_order_ids", "tcga_recent_searches", "tcga_admin_ia_search_history", "tcga_restock_subs"],
+    storageKeys: ["tcgacademy_recently_viewed", "tcgacademy_search_history", "tcgacademy_recent_order_ids", "tcga_recent_searches", "tcga_admin_ia_search_history", "tcga_restock_subs"],
     event: "tcga:user_activity:updated" as DataHubEventName,
     pii: true,
     retentionMonths: 6,
@@ -468,7 +468,7 @@ const PARTIAL: EntityRegistryEntry[] = [
     maturity: "partial",
     category: "catalogo",
     dependsOn: ["users", "products"],
-    notes: "recent_views y recently_viewed son solapados: deduplicar en Phase 2.",
+    notes: "Clave canónica: tcgacademy_recently_viewed (vía recentlyViewed.ts). Las tcga_* son stubs para futuras features.",
   },
   {
     key: "systemOps",

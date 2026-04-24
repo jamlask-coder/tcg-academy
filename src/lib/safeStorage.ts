@@ -220,7 +220,7 @@ const TRIMMABLE_KEYS = [
   "tcgacademy_fiscal_audit_log",
   "tcgacademy_audit_log",
   "tcgacademy_storage_errors",
-  "tcgacademy_recent_views",
+  "tcgacademy_recently_viewed",
   "tcgacademy_search_history",
 ];
 
@@ -229,7 +229,7 @@ const PURGEABLE_KEYS = [
   "tcgacademy_autopilot_log",
   "tcgacademy_fiscal_audit_log",
   "tcgacademy_storage_errors",
-  "tcgacademy_recent_views",
+  "tcgacademy_recently_viewed",
   "tcgacademy_search_history",
   "tcgacademy_notif_dynamic",
   "tcgacademy_email_log",
