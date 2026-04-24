@@ -107,6 +107,10 @@ export interface UserRecord {
   lastName: string;
   phone?: string;
   role: "cliente" | "mayorista" | "tienda" | "admin";
+  /** NIF/NIE/CIF normalizado — obligatorio desde el registro. */
+  nif?: string;
+  /** Tipo detectado del NIF, para mostrar en factura. */
+  nifType?: "DNI" | "NIE" | "CIF";
   referralCode?: string;
   referredBy?: string;
   birthDate?: string;
@@ -449,6 +453,12 @@ export interface DbAdapter {
   getUser(userId: string): Promise<UserRecord | null>;
   getUserByEmail(email: string): Promise<UserRecord | null>;
   getUserByUsername(username: string): Promise<UserRecord | null>;
+  /**
+   * Busca por NIF/NIE/CIF normalizado (MAYÚSCULAS, sin espacios).
+   * Usado para impedir que dos usuarios se registren con el mismo
+   * identificador fiscal — requisito de integridad legal.
+   */
+  getUserByNif(nif: string): Promise<UserRecord | null>;
   createUser(user: Omit<UserRecord, "createdAt" | "updatedAt">): Promise<UserRecord>;
   updateUser(userId: string, data: Partial<UserRecord>): Promise<void>;
   deleteUser(userId: string): Promise<void>;
@@ -603,7 +613,17 @@ function writeStorage(key: string, value: unknown): void {
 
 interface RegisteredEntry {
   password: string;
-  user: { id: string; name: string; lastName: string; email: string; username?: string; role?: string };
+  user: {
+    id: string;
+    name: string;
+    lastName: string;
+    email: string;
+    username?: string;
+    role?: string;
+    /** NIF/NIE/CIF normalizado — obligatorio en el registro nuevo. */
+    nif?: string;
+    nifType?: "DNI" | "NIE" | "CIF";
+  };
 }
 
 export class LocalDbAdapter implements DbAdapter {
@@ -663,11 +683,43 @@ export class LocalDbAdapter implements DbAdapter {
     return null;
   }
 
+  async getUserByNif(nif: string): Promise<UserRecord | null> {
+    const needle = nif.toUpperCase().replace(/\s/g, "").trim();
+    if (!needle) return null;
+    const registered = readStorage<Record<string, RegisteredEntry>>(KEYS.users, {});
+    for (const [email, entry] of Object.entries(registered)) {
+      if (entry.user.nif && entry.user.nif === needle) {
+        return {
+          id: entry.user.id,
+          email,
+          name: entry.user.name,
+          lastName: entry.user.lastName,
+          passwordHash: entry.password,
+          role: (entry.user.role as UserRecord["role"]) ?? "cliente",
+          nif: entry.user.nif,
+          nifType: entry.user.nifType,
+          createdAt: "",
+          updatedAt: "",
+        };
+      }
+    }
+    return null;
+  }
+
   async createUser(user: Omit<UserRecord, "createdAt" | "updatedAt">): Promise<UserRecord> {
     const registered = readStorage<Record<string, RegisteredEntry>>(KEYS.users, {});
     registered[user.email] = {
       password: user.passwordHash,
-      user: { id: user.id, name: user.name, lastName: user.lastName, email: user.email, username: user.username, role: user.role },
+      user: {
+        id: user.id,
+        name: user.name,
+        lastName: user.lastName,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        nif: user.nif,
+        nifType: user.nifType,
+      },
     };
     writeStorage(KEYS.users, registered);
     return { ...user, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
@@ -943,6 +995,14 @@ export class ServerDbAdapter implements DbAdapter {
     return mapUserRow(data);
   }
 
+  async getUserByNif(nif: string): Promise<UserRecord | null> {
+    const needle = nif.toUpperCase().replace(/\s/g, "").trim();
+    if (!needle) return null;
+    const { data, error } = await this.db.from("users").select("*").eq("tax_id", needle).maybeSingle();
+    if (error || !data) return null;
+    return mapUserRow(data);
+  }
+
   async createUser(user: Omit<UserRecord, "createdAt" | "updatedAt">): Promise<UserRecord> {
     const { data, error } = await this.db.from("users").insert({
       id: user.id,
@@ -953,6 +1013,8 @@ export class ServerDbAdapter implements DbAdapter {
       last_name: user.lastName,
       phone: user.phone || "",
       role: user.role,
+      tax_id: user.nif || null,
+      tax_id_type: user.nifType || null,
       referral_code: user.referralCode || null,
       referred_by: user.referredBy || null,
       birth_date: user.birthDate || null,
@@ -1336,6 +1398,11 @@ function mapUserRow(row: DbRow): UserRecord {
     lastName: asStr(row.last_name),
     phone: asOpt<string>(row.phone),
     role: row.role as UserRecord["role"],
+    nif: asOpt<string>(row.tax_id),
+    nifType: ((): UserRecord["nifType"] => {
+      const t = asOpt<string>(row.tax_id_type);
+      return t === "DNI" || t === "NIE" || t === "CIF" ? t : undefined;
+    })(),
     referralCode: asOpt<string>(row.referral_code),
     referredBy: asOpt<string>(row.referred_by),
     birthDate: asOpt<string>(row.birth_date),

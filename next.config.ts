@@ -27,14 +27,29 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
+    // CSP endurecido. Notas:
+    //  - `unsafe-eval` solo en dev (Next.js HMR/sourcemaps lo necesitan).
+    //    En producción se elimina → bloquea `eval`, `new Function()`, etc.
+    //  - `unsafe-inline` en script-src permanece: Next.js 16 inyecta scripts
+    //    inline (streaming/Flight) sin nonce. Migración a nonces pendiente.
+    //  - Añadidos: object-src none, base-uri self, form-action self
+    //    (defensa contra inyección de <base>, <object>, form hijack).
+    //  - connect-src incluye Stripe + Supabase + Turnstile para server mode.
+    const isDev = process.env.NODE_ENV !== "production";
+    const scriptSrc = isDev
+      ? "'self' 'unsafe-inline' 'unsafe-eval'"
+      : "'self' 'unsafe-inline'";
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      `script-src ${scriptSrc}`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "img-src 'self' data: blob: https://static.cardmarket.com https://images.pokemontcg.io https://cards.scryfall.io https://c1.scryfall.com https://svgs.scryfall.io https://images.ygoprodeck.com https://api.tcgdex.net https://assets.tcgdex.net https://files.bandai-tcg-plus.com https://storage.googleapis.com https://tcgplayer-cdn.tcgplayer.com https://lorcana-api.com https://images.riftbound.gg https://apitcg.com https://images.digimoncard.io https://en.digimoncard.com https://cdn11.bigcommerce.com https://cdn.sanity.io https://img.yugioh-card.com https://www.yugioh-card.com https://pandacollecting.com",
+      "img-src 'self' data: blob: https://flagcdn.com https://static.cardmarket.com https://images.pokemontcg.io https://cards.scryfall.io https://c1.scryfall.com https://svgs.scryfall.io https://images.ygoprodeck.com https://api.tcgdex.net https://assets.tcgdex.net https://files.bandai-tcg-plus.com https://storage.googleapis.com https://tcgplayer-cdn.tcgplayer.com https://lorcana-api.com https://images.riftbound.gg https://apitcg.com https://images.digimoncard.io https://en.digimoncard.com https://cdn11.bigcommerce.com https://cdn.sanity.io https://img.yugioh-card.com https://www.yugioh-card.com https://pandacollecting.com",
       "font-src 'self' https://fonts.gstatic.com data:",
-      "connect-src 'self' https://api.scryfall.com https://api.pokemontcg.io https://api.tcgdex.net https://api.lorcana-api.com https://db.ygoprodeck.com https://api.frankfurter.app https://apitcg.com https://digimoncard.io",
-      "frame-src 'self' https://www.google.com https://maps.google.com",
+      "connect-src 'self' https://api.scryfall.com https://api.pokemontcg.io https://api.tcgdex.net https://api.lorcana-api.com https://db.ygoprodeck.com https://api.frankfurter.app https://apitcg.com https://digimoncard.io https://api.stripe.com https://*.supabase.co https://*.supabase.in https://challenges.cloudflare.com",
+      "frame-src 'self' https://www.google.com https://maps.google.com https://js.stripe.com https://hooks.stripe.com https://challenges.cloudflare.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
       "frame-ancestors 'none'",
       "upgrade-insecure-requests",
     ].join("; ");

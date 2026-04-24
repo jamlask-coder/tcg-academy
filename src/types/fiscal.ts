@@ -70,11 +70,42 @@ export enum CorrectionType {
 /** Método de pago */
 export enum PaymentMethod {
   TARJETA = "tarjeta",
+  DATAFONO = "datafono",
   TRANSFERENCIA = "transferencia",
   EFECTIVO = "efectivo",
   BIZUM = "bizum",
   PAYPAL = "paypal",
+  /** Mantenido por compatibilidad con facturas históricas. No usar para nuevas. */
   CONTRA_REEMBOLSO = "contra_reembolso",
+}
+
+/**
+ * Origen de la factura — se refleja como sufijo letra en el número
+ * (FAC-YYYY-NNNNNXXXXX<O>). Determinista e inmutable una vez emitida.
+ *
+ * - E = Electrónica / web (pedido desde la tienda online)
+ * - P = Presencial (venta en tienda física, da igual medio de pago)
+ *
+ * Los valores T (TPV), M (Manual) y B (B2B) se mantienen sólo para facturas
+ * históricas que ya hubieran podido emitirse con esos sufijos. NO usar
+ * para nuevas facturas — el operador elige E o P.
+ */
+export enum InvoiceOrigin {
+  WEB = "E",
+  PRESENCIAL = "P",
+  /**
+   * Factura rectificativa — Art. 15 RD 1619/2012. Sufijo "R" en el número de
+   * factura para distinguirla visualmente en el libro y en el 303/390/349.
+   * Se aplica automáticamente al usar `rectifyInvoice()`; no es seleccionable
+   * en los forms de emisión normal.
+   */
+  RECTIFICATIVA = "R",
+  /** @deprecated Usar PRESENCIAL. Se conserva para compat de facturas antiguas. */
+  TPV = "T",
+  /** @deprecated Usar PRESENCIAL. Se conserva para compat de facturas antiguas. */
+  MANUAL = "M",
+  /** @deprecated Usar PRESENCIAL. Se conserva para compat de facturas antiguas. */
+  B2B = "B",
 }
 
 // ─── Direcciones y datos empresa ────────────────────────────────────────────
@@ -336,4 +367,65 @@ export interface VerifactuStatusDetail {
   status: VerifactuStatus;
   lastChecked: Date;
   aeatReference?: string;
+}
+
+// ─── Albaranes (delivery notes) ──────────────────────────────────────────────
+
+/**
+ * Estado del albarán.
+ * - PENDIENTE: emitido pero todavía sin facturar.
+ * - FACTURADO: ya se generó una factura a partir de él (`invoiceId` no null).
+ * - ANULADO: descartado manualmente (no se puede facturar).
+ */
+export enum DeliveryNoteStatus {
+  PENDIENTE = "pendiente",
+  FACTURADO = "facturado",
+  ANULADO = "anulado",
+}
+
+/**
+ * Albarán / nota de entrega.
+ *
+ * Documento de entrega que NO es una factura: no entra en la cadena VeriFactu,
+ * no genera hash encadenado, no aparece en el Libro de Facturas ni en los
+ * modelos 303/390/349. Su único propósito es documentar la entrega y, si
+ * posteriormente se factura, queda trazado por `invoiceId` / `invoiceNumber`.
+ *
+ * La conversión a factura llama a `createInvoice()` del servicio canónico y
+ * transfiere items/cliente/totales — solo entonces se crea el asiento,
+ * la cadena VeriFactu y el registro en el libro.
+ */
+export interface DeliveryNoteRecord {
+  /** ID único interno (UUID) */
+  deliveryNoteId: string;
+  /** Número visible: ALB-YYYY-NNNN (correlativo anual) */
+  deliveryNoteNumber: string;
+  /** Fecha de emisión del albarán */
+  deliveryNoteDate: Date;
+  /** Fecha de la operación (si es distinta a la emisión) */
+  operationDate: Date;
+  /** Emisor (snapshot igual que en factura) */
+  issuer: CompanyData;
+  /** Receptor (empresa o particular) */
+  recipient: CompanyData | CustomerData;
+  items: InvoiceLineItem[];
+  taxBreakdown: TaxBreakdown[];
+  totals: InvoiceTotals;
+  paymentMethod: PaymentMethod;
+  paymentDate: Date | null;
+  status: DeliveryNoteStatus;
+  /** ID del pedido de origen, si aplica */
+  sourceOrderId: string | null;
+  /**
+   * Si el albarán ya se facturó: id y número de la factura resultante.
+   * Null mientras el albarán esté PENDIENTE.
+   */
+  invoiceId: string | null;
+  invoiceNumber: string | null;
+  /** Timestamp del momento en que se convirtió a factura */
+  invoicedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  auditLog: AuditLogEntry[];
+  metadata: Record<string, unknown>;
 }

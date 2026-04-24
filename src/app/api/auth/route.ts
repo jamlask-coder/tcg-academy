@@ -1,10 +1,12 @@
 import type { NextRequest} from "next/server";
 import { NextResponse } from "next/server";
-import { serverRateLimit } from "@/utils/sanitize";
+import { persistentRateLimit } from "@/lib/rateLimitStore";
 import { getDb } from "@/lib/db";
 import {
   hashPassword,
   verifyPassword,
+  simulatePasswordVerify,
+  enforceMinDuration,
   createSessionToken,
   setSessionCookie,
   clearSessionCookie,
@@ -14,14 +16,19 @@ import { getEmailService } from "@/lib/email";
 import { sanitizeString } from "@/utils/sanitize";
 import { authBodySchema, zodMessage } from "@/lib/validations/api";
 import { verifyTurnstileToken, isTurnstileConfigured } from "@/lib/turnstile";
+import { validateSpanishNIF } from "@/lib/validations/nif";
 
 const isServerMode = () => (process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local") === "server";
 
 // POST /api/auth — Unified auth endpoint
+// CSRF/origin check → aplicado globalmente en `src/proxy.ts`.
 export async function POST(req: NextRequest) {
   try {
     const ip = getClientIp(req);
-    const rl = serverRateLimit(`auth:${ip}`, 5, 60_000);
+    // Rate limit general (protege contra bots que martillean la ruta).
+    // `persistentRateLimit` usa Supabase en server mode (cuota global
+    // real en serverless) y cae al Map in-memory en local mode.
+    const rl = await persistentRateLimit(`auth:${ip}`, 20, 60_000);
     if (!rl.allowed) {
       return NextResponse.json(
         { error: "Demasiados intentos. Espera un momento." },
@@ -39,6 +46,26 @@ export async function POST(req: NextRequest) {
     }
     const body = rawBody;
     const { action } = parsed.data;
+
+    // Rate limit granular por acción — login/register/reset son los endpoints
+    // caros y sensibles (brute force, spam de cuentas). Se aplican ADEMÁS del
+    // límite general para que fallos de login no consuman cuota de otras
+    // acciones (ej: logout desde la misma IP).
+    const granularLimits: Record<string, { max: number; windowMs: number }> = {
+      login: { max: 10, windowMs: 300_000 },         // 10 intentos / 5 min
+      register: { max: 3, windowMs: 3_600_000 },     // 3 registros / hora
+      "reset-password": { max: 3, windowMs: 900_000 }, // 3 solicitudes / 15 min
+    };
+    const limit = granularLimits[action];
+    if (limit) {
+      const grl = await persistentRateLimit(`auth:${action}:${ip}`, limit.max, limit.windowMs);
+      if (!grl.allowed) {
+        return NextResponse.json(
+          { error: "Demasiados intentos. Espera unos minutos." },
+          { status: 429, headers: { "Retry-After": String(Math.ceil((grl.resetAt - Date.now()) / 1000)) } },
+        );
+      }
+    }
 
     // Verify Turnstile CAPTCHA on register — must run antes del early return
     // local mode, porque el registro *real* siempre necesita anti-bot si hay
@@ -68,6 +95,7 @@ export async function POST(req: NextRequest) {
       // ── LOGIN ──────────────────────────────────────────────────────────
       case "login": {
         const { email, password, rememberMe } = body;
+        const loginStart = Date.now();
         if (!email || !password) {
           return NextResponse.json({ error: "Email y contraseña requeridos" }, { status: 400 });
         }
@@ -81,6 +109,10 @@ export async function POST(req: NextRequest) {
         }
 
         if (!user) {
+          // Timing-safe: simula hash bcrypt contra dummy + padding mínimo para
+          // que "user no existe" tarde lo mismo que "user existe, password mala".
+          await simulatePasswordVerify(password);
+          await enforceMinDuration(loginStart, 500);
           return NextResponse.json({ error: "Usuario o contraseña incorrectos" }, { status: 401 });
         }
 
@@ -92,6 +124,7 @@ export async function POST(req: NextRequest) {
             action: "login_failed",
             ipAddress: ip,
           });
+          await enforceMinDuration(loginStart, 500);
           return NextResponse.json({ error: "Usuario o contraseña incorrectos" }, { status: 401 });
         }
 
@@ -128,12 +161,12 @@ export async function POST(req: NextRequest) {
 
       // ── REGISTER ───────────────────────────────────────────────────────
       case "register": {
-        const { nombre, apellidos, email, password, username, phone, referralCode, marketingConsent } = body;
+        const { nombre, apellidos, email, password, username, phone, nif, nifType, referralCode, marketingConsent } = body;
         if (!nombre || !email || !password) {
           return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
         }
-        if (password.length < 6) {
-          return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres" }, { status: 400 });
+        if (password.length < 8) {
+          return NextResponse.json({ error: "La contraseña debe tener al menos 8 caracteres" }, { status: 400 });
         }
 
         const cleanEmail = email.toLowerCase().trim();
@@ -153,10 +186,34 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // NIF/NIE/CIF: re-validar server-side con el MISMO algoritmo
+        // (mod-23 + checksum CIF). El schema Zod ya lo rechaza, pero
+        // detectamos aquí el tipo auténtico y comprobamos unicidad.
+        const nifResult = validateSpanishNIF(typeof nif === "string" ? nif : "");
+        if (!nifResult.valid) {
+          return NextResponse.json(
+            { error: nifResult.error ?? "NIF/NIE/CIF inválido" },
+            { status: 400 },
+          );
+        }
+        const cleanNif = nifResult.normalized;
+        const detectedNifType: "DNI" | "NIE" | "CIF" =
+          nifResult.type === "DNI" || nifResult.type === "NIE" || nifResult.type === "CIF"
+            ? nifResult.type
+            : (nifType === "DNI" || nifType === "NIE" || nifType === "CIF" ? nifType : "DNI");
+
+        // Integridad: un mismo NIF no puede estar ligado a dos cuentas.
+        const existingByNif = await db.getUserByNif(cleanNif);
+        if (existingByNif) {
+          return NextResponse.json(
+            { error: "Ya existe una cuenta asociada a este NIF/NIE/CIF" },
+            { status: 409 },
+          );
+        }
+
         // Hash password with bcrypt
         const passwordHash = await hashPassword(password);
 
-        // Create user
         const newUser = await db.createUser({
           id: crypto.randomUUID(),
           email: cleanEmail,
@@ -166,6 +223,8 @@ export async function POST(req: NextRequest) {
           lastName: sanitizeString(apellidos || ""),
           phone: phone ? sanitizeString(phone) : "",
           role: "cliente",
+          nif: cleanNif,
+          nifType: detectedNifType,
           referralCode: undefined, // auto-generated by DB trigger
           referredBy: referralCode?.toUpperCase().trim() || undefined,
         });
@@ -257,6 +316,7 @@ export async function POST(req: NextRequest) {
 
       // ── RESET PASSWORD REQUEST ─────────────────────────────────────────
       case "reset-password": {
+        const resetStart = Date.now();
         const { email: resetEmail } = body;
         if (!resetEmail) {
           return NextResponse.json({ error: "Email requerido" }, { status: 400 });
@@ -265,8 +325,11 @@ export async function POST(req: NextRequest) {
         const cleanEmail = resetEmail.toLowerCase().trim();
         const user = await db.getUserByEmail(cleanEmail);
 
-        // Always return success to prevent email enumeration
+        // Always return success to prevent email enumeration + timing padding
+        // (generar token + enviar email tarda ~200-400ms, la rama "no existe"
+        // respondía mucho antes y se podía enumerar midiendo latencias).
         if (!user) {
+          await enforceMinDuration(resetStart, 600);
           return NextResponse.json({ ok: true, message: "Si el email existe, se enviará un enlace." });
         }
 
@@ -315,6 +378,7 @@ export async function POST(req: NextRequest) {
           ipAddress: ip,
         });
 
+        await enforceMinDuration(resetStart, 600);
         return NextResponse.json({ ok: true, message: "Si el email existe, se enviará un enlace." });
       }
 
@@ -324,14 +388,14 @@ export async function POST(req: NextRequest) {
         if (!confirmEmail || !token || !newPassword) {
           return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
         }
-        if (newPassword.length < 6) {
-          return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres" }, { status: 400 });
+        if (newPassword.length < 8) {
+          return NextResponse.json({ error: "La contraseña debe tener al menos 8 caracteres" }, { status: 400 });
         }
 
         const cleanEmail = confirmEmail.toLowerCase().trim();
 
         // Rate limit brute-force de tokens por email: 5 intentos / 5 min
-        const confirmRl = serverRateLimit(`reset-confirm:${cleanEmail}`, 5, 300_000);
+        const confirmRl = await persistentRateLimit(`reset-confirm:${cleanEmail}`, 5, 300_000);
         if (!confirmRl.allowed) {
           return NextResponse.json(
             { error: "Demasiados intentos. Solicita un nuevo enlace." },
@@ -430,7 +494,7 @@ export async function POST(req: NextRequest) {
         const cleanEmail = vEmail.toLowerCase().trim();
 
         // Rate limit brute-force de tokens por email: 5 intentos / 5 min
-        const verRl = serverRateLimit(`verify-email:${cleanEmail}`, 5, 300_000);
+        const verRl = await persistentRateLimit(`verify-email:${cleanEmail}`, 5, 300_000);
         if (!verRl.allowed) {
           return NextResponse.json({ error: "Demasiados intentos." }, { status: 429 });
         }
@@ -468,6 +532,7 @@ export async function POST(req: NextRequest) {
 
       // ── RESEND VERIFICATION ────────────────────────────────────────────
       case "resend-verification": {
+        const resendStart = Date.now();
         const { email: rEmail } = body;
         if (!rEmail) {
           return NextResponse.json({ error: "Email requerido" }, { status: 400 });
@@ -475,14 +540,15 @@ export async function POST(req: NextRequest) {
         const cleanEmail = rEmail.toLowerCase().trim();
 
         // Rate limit: 3 reenvíos cada 15 min por email
-        const rsRl = serverRateLimit(`resend-verif:${cleanEmail}`, 3, 900_000);
+        const rsRl = await persistentRateLimit(`resend-verif:${cleanEmail}`, 3, 900_000);
         if (!rsRl.allowed) {
           return NextResponse.json({ error: "Espera unos minutos antes de reintentar." }, { status: 429 });
         }
 
         const user = await db.getUserByEmail(cleanEmail);
-        // Nunca revelar si el email existe o no (enumeration).
+        // Nunca revelar si el email existe o no (enumeration + timing).
         if (!user) {
+          await enforceMinDuration(resendStart, 500);
           return NextResponse.json({ ok: true });
         }
 
@@ -509,6 +575,7 @@ export async function POST(req: NextRequest) {
           expires_in: "7 días",
         });
 
+        await enforceMinDuration(resendStart, 500);
         return NextResponse.json({ ok: true });
       }
 

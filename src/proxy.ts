@@ -67,6 +67,52 @@ export function proxy(request: NextRequest) {
       response.headers.set("Access-Control-Allow-Origin", allowedOrigin);
     }
 
+    // CSRF / Origin check para operaciones mutantes. Rechaza requests que no
+    // vienen del propio origen (curl/otra web/extensión). Excluimos webhooks
+    // (Stripe) y crons (providers externos) porque son cross-origin por
+    // diseño y se autentican con secrets distintos.
+    const MUTATING = new Set(["POST", "PATCH", "PUT", "DELETE"]);
+    const ORIGIN_EXCLUDE = ["/api/payments/webhook", "/api/cron/"];
+    const isMutating = MUTATING.has(request.method.toUpperCase());
+    const isOriginExcluded = ORIGIN_EXCLUDE.some((p) => pathname.startsWith(p));
+    if (isMutating && !isOriginExcluded) {
+      const referer = request.headers.get("referer");
+      const allowed = (() => {
+        try {
+          return new URL(allowedOrigin).origin;
+        } catch {
+          return allowedOrigin;
+        }
+      })();
+      if (!origin && !referer) {
+        return new NextResponse(
+          JSON.stringify({ error: "Origen no permitido" }),
+          { status: 403, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (origin && origin !== allowed) {
+        return new NextResponse(
+          JSON.stringify({ error: "Origen no permitido" }),
+          { status: 403, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (!origin && referer) {
+        try {
+          if (new URL(referer).origin !== allowed) {
+            return new NextResponse(
+              JSON.stringify({ error: "Origen no permitido" }),
+              { status: 403, headers: { "Content-Type": "application/json" } },
+            );
+          }
+        } catch {
+          return new NextResponse(
+            JSON.stringify({ error: "Origen no permitido" }),
+            { status: 403, headers: { "Content-Type": "application/json" } },
+          );
+        }
+      }
+    }
+
     // Reject suspiciously large payloads early
     const contentLength = request.headers.get("content-length");
     if (contentLength && parseInt(contentLength, 10) > 1024 * 1024) {

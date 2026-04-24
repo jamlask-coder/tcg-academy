@@ -163,8 +163,10 @@ export function checkRateLimit(
 }
 
 // ─── Server-side rate limiting (single-server, in-memory) ────────────────────
-// TODO: For multi-server / serverless deployments, replace the in-memory Map
-// with a Redis-backed store (e.g. `ioredis` INCR + EXPIRE pattern).
+// Para despliegues serverless / multi-instancia, usar `persistentRateLimit`
+// de `src/lib/rateLimitStore.ts` — respaldado por Supabase cuando está
+// configurado. Este `serverRateLimit` sigue siendo el store por defecto
+// (una sola instancia) y fallback si Supabase no está disponible.
 
 interface RateLimitEntry {
   count: number;

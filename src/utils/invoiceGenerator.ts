@@ -14,7 +14,7 @@
  */
 
 import { SITE_CONFIG } from "@/config/siteConfig";
-import { getIssuerAddress } from "@/lib/fiscalAddress";
+import { getIssuerAddress, abbreviateAddressLine } from "@/lib/fiscalAddress";
 import {
   loadInvoiceTemplate,
   DEFAULT_TEMPLATE,
@@ -74,6 +74,15 @@ export interface InvoiceData {
   couponCode?: string;
   couponDiscount?: number;
   pointsDiscount?: number;
+
+  /**
+   * Si `true`, el documento se renderiza como ALBARÁN:
+   *  - título "ALBARÁN Nº …" (en lugar de "FACTURA Nº …")
+   *  - marca de agua diagonal "ALBARÁN" roja semitransparente (ocupa toda la página)
+   *  - sin CSV VeriFactu en el pie (los albaranes no van a la AEAT)
+   *  - `<title>` y texto legal adaptados
+   */
+  isDeliveryNote?: boolean;
 }
 
 /** Calculates base imponible and IVA from price-with-VAT */
@@ -108,6 +117,31 @@ function fmtDate(iso: string): string {
   });
 }
 
+/**
+ * Normaliza el método de pago para impresión. Los valores del enum
+ * `PaymentMethod` llegan en minúsculas (`tarjeta`, `datafono`, `paypal`...).
+ * Devolvemos un label humano con la mayúscula y tildes correctas; si el valor
+ * ya viene formateado (ej. "Tarjeta Visa ****4242") se respeta tal cual salvo
+ * la primera letra.
+ */
+function prettyPaymentMethod(raw: string | undefined): string {
+  if (!raw) return "—";
+  const trimmed = raw.trim();
+  if (!trimmed) return "—";
+  const map: Record<string, string> = {
+    tarjeta: "Tarjeta",
+    datafono: "Datáfono",
+    transferencia: "Transferencia",
+    efectivo: "Efectivo",
+    bizum: "Bizum",
+    paypal: "PayPal",
+    contra_reembolso: "Contra reembolso",
+  };
+  const key = trimmed.toLowerCase();
+  if (map[key]) return map[key];
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
+
 export function generateInvoiceHTML(
   data: InvoiceData,
   templateOverride?: InvoiceTemplate,
@@ -122,7 +156,7 @@ export function generateInvoiceHTML(
     paymentMethod,
     paymentStatus,
     verifactuHash,
-    verifactuQR,
+    verifactuQR: _verifactuQR,
     verifactuStatus: _verifactuStatus,
     issuerName,
     issuerCIF,
@@ -144,6 +178,7 @@ export function generateInvoiceHTML(
     couponCode,
     couponDiscount = 0,
     pointsDiscount = 0,
+    isDeliveryNote = false,
   } = data;
 
   const formattedDate = fmtDate(date);
@@ -198,10 +233,10 @@ export function generateInvoiceHTML(
     <tr>
       <td class="desc">${escapeHtml(l.name)}</td>
       <td class="center qty-col">${l.quantity}</td>
-      <td class="right num">${unitNoVat.toFixed(2)} €</td>
-      <td class="right num">${l.base.toFixed(2)} €</td>
-      <td class="right num">${l.vatAmount.toFixed(2)} €</td>
-      <td class="right num bold">${l.totalWithVAT.toFixed(2)} €</td>
+      <td class="right num">${unitNoVat.toFixed(2)}&nbsp;€</td>
+      <td class="right num">${l.base.toFixed(2)}&nbsp;€</td>
+      <td class="right num">${l.vatAmount.toFixed(2)}&nbsp;€</td>
+      <td class="right num bold">${l.totalWithVAT.toFixed(2)}&nbsp;€</td>
     </tr>`;
     })
     .join("");
@@ -212,15 +247,22 @@ export function generateInvoiceHTML(
       ? PAYMENT_STATUS_LABEL[paymentStatus]
       : null;
 
-  // Ocultar prefijo interno `FAC-` al renderizar (el hash-chain lo sigue usando internamente).
-  const displayNumber = invoiceNumber.replace(/^FAC-/, "");
+  // Ocultar prefijo interno al renderizar:
+  //  - FAC- en facturas (el hash-chain lo sigue usando internamente)
+  //  - ALB- en albaranes (numeración independiente)
+  const displayNumber = invoiceNumber.replace(/^(FAC|ALB)-/, "");
+
+  // Título del documento — varía entre factura y albarán.
+  // El albarán ignora `tpl.labelTitle` porque es un documento distinto, no una
+  // variante visual del mismo.
+  const docTitle = isDeliveryNote ? "ALBARÁN" : tpl.labelTitle;
 
   // Client info — filter empty lines
   const clientLines = [
     clientCIF ? `NIF: ${escapeHtml(clientCIF)}` : null,
     clientPhone ? escapeHtml(clientPhone) : null,
     clientEmail ? escapeHtml(clientEmail) : null,
-    clientAddress ? escapeHtml(clientAddress) : null,
+    clientAddress ? escapeHtml(abbreviateAddressLine(clientAddress)) : null,
     clientCity ? escapeHtml(clientCity) : null,
     [clientProvince, clientCountry]
       .filter(Boolean)
@@ -237,19 +279,41 @@ export function generateInvoiceHTML(
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Factura ${invoiceNumber}</title>
+  <title>${isDeliveryNote ? "Albarán" : "Factura"} ${invoiceNumber}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
+    /* Paleta brand: navy principal derivado del logo (degradado
+       #0a0f1a → #1e3a8a → #1d4ed8). Se usa #1e3a8a como acento principal y
+       #0a0f1a como tono profundo para bordes decisivos. */
+    :root {
+      --brand-navy: #1e3a8a;
+      --brand-navy-deep: #0f1e4a;
+      --brand-navy-soft: #eef2ff;
+    }
+
     @page { size: A4; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 210mm; min-height: 297mm; }
-    body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #111827; background: white; }
+    /* Inter: trazos más estrechos que Arial Black. Fallback a system UI estilos
+       narrow (Segoe UI en Windows, Helvetica Neue en macOS). */
+    body { font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 10pt; color: #111827; background: white; }
     .invoice-wrap {
       width: 210mm;
       min-height: 297mm;
       margin: 0 auto;
-      padding: ${tpl.paddingTop}mm ${tpl.paddingX}mm ${tpl.paddingBottom}mm;
+      padding: ${tpl.paddingTop}mm ${tpl.paddingX}mm ${tpl.paddingBottom}mm ${tpl.paddingX}mm;
+      padding-bottom: calc(${tpl.paddingBottom}mm + 16mm); /* reserva para footer fijo */
       position: relative;
       overflow: hidden;
+    }
+
+    /* Cierre visual fino inmediatamente debajo de la tabla de items. */
+    .items-close {
+      height: 0;
+      border-bottom: 1px solid #cbd5e1;
+      margin: 0 0 14px 0;
     }
 
     /* ── Marca de agua ── */
@@ -264,24 +328,52 @@ export function generateInvoiceHTML(
       user-select: none;
       z-index: 0;
     }
-    .invoice-wrap > *:not(.watermark) { position: relative; z-index: 1; }
+    /* Marca de agua ALBARÁN — texto diagonal rojo, inmenso, para que nunca
+       se confunda con una factura real. Se renderiza en lugar de la imagen
+       watermark estándar cuando isDeliveryNote es true. */
+    .watermark-albaran {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-30deg);
+      font-size: 160pt;
+      font-weight: 900;
+      letter-spacing: 14px;
+      color: rgba(220, 38, 38, 0.14);
+      white-space: nowrap;
+      pointer-events: none;
+      user-select: none;
+      z-index: 0;
+      font-family: 'Inter', Arial, sans-serif;
+    }
+    .invoice-wrap > *:not(.watermark):not(.watermark-albaran) { position: relative; z-index: 1; }
 
     /* ── HEADER — logo left, company info right ── */
-    .hdr { display: flex; justify-content: space-between; align-items: center; gap: 32px; margin-bottom: ${tpl.gapAfterHeader}px; }
-    .brand-logo { height: ${tpl.logoSize}px; width: auto; max-width: 320px; object-fit: contain; flex-shrink: 0; display: block; }
+    .hdr { display: flex; justify-content: space-between; align-items: center; gap: 32px; margin-bottom: ${tpl.gapAfterHeader}px; padding-bottom: 14px; border-bottom: 2px solid var(--brand-navy); }
+    /* margin-left negativo: el logo queda ópticamente más a la izquierda sin
+       reducir el margen lateral del cuerpo de la factura (que el usuario quiere
+       algo más ancho). */
+    .brand-logo { height: ${tpl.logoSize}px; width: auto; max-width: 380px; object-fit: contain; flex-shrink: 0; display: block; margin-left: -12mm; }
     .company-info { text-align: left; font-size: 10.5pt; color: #111827; line-height: 1.55; }
-    .company-info strong { color: #111827; font-weight: 700; font-size: 11.5pt; display: block; margin-bottom: 3px; }
+    .company-info strong { color: var(--brand-navy); font-weight: 700; font-size: 11.5pt; display: block; margin-bottom: 3px; letter-spacing: 0.1px; }
 
     /* ── FACTURA Nº — título bajo cabecera ── */
-    .invoice-title { font-size: 14pt; font-weight: 800; color: #111827; letter-spacing: -0.2px; margin-bottom: ${tpl.gapAfterParties}px; margin-top: 4px; }
+    .invoice-title {
+      font-size: 13.5pt;
+      font-weight: 700;
+      color: var(--brand-navy);
+      letter-spacing: -0.1px;
+      margin-bottom: ${tpl.gapAfterParties}px;
+      margin-top: 4px;
+    }
 
     /* ── Bloque cliente + pedido en 2 columnas ── */
     .parties { display: flex; justify-content: space-between; align-items: flex-start; gap: 32px; margin-bottom: ${tpl.gapAfterOrderBar}px; }
-    .client-block { flex: 1 1 auto; font-size: 9pt; color: #111827; line-height: 1.5; }
-    .client-block strong { color: #111827; font-weight: 700; font-size: 10pt; display: block; margin-bottom: 2px; }
+    .client-block { flex: 1 1 auto; font-size: 9pt; color: #111827; line-height: 1.5; padding-left: 10px; border-left: 3px solid var(--brand-navy); }
+    .client-block strong { color: var(--brand-navy); font-weight: 700; font-size: 10pt; display: block; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.3px; }
     .order-block { flex: 0 0 auto; font-size: 9pt; color: #111827; line-height: 1.55; text-align: left; min-width: 42%; }
     .order-block .line { white-space: nowrap; }
-    .order-block .lbl { font-weight: 700; }
+    .order-block .lbl { font-weight: 700; color: var(--brand-navy); }
     .order-block .val.mono { font-family: 'Courier New', monospace; }
     .status-chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 7.5pt; font-weight: 700; margin-left: 4px; }
 
@@ -289,20 +381,27 @@ export function generateInvoiceHTML(
     .intracom-note { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 8px 12px; font-size: 8.5pt; color: #1e40af; margin-bottom: 12px; }
 
     /* ── ITEMS TABLE ── */
-    table.items { width: 100%; border-collapse: collapse; margin-bottom: ${tpl.gapAfterTable}px; font-size: 9pt; table-layout: fixed; }
-    table.items thead tr { background: #000000; color: #ffffff; }
+    table.items { width: 100%; border-collapse: collapse; margin-bottom: ${tpl.gapAfterTable}px; font-size: 9pt; table-layout: fixed; border: 1px solid var(--brand-navy); border-radius: 4px; overflow: hidden; }
+    table.items thead tr { background: linear-gradient(180deg, var(--brand-navy) 0%, var(--brand-navy-deep) 100%); color: #ffffff; }
     table.items thead th {
-      padding: 9px 10px;
+      padding: 6px 8px;
       text-align: center;
       font-weight: 700;
-      font-size: 9pt;
-      letter-spacing: 0;
+      font-size: 8.5pt;
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
       color: #ffffff;
+      border-right: 1px solid rgba(255,255,255,0.15);
+      word-break: normal;
+      overflow-wrap: break-word;
     }
+    table.items thead th:last-child { border-right: 0; }
     table.items thead th.left { text-align: left; }
     table.items thead th.right { text-align: center; }
-    table.items tbody tr { border-bottom: 1px solid #d1d5db; }
-    table.items tbody td { padding: 8px 10px; vertical-align: middle; }
+    table.items tbody tr { border-bottom: 1px solid #e5e7eb; }
+    table.items tbody tr:nth-child(even) { background: #f8fafc; }
+    table.items tbody tr:last-child { border-bottom: 0; }
+    table.items tbody td { padding: 5px 10px; vertical-align: middle; }
     table.items tbody td.desc { font-weight: 500; word-break: break-word; }
     table.items tbody td.center { text-align: center; }
     table.items tbody td.right { text-align: right; }
@@ -312,13 +411,14 @@ export function generateInvoiceHTML(
     table.items tbody tr.shipping-row td { color: #374151; }
     table.items tbody tr.shipping-row td.dash { color: #6b7280; }
 
-    /* Column widths (fiel al DOCX): Producto 44%, Cantidad 11%, P.unit 14%, Tot.s/IVA 11%, IVA 8%, Total 12% */
-    col.col-desc   { width: 44%; }
-    col.col-qty    { width: 11%; }
-    col.col-unit   { width: 14%; }
-    col.col-total  { width: 11%; }
-    col.col-iva    { width: 8%; }
-    col.col-ttotal { width: 12%; }
+    /* Column widths — "Cantidad" necesita sitio para no superponerse con
+       "Precio unit. s/IVA". Las numéricas respiran para evitar cortes "€". */
+    col.col-desc   { width: 32%; }
+    col.col-qty    { width: 12%; }
+    col.col-unit   { width: 15%; }
+    col.col-total  { width: 13%; }
+    col.col-iva    { width: 12%; }
+    col.col-ttotal { width: 16%; }
 
     /* ── DISCOUNTS CARD ── */
     .discounts-card {
@@ -343,42 +443,68 @@ export function generateInvoiceHTML(
     .vat-breakdown td { padding: 2px 10px 2px 0; }
 
     /* ── TOTALS block ── */
-    .totals { margin-left: auto; width: 46%; font-size: 10pt; font-variant-numeric: tabular-nums; background: transparent; }
-    .totals .row { display: flex; justify-content: space-between; padding: 6px 4px; }
+    .totals { margin-left: auto; width: 46%; font-size: 10pt; font-variant-numeric: tabular-nums; background: transparent; border: 1px solid var(--brand-navy); border-radius: 6px; overflow: hidden; }
+    .totals .row { display: flex; justify-content: space-between; padding: 5px 12px; }
+    .totals .row:not(.final) { border-bottom: 1px solid #e5e7eb; }
     .totals .row span:first-child { color: #111827; font-weight: 600; }
     .totals .row span:last-child { font-weight: 700; color: #111827; }
     .totals .row.final {
-      border-top: 2px solid #000000;
-      border-bottom: 2px solid #000000;
-      padding: 10px 4px;
-      margin-top: 4px;
-      font-size: 13pt;
-      font-weight: 800;
-      color: #000000;
-      letter-spacing: 0.3px;
+      background: linear-gradient(180deg, var(--brand-navy) 0%, var(--brand-navy-deep) 100%);
+      padding: 7px 12px;
+      margin-top: 0;
+      font-size: 12pt;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 0.2px;
+      border-top: 0;
+      border-bottom: 0;
     }
-    .totals .row.final span:first-child { color: #000000; font-weight: 800; }
-    .totals .row.final span:last-child { color: #000000; font-weight: 800; }
+    .totals .row.final span:first-child { color: #ffffff; font-weight: 700; }
+    .totals .row.final span:last-child { color: #ffffff; font-weight: 700; }
     .totals .row.discount span:last-child { color: #16a34a; }
 
-    /* ── LEGAL ── */
-    .legal { margin-top: 22px; padding-top: 10px; border-top: 1px solid #e5e7eb; font-size: 7.5pt; color: #9ca3af; text-align: center; line-height: 1.5; font-style: italic; }
-
-    /* ── VeriFactu CSV — discreto, al pie ── */
-    .verifactu {
-      position: absolute;
-      bottom: 6mm;
+    /* ── FOOTER fijado al pie de cada página ────────────────────────────── */
+    .page-footer {
+      position: fixed;
+      bottom: 5mm;
       left: ${tpl.paddingX}mm;
       right: ${tpl.paddingX}mm;
-      font-size: 6pt;
-      color: #9ca3af;
+      padding: 5px 0 0;
+      border-top: 2px solid var(--brand-navy);
+      background: #ffffff;
+      font-size: 7pt;
+      color: #6b7280;
       line-height: 1.4;
-      text-align: center;
-      z-index: 2;
+      z-index: 5;
     }
-    .verifactu .csv-label { color: #6b7280; font-weight: 600; }
-    .verifactu .csv-hash { font-family: 'Courier New', monospace; word-break: break-all; }
-
+    .page-footer .footer-grid {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+    }
+    .page-footer .footer-col { flex: 1; min-width: 0; }
+    .page-footer .footer-col.center { text-align: center; }
+    .page-footer .footer-col.right { text-align: right; flex: 0 0 auto; }
+    .page-footer .legal {
+      font-size: 7pt;
+      color: #6b7280;
+      line-height: 1.45;
+      font-style: italic;
+    }
+    .page-footer .csv-row {
+      margin-top: 4px;
+      font-size: 6.5pt;
+      color: #9ca3af;
+    }
+    .page-footer .csv-label { color: var(--brand-navy); font-weight: 700; letter-spacing: 0.4px; }
+    .page-footer .csv-hash { font-family: 'Courier New', monospace; word-break: break-all; color: #6b7280; }
+    .page-footer .page-num {
+      font-size: 7.5pt;
+      font-weight: 700;
+      color: var(--brand-navy);
+      white-space: nowrap;
+    }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .no-print { display: none; }
@@ -388,7 +514,13 @@ export function generateInvoiceHTML(
 <body>
 <div class="invoice-wrap">
 
-  ${tpl.watermarkEnabled ? `<img class="watermark" src="/images/invoice-watermark.png" alt="" aria-hidden="true" />` : ""}
+  ${
+    isDeliveryNote
+      ? `<div class="watermark-albaran" aria-hidden="true">ALBARÁN</div>`
+      : tpl.watermarkEnabled
+        ? `<img class="watermark" src="/images/invoice-watermark.png" alt="" aria-hidden="true" />`
+        : ""
+  }
 
   <!-- HEADER: logo izquierda + datos empresa derecha -->
   <div class="hdr">
@@ -403,8 +535,8 @@ export function generateInvoiceHTML(
     </div>
   </div>
 
-  <!-- FACTURA Nº -->
-  <div class="invoice-title">${escapeHtml(tpl.labelTitle)} Nº ${escapeHtml(displayNumber)}</div>
+  <!-- FACTURA / ALBARÁN Nº -->
+  <div class="invoice-title">${escapeHtml(docTitle)} Nº ${escapeHtml(displayNumber)}</div>
 
   <!-- CLIENTE (izq) + PEDIDO (der) en 2 columnas -->
   <div class="parties">
@@ -418,7 +550,7 @@ export function generateInvoiceHTML(
     <div class="order-block">
       <div class="line"><span class="lbl">Pedido:</span> <span class="val">${orderId ? escapeHtml(orderId) : "—"}</span></div>
       <div class="line"><span class="lbl">Fecha de pedido:</span> <span class="val">${formattedDate}</span></div>
-      <div class="line"><span class="lbl">${escapeHtml(tpl.labelPaymentMethod)}:</span> <span class="val">${paymentMethod ? escapeHtml(paymentMethod) : "—"}${statusChip ? `<span class="status-chip" style="background:${statusChip.bg};color:${statusChip.color}">${statusChip.label}</span>` : ""}</span></div>
+      <div class="line"><span class="lbl">${escapeHtml(tpl.labelPaymentMethod)}:</span> <span class="val">${escapeHtml(prettyPaymentMethod(paymentMethod))}${statusChip ? `<span class="status-chip" style="background:${statusChip.bg};color:${statusChip.color}">${statusChip.label}</span>` : ""}</span></div>
     </div>`
         : ""
     }
@@ -453,16 +585,17 @@ export function generateInvoiceHTML(
           ? `
       <tr class="shipping-row">
         <td class="desc">Gastos de envío</td>
-        <td class="center dash">----</td>
-        <td class="right dash">----</td>
-        <td class="right num">${shippingBase.toFixed(2)} €</td>
-        <td class="right num">${shippingVAT.toFixed(2)} €</td>
-        <td class="right num bold">${shipping.toFixed(2)} €</td>
+        <td class="center dash">—</td>
+        <td class="right dash">—</td>
+        <td class="right num">${shippingBase.toFixed(2)}&nbsp;€</td>
+        <td class="right num">${shippingVAT.toFixed(2)}&nbsp;€</td>
+        <td class="right num bold">${shipping.toFixed(2)}&nbsp;€</td>
       </tr>`
           : ""
       }
     </tbody>
   </table>
+  <div class="items-close"></div>
 
   ${
     tpl.showDiscountsCard && discounts > 0
@@ -471,12 +604,12 @@ export function generateInvoiceHTML(
     <div class="title">Descuentos aplicados</div>
     ${
       couponDiscount > 0
-        ? `<div class="line"><span>Cupón${couponCode ? ` <strong>${escapeHtml(couponCode)}</strong>` : ""}</span><span class="amt">-${couponDiscount.toFixed(2)} €</span></div>`
+        ? `<div class="line"><span>Cupón${couponCode ? ` <strong>${escapeHtml(couponCode)}</strong>` : ""}</span><span class="amt">-${couponDiscount.toFixed(2)}&nbsp;€</span></div>`
         : ""
     }
     ${
       pointsDiscount > 0
-        ? `<div class="line"><span>Canje de puntos de fidelidad</span><span class="amt">-${pointsDiscount.toFixed(2)} €</span></div>`
+        ? `<div class="line"><span>Canje de puntos de fidelidad</span><span class="amt">-${pointsDiscount.toFixed(2)}&nbsp;€</span></div>`
         : ""
     }
   </div>`
@@ -493,7 +626,7 @@ export function generateInvoiceHTML(
         ${breakdownEntries
           .map(
             ([rate, v]) =>
-              `<td>Base ${rate}%: <strong>${v.base.toFixed(2)} €</strong> · Cuota: <strong>${v.vat.toFixed(2)} €</strong></td>`,
+              `<td>Base ${rate}%: <strong>${v.base.toFixed(2)}&nbsp;€</strong> · Cuota: <strong>${v.vat.toFixed(2)}&nbsp;€</strong></td>`,
           )
           .join("")}
       </tr>
@@ -503,29 +636,37 @@ export function generateInvoiceHTML(
   }
 
   <div class="totals">
-    <div class="row"><span>Base imponible</span><span>${subtotalBase.toFixed(2)} €</span></div>
-    <div class="row"><span>IVA ${intracomunitario ? "0% — exento" : `${SITE_CONFIG.vatRate}%`}</span><span>${subtotalVAT.toFixed(2)} €</span></div>
-    ${couponDiscount > 0 ? `<div class="row discount"><span>Dto. cupón${couponCode ? ` (${escapeHtml(couponCode)})` : ""}</span><span>-${couponDiscount.toFixed(2)} €</span></div>` : ""}
-    ${pointsDiscount > 0 ? `<div class="row discount"><span>Dto. canje de puntos</span><span>-${pointsDiscount.toFixed(2)} €</span></div>` : ""}
-    <div class="row final"><span>TOTAL</span><span>${totalFinal.toFixed(2)} €</span></div>
+    <div class="row"><span>Base imponible</span><span>${subtotalBase.toFixed(2)}&nbsp;€</span></div>
+    <div class="row"><span>IVA ${intracomunitario ? "0% — exento" : `${SITE_CONFIG.vatRate}%`}</span><span>${subtotalVAT.toFixed(2)}&nbsp;€</span></div>
+    ${couponDiscount > 0 ? `<div class="row discount"><span>Dto. cupón${couponCode ? ` (${escapeHtml(couponCode)})` : ""}</span><span>-${couponDiscount.toFixed(2)}&nbsp;€</span></div>` : ""}
+    ${pointsDiscount > 0 ? `<div class="row discount"><span>Dto. canje de puntos</span><span>-${pointsDiscount.toFixed(2)}&nbsp;€</span></div>` : ""}
+    <div class="row final"><span>TOTAL</span><span>${totalFinal.toFixed(2)}&nbsp;€</span></div>
   </div>
 
-  ${
-    tpl.showLegal
-      ? `<div class="legal">${escapeHtml(tpl.legalText)}${intracomunitario ? "<br>Operación exenta de IVA. Inversión del sujeto pasivo (art. 25 LIVA, Ley 37/1992)." : ""}</div>`
-      : ""
-  }
-
-  ${
-    tpl.showVerifactu && (verifactuHash || verifactuQR)
-      ? `
-  <div class="verifactu">
-    ${verifactuHash ? `<span class="csv-label">CSV:</span> <span class="csv-hash">${verifactuHash}</span>` : ""}
-  </div>`
-      : ""
-  }
-
 </div>
+
+<!-- PIE DE PÁGINA — se repite en cada página impresa (position: fixed). ──
+     Aquí viven el legal, el CSV VeriFactu y la paginación. -->
+<div class="page-footer">
+  <div class="footer-grid">
+    <div class="footer-col">
+      ${
+        tpl.showLegal
+          ? `<div class="legal">${escapeHtml(tpl.legalText)}${intracomunitario ? "<br>Operación exenta de IVA. Inversión del sujeto pasivo (art. 25 LIVA, Ley 37/1992)." : ""}</div>`
+          : ""
+      }
+      ${
+        tpl.showVerifactu && verifactuHash
+          ? `<div class="csv-row"><span class="csv-label">CSV:</span> <span class="csv-hash">${verifactuHash}</span></div>`
+          : ""
+      }
+    </div>
+    <div class="footer-col right">
+      <span class="page-num">Página 1 de 1</span>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>`;
 }
@@ -591,7 +732,11 @@ export async function printInvoiceWithCSV(data: InvoiceData): Promise<void> {
  * itself so it cannot be bypassed.
  */
 export async function printInvoice(data: InvoiceData): Promise<void> {
-  await ensureVerifactuHash(data);
+  // Los albaranes NO llevan CSV VeriFactu — son documentos de entrega, no
+  // facturas, y no entran en la cadena hash ni se envían a la AEAT.
+  if (!data.isDeliveryNote) {
+    await ensureVerifactuHash(data);
+  }
   const html = generateInvoiceHTML(data);
   // Inject a <base> tag so relative image paths (logo, etc.) resolve from the origin
   const baseTag = `<base href="${window.location.origin}/">`;

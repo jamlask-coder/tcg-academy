@@ -13,7 +13,9 @@ import { SITE_CONFIG } from "@/config/siteConfig";
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 
-const BCRYPT_ROUNDS = 12;
+// bcrypt cost factor. Cada incremento duplica el tiempo de hash.
+// 13 ≈ 250-350 ms en hardware típico de 2026 — balance entre seguridad y UX.
+const BCRYPT_ROUNDS = 13;
 const JWT_ALGORITHM = "HS256";
 const COOKIE_NAME = "tcga_session";
 // Duración derivada de SITE_CONFIG para mantener una única fuente de verdad:
@@ -41,6 +43,43 @@ export async function verifyPassword(
   hash: string,
 ): Promise<boolean> {
   return bcrypt.compare(password, hash);
+}
+
+// Dummy hash precomputado lazy para evitar timing attacks. Cuando el login
+// recibe un email que no existe, ejecutamos verifyPassword contra este hash
+// para que el tiempo de respuesta sea indistinguible de un user real con
+// contraseña incorrecta. Sin esto, un atacante puede enumerar cuentas midiendo
+// el delta temporal entre "user desconocido" (rápido) y "user conocido" (hash).
+let _dummyHash: string | null = null;
+async function getDummyHash(): Promise<string> {
+  if (!_dummyHash) {
+    _dummyHash = await bcrypt.hash("__tcga_dummy_never_matches__", BCRYPT_ROUNDS);
+  }
+  return _dummyHash;
+}
+
+/**
+ * Simula la verificación de contraseña contra un hash dummy. Usar cuando el
+ * usuario no existe para que el tiempo total del endpoint sea constante.
+ */
+export async function simulatePasswordVerify(password: string): Promise<void> {
+  const dummy = await getDummyHash();
+  await bcrypt.compare(password, dummy);
+}
+
+/**
+ * Garantiza que una operación tarde AL MENOS `minMs`. Útil en endpoints de
+ * auth para ocultar diferencias de tiempo entre ramas (user existe vs. no,
+ * email válido vs. rebotado, etc.). No sustituye al hash dummy — lo complementa.
+ */
+export async function enforceMinDuration(
+  startedAt: number,
+  minMs: number,
+): Promise<void> {
+  const elapsed = Date.now() - startedAt;
+  if (elapsed < minMs) {
+    await new Promise((r) => setTimeout(r, minMs - elapsed));
+  }
 }
 
 // ─── JWT ────────────────────────────────────────────────────────────────────

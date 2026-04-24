@@ -54,7 +54,7 @@ export interface InvoiceTemplate {
 
 export const DEFAULT_TEMPLATE: InvoiceTemplate = {
   paddingTop: 14,
-  paddingX: 14,
+  paddingX: 17,
   paddingBottom: 22,
 
   primaryColor: "#2563eb",
@@ -63,7 +63,7 @@ export const DEFAULT_TEMPLATE: InvoiceTemplate = {
   totalBgColor: "#ffffff",
   totalTextColor: "#111827",
 
-  logoSize: 140,
+  logoSize: 180,
   brandName: "TCG Academy",
   brandSub: "Tienda especialista en TCG",
   showBrandSub: true,

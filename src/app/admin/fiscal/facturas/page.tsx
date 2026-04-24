@@ -15,6 +15,7 @@ import {
   Info,
   CheckCircle2,
   XCircle,
+  FileWarning,
 } from "lucide-react";
 // ChevronDown, ChevronUp used by SortIcon
 import {
@@ -478,12 +479,6 @@ export default function FacturasPage() {
           >
             <Plus size={15} /> Emitir factura manual
           </Link>
-          <Link
-            href="/admin/fiscal/presupuesto"
-            className="flex h-9 items-center gap-2 rounded-lg bg-amber-500 px-4 text-sm font-semibold !text-white transition hover:bg-amber-600"
-          >
-            <Plus size={15} /> Emitir presupuesto
-          </Link>
           <button
             onClick={exportAll}
             className="flex h-9 items-center gap-2 rounded-lg bg-[#2563eb] px-4 text-sm font-semibold !text-white transition hover:bg-[#1d4ed8]"
@@ -855,12 +850,14 @@ export default function FacturasPage() {
                     Total{" "}
                     <SortIcon k="total" sortKey={sortKey} sortAsc={sortAsc} />
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold">Tipo</th>
                   <th className="px-4 py-3 text-center font-semibold">
                     Estado
                   </th>
                   <th className="px-4 py-3 text-center font-semibold">
                     VeriFactu
+                  </th>
+                  <th className="px-4 py-3 text-center font-semibold">
+                    Acciones
                   </th>
                 </tr>
               </thead>
@@ -898,23 +895,36 @@ export default function FacturasPage() {
                       <td className="px-4 py-3 font-mono text-xs text-gray-500">
                         {recipient.taxId ?? "—"}
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-800">
-                        {inv.totals.totalTaxableBase.toFixed(2)} €
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-gray-800">
+                        {inv.totals.totalTaxableBase.toFixed(2)}&nbsp;€
                       </td>
-                      <td className="px-4 py-3 text-right text-red-600">
-                        {inv.totals.totalVAT.toFixed(2)} €
+                      <td className="whitespace-nowrap px-4 py-3 text-right text-red-600">
+                        {inv.totals.totalVAT.toFixed(2)}&nbsp;€
                       </td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-900">
-                        {inv.totals.totalInvoice.toFixed(2)} €
-                      </td>
-                      <td className="px-4 py-3 text-center text-xs text-gray-600 capitalize">
-                        {inv.invoiceType}
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-bold text-gray-900">
+                        {inv.totals.totalInvoice.toFixed(2)}&nbsp;€
                       </td>
                       <td className="px-4 py-3 text-center">
                         {statusBadge(inv.status)}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {verifactuBadge(inv.verifactuStatus)}
+                      </td>
+                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        {inv.status !== InvoiceStatus.ANULADA &&
+                        inv.invoiceType !== InvoiceType.RECTIFICATIVA ? (
+                          <Link
+                            href={`/admin/fiscal/rectificar/${inv.invoiceId}`}
+                            className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 transition hover:border-amber-400 hover:bg-amber-100"
+                            title="Emitir factura rectificativa"
+                            aria-label={`Rectificar ${inv.invoiceNumber}`}
+                          >
+                            <FileWarning size={12} />
+                            Rectificar
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-gray-300">—</span>
+                        )}
                       </td>
                     </tr>
                   );

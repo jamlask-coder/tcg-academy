@@ -78,6 +78,14 @@ export interface RegisterData {
   lastName: string;
   phone: string;
   gender?: UserGender;
+  /**
+   * NIF / NIE / CIF del usuario — OBLIGATORIO en el registro. Se valida
+   * con `validateSpanishNIF` (checksum incluido) y se detecta el tipo
+   * (DNI/NIE/CIF) automáticamente. Necesario para emitir facturas
+   * completas sin fricción posterior (Art. 6.1.d RD 1619/2012).
+   */
+  nif: string;
+  nifType: "DNI" | "NIE" | "CIF";
   address: Omit<Address, "id" | "predeterminada" | "label">;
   referralCode?: string;
   marketingConsent?: boolean;

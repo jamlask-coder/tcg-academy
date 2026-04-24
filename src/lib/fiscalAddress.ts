@@ -90,3 +90,40 @@ export function parseFiscalAddress(raw: string): ParsedFiscalAddress {
 export function getIssuerAddress(): ParsedFiscalAddress {
   return parseFiscalAddress(SITE_CONFIG.address);
 }
+
+/**
+ * Abreviaturas postales compactas para la línea de dirección en factura.
+ * Transformación puramente presentacional (NO altera lo que almacena el
+ * usuario — solo lo que imprime el generador de PDF).
+ *
+ * Ejemplos:
+ *   "Av. del Norte 40, 2ª planta, puerta B"
+ *   → "Av. del Norte 40, 2ªPL, PTA B"
+ *
+ *   "Calle Mayor 12, 3º piso, escalera A, derecha"
+ *   → "Calle Mayor 12, 3ºPL, ESC A, DCHA"
+ *
+ * Reglas conservadoras: solo transformamos palabras completas (con \b).
+ * Si el admin ya escribió una abreviatura propia ("2º pl.", "pta"), se
+ * respeta tal cual.
+ */
+export function abbreviateAddressLine(raw: string): string {
+  if (!raw) return raw;
+  return raw
+    // "2ª planta" / "2º planta" / "2 planta" / "planta 2" → "2ªPL" / "PL 2"
+    .replace(/(\d+\s*[ºª°]?)\s*planta\b/gi, "$1PL")
+    .replace(/\bplanta\b/gi, "PL")
+    // "2º piso" → "2ºPL" (tratamos piso como equivalente a planta)
+    .replace(/(\d+\s*[ºª°]?)\s*piso\b/gi, "$1PL")
+    .replace(/\bpiso\b/gi, "PL")
+    // "puerta B" → "PTA B"
+    .replace(/\bpuerta\b/gi, "PTA")
+    // "escalera A" → "ESC A"
+    .replace(/\bescalera\b/gi, "ESC")
+    // "derecha" / "izquierda" → "DCHA" / "IZQDA"
+    .replace(/\bderecha\b/gi, "DCHA")
+    .replace(/\bizquierda\b/gi, "IZQDA")
+    // Colapsa dobles espacios que pudieran haber quedado tras reemplazos.
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}

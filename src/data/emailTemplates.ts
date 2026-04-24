@@ -746,4 +746,31 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       </div>
     `),
   },
+  {
+    id: "invitacion_cuenta",
+    name: "Invitación a crear cuenta (factura manual)",
+    subject: "Activa tu cuenta en TCG Academy — factura {{numeroFactura}}",
+    description:
+      "Se envía automáticamente al emitir una factura manual a un cliente nuevo. Le invita a completar el alta online (contraseña, usuario, fecha de nacimiento).",
+    variables: ["nombre", "numeroFactura", "urlActivacion", "expiraEn"],
+    html: wrapEmail(`
+      <div class="hero">
+        <h1>Bienvenido a TCG Academy 🎴</h1>
+        <p>Completa tu cuenta para gestionar tus pedidos y facturas</p>
+      </div>
+      <div class="content">
+        <p>Hola {{nombre}},</p>
+        <p>Acabamos de emitirte la factura <strong>{{numeroFactura}}</strong> y hemos creado un perfil de cliente con tus datos. Para que puedas consultar tus pedidos, descargar tus facturas y disfrutar del programa de puntos, sólo te falta activar tu acceso online.</p>
+        <p style="text-align:center; margin: 28px 0;">
+          <a href="{{urlActivacion}}" class="btn">Activar mi cuenta</a>
+        </p>
+        <div class="info-box">
+          ⏰ El enlace caduca en <strong>{{expiraEn}}</strong>. Al activarla, tendrás que elegir una contraseña, un nombre de usuario y confirmar tu fecha de nacimiento.
+        </div>
+        <p style="color:#6b7280; font-size:13px">¿El botón no funciona? Copia y pega este enlace en tu navegador:<br/><a href="{{urlActivacion}}" style="word-break:break-all; color:#2563eb">{{urlActivacion}}</a></p>
+        <p style="color:#6b7280; font-size:13px">Si no reconoces esta compra o no quieres activar la cuenta, simplemente ignora este email — nadie podrá acceder en tu nombre.</p>
+        <p><strong>El equipo de ${SITE_CONFIG.name}</strong></p>
+      </div>
+    `),
+  },
 ];

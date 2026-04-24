@@ -154,10 +154,25 @@ function backfillNifIndex(): void {
 }
 
 // ─── Crypto helpers ───────────────────────────────────────────────────────────
-// Salts are client-side only (static export). They prevent casual localStorage
-// tampering but are not a substitute for server-side session management.
+//
+// Los hashes sólo protegen el localStorage de lecturas casuales (inspector,
+// malware de bajo nivel). NO sustituyen autenticación server-side — en
+// producción, usar NEXT_PUBLIC_BACKEND_MODE=server con JWT + bcrypt.
+//
+// Formato de almacenamiento (2026-04, v2):
+//   `v2:<saltB64>:<iterations>:<hashB64>`
+//
+// PBKDF2-SHA256 con 600.000 iteraciones (recomendación OWASP 2023) y salt
+// único por usuario (128 bits). Sustituye al SHA-256 crudo anterior, que era
+// rápido de brute-forcear con cualquier GPU.
+//
+// Migración automática: `verifyStoredPassword` acepta formato legacy (SHA-256
+// hex 64 chars o texto plano) y los callers rehashan al primer login exitoso.
 const SESSION_HASH_SALT = "tcga-2025-session-v1";
-const PASSWORD_HASH_SALT = "tcga-2025-pwd-v1";
+const PASSWORD_HASH_SALT = "tcga-2025-pwd-v1"; // Legacy — solo para verify legacy
+const PBKDF2_ITERATIONS = 600_000;
+const PBKDF2_SALT_BYTES = 16;
+const PBKDF2_HASH_BITS = 256;
 
 async function sha256hex(input: string): Promise<string> {
   const encoded = new TextEncoder().encode(input);
@@ -167,9 +182,97 @@ async function sha256hex(input: string): Promise<string> {
     .join("");
 }
 
-/** Hash a password for storage — used for registered (non-demo) users */
+function bytesToB64(bytes: Uint8Array): string {
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+async function pbkdf2(
+  password: string,
+  salt: Uint8Array,
+  iterations: number,
+  bits: number,
+): Promise<Uint8Array> {
+  const pwBytes = new TextEncoder().encode(password);
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    pwBytes as unknown as BufferSource,
+    { name: "PBKDF2" },
+    false,
+    ["deriveBits"],
+  );
+  const buf = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt: salt as unknown as BufferSource, iterations, hash: "SHA-256" },
+    keyMaterial,
+    bits,
+  );
+  return new Uint8Array(buf);
+}
+
+/**
+ * Hashea una contraseña para almacenamiento local (formato v2: PBKDF2 con
+ * salt único por usuario). Llamar SIEMPRE al crear usuario o rotar password.
+ */
 export async function hashPassword(pw: string): Promise<string> {
-  return sha256hex(PASSWORD_HASH_SALT + pw);
+  const salt = new Uint8Array(PBKDF2_SALT_BYTES);
+  crypto.getRandomValues(salt);
+  const hash = await pbkdf2(pw, salt, PBKDF2_ITERATIONS, PBKDF2_HASH_BITS);
+  return `v2:${bytesToB64(salt)}:${PBKDF2_ITERATIONS}:${bytesToB64(hash)}`;
+}
+
+function timingSafeEquals(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}
+
+/**
+ * Verifica una password contra un hash almacenado. Acepta:
+ *   - v2: PBKDF2 (formato actual) — seguro.
+ *   - legacy SHA-256 hex (64 chars) — se re-hashea al próximo login.
+ *   - texto plano — pre-hashing era opcional. También se re-hashea.
+ *
+ * Devuelve `{ ok, needsRehash }` — si `needsRehash`, el caller debe llamar
+ * `hashPassword(pw)` y guardar el resultado para migrar al formato v2.
+ */
+export async function verifyStoredPassword(
+  pw: string,
+  stored: string,
+): Promise<{ ok: boolean; needsRehash: boolean }> {
+  if (!stored) return { ok: false, needsRehash: false };
+  if (stored.startsWith("v2:")) {
+    const parts = stored.split(":");
+    if (parts.length !== 4) return { ok: false, needsRehash: false };
+    const [, saltB64, iterStr, hashB64] = parts;
+    const iterations = Number(iterStr);
+    if (!Number.isFinite(iterations) || iterations < 1000) {
+      return { ok: false, needsRehash: false };
+    }
+    try {
+      const salt = b64ToBytes(saltB64);
+      const expected = b64ToBytes(hashB64);
+      const candidate = await pbkdf2(pw, salt, iterations, expected.length * 8);
+      return { ok: timingSafeEquals(candidate, expected), needsRehash: false };
+    } catch {
+      return { ok: false, needsRehash: false };
+    }
+  }
+  // Legacy SHA-256 hex (64 chars de [0-9a-f])
+  if (/^[0-9a-f]{64}$/i.test(stored)) {
+    const legacy = await sha256hex(PASSWORD_HASH_SALT + pw);
+    return { ok: stored.toLowerCase() === legacy.toLowerCase(), needsRehash: true };
+  }
+  // Plaintext (compatibilidad con cuentas creadas antes de hashing)
+  return { ok: stored === pw, needsRehash: true };
 }
 
 /** Integrity hash that ties id+role+email+loginAt together */
@@ -462,12 +565,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ) as Record<string, { password: string; user: User }>;
         const entry = registered[key];
         if (entry) {
-          const hashed = await hashPassword(password);
-          const matches =
-            entry.password === hashed || entry.password === password;
+          const { ok: matches, needsRehash } = await verifyStoredPassword(
+            password,
+            entry.password,
+          );
           if (matches) {
-            if (entry.password === password) {
-              entry.password = hashed;
+            if (needsRehash) {
+              // Migración silenciosa: cuenta legacy (SHA-256/plaintext) →
+              // re-hasheamos a PBKDF2 en el primer login exitoso.
+              entry.password = await hashPassword(password);
               persistRegistered(registered);
             }
             // Feature flag: si `NEXT_PUBLIC_EMAIL_VERIFICATION_REQUIRED=true`
@@ -632,6 +738,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const sanitizedLastName = sanitizeString(data.lastName);
         const sanitizedPhone = data.phone ? sanitizeString(data.phone) : "";
         const sanitizedUsername = username ? sanitizeString(username) : undefined;
+        const sanitizedNif = data.nif ? sanitizeString(data.nif).toUpperCase() : "";
         const newUser: User = {
           id: newUserId,
           email,
@@ -641,6 +748,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           phone: sanitizedPhone,
           gender: data.gender,
           role: "cliente",
+          ...(sanitizedNif ? { nif: sanitizedNif, nifType: data.nifType } : {}),
           addresses: [
             {
               id: `addr-${crypto.randomUUID()}`,
@@ -862,15 +970,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const entry = registered[email];
         if (!entry) return { ok: false, error: "Cuenta no encontrada" };
 
-        const hashedCurrent = await hashPassword(currentPassword);
-        const matches =
-          entry.password === hashedCurrent || entry.password === currentPassword;
+        const { ok: matches } = await verifyStoredPassword(
+          currentPassword,
+          entry.password,
+        );
         if (!matches) {
           return { ok: false, error: "La contraseña actual no es correcta" };
         }
 
-        const hashedNew = await hashPassword(newPassword);
-        entry.password = hashedNew;
+        entry.password = await hashPassword(newPassword);
         persistRegistered(registered);
         return { ok: true };
       } catch {

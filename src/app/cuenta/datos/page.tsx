@@ -266,8 +266,8 @@ export default function DatosPage() {
           setPwdError("");
           setPwdSuccess(false);
 
-          if (pwdForm.next.length < 6) {
-            setPwdError("La nueva contraseña debe tener al menos 6 caracteres");
+          if (pwdForm.next.length < 8) {
+            setPwdError("La nueva contraseña debe tener al menos 8 caracteres");
             return;
           }
           if (pwdForm.next !== pwdForm.confirm) {
@@ -311,7 +311,7 @@ export default function DatosPage() {
                   onChange={(e) =>
                     setPwdForm((f) => ({ ...f, [key]: e.target.value }))
                   }
-                  placeholder={key === "next" ? "Mínimo 6 caracteres" : "••••••••"}
+                  placeholder={key === "next" ? "Mínimo 8 caracteres" : "••••••••"}
                   maxLength={128}
                   className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 pr-10 text-sm transition focus:border-[#2563eb] focus:outline-none"
                 />

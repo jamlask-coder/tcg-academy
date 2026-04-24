@@ -8,6 +8,7 @@
  */
 
 import { z } from "zod";
+import { validateSpanishNIF } from "@/lib/validations/nif";
 
 // ─── Auth ────────────────────────────────────────────────────────────────
 
@@ -22,9 +23,30 @@ export const authRegisterSchema = z.object({
   action: z.literal("register"),
   name: z.string().min(1).max(120),
   email: z.string().email().max(254),
-  password: z.string().min(6).max(200),
+  password: z.string().min(8).max(200),
   phone: z.string().max(40).optional(),
   username: z.string().max(40).optional(),
+  /**
+   * NIF/NIE/CIF obligatorio en el registro — se valida con el
+   * **mismo algoritmo** que en el cliente (mod-23 DNI/NIE + checksum CIF)
+   * para que un atacante que salte el form no pueda meter basura.
+   * El tipo se infiere server-side con `validateSpanishNIF`, por lo que
+   * aquí aceptamos `nifType` sólo como hint opcional.
+   */
+  nif: z
+    .string()
+    .min(1, "NIF/NIE/CIF obligatorio")
+    .max(12)
+    .superRefine((v, ctx) => {
+      const r = validateSpanishNIF(v);
+      if (!r.valid) {
+        ctx.addIssue({
+          code: "custom",
+          message: r.error ?? "NIF/NIE/CIF inválido",
+        });
+      }
+    }),
+  nifType: z.enum(["DNI", "NIE", "CIF"]).optional(),
   consent: z.array(z.string()).optional(),
   /** Cloudflare Turnstile token — verificado server-side si hay secret. */
   captchaToken: z.string().max(4096).optional(),
@@ -39,14 +61,14 @@ export const authResetConfirmSchema = z.object({
   action: z.literal("reset-confirm"),
   email: z.string().email().max(254),
   token: z.string().min(10).max(256),
-  newPassword: z.string().min(6).max(200),
+  newPassword: z.string().min(8).max(200),
 });
 
 export const authChangePasswordSchema = z.object({
   action: z.literal("change-password"),
   userId: z.string().min(1).max(120),
   currentPassword: z.string().min(1).max(200),
-  newPassword: z.string().min(6).max(200),
+  newPassword: z.string().min(8).max(200),
 });
 
 export const authLogoutSchema = z.object({

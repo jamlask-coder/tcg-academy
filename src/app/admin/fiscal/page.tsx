@@ -95,13 +95,6 @@ const FISCAL_SECTIONS = [
     color: "#d97706",
   },
   {
-    href: "/admin/fiscal/presupuesto",
-    icon: Euro,
-    title: "Presupuestos",
-    desc: "Crear y gestionar presupuestos para clientes",
-    color: "#059669",
-  },
-  {
     href: "/admin/fiscal/editor-factura",
     icon: Palette,
     title: "Editor de Factura",

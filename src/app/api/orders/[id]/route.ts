@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 import { requireAuth, requireAdmin } from "@/lib/apiAuth";
 import { logger } from "@/lib/logger";
 import { orderPatchSchema, zodMessage } from "@/lib/validations/api";
+import { getDb } from "@/lib/db";
 
-// GET /api/orders/[id] — Get a single order
+// GET /api/orders/[id] — Get a single order (ownership-checked)
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -16,11 +17,28 @@ export async function GET(
   const backendMode = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
 
   if (backendMode === "server") {
-    // TODO: Fetch from database via getDb().getOrder(id)
-    // TODO: Verify order belongs to user (or user is admin)
+    // IDOR guard: fetch order and verify ownership. Admin bypasses.
+    const order = await getDb().getOrder(id);
+    if (!order) {
+      return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
+    }
+    const isOwner = order.userId && order.userId === authResult.id;
+    const isAdmin = authResult.role === "admin";
+    if (!isOwner && !isAdmin) {
+      // 404 (no 403) para no filtrar la existencia del pedido a usuarios ajenos.
+      logger.warn(
+        `IDOR attempt on order ${id} by user ${authResult.id}`,
+        "api/orders",
+        { attemptedBy: authResult.id, role: authResult.role },
+      );
+      return NextResponse.json({ error: "Pedido no encontrado" }, { status: 404 });
+    }
     logger.info(`Order detail requested: ${id}`, "api/orders", { userId: authResult.id });
+    return NextResponse.json({ ok: true, order });
   }
 
+  // Modo local: los pedidos viven en localStorage del navegador del propio
+  // usuario; no cruzan a otros clientes vía esta ruta. Nada que servir aquí.
   return NextResponse.json({
     ok: true,
     orderId: id,

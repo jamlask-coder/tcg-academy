@@ -17,6 +17,12 @@ import { useAuth } from "@/context/AuthContext";
 import { checkRateLimit } from "@/utils/sanitize";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { TurnstileWidget } from "@/components/auth/TurnstileWidget";
+import {
+  COUNTRY_OPTIONS,
+  findCountryOption,
+} from "@/data/countryPrefixes";
+import { PhonePrefixPicker } from "@/components/ui/PhonePrefixPicker";
+import { validateSpanishNIF } from "@/lib/validations/nif";
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_\.]{3,20}$/;
 
@@ -31,15 +37,29 @@ const schema = z
       .max(20, "Máximo 20 caracteres")
       .regex(USERNAME_REGEX, "Solo letras, números, _ y . (sin espacios)"),
     email: z.string().email("Email inválido").max(254),
+    nif: z
+      .string()
+      .min(1, "NIF/NIE/CIF obligatorio")
+      .max(12)
+      .superRefine((v, ctx) => {
+        const r = validateSpanishNIF(v);
+        if (!r.valid) {
+          ctx.addIssue({
+            code: "custom",
+            message:
+              r.error ?? "NIF/NIE/CIF no válido (revisa formato y letra de control)",
+          });
+        }
+      }),
     telefono: z
       .string()
       .min(6, "Teléfono obligatorio")
       .max(20, "Máximo 20 caracteres")
       .regex(
-        /^[+\d\s\-()]{6,20}$/,
-        "Solo dígitos, espacios y los símbolos +-()",
+        /^[\d\s\-()]{6,20}$/,
+        "Solo dígitos, espacios y los símbolos -()",
       ),
-    password: z.string().min(6, "Mínimo 6 caracteres").max(128),
+    password: z.string().min(8, "Mínimo 8 caracteres").max(128),
     confirmPassword: z.string().min(1, "Confirma tu contraseña"),
     calle: z.string().min(1, "La calle es obligatoria").max(200),
     numero: z.string().min(1, "El número es obligatorio").max(20),
@@ -119,6 +139,7 @@ export default function RegistroPage() {
   const [mounted, setMounted] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
   const [captchaToken, setCaptchaToken] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState("ES");
 
   const {
     register,
@@ -128,7 +149,8 @@ export default function RegistroPage() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      telefono: "+34 ",
+      telefono: "",
+      nif: "",
       terminos: undefined,
       comunicaciones: false,
       calle: "",
@@ -186,14 +208,25 @@ export default function RegistroPage() {
       return;
     }
     setServerError("");
+    const dial = findCountryOption(phoneCountryCode).dialCode;
+    const composedPhone = `${dial} ${data.telefono.trim()}`.trim();
+    // Normalizamos NIF y detectamos el tipo con la misma función que usa
+    // checkout / admin para garantizar coherencia en todo el sistema.
+    const nifResult = validateSpanishNIF(data.nif);
+    const detectedNifType: "DNI" | "NIE" | "CIF" =
+      nifResult.type === "DNI" || nifResult.type === "NIE" || nifResult.type === "CIF"
+        ? nifResult.type
+        : "DNI";
     const { ok, error } = await authRegister({
       email: data.email,
       username: data.username,
       password: data.password,
       name: data.nombre,
       lastName: data.apellidos,
-      phone: data.telefono,
+      phone: composedPhone,
       gender: data.tratamiento,
+      nif: nifResult.normalized,
+      nifType: detectedNifType,
       referralCode: data.referralCode?.toUpperCase().trim() || undefined,
       marketingConsent: data.comunicaciones ?? false,
       address: {
@@ -235,21 +268,12 @@ export default function RegistroPage() {
         >
           <div className="mb-8">
             <h2 className="text-3xl font-bold text-gray-900">Crear cuenta</h2>
-            <p className="mt-1 text-gray-500">
-              Es gratis y solo tarda un minuto
-            </p>
+            <p className="mt-1 text-gray-500">Sólo tardarás un minuto</p>
           </div>
 
           {/* Google Sign-In — auto-registers as cliente if env var is set */}
           <div className="mb-6">
             <GoogleSignInButton redirectTo="/cuenta" />
-          </div>
-
-          {/* Divider (only visible alongside Google button; harmless otherwise) */}
-          <div className="mb-6 flex items-center gap-4">
-            <div className="h-px flex-1 bg-gray-200" />
-            <span className="text-xs text-gray-400">o regístrate con email</span>
-            <div className="h-px flex-1 bg-gray-200" />
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -327,6 +351,33 @@ export default function RegistroPage() {
               )}
             </div>
 
+            {/* NIF / NIE / CIF — identificador fiscal obligatorio */}
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-gray-700">
+                NIF / NIE / CIF *
+              </label>
+              <input
+                {...register("nif", {
+                  setValueAs: (v) =>
+                    typeof v === "string" ? v.toUpperCase().replace(/\s/g, "") : v,
+                })}
+                type="text"
+                placeholder="12345678A"
+                maxLength={12}
+                autoComplete="off"
+                spellCheck={false}
+                className={inputCls(!!errors.nif)}
+              />
+              {errors.nif ? (
+                <p className="mt-1 text-xs text-red-500">{errors.nif.message}</p>
+              ) : (
+                <p className="mt-1 text-xs text-gray-400">
+                  Lo necesitamos para emitir factura cuando hagas un pedido
+                  (Art. 6.1.d RD 1619/2012).
+                </p>
+              )}
+            </div>
+
             {/* Username */}
             <div>
               <label className="mb-1.5 block text-sm font-semibold text-gray-700">
@@ -388,14 +439,25 @@ export default function RegistroPage() {
                 <label className="mb-1.5 block text-sm font-semibold text-gray-700">
                   Teléfono *
                 </label>
-                <input
-                  {...register("telefono")}
-                  type="tel"
-                  placeholder="+34600000000"
-                  maxLength={20}
-                  autoComplete="tel"
-                  className={inputCls(!!errors.telefono)}
-                />
+                <div className="flex">
+                  <PhonePrefixPicker
+                    value={phoneCountryCode}
+                    onChange={setPhoneCountryCode}
+                    disabled={isSubmitting}
+                  />
+                  <input
+                    {...register("telefono")}
+                    type="tel"
+                    placeholder="600 000 000"
+                    maxLength={20}
+                    autoComplete="tel-national"
+                    className={`h-11 w-full rounded-r-xl border-2 border-l-0 px-4 text-sm transition-all focus:outline-none focus:ring-2 ${
+                      errors.telefono
+                        ? "border-red-400 focus:border-red-500 focus:ring-red-100"
+                        : "border-gray-200 focus:border-[#2563eb] focus:ring-[#2563eb]/10"
+                    }`}
+                  />
+                </div>
                 {errors.telefono && (
                   <p className="mt-1 text-xs text-red-500">
                     {errors.telefono.message}
@@ -418,7 +480,7 @@ export default function RegistroPage() {
                   <input
                     {...register("password")}
                     type={showPwd ? "text" : "password"}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder="Mínimo 8 caracteres"
                     maxLength={128}
                     className={inputCls(!!errors.password) + " pr-10"}
                   />
@@ -476,7 +538,7 @@ export default function RegistroPage() {
                   <input
                     {...register("calle")}
                     type="text"
-                    placeholder="Ej. Av. del Norte"
+                    placeholder="Nombre de la calle"
                     maxLength={200}
                     autoComplete="address-line1"
                     className={inputCls(!!errors.calle)}
@@ -509,7 +571,7 @@ export default function RegistroPage() {
                 <input
                   {...register("piso")}
                   type="text"
-                  placeholder="2ª planta, puerta B"
+                  placeholder="Ej. 2ºA"
                   maxLength={30}
                   autoComplete="address-line2"
                   className={inputCls(false)}
@@ -525,7 +587,7 @@ export default function RegistroPage() {
                     {...register("cp")}
                     type="text"
                     inputMode="numeric"
-                    placeholder="03710"
+                    placeholder="5 dígitos"
                     maxLength={5}
                     autoComplete="postal-code"
                     className={inputCls(!!errors.cp)}
@@ -541,7 +603,7 @@ export default function RegistroPage() {
                   <input
                     {...register("ciudad")}
                     type="text"
-                    placeholder="Calpe"
+                    placeholder="Tu ciudad"
                     maxLength={100}
                     autoComplete="address-level2"
                     className={inputCls(!!errors.ciudad)}
@@ -560,7 +622,7 @@ export default function RegistroPage() {
                   <input
                     {...register("provincia")}
                     type="text"
-                    placeholder="Alicante"
+                    placeholder="Tu provincia"
                     maxLength={100}
                     autoComplete="address-level1"
                     className={inputCls(!!errors.provincia)}
@@ -578,12 +640,13 @@ export default function RegistroPage() {
                     autoComplete="country"
                     className={inputCls(!!errors.pais)}
                   >
-                    <option value="ES">España</option>
-                    <option value="PT">Portugal</option>
-                    <option value="FR">Francia</option>
-                    <option value="IT">Italia</option>
-                    <option value="DE">Alemania</option>
-                    <option value="AD">Andorra</option>
+                    {COUNTRY_OPTIONS.filter((c) => c.code !== "OTRO").map(
+                      (c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.name}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </div>
               </div>

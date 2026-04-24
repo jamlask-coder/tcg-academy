@@ -33,6 +33,10 @@ import {
   Bell,
   Send,
   Undo2,
+  FilePlus,
+  FileText,
+  BookOpen,
+  Truck,
 } from "lucide-react";
 
 const SOLICITUDES_KEY = "tcgacademy_solicitudes";
@@ -67,7 +71,17 @@ const NAV_ITEMS: NavItem[] = [
       { href: "/admin/solicitudes", label: "Solicitudes B2B", icon: Inbox },
     ],
   },
-  { href: "/admin/fiscal/facturas", label: "Facturas", icon: Receipt },
+  {
+    href: "/admin/fiscal",
+    label: "Facturación",
+    icon: Receipt,
+    sub: [
+      { href: "/admin/fiscal/nueva-factura", label: "Emitir facturas", icon: FilePlus },
+      { href: "/admin/fiscal/nuevo-albaran", label: "Emitir albarán", icon: Truck },
+      { href: "/admin/fiscal/facturas", label: "Libro de facturas", icon: BookOpen },
+      { href: "/admin/fiscal/albaranes", label: "Libro de albaranes", icon: FileText },
+    ],
+  },
   { href: "/admin/categorias", label: "Categorías", icon: Layers },
   {
     href: "/admin/bonos",

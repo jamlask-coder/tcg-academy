@@ -27,6 +27,8 @@ import {
   VerifactuStatus,
   TaxIdType,
   AuditAction,
+  InvoiceOrigin,
+  CorrectionType,
 } from "@/types/fiscal";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { getIssuerAddress } from "@/lib/fiscalAddress";
@@ -48,7 +50,7 @@ import { moneyRound as roundTo2, baseFromPriceWithVAT } from "@/lib/money";
 
 // ─── Datos del emisor (TCG Academy) ──────────────────────────────────────────
 
-function buildIssuer(): CompanyData {
+export function buildIssuer(): CompanyData {
   // El parser de dirección vive en `@/lib/fiscalAddress` — fuente única para
   // todo el sistema (facturas, presupuestos, PDFs, emails).
   const issuer = getIssuerAddress();
@@ -123,7 +125,8 @@ const CONTROL_PRIME_YEAR = 32771;    // primo impar, > 2*año max razonable
 const CONTROL_PRIME_OFFSET = 17389;  // primo impar, evita colisión con N=0
 const CONTROL_MODULUS = 99991;       // mayor primo ≤ 99999 → rango [0, 99990]
 
-export const INVOICE_ORIGIN_WEB = "E";
+/** @deprecated Usar `InvoiceOrigin.WEB` del enum en `@/types/fiscal`. */
+export const INVOICE_ORIGIN_WEB = InvoiceOrigin.WEB;
 
 /**
  * Calcula los 5 dígitos de control para una factura dada.
@@ -182,14 +185,15 @@ export function verifyInvoiceNumber(invoiceNumber: string): { valid: boolean; re
 }
 
 /**
- * Genera el siguiente número de factura en formato FAC-YYYY-NNNNNXXXXXE.
+ * Genera el siguiente número de factura en formato FAC-YYYY-NNNNNXXXXXO.
  * Garantiza correlatividad sin saltos (requisito art. 6 RD 1619/2012).
+ * El sufijo `origin` indica el canal de emisión (E=web, T=TPV, M=manual, B=B2B).
  *
  * HARDENED: Uses a localStorage lock to prevent concurrent tabs from generating
  * the same invoice number. Extracts max existing number from parsed values
  * (not array length) to handle gaps from corrupted data.
  */
-export function generateInvoiceNumber(): string {
+export function generateInvoiceNumber(origin: InvoiceOrigin = InvoiceOrigin.WEB): string {
   // Try to acquire lock (retry once after 100ms if busy)
   if (!acquireInvoiceLock()) {
     // Brief spin — invoice generation is fast
@@ -218,10 +222,19 @@ export function generateInvoiceNumber(): string {
     const nextNum = maxNum + 1;
     const nStr = String(nextNum).padStart(5, "0");
     const xStr = computeControlDigits(nextNum, year);
-    return `${INVOICE_SERIES}-${year}-${nStr}${xStr}${INVOICE_ORIGIN_WEB}`;
+    return `${INVOICE_SERIES}-${year}-${nStr}${xStr}${origin}`;
   } finally {
     releaseInvoiceLock();
   }
+}
+
+/** Extrae el origen (última letra) de un número de factura en formato v2. */
+function extractOriginFromNumber(invoiceNumber: string): InvoiceOrigin {
+  const m = invoiceNumber.match(/^[A-Z]+-\d{4}-\d{5}\d{5}([A-Z])$/);
+  if (!m) return InvoiceOrigin.WEB;
+  const letter = m[1];
+  const values = Object.values(InvoiceOrigin) as string[];
+  return values.includes(letter) ? (letter as InvoiceOrigin) : InvoiceOrigin.WEB;
 }
 
 // ─── Construcción de líneas de factura ───────────────────────────────────────
@@ -251,11 +264,17 @@ export function buildLineItem(params: {
     applySurcharge = false,
   } = params;
 
+  // `unitPriceWithVAT` es el precio final IVA incluido que teclea el usuario —
+  // tratarlo como autoritativo y derivar base/IVA hacia atrás evita perder
+  // céntimos por redondeos intermedios (ej: 10 € IVA 21 % no debe caer a 9,99).
   const unitPriceNoVAT = baseFromPriceWithVAT(unitPriceWithVAT, vatRate);
-  const subtotal = roundTo2(unitPriceNoVAT * quantity);
-  const discountAmount = roundTo2(subtotal * (discount / 100));
-  const taxableBase = roundTo2(subtotal - discountAmount);
-  const vatAmount = calculateVAT(taxableBase, vatRate);
+  const grossTotal = roundTo2(unitPriceWithVAT * quantity);
+  const finalGross = roundTo2(grossTotal * (1 - discount / 100));
+  const taxableBase = roundTo2(finalGross / (1 + vatRate / 100));
+  const vatAmount = roundTo2(finalGross - taxableBase);
+  // discountAmount se expresa sobre la base imponible (convención fiscal).
+  const subtotalBase = roundTo2(unitPriceNoVAT * quantity);
+  const discountAmount = roundTo2(subtotalBase - taxableBase);
 
   const surchargeRateMap: Record<number, 0 | 0.5 | 1.4 | 5.2> = {
     0: 0,
@@ -289,7 +308,7 @@ export function buildLineItem(params: {
 
 // ─── Totales (con verificación cruzada interna) ─────────────────────────────
 
-function calculateTotals(items: InvoiceLineItem[]): InvoiceTotals {
+export function calculateTotals(items: InvoiceLineItem[]): InvoiceTotals {
   const totalTaxableBase = roundTo2(
     items.reduce((s, i) => s + i.taxableBase, 0),
   );
@@ -352,6 +371,8 @@ export interface CreateInvoiceParams {
   operationDate?: Date;
   invoiceType?: InvoiceType;
   correctionData?: CorrectionData;
+  /** Canal de emisión — sufijo del número de factura. Default: WEB (E). */
+  origin?: InvoiceOrigin;
 }
 
 /**
@@ -370,9 +391,10 @@ export async function createInvoice(
     operationDate,
     invoiceType = InvoiceType.COMPLETA,
     correctionData,
+    origin = InvoiceOrigin.WEB,
   } = params;
 
-  const invoiceNumber = generateInvoiceNumber();
+  const invoiceNumber = generateInvoiceNumber(origin);
   const invoiceId = generateId();
 
   // Recargo de equivalencia — si el receptor está en ese régimen especial
@@ -504,21 +526,60 @@ export async function chainInvoiceHash(
 
 /**
  * Crea una factura rectificativa sobre una factura original.
- * La rectificativa es una nueva factura con las correcciones aplicadas.
- * La original NO se modifica (solo cambia su estado a ANULADA si es sustitución).
+ *
+ * Dos modos según Art. 15.3 RD 1619/2012:
+ *   - SUSTITUCION: la rectificativa recoge los importes correctos en su totalidad
+ *     y la original queda ANULADA. Usar cuando hubo error de fondo
+ *     (cliente incorrecto, concepto erróneo, factura emitida por duplicado).
+ *   - DIFERENCIAS: la rectificativa recoge sólo el delta (puede llevar líneas
+ *     negativas). La original SIGUE VIGENTE. Usar para ajustes de precio,
+ *     descuentos posteriores, o devoluciones parciales.
+ *
+ * La rectificativa lleva sufijo "R" en el número de factura para que sea
+ * visualmente identificable en el libro y en los modelos 303/390/349/347.
+ * Su hash encadenado garantiza la integridad VeriFactu.
  */
 export async function rectifyInvoice(
   originalId: string,
   corrections: Partial<CreateInvoiceParams> & {
     correctionData: CorrectionData;
+    /** Admin que está rectificando. Se registra en el auditLog. */
+    userId?: string;
+    userName?: string;
   },
 ): Promise<InvoiceRecord> {
   if (!corrections.correctionData) {
     throw new Error("rectifyInvoice: correctionData es obligatorio (Art. 15 RD 1619/2012)");
   }
+  if (!corrections.correctionData.reason?.trim()) {
+    throw new Error("rectifyInvoice: motivo de la rectificación obligatorio");
+  }
   const invoices = loadInvoices();
   const original = invoices.find((inv) => inv.invoiceId === originalId);
   if (!original) throw new Error(`Factura ${originalId} no encontrada`);
+
+  // No se puede rectificar una factura ya anulada — debe hacerse desde la
+  // rectificativa que la sustituyó, si existe.
+  if (original.status === InvoiceStatus.ANULADA) {
+    throw new Error(
+      `Factura ${original.invoiceNumber} ya está anulada. No se puede rectificar una factura anulada.`,
+    );
+  }
+  // No tiene sentido rectificar una rectificativa — debería emitirse una nueva
+  // rectificativa sobre la ORIGINAL (cadena de rectificativas no permitida por AEAT).
+  if (original.invoiceType === InvoiceType.RECTIFICATIVA) {
+    throw new Error(
+      `La factura ${original.invoiceNumber} ya es rectificativa. Emitir nueva rectificativa sobre la original.`,
+    );
+  }
+
+  // Asegurar coherencia: los datos de la original dentro de correctionData.
+  const correctionData: CorrectionData = {
+    ...corrections.correctionData,
+    originalInvoiceId: original.invoiceId,
+    originalInvoiceNumber: original.invoiceNumber,
+    originalInvoiceDate: new Date(original.invoiceDate),
+  };
 
   const rectificativa = await createInvoice({
     recipient: corrections.recipient ?? original.recipient,
@@ -526,25 +587,50 @@ export async function rectifyInvoice(
     paymentMethod: corrections.paymentMethod ?? original.paymentMethod,
     sourceOrderId: original.sourceOrderId ?? undefined,
     invoiceType: InvoiceType.RECTIFICATIVA,
-    correctionData: corrections.correctionData,
+    correctionData,
+    // Sufijo "R" en el número → visible en el libro y en los modelos fiscales.
+    origin: InvoiceOrigin.RECTIFICATIVA,
   });
 
-  // Actualizar estado de la original
-  const updatedOriginal: InvoiceRecord = {
-    ...original,
-    status: InvoiceStatus.ANULADA,
-    updatedAt: new Date(),
-    auditLog: [
-      ...original.auditLog,
-      {
-        timestamp: new Date(),
-        userId: "admin",
-        userName: "Administrador",
-        action: AuditAction.RECTIFICADA,
-        detail: `Rectificada por factura ${rectificativa.invoiceNumber}`,
-      },
-    ],
-  };
+  // Actor que registra la rectificación (audit trail fiscal real, no "admin").
+  const actorId = corrections.userId ?? "admin";
+  const actorName = corrections.userName ?? "Administrador";
+
+  // Sólo se anula la original si la rectificación es por SUSTITUCIÓN.
+  // En DIFERENCIAS la original permanece vigente (Art. 15.3 RD 1619/2012).
+  const isSubstitution =
+    correctionData.correctionType === CorrectionType.SUSTITUCION;
+
+  const updatedOriginal: InvoiceRecord = isSubstitution
+    ? {
+        ...original,
+        status: InvoiceStatus.ANULADA,
+        updatedAt: new Date(),
+        auditLog: [
+          ...original.auditLog,
+          {
+            timestamp: new Date(),
+            userId: actorId,
+            userName: actorName,
+            action: AuditAction.RECTIFICADA,
+            detail: `Sustituida por rectificativa ${rectificativa.invoiceNumber} (${correctionData.reasonCode}: ${correctionData.reason})`,
+          },
+        ],
+      }
+    : {
+        ...original,
+        updatedAt: new Date(),
+        auditLog: [
+          ...original.auditLog,
+          {
+            timestamp: new Date(),
+            userId: actorId,
+            userName: actorName,
+            action: AuditAction.RECTIFICADA,
+            detail: `Rectificada por diferencias mediante ${rectificativa.invoiceNumber} (${correctionData.reasonCode}: ${correctionData.reason}). Original sigue vigente.`,
+          },
+        ],
+      };
 
   const updatedInvoices = invoices.map((inv) =>
     inv.invoiceId === originalId ? updatedOriginal : inv,
@@ -905,7 +991,8 @@ export function saveInvoice(invoice: InvoiceRecord): void {
   // un número nuevo (que avanza el correlativo) a colisionar con un número
   // ya emitido.
   if (invoices.some((inv) => inv.invoiceNumber === invoice.invoiceNumber)) {
-    const newNumber = generateInvoiceNumber();
+    const origin = extractOriginFromNumber(invoice.invoiceNumber);
+    const newNumber = generateInvoiceNumber(origin);
     invoice = { ...invoice, invoiceNumber: newNumber };
   }
 
