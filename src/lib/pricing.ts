@@ -1,15 +1,27 @@
 /**
  * SSOT pricing helper — usable fuera de React.
  *
+ * ÁMBITO: precio de LÍNEA (unitario por producto). NO es el total del pedido.
+ *
+ *   Línea (este helper)                    Total pedido (checkout)
+ *   ─────────────────────                  ────────────────────────
+ *   product.price (por rol)                Σ líneas
+ *   − ProductDiscount admin (catálogo)     − cupón (couponService)
+ *   + IVA                                  − puntos canjeados (pointsService)
+ *                                          + envío (si < umbral)
+ *                                          = total a pagar
+ *
+ * Cupones y puntos NO tocan el precio del producto — se aplican al total
+ * del pedido en checkout. Viven en otra capa (couponService / pointsService).
+ *
  * Problema que resuelve: hoy `usePrice` (hook React) encapsula el cálculo
- * completo (rol → precio → descuento → IVA → etiquetas). Pero servicios,
- * scripts y rutas API no pueden usar hooks → acababan duplicando fragmentos
- * del cálculo (ej: `product.price * (1 + SITE_CONFIG.vatRate/100)`), lo que
- * creaba divergencia con la UI (cliente veía 24.20 €, el pedido quedaba
- * guardado con 24.00 €).
+ * de línea. Pero servicios, scripts y rutas API no pueden usar hooks →
+ * acababan duplicando fragmentos del cálculo (ej: `product.price * (1 +
+ * SITE_CONFIG.vatRate/100)`), lo que creaba divergencia con la UI (cliente
+ * veía 24.20 €, el pedido quedaba guardado con 24.00 €).
  *
  * Ahora: una sola función pura que cualquiera puede llamar. `usePrice` es
- * el adaptador React que la envuelve con los contextos de auth+descuentos.
+ * el adaptador React que la envuelve con los contextos de auth+discounts.
  *
  * Reglas SSOT (ver memoria project_snapshot_architecture):
  *  - Precio base viene del `product` recibido (merge con overrides ya hecho).
