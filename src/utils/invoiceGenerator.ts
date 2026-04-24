@@ -392,7 +392,7 @@ export function generateInvoiceHTML(
 
   <!-- HEADER: logo izquierda + datos empresa derecha -->
   <div class="hdr">
-    <img class="brand-logo" src="/images/invoice-logo.png" alt="${escapeHtml(tpl.brandName)}" />
+    <img class="brand-logo" src="/images/invoice-logo.png?v=2026042401" alt="${escapeHtml(tpl.brandName)}" />
     <div class="company-info">
       <strong>${escapeHtml(issuerName)}</strong>
       CIF: ${escapeHtml(issuerCIF)}<br>
