@@ -149,7 +149,10 @@ Todos los datos de un usuario (pedidos, facturas, puntos, favoritos, cupones, me
 1. **SITE_CONFIG es SSOT vivo** — cambia ahí y se propaga. Nunca hardcodear 21, 149, 24h, VAT.
 2. **Pedidos/facturas congelan con `captureSellerSnapshot()`** — una vez emitidos, NO releer issuer desde SITE_CONFIG (inmutabilidad fiscal).
 3. **Factura ≠ editable** — solo anular + rectificativa vía `createInvoice()`. La cadena hash SHA-256 detecta manipulaciones.
-4. **Precio con IVA siempre** en público. `usePrice` aplica rol + IVA automáticamente.
+4. **Precio con IVA siempre** en público. SSOT del precio efectivo:
+   - Componentes React → `usePrice(product)` (hook, lee auth+discounts del contexto).
+   - Servicios/API/scripts → `getEffectivePriceWithVat(product, role, discounts?)` o `getEffectivePriceById(productId, role)` en `@/lib/pricing` (función pura).
+   - Ambos comparten el mismo núcleo `computeEffectivePrice + calcVAT` → imposible que la UI y el backend muestren cifras distintas.
 5. **Badge NUEVO** → `isNewProduct(product)` (45 días desde `createdAt`). NUNCA `product.isNew`.
 6. **Un write = un emit**. Si escribes a una entidad sin disparar su evento, los listeners quedan desincronizados.
 7. **Claves no registradas = huérfanas** → panel `/admin/herramientas` las muestra. Si aparece, o registrar en el registry o eliminar.
