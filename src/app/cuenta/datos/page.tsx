@@ -5,6 +5,10 @@ import { CheckCircle, Eye, EyeOff, MapPin, Plus, Pencil, Trash2, Star, AlertCirc
 import type { Address } from "@/types/user";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
 import { validateSpanishNIF } from "@/lib/validations/nif";
+import { useFieldErrors } from "@/hooks/useFieldErrors";
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^[\d\s\-()+]{6,20}$/;
 
 const ADDR_EMPTY: Partial<Address> = {
   label: "",
@@ -26,8 +30,9 @@ export default function DatosPage() {
     nif: user?.nif ?? "",
     email: user?.email ?? "",
   });
-  const [nifError, setNifError] = useState("");
-  const [emailError, setEmailError] = useState("");
+  // Errores por campo del formulario de perfil (name/lastName/nif/phone/email).
+  // Mismo hook que registro y completar-datos → un único contrato visual.
+  const profileErrors = useFieldErrors();
   const [savingProfile, setSavingProfile] = useState(false);
   const [pwdForm, setPwdForm] = useState({
     current: "",
@@ -45,7 +50,7 @@ export default function DatosPage() {
   const [showAddrForm, setShowAddrForm] = useState(false);
   const [editAddrId, setEditAddrId] = useState<string | null>(null);
   const [addrForm, setAddrForm] = useState<Partial<Address>>(ADDR_EMPTY);
-  const [addrError, setAddrError] = useState("");
+  const addrErrors = useFieldErrors();
   const [addrSaved, setAddrSaved] = useState(false);
 
   if (!user) return null;
@@ -64,7 +69,9 @@ export default function DatosPage() {
   };
 
   const handleSaveAddr = () => {
-    // Validación mínima: campos obligatorios para que la dirección sea usable en checkout
+    addrErrors.clearAll();
+    // Validación mínima: campos obligatorios para que la dirección sea usable en checkout.
+    // Recorremos en orden — el primer hueco marca el campo a resaltar en rojo.
     const required: Array<keyof Address> = [
       "label",
       "calle",
@@ -73,22 +80,20 @@ export default function DatosPage() {
       "ciudad",
       "provincia",
     ];
-    const missing = required.filter(
-      (k) => !(addrForm[k] as string | undefined)?.toString().trim(),
-    );
-    if (missing.length > 0) {
-      setAddrError("Rellena todos los campos obligatorios");
-      return;
+    for (const k of required) {
+      if (!(addrForm[k] as string | undefined)?.toString().trim()) {
+        addrErrors.failWith(k, "Rellena todos los campos obligatorios");
+        return;
+      }
     }
     // Validación básica de código postal español (5 dígitos) si país = ES
     if (
       (addrForm.pais ?? "ES") === "ES" &&
       !/^\d{5}$/.test((addrForm.cp ?? "").trim())
     ) {
-      setAddrError("El código postal debe tener 5 dígitos");
+      addrErrors.failWith("cp", "El código postal debe tener 5 dígitos");
       return;
     }
-    setAddrError("");
 
     let next: Address[];
     if (editAddrId) {
@@ -131,17 +136,35 @@ export default function DatosPage() {
     setAddrForm(addr);
     setEditAddrId(addr.id);
     setShowAddrForm(true);
-    setAddrError("");
+    addrErrors.clearAll();
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setNifError("");
-    setEmailError("");
+    profileErrors.clearAll();
+    if (!form.name.trim()) {
+      profileErrors.failWith("name", "El nombre es obligatorio.");
+      return;
+    }
+    if (!form.lastName.trim()) {
+      profileErrors.failWith("lastName", "Los apellidos son obligatorios.");
+      return;
+    }
     // NIF obligatorio y validado (Art. 6.1.d RD 1619/2012)
     const nifResult = validateSpanishNIF(form.nif);
     if (!nifResult.valid) {
-      setNifError(nifResult.error ?? "NIF inválido");
+      profileErrors.failWith("nif", nifResult.error ?? "NIF inválido");
+      return;
+    }
+    if (form.phone.trim() && !PHONE_REGEX.test(form.phone.trim())) {
+      profileErrors.failWith(
+        "phone",
+        "Teléfono: solo dígitos, espacios, + y -().",
+      );
+      return;
+    }
+    if (!EMAIL_REGEX.test(form.email.trim())) {
+      profileErrors.failWith("email", "Email inválido.");
       return;
     }
 
@@ -152,7 +175,7 @@ export default function DatosPage() {
     if (nextEmail !== user.email.toLowerCase()) {
       const { ok, error } = await changeEmail(nextEmail);
       if (!ok) {
-        setEmailError(error ?? "No se pudo cambiar el email");
+        profileErrors.failWith("email", error ?? "No se pudo cambiar el email");
         setSavingProfile(false);
         return;
       }
@@ -166,7 +189,10 @@ export default function DatosPage() {
       nifType: nifResult.type === "OTHER" ? undefined : nifResult.type,
     });
     if (!profileResult.ok) {
-      setEmailError(profileResult.error ?? "No se pudo guardar");
+      profileErrors.failWith(
+        "nif",
+        profileResult.error ?? "No se pudo guardar",
+      );
       setSavingProfile(false);
       return;
     }
@@ -197,6 +223,34 @@ export default function DatosPage() {
           ).map(([key, label, value]) => {
             const isNif = key === "nif";
             const isEmail = key === "email";
+            const isPhone = key === "phone";
+            // Validación on-blur por campo: feedback visual en cuanto el
+            // usuario pasa a otro input, no solo al enviar.
+            const onBlur = () => {
+              const v = value.trim();
+              if (!v) return; // requireds se validan en submit
+              if (isNif) {
+                const r = validateSpanishNIF(v);
+                if (!r.valid) {
+                  profileErrors.failWith(
+                    "nif",
+                    r.error ?? "NIF / NIE / CIF inválido",
+                  );
+                }
+                return;
+              }
+              if (isEmail && !EMAIL_REGEX.test(v)) {
+                profileErrors.failWith("email", "Email inválido.");
+                return;
+              }
+              if (isPhone && !PHONE_REGEX.test(v)) {
+                profileErrors.failWith(
+                  "phone",
+                  "Teléfono: solo dígitos, espacios, + y -().",
+                );
+                return;
+              }
+            };
             return (
             <div key={key}>
               <label className="mb-1.5 block text-sm font-semibold text-gray-700">
@@ -213,11 +267,17 @@ export default function DatosPage() {
                       : e.target.value,
                   }))
                 }
+                onFocus={() => profileErrors.clearIfCurrent(key)}
+                onBlur={onBlur}
+                aria-invalid={profileErrors.isFieldInvalid(key)}
                 maxLength={isNif ? 9 : isEmail ? 254 : undefined}
                 autoComplete={isNif ? "off" : isEmail ? "email" : undefined}
-                className={`h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${
-                  isNif ? "font-mono uppercase tracking-wider" : ""
-                }`}
+                className={profileErrors.fieldCls(
+                  key,
+                  `h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:outline-none ${
+                    isNif ? "font-mono uppercase tracking-wider" : ""
+                  }`,
+                )}
               />
               {isEmail && (
                 <p className="mt-1 text-xs text-gray-500">
@@ -234,14 +294,9 @@ export default function DatosPage() {
           })}
         </div>
 
-        {nifError && (
+        {profileErrors.error && (
           <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <AlertCircle size={16} className="shrink-0" /> {nifError}
-          </div>
-        )}
-        {emailError && (
-          <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <AlertCircle size={16} className="shrink-0" /> {emailError}
+            <AlertCircle size={16} className="shrink-0" /> {profileErrors.error}
           </div>
         )}
         {saved && (
@@ -452,18 +507,40 @@ export default function DatosPage() {
                         type="text"
                         value={(addrForm[key] as string) ?? ""}
                         onChange={setAddr(key)}
+                        onFocus={() => addrErrors.clearIfCurrent(key)}
+                        onBlur={() => {
+                          // Validación on-blur: CP español (5 dígitos).
+                          // El resto de required se comprueba en submit.
+                          if (key === "cp") {
+                            const v = ((addrForm.cp as string) ?? "").trim();
+                            if (!v) return;
+                            if (
+                              (addrForm.pais ?? "ES") === "ES" &&
+                              !/^\d{5}$/.test(v)
+                            ) {
+                              addrErrors.failWith(
+                                "cp",
+                                "El código postal debe tener 5 dígitos",
+                              );
+                            }
+                          }
+                        }}
+                        aria-invalid={addrErrors.isFieldInvalid(key)}
                         placeholder={placeholder ?? ""}
                         maxLength={key === "label" ? 30 : undefined}
-                        className="h-10 w-full rounded-xl border-2 border-gray-200 px-3 text-sm focus:border-[#2563eb] focus:outline-none transition"
+                        className={addrErrors.fieldCls(
+                          key,
+                          "h-10 w-full rounded-xl border-2 px-3 text-sm focus:outline-none transition",
+                        )}
                       />
                     )}
                   </div>
                 );
               })}
             </div>
-            {addrError && (
+            {addrErrors.error && (
               <div className="mt-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                <AlertCircle size={16} className="shrink-0" /> {addrError}
+                <AlertCircle size={16} className="shrink-0" /> {addrErrors.error}
               </div>
             )}
             <div className="mt-5 flex gap-3">
@@ -477,7 +554,7 @@ export default function DatosPage() {
                 onClick={() => {
                   setShowAddrForm(false);
                   setEditAddrId(null);
-                  setAddrError("");
+                  addrErrors.clearAll();
                 }}
                 className="rounded-xl border-2 border-gray-200 px-6 py-2.5 text-sm font-semibold text-gray-600 transition hover:border-gray-300"
               >

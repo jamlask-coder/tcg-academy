@@ -8,6 +8,7 @@ export const SITE_CONFIG = {
   legalName: "TCG HOBBY, S.L.",
   cif: "B26979302",
   address: "Av. del Norte 40, 2ª planta, puerta B, 03710 Calpe, Alicante",
+  country: "España",
   email: "tcgacademycalpe@gmail.com",
   phone: "+34 648 63 57 23",
 

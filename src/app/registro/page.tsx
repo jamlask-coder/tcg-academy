@@ -148,6 +148,7 @@ export default function RegistroPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
+    mode: "onTouched",
     defaultValues: {
       telefono: "",
       nif: "",

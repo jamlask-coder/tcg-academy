@@ -68,6 +68,13 @@ export interface User {
    */
   emailVerified?: boolean;
   emailVerifiedAt?: string; // ISO timestamp
+  /**
+   * URL pública de la foto de perfil del usuario.
+   * Actualmente se rellena automáticamente desde el claim `picture` del
+   * ID token de Google OIDC al iniciar sesión con Google. Puede sobrescribirse
+   * si en el futuro añadimos upload manual de avatar.
+   */
+  avatarUrl?: string;
 }
 
 export interface RegisterData {

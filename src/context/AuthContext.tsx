@@ -625,7 +625,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ) as Record<string, { password: string; user: User }>;
 
         if (registered[email]) {
-          persist(registered[email].user, REMEMBER_ME_MS);
+          // Usuario ya existía (p.ej. registrado antes con email/password).
+          // Enriquecemos con datos de Google si faltan: Google ya validó el
+          // correo, así que su `emailVerified` es autoritativo; y guardamos
+          // la foto de perfil si no tenía.
+          const existing = registered[email].user;
+          const nowIso = new Date().toISOString();
+          const upgraded: User = {
+            ...existing,
+            emailVerified: existing.emailVerified || payload.email_verified === true,
+            emailVerifiedAt:
+              existing.emailVerifiedAt ??
+              (payload.email_verified === true ? nowIso : undefined),
+            avatarUrl: existing.avatarUrl ?? payload.picture,
+          };
+          registered[email] = { ...registered[email], user: upgraded };
+          persistRegistered(registered);
+          persist(upgraded, REMEMBER_ME_MS);
           return { ok: true };
         }
 
@@ -652,6 +668,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           isUsed: (h) => !!usernameIndex[h] || isHandleReserved(h),
         });
 
+        // Google ya ha validado el email (claim `email_verified`). No
+        // emitimos token de verificación ni email nuestro — damos la cuenta
+        // por verificada desde el minuto 0. Además extraemos el máximo
+        // posible de los claims OIDC: foto de perfil (picture), nombre
+        // completo (ya separado arriba en name/lastName) y el flag de
+        // verificación. Campos como NIF/teléfono/dirección los pedimos
+        // solo en checkout (FiscalDataGuard).
+        const nowIso = new Date().toISOString();
         const newUser: User = {
           id: newUserId,
           email,
@@ -662,8 +686,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: "cliente",
           addresses: [],
           favorites: [],
-          createdAt: new Date().toISOString(),
+          createdAt: nowIso,
           referralCode: refCode,
+          emailVerified: payload.email_verified === true,
+          emailVerifiedAt:
+            payload.email_verified === true ? nowIso : undefined,
+          avatarUrl: payload.picture,
         };
 
         // Random password — Google users can still request a password reset

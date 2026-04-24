@@ -16,7 +16,10 @@ import {
   CheckCircle2,
   XCircle,
   FileWarning,
+  RotateCcw,
 } from "lucide-react";
+import DevolucionModal from "@/components/admin/fiscal/DevolucionModal";
+import { DataHub } from "@/lib/dataHub";
 // ChevronDown, ChevronUp used by SortIcon
 import {
   loadInvoices,
@@ -271,6 +274,15 @@ export default function FacturasPage() {
   const [invoices, setInvoices] = useState<InvoiceRecord[]>(() => loadInvoices());
   const [syncReport, setSyncReport] = useState<SyncResult | null>(null);
   const [migrationReport, setMigrationReport] = useState<InvoiceMigrationReport | null>(null);
+  // Factura sobre la que se está emitiendo devolución (null = modal cerrado).
+  const [refundingInvoice, setRefundingInvoice] = useState<InvoiceRecord | null>(null);
+
+  // Tras una emisión (rectificativa, sync, etc.) otra pestaña o el propio flujo
+  // DevolucionModal publican "invoices" por DataHub → refrescamos la lista.
+  useEffect(() => {
+    const off = DataHub.on("invoices", () => setInvoices(loadInvoices()));
+    return off;
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -921,15 +933,27 @@ export default function FacturasPage() {
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         {inv.status !== InvoiceStatus.ANULADA &&
                         inv.invoiceType !== InvoiceType.RECTIFICATIVA ? (
-                          <Link
-                            href={`/admin/fiscal/rectificar/${inv.invoiceId}`}
-                            className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 transition hover:border-amber-400 hover:bg-amber-100"
-                            title="Emitir factura rectificativa"
-                            aria-label={`Rectificar ${inv.invoiceNumber}`}
-                          >
-                            <FileWarning size={12} />
-                            Rectificar
-                          </Link>
+                          <div className="inline-flex flex-col items-stretch gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setRefundingInvoice(inv)}
+                              className="inline-flex items-center justify-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700 transition hover:border-red-400 hover:bg-red-100"
+                              title="Emitir devolución — genera factura rectificativa"
+                              aria-label={`Devolución de ${inv.invoiceNumber}`}
+                            >
+                              <RotateCcw size={11} />
+                              Devolución
+                            </button>
+                            <Link
+                              href={`/admin/fiscal/rectificar/${inv.invoiceId}`}
+                              className="inline-flex items-center justify-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 transition hover:border-amber-400 hover:bg-amber-100"
+                              title="Emitir factura rectificativa (corrección de datos)"
+                              aria-label={`Rectificar ${inv.invoiceNumber}`}
+                            >
+                              <FileWarning size={11} />
+                              Rectificar
+                            </Link>
+                          </div>
                         ) : (
                           <span className="text-xs text-gray-300">—</span>
                         )}
@@ -1114,6 +1138,16 @@ export default function FacturasPage() {
           </div>
         )}
       </div>
+
+      {/* Modal de devolución — se abre desde la fila de cada factura. Emite
+          rectificativa + reembolso en un solo paso. */}
+      {refundingInvoice && (
+        <DevolucionModal
+          invoice={refundingInvoice}
+          onClose={() => setRefundingInvoice(null)}
+          onSuccess={() => setInvoices(loadInvoices())}
+        />
+      )}
     </div>
   );
 }

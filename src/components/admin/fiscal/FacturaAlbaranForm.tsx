@@ -19,7 +19,7 @@
  *  - Se oculta el selector de Origen (E/P/R) — los albaranes no llevan
  *    marca de origen en la numeración.
  */
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -46,10 +46,12 @@ import {
 } from "@/services/invoiceService";
 import { createDeliveryNote } from "@/services/deliveryNoteService";
 import { getMergedProducts } from "@/lib/productStore";
+import { deductStockForInvoiceItems } from "@/lib/stockMovement";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import {
   generateInvoiceHTML,
   printInvoice,
+  ensureVerifactuHash,
   type InvoiceData,
 } from "@/utils/invoiceGenerator";
 import { Send } from "lucide-react";
@@ -586,8 +588,37 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
   // ── Preview HTML — render real del PDF final (mismo generador que imprime).
   // Se recalcula solo cuando el modal está abierto para no gastar CPU mientras
   // edita. Incluye envío y cupón como items (igual que en createInvoice).
-  const previewHtml = useMemo(() => {
-    if (!showPreview) return "";
+  // Es async porque necesitamos `ensureVerifactuHash` para que la vista previa
+  // muestre el CSV (Código Seguro de Verificación) igual que el PDF final.
+  const [previewHtml, setPreviewHtml] = useState("");
+  // Ref + altura del iframe. El iframe se redimensiona al alto real del
+  // documento (scrollHeight del body del iframe) para que el scroll lo maneje
+  // el contenedor exterior y se vean todos los saltos de página (indicador
+  // visual gris+rojo cada 297mm). Con h-full el iframe quedaba clavado al
+  // alto del modal y el usuario no veía los saltos ni las páginas siguientes.
+  const previewIframeRef = useRef<HTMLIFrameElement>(null);
+  const [previewHeight, setPreviewHeight] = useState<number>(0);
+  const resizePreview = useCallback(() => {
+    const iframe = previewIframeRef.current;
+    if (!iframe) return;
+    const doc = iframe.contentDocument;
+    if (!doc || !doc.body) return;
+    // Math.max: usamos scrollHeight y offsetHeight porque el motor puede
+    // diferir 1-2px según si el documento tiene decimales en márgenes.
+    const h = Math.max(
+      doc.body.scrollHeight,
+      doc.body.offsetHeight,
+      doc.documentElement.scrollHeight,
+    );
+    if (h > 0) setPreviewHeight(h);
+  }, []);
+  useEffect(() => {
+    if (!showPreview) {
+      setPreviewHtml("");
+      setPreviewHeight(0);
+      return;
+    }
+    let cancelled = false;
     const activeLines = lines.filter(
       (l) => l.description.trim() && l.unitPriceWithVAT > 0,
     );
@@ -620,6 +651,7 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
       issuerCIF: SITE_CONFIG.cif,
       issuerAddress: SITE_CONFIG.address,
       issuerCity: "",
+      issuerCountry: SITE_CONFIG.country,
       issuerPhone: SITE_CONFIG.phone,
       issuerEmail: SITE_CONFIG.email,
       clientName: clientName || "—",
@@ -641,11 +673,18 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
           : undefined,
       isDeliveryNote: isAlbaran,
     };
-    const html = generateInvoiceHTML(data);
-    // srcDoc no tiene origin → las URLs relativas (logo, watermark) rompen.
-    // Inyectar <base> resuelve las rutas igual que en printInvoice().
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    return html.replace("<head>", `<head><base href="${origin}/">`);
+    (async () => {
+      const withHash = await ensureVerifactuHash(data);
+      if (cancelled) return;
+      const html = generateInvoiceHTML(withHash);
+      // srcDoc no tiene origin → las URLs relativas (logo, watermark) rompen.
+      // Inyectar <base> resuelve las rutas igual que en printInvoice().
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      setPreviewHtml(html.replace("<head>", `<head><base href="${origin}/">`));
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [
     showPreview,
     lines,
@@ -859,6 +898,9 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
           paymentMethod,
           deliveryNoteDate: new Date(invoiceDate),
         });
+        // Salida física del producto → resta stock. Si luego se convierte a
+        // factura vía convertToInvoice(), NO se vuelve a restar.
+        deductStockForInvoiceItems(builtItems);
         setSaved(true);
         setTimeout(() => router.push("/admin/fiscal/albaranes"), 1500);
         return;
@@ -876,6 +918,11 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
 
       saveInvoice(invoice);
 
+      // Factura manual directa (sin albarán previo) → resta stock.
+      // Las facturas web ya lo restan en /finalizar-compra; las generadas
+      // por convertToInvoice() ya lo restaron al crear el albarán.
+      deductStockForInvoiceItems(invoice.items);
+
       // Construir InvoiceData una sola vez (se usa para openPdf y email).
       const pdfData: InvoiceData = {
         invoiceNumber: invoice.invoiceNumber,
@@ -888,6 +935,7 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
         issuerCIF: SITE_CONFIG.cif,
         issuerAddress: SITE_CONFIG.address,
         issuerCity: "",
+        issuerCountry: SITE_CONFIG.country,
         issuerPhone: SITE_CONFIG.phone,
         issuerEmail: SITE_CONFIG.email,
         clientName: clientName || "—",
@@ -1628,7 +1676,11 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
           </button>
 
           {lines.length > 0 && (
-            <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3 text-sm">
+            // pr-9 (36px) = ancho de la columna "papelera" de la tabla
+            // (w-8 + pl-1). Con ese padding derecho, la cifra del subtotal
+            // queda alineada verticalmente con los precios de la columna
+            // "Total" de cada línea.
+            <div className="mt-4 flex items-center justify-end gap-6 border-t border-gray-100 pt-3 pr-9 text-sm">
               <span className="font-medium text-gray-600">Subtotal productos</span>
               <span className="font-semibold tabular-nums text-gray-800">
                 {totals.linesTotalBeforeGlobal.toFixed(2)} €
@@ -1755,15 +1807,17 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
           </div>
 
           {(totals.globalDiscountAmount > 0 || totals.coupon > 0) && (
-            <div className="mt-4 space-y-1.5 border-t border-gray-100 pt-3 text-sm">
-              <div className="flex items-center justify-between text-gray-600">
+            // pr-9 por la misma razón: alinear cifras con la columna "Total"
+            // de la tabla de líneas (hay una columna papelera w-8 + pl-1).
+            <div className="mt-4 space-y-1.5 border-t border-gray-100 pt-3 pr-9 text-sm">
+              <div className="flex items-center justify-end gap-6 text-gray-600">
                 <span>Subtotal (sin descuentos generales)</span>
                 <span className="tabular-nums">
                   {totals.subtotalBeforeGlobal.toFixed(2)} €
                 </span>
               </div>
               {totals.globalDiscountAmount > 0 && (
-                <div className="flex items-center justify-between text-rose-600">
+                <div className="flex items-center justify-end gap-6 text-rose-600">
                   <span>Descuento general ({globalDiscountPct}%)</span>
                   <span className="font-medium tabular-nums">
                     −{totals.globalDiscountAmount.toFixed(2)} €
@@ -1771,7 +1825,7 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
                 </div>
               )}
               {totals.coupon > 0 && (
-                <div className="flex items-center justify-between text-rose-600">
+                <div className="flex items-center justify-end gap-6 text-rose-600">
                   <span>Descuento cupón / promoción</span>
                   <span className="font-medium tabular-nums">
                     −{totals.coupon.toFixed(2)} €
@@ -1781,7 +1835,9 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
             </div>
           )}
 
-          <div className="mt-4 flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3 text-lg font-bold text-gray-900">
+          {/* TOTAL: barra destacada. El padding derecho px-4 del bloque más
+              pr-5 extra iguala los ~36px del offset de la columna papelera. */}
+          <div className="mt-4 flex items-center justify-end gap-6 rounded-xl bg-blue-50 py-3 pl-4 pr-9 text-lg font-bold text-gray-900">
             <span>TOTAL</span>
             <span className="tabular-nums">
               {totals.finalTotal.toFixed(2)} €
@@ -1827,7 +1883,7 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
           aria-modal="true"
           aria-labelledby="preview-title"
         >
-          <div className="flex h-[95vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="flex h-[95vh] w-full max-w-[860px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex shrink-0 items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
               <h3 id="preview-title" className="flex items-center gap-2 text-base font-bold text-gray-900">
                 <Eye size={16} className="text-blue-600" />
@@ -1844,11 +1900,21 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 bg-gray-100 p-4">
+            {/* El documento interior mide 210mm exactos (A4). El HTML generado
+                incluye un script de paginación que divide el contenido en
+                N .sheet A4 de 210×297mm. En pantalla cada hoja se ve como
+                un folio blanco con sombra, separadas por el body gris. Al
+                imprimir, cada .sheet fuerza salto de página → PDF idéntico.
+                El iframe se auto-ajusta vía onLoad a la altura real del
+                documento ya paginado (N × 297mm + gaps). */}
+            <div className="min-h-0 flex-1 overflow-auto bg-gray-100 p-4">
               <iframe
+                ref={previewIframeRef}
                 title={`Vista previa de ${labels.docNoun}`}
                 srcDoc={previewHtml}
-                className="block h-full w-full rounded-lg border border-gray-200 bg-white shadow-inner"
+                onLoad={resizePreview}
+                style={{ height: previewHeight ? `${previewHeight}px` : "100%" }}
+                className="mx-auto block w-[210mm] rounded-lg border border-gray-200 bg-white shadow-inner"
               />
             </div>
 
@@ -1889,7 +1955,7 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
                     ? labels.savingLabel
                     : isAlbaran
                       ? "Confirmar y guardar albarán"
-                      : "Confirmar y guardar PDF"}
+                      : "Confirmar"}
                 </button>
                 {!isAlbaran && (
                   <button

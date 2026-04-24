@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import {
   ShoppingCart,
-  Heart,
   User,
   Search,
   X,
@@ -23,7 +22,6 @@ import {
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
-import { useFavorites } from "@/context/FavoritesContext";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { GAME_CONFIG } from "@/data/products";
 import { getMergedProducts, getProductUrl } from "@/lib/productStore";
@@ -473,7 +471,6 @@ function HeaderInlineAuth() {
 export function Header() {
   const { count } = useCart();
   const { user, logout } = useAuth();
-  const { count: favCount } = useFavorites();
   const { unreadCount } = useNotifications();
   const router = useRouter();
 
@@ -781,8 +778,21 @@ export function Header() {
         {/* Fin zona central */}
 
         {/* Iconos — siempre a la derecha, con margen para el badge.
-            En móvil alineados al top para cuadrar con "TCG Academy". */}
+            En móvil alineados al top para cuadrar con "TCG Academy".
+            Orden invariante: Perfil (izquierda del todo) → [atajos admin
+            / bell notificaciones] → Carrito (derecha del todo). */}
         <div className="flex shrink-0 items-start gap-0.5 pr-2 lg:items-center">
+          {/* 1. User icon — SIEMPRE el primero (izquierda del todo).
+              Desktop only: en móvil el login/cuenta vive en la píldora estilo
+              YouTube del centro (middle zone). */}
+          <Link
+            href={user ? (user.role === "admin" ? "/admin" : "/cuenta") : "/login"}
+            className="hidden items-center justify-center gap-1.5 rounded-lg p-2 transition hover:bg-white/10 lg:flex lg:min-h-[44px]"
+            aria-label={user?.role === "admin" ? "Panel de administración" : "Mi cuenta"}
+          >
+            <User size={22} className="text-white" />
+          </Link>
+
           {/* Admin shortcut (sm, not desktop where panel admin is in greeting menu) */}
           {user?.role === "admin" && (
             <Link
@@ -819,6 +829,7 @@ export function Header() {
               ))}
             </>
           )}
+
           {/* User: notifications bell */}
           {user && user.role !== "admin" && (
             <Link
@@ -835,34 +846,9 @@ export function Header() {
             </Link>
           )}
 
-          {/* 1. User icon — solo desktop. En móvil el login/cuenta vive en
-              la píldora estilo YouTube del centro (middle zone). */}
-          <Link
-            href={user ? (user.role === "admin" ? "/admin" : "/cuenta") : "/login"}
-            className="hidden items-center justify-center gap-1.5 rounded-lg p-2 transition hover:bg-white/10 lg:flex lg:min-h-[44px]"
-            aria-label={user?.role === "admin" ? "Panel de administración" : "Mi cuenta"}
-          >
-            <User size={22} className="text-white" />
-          </Link>
-
-          {/* 2. Favorites — desktop only */}
-          {user?.role !== "admin" && (
-            <Link
-              href="/cuenta/favoritos"
-              className="relative hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10 lg:flex"
-              aria-label="Favoritos"
-            >
-              <Heart size={22} className="text-white" fill={favCount > 0 ? "white" : "none"} />
-              {favCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
-                  {favCount}
-                </span>
-              )}
-            </Link>
-          )}
-
-          {/* 3. Cart — desktop only (en móvil el carrito va junto al icono de
-              perfil en la zona central, justo a la derecha de TCG Academy). */}
+          {/* 2. Cart — SIEMPRE el último (derecha del todo). Desktop only: en
+              móvil el carrito va junto al icono de perfil en la zona central,
+              justo a la derecha de TCG Academy. */}
           {user?.role !== "admin" && (
             <Link
               href="/carrito"

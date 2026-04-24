@@ -22,6 +22,33 @@ import {
 } from "@/lib/validations/profileComplete";
 import type { Address } from "@/types/user";
 import { AlertCircle, ShieldCheck, CheckCircle } from "lucide-react";
+import { PhonePrefixPicker } from "@/components/ui/PhonePrefixPicker";
+import {
+  COUNTRY_OPTIONS,
+  findCountryOption,
+} from "@/data/countryPrefixes";
+import { useFieldErrors } from "@/hooks/useFieldErrors";
+
+/**
+ * Separa un `User.phone` guardado como "+34 600 000 000" en (código país,
+ * resto). Usado para pre-rellenar el picker si el usuario ya tenía teléfono.
+ * Fallback: ES + el string completo en el input nacional.
+ */
+function splitStoredPhone(raw: string): { code: string; rest: string } {
+  if (!raw) return { code: "ES", rest: "" };
+  const trimmed = raw.trim();
+  // COUNTRY_OPTIONS ordenado con dialCodes más largos primero para evitar
+  // que "+3" coincida antes que "+34".
+  const sorted = [...COUNTRY_OPTIONS]
+    .filter((c) => c.code !== "OTRO")
+    .sort((a, b) => b.dialCode.length - a.dialCode.length);
+  for (const c of sorted) {
+    if (trimmed.startsWith(c.dialCode)) {
+      return { code: c.code, rest: trimmed.slice(c.dialCode.length).trim() };
+    }
+  }
+  return { code: "ES", rest: trimmed };
+}
 
 function CompletarDatosInner() {
   const { user, updateProfile } = useAuth();
@@ -35,7 +62,14 @@ function CompletarDatosInner() {
     user?.addresses?.find((a) => a.predeterminada) ?? user?.addresses?.[0] ?? null;
 
   const [nif, setNif] = useState(user?.nif ?? "");
-  const [phone, setPhone] = useState(user?.phone ?? "");
+  // Teléfono en 2 piezas — mismo patrón que /registro: picker con bandera +
+  // prefijo (SSOT `countryPrefixes.ts`) e input con la parte nacional. Al
+  // enviar se concatenan → `User.phone = "+34 600 000 000"`.
+  const initialPhoneSplit = splitStoredPhone(user?.phone ?? "");
+  const [phoneCountryCode, setPhoneCountryCode] = useState(
+    initialPhoneSplit.code,
+  );
+  const [phone, setPhone] = useState(initialPhoneSplit.rest);
   const [calle, setCalle] = useState(existingAddr?.calle ?? "");
   const [numero, setNumero] = useState(existingAddr?.numero ?? "");
   const [piso, setPiso] = useState(existingAddr?.piso ?? "");
@@ -43,8 +77,12 @@ function CompletarDatosInner() {
   const [ciudad, setCiudad] = useState(existingAddr?.ciudad ?? "");
   const [provincia, setProvincia] = useState(existingAddr?.provincia ?? "");
   const [pais, setPais] = useState(existingAddr?.pais ?? "España");
-  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Errores por campo + clases rojas al vuelo. Mismo hook en toda la web
+  // (registro, cuenta/datos, finalizar-compra) → un solo contrato de estilos.
+  const { error, errorField, failWith, clearIfCurrent, clearAll, fieldCls } =
+    useFieldErrors();
 
   useEffect(() => {
     if (!user) {
@@ -63,40 +101,53 @@ function CompletarDatosInner() {
 
   if (!user) return null;
 
+  // Estado de completitud al entrar — usado solo para mostrar "Te faltan: X".
+  // El gating real (useEffect arriba) decide si redirigir o no; este preCheck
+  // alimenta el mensaje informativo del header.
+  const preCheck = isFiscalProfileComplete(user);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    clearAll();
 
     // ── NIF ──
     const nifResult = validateSpanishNIF(nif);
     if (!nifResult.valid) {
-      setError(nifResult.error ?? "NIF / NIE / CIF inválido");
+      failWith("nif", nifResult.error ?? "NIF / NIE / CIF inválido");
       return;
     }
 
-    // ── Teléfono ──
-    if (!phone || phone.trim().length < 9) {
-      setError("El teléfono debe tener al menos 9 dígitos.");
+    // ── Teléfono ── (mismas reglas que /registro: dígitos, espacios, -())
+    const phoneRaw = phone.trim();
+    if (!phoneRaw || phoneRaw.length < 6) {
+      failWith("phone", "El teléfono debe tener al menos 6 caracteres.");
       return;
     }
+    if (!/^[\d\s\-()]{6,20}$/.test(phoneRaw)) {
+      failWith("phone", "Teléfono: solo dígitos, espacios y los símbolos -().");
+      return;
+    }
+    const dial = findCountryOption(phoneCountryCode).dialCode;
+    const composedPhone = `${dial} ${phoneRaw}`.trim();
 
     // ── Dirección fiscal (5 campos postales obligatorios + número) ──
-    const fields: Array<[string, string]> = [
-      ["calle", calle],
-      ["número", numero],
-      ["código postal", cp],
-      ["ciudad", ciudad],
-      ["provincia", provincia],
-      ["país", pais],
+    // [key interno, label visible, valor]. El key alimenta el highlight.
+    const fields: Array<[string, string, string]> = [
+      ["calle", "calle", calle],
+      ["numero", "número", numero],
+      ["cp", "código postal", cp],
+      ["ciudad", "ciudad", ciudad],
+      ["provincia", "provincia", provincia],
+      ["pais", "país", pais],
     ];
-    for (const [label, value] of fields) {
+    for (const [key, label, value] of fields) {
       if (!value.trim()) {
-        setError(`Falta el campo: ${label}.`);
+        failWith(key, `Falta el campo: ${label}.`);
         return;
       }
     }
     if (!/^\d{5}$/.test(cp.trim())) {
-      setError("El código postal debe tener 5 dígitos.");
+      failWith("cp", "El código postal debe tener 5 dígitos.");
       return;
     }
 
@@ -115,7 +166,7 @@ function CompletarDatosInner() {
       ciudad: ciudad.trim(),
       provincia: provincia.trim(),
       pais: pais.trim(),
-      telefono: phone.trim(),
+      telefono: composedPhone,
       predeterminada: true,
     };
     const otherAddresses = (user.addresses ?? []).filter(
@@ -125,11 +176,14 @@ function CompletarDatosInner() {
     const saveResult = updateProfile({
       nif: nifResult.normalized,
       nifType: nifResult.type === "OTHER" ? undefined : nifResult.type,
-      phone: phone.trim(),
+      phone: composedPhone,
       addresses: [newAddress, ...otherAddresses],
     });
     if (!saveResult.ok) {
-      setError(saveResult.error ?? "No se pudo guardar");
+      // Error devuelto por el servicio de guardado. No sabemos qué campo lo
+      // provocó (la mayoría de mensajes de updateProfile suelen ser sobre NIF
+      // duplicado → apuntamos al NIF como mejor heurística).
+      failWith("nif", saveResult.error ?? "No se pudo guardar");
       setSubmitting(false);
       return;
     }
@@ -192,12 +246,28 @@ function CompletarDatosInner() {
                 type="text"
                 value={nif}
                 onChange={(e) => setNif(e.target.value.toUpperCase())}
+                onFocus={() => clearIfCurrent("nif")}
+                onBlur={() => {
+                  // Validación instantánea al salir del campo. Si está vacío
+                  // no marcamos error (el usuario puede estar solo haciendo
+                  // tab rápido) — el submit ya valida required.
+                  const v = nif.trim();
+                  if (!v) return;
+                  const r = validateSpanishNIF(v);
+                  if (!r.valid) {
+                    failWith("nif", r.error ?? "NIF / NIE / CIF inválido");
+                  }
+                }}
                 placeholder="12345678A"
                 maxLength={9}
                 autoComplete="off"
                 autoFocus
                 required
-                className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 font-mono text-sm uppercase tracking-wider transition focus:border-[#2563eb] focus:outline-none"
+                aria-invalid={errorField === "nif"}
+                className={fieldCls(
+                  "nif",
+                  "h-11 w-full rounded-xl border-2 px-4 font-mono text-sm uppercase tracking-wider transition focus:outline-none",
+                )}
               />
             </div>
 
@@ -205,15 +275,40 @@ function CompletarDatosInner() {
               <label className="mb-1.5 block text-sm font-semibold text-gray-700">
                 Teléfono <span className="text-red-500">*</span>
               </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+34 612 345 678"
-                maxLength={20}
-                required
-                className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
-              />
+              <div className="flex">
+                <PhonePrefixPicker
+                  value={phoneCountryCode}
+                  onChange={setPhoneCountryCode}
+                  disabled={submitting}
+                />
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  onFocus={() => clearIfCurrent("phone")}
+                  onBlur={() => {
+                    // Mismas reglas que /registro: dígitos, espacios y -()
+                    const v = phone.trim();
+                    if (!v) return;
+                    if (v.length < 6) {
+                      failWith("phone", "El teléfono debe tener al menos 6 caracteres.");
+                      return;
+                    }
+                    if (!/^[\d\s\-()]{6,20}$/.test(v)) {
+                      failWith("phone", "Teléfono: solo dígitos, espacios y los símbolos -().");
+                    }
+                  }}
+                  placeholder="600 000 000"
+                  maxLength={20}
+                  autoComplete="tel-national"
+                  required
+                  aria-invalid={errorField === "phone"}
+                  className={fieldCls(
+                    "phone",
+                    "h-11 w-full rounded-r-xl border-2 border-l-0 px-4 text-sm transition focus:outline-none",
+                  )}
+                />
+              </div>
             </div>
           </div>
 
@@ -232,7 +327,11 @@ function CompletarDatosInner() {
                   onChange={(e) => setCalle(e.target.value)}
                   placeholder="Gran Vía"
                   required
-                  className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
+                  aria-invalid={errorField === "calle"}
+                  className={fieldCls(
+                    "calle",
+                    "h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:outline-none",
+                  )}
                 />
               </div>
               <div>
@@ -245,7 +344,11 @@ function CompletarDatosInner() {
                   onChange={(e) => setNumero(e.target.value)}
                   placeholder="10"
                   required
-                  className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
+                  aria-invalid={errorField === "numero"}
+                  className={fieldCls(
+                    "numero",
+                    "h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:outline-none",
+                  )}
                 />
               </div>
               <div>
@@ -273,11 +376,23 @@ function CompletarDatosInner() {
                   onChange={(e) =>
                     setCp(e.target.value.replace(/\D/g, "").slice(0, 5))
                   }
+                  onFocus={() => clearIfCurrent("cp")}
+                  onBlur={() => {
+                    const v = cp.trim();
+                    if (!v) return;
+                    if (!/^\d{5}$/.test(v)) {
+                      failWith("cp", "El código postal debe tener 5 dígitos.");
+                    }
+                  }}
                   placeholder="28013"
                   maxLength={5}
                   inputMode="numeric"
                   required
-                  className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
+                  aria-invalid={errorField === "cp"}
+                  className={fieldCls(
+                    "cp",
+                    "h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:outline-none",
+                  )}
                 />
               </div>
               <div>
@@ -290,7 +405,11 @@ function CompletarDatosInner() {
                   onChange={(e) => setCiudad(e.target.value)}
                   placeholder="Madrid"
                   required
-                  className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
+                  aria-invalid={errorField === "ciudad"}
+                  className={fieldCls(
+                    "ciudad",
+                    "h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:outline-none",
+                  )}
                 />
               </div>
               <div>
@@ -303,7 +422,11 @@ function CompletarDatosInner() {
                   onChange={(e) => setProvincia(e.target.value)}
                   placeholder="Madrid"
                   required
-                  className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
+                  aria-invalid={errorField === "provincia"}
+                  className={fieldCls(
+                    "provincia",
+                    "h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:outline-none",
+                  )}
                 />
               </div>
             </div>
@@ -318,7 +441,11 @@ function CompletarDatosInner() {
                 onChange={(e) => setPais(e.target.value)}
                 placeholder="España"
                 required
-                className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
+                aria-invalid={errorField === "pais"}
+                className={fieldCls(
+                  "pais",
+                  "h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:outline-none",
+                )}
               />
             </div>
           </div>

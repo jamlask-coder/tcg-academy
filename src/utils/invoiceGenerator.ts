@@ -52,6 +52,7 @@ export interface InvoiceData {
   issuerCIF: string;
   issuerAddress: string;
   issuerCity: string;
+  issuerCountry?: string;
   issuerPhone: string;
   issuerEmail: string;
 
@@ -170,6 +171,7 @@ export function generateInvoiceHTML(
     issuerCIF,
     issuerAddress,
     issuerCity,
+    issuerCountry,
     issuerPhone,
     issuerEmail,
     clientName,
@@ -280,11 +282,14 @@ export function generateInvoiceHTML(
     clientPhone ? escapeHtml(clientPhone) : null,
     clientEmail ? escapeHtml(clientEmail) : null,
     clientAddress ? escapeHtml(abbreviateAddressLine(clientAddress)) : null,
-    clientCity ? escapeHtml(clientCity) : null,
-    [clientProvince, clientCountry]
+    // Población y provincia juntas en una línea ("Calp, Alicante"); país solo
+    // en la siguiente ("España"). Más legible y coherente con cómo se escribe
+    // una dirección postal española.
+    [clientCity, clientProvince]
       .filter(Boolean)
       .map((v) => escapeHtml(v as string))
       .join(", ") || null,
+    clientCountry ? escapeHtml(clientCountry) : null,
   ]
     .filter(Boolean)
     .join("<br>");
@@ -310,20 +315,83 @@ export function generateInvoiceHTML(
       --brand-navy-soft: #eef2ff;
     }
 
+    /* @page — margin:0 porque cada .sheet lleva su propio padding interno
+       (los márgenes del documento). El footer va DENTRO de cada .sheet, en
+       su padding-bottom, así se clona automáticamente en cada página. */
     @page { size: A4; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    /* El documento ES A4: html y body DEBEN medir 210mm exactos porque
+       printInvoice() imprime el documento nativo vía iframe.print() —
+       cualquier desviación (por ejemplo width:100%) hace que el body se
+       colapse al ancho del iframe oculto y el PDF resultante sale roto. */
     html, body { width: 210mm; min-height: 297mm; }
     /* Inter: trazos más estrechos que Arial Black. Fallback a system UI estilos
        narrow (Segoe UI en Windows, Helvetica Neue en macOS). */
     body { font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 10pt; color: #111827; background: white; }
+    /* El wrap crece libremente en altura — NO lleva overflow:hidden porque
+       eso clipaba el contenido que pasa de la primera página. La reserva
+       para el footer en páginas intermedias/última ya la hace @page
+       margin-bottom arriba (16mm en cada hoja). En pantalla, el wrap puede
+       medir mucho más de 297mm si la factura tiene muchas líneas — el
+       usuario ve un documento largo con scroll en la preview. */
+    /* El wrap es el contenedor FUENTE (pre-paginación). El script lo vacía
+       y reparte su contenido en .sheet hijas. Sin padding — el padding va
+       en cada .sheet. Sin min-height — el alto lo dictan las sheets. */
     .invoice-wrap {
       width: 210mm;
-      min-height: 297mm;
       margin: 0 auto;
-      padding: ${tpl.paddingTop}mm ${tpl.paddingX}mm ${tpl.paddingBottom}mm ${tpl.paddingX}mm;
-      padding-bottom: calc(${tpl.paddingBottom}mm + 16mm); /* reserva para footer fijo */
+      position: relative;
+    }
+
+    /* ── Paginación real (multi-sheet) ──────────────────────────────────
+       El script de paginación al final del documento divide el wrap en N
+       .sheet A4 de 210 por 297mm. En pantalla cada hoja se ve como un
+       folio separado con sombra; al imprimir, cada sheet fuerza salto de
+       página mediante break-after: page. */
+    /* La zona inferior de cada hoja queda reservada al footer con padding
+       extra fijo (18mm). Así el contenido NUNCA puede pisar el footer —
+       no hay cálculo dinámico que pueda fallar. El footer se ancla con
+       position:absolute a esa zona. overflow:visible para que, si algo
+       desborda, se vea y podamos diagnosticar en lugar de tragarlo. */
+    /* Altura FIJA 297mm (no min-height). Con min-height, el .sheet crece con
+       el contenido, sheet.bottom se aleja, y nodeFits() siempre devuelve true
+       → todo entra en una sola hoja gigante. Con height fijo, sheet.bottom es
+       siempre el borde A4 físico y la paginación detecta el desbordamiento. */
+    .sheet {
+      width: 210mm;
+      height: 297mm;
+      box-sizing: border-box;
+      padding:
+        ${tpl.paddingTop}mm
+        ${tpl.paddingX}mm
+        calc(${tpl.paddingBottom}mm + 18mm)
+        ${tpl.paddingX}mm;
+      background: #ffffff;
       position: relative;
       overflow: hidden;
+    }
+    @media screen {
+      body { background: #cbd5e1; margin: 0; padding: 20mm 0; }
+      .sheet {
+        margin: 0 auto 18mm auto;
+        box-shadow: 0 6px 22px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.10);
+      }
+      /* Mientras el script no ha paginado aún, ocultamos el contenido para
+         que no haya flash del bloque continuo. */
+      .invoice-wrap:not(.paginated) { visibility: hidden; }
+    }
+    @media print {
+      body { background: #ffffff; margin: 0; padding: 0; }
+      .sheet {
+        margin: 0;
+        box-shadow: none;
+        break-after: page;
+        page-break-after: always;
+      }
+      .sheet:last-child {
+        break-after: auto;
+        page-break-after: auto;
+      }
     }
 
     /* Espacio después de la tabla de items. El cierre de línea ya lo hace
@@ -375,10 +443,11 @@ export function generateInvoiceHTML(
     .hdr {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       gap: 24px;
+      margin-top: -6mm;
       margin-bottom: ${tpl.gapAfterHeader}px;
-      padding-bottom: 14px;
+      padding-bottom: 10px;
       border-bottom: 2px solid var(--brand-navy);
     }
     /* margin-left negativo: el logo queda ópticamente más a la izquierda sin
@@ -398,9 +467,10 @@ export function generateInvoiceHTML(
       text-align: left;
       font-size: 10.5pt;
       color: #111827;
-      line-height: 1.55;
+      line-height: 1.5;
       overflow-wrap: break-word;
       word-wrap: break-word;
+      margin-right: -4mm;
     }
     .company-info strong { color: var(--brand-navy); font-weight: 700; font-size: 11.5pt; display: block; margin-bottom: 3px; letter-spacing: 0.1px; }
 
@@ -449,7 +519,7 @@ export function generateInvoiceHTML(
     /* Zebra con alfa — así la marca de agua se transluce a través de las
        filas con fondo (requisito del usuario: ningún fondo sólido debe
        tapar el logo). */
-    table.items tbody tr:nth-child(even) { background: rgba(248, 250, 252, 0.55); }
+    table.items tbody tr:nth-child(even) { background: rgba(219, 234, 254, 0.45); }
     /* La última fila conserva su border-bottom para cerrar la tabla
        visualmente — 1px algo mas oscuro que las separaciones internas.
        Asi no queda ese hueco suelto abajo a la izquierda. */
@@ -462,7 +532,7 @@ export function generateInvoiceHTML(
     table.items tbody td.bold { font-weight: 700; }
     table.items tbody td.qty-col { color: #111827; }
     table.items tbody tr.shipping-row td { color: #374151; }
-    table.items tbody tr.shipping-row td.dash { color: #6b7280; text-align: center; }
+    table.items tbody tr.shipping-row td.dash { color: #6b7280; }
     /* "Gastos de envío" no debe partirse en dos líneas — si la columna desc
        es estrecha, preferimos que se muestre completo sin wrap. */
     table.items tbody tr.shipping-row td.desc { white-space: nowrap; }
@@ -531,14 +601,14 @@ export function generateInvoiceHTML(
     .totals .row.final span:last-child { color: #ffffff; font-weight: 700; }
     .totals .row.discount span:last-child { color: #16a34a; }
 
-    /* ── FOOTER fijado al pie de la página ───────────────────────────────
-       En pantalla (preview en iframe): position:absolute anclado al fondo
-       del .invoice-wrap — así queda realmente al pie del documento y no
-       flotando sobre el viewport. En impresión/PDF: position:fixed para
-       que se repita en cada página (@media print abajo). */
+    /* ── FOOTER fijado al pie de cada SHEET ───────────────────────────────
+       El footer se posiciona dentro de la zona de 18mm reservada al pie de
+       cada .sheet (ver padding-bottom extra). Queda pegado a esa zona, no
+       al borde absoluto del folio — así respeta margen inferior visualmente
+       y, como el padding lo aísla del contenido, jamás puede pisar filas. */
     .page-footer {
       position: absolute;
-      bottom: 5mm;
+      bottom: ${tpl.paddingBottom}mm;
       left: ${tpl.paddingX}mm;
       right: ${tpl.paddingX}mm;
       padding: 5px 0 0;
@@ -580,9 +650,22 @@ export function generateInvoiceHTML(
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .no-print { display: none; }
-      /* En impresión sí queremos fixed para que el footer se repita en
-         cada página (facturas de más de 1 página). */
-      .page-footer { position: fixed; }
+
+      /* Con paginación real, cada .sheet es ya una hoja A4 con su footer y
+         watermark dentro. No necesitamos position:fixed ni table-header-group
+         — el script de paginación ha repetido thead en cada trozo de tabla y
+         ha clonado footer+watermark en cada sheet. Solo reforzamos
+         break-inside:avoid por si el render del navegador mete un corte
+         "extra" dentro de un bloque indivisible. */
+      table.items tbody tr,
+      .totals,
+      .vat-breakdown,
+      .discounts-card,
+      .parties,
+      .intracom-note {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
     }
   </style>
 </head>
@@ -605,8 +688,8 @@ export function generateInvoiceHTML(
       CIF: ${escapeHtml(issuerCIF)}<br>
       ${escapeHtml(issuerPhone)}<br>
       ${escapeHtml(issuerEmail)}<br>
-      ${escapeHtml(issuerAddress)}<br>
-      ${escapeHtml(issuerCity)}
+      ${escapeHtml(abbreviateAddressLine(issuerAddress))}<br>
+      ${escapeHtml(issuerCity)}${issuerCountry ? `<br>${escapeHtml(issuerCountry)}` : ""}
     </div>
   </div>
 
@@ -724,9 +807,10 @@ export function generateInvoiceHTML(
     <div class="row final"><span>TOTAL</span><span>${totalFinal.toFixed(2)}&nbsp;€</span></div>
   </div>
 
-  <!-- PIE DE PÁGINA — se repite en cada página impresa (position: fixed). ──
-       Va DENTRO de .invoice-wrap para que position:absolute bottom:5mm se
-       ancle al wrap (con position:relative), no al viewport del iframe. -->
+  <!-- PIE DE PÁGINA — el script de paginación clona este nodo al pie de
+       cada .sheet y actualiza "Página X de Y". position:absolute se ancla
+       a la .sheet (que lleva position:relative implícito por el .sheet que
+       crea el script). -->
   <div class="page-footer">
     <div class="footer-grid">
       <div class="footer-col">
@@ -749,6 +833,154 @@ export function generateInvoiceHTML(
 
 </div>
 
+<script>
+(function () {
+  /**
+   * Paginación real del documento en N hojas A4 de 210×297mm. La zona
+   * reservada al footer (FOOTER_AREA_MM + paddingBottom) está garantizada
+   * por el padding-bottom de cada .sheet — no se mide dinámicamente, así
+   * no puede fallar. El contenido JAMÁS invade esa zona: si una fila no
+   * cabe en la sheet actual, pasa a la siguiente.
+   */
+  var PADDING_TOP_MM = ${tpl.paddingTop};
+  var PADDING_BOTTOM_MM = ${tpl.paddingBottom};
+  var FOOTER_AREA_MM = 18; // zona reservada al footer (coincide con padding extra)
+
+  function mmToPx(mm) {
+    // 96 CSS px = 1 inch = 25.4mm. Conversión estándar del navegador.
+    return (mm * 96) / 25.4;
+  }
+
+  function ready(fn) {
+    if (document.readyState !== 'loading') fn();
+    else document.addEventListener('DOMContentLoaded', fn);
+  }
+
+  function paginate() {
+    var wrap = document.querySelector('.invoice-wrap');
+    if (!wrap || wrap.classList.contains('paginated')) return;
+
+    // Plantillas que se clonan en cada .sheet (watermark al fondo absolute,
+    // footer en su zona reservada).
+    var watermarkT = wrap.querySelector('.watermark, .watermark-albaran');
+    var footerT = wrap.querySelector('.page-footer');
+
+    // Recolectamos los nodos de contenido (todo excepto watermark/footer).
+    var contentNodes = Array.prototype.slice.call(wrap.children).filter(
+      function (n) { return n !== watermarkT && n !== footerT; }
+    );
+
+    // Vaciamos el wrap para reconstruir con .sheet.
+    wrap.innerHTML = '';
+    var sheets = [];
+
+    function newSheet() {
+      var s = document.createElement('div');
+      s.className = 'sheet';
+      // Watermark absolute al fondo, NO afecta al flujo ni al cálculo de fit.
+      if (watermarkT) s.appendChild(watermarkT.cloneNode(true));
+      // Footer absolute en su zona reservada, tampoco afecta al flujo.
+      // Lo añadimos AQUÍ para que exista desde la primera medición (si algo
+      // saliera mal y el contenido invadiera la zona, se vería superpuesto).
+      if (footerT) s.appendChild(footerT.cloneNode(true));
+      wrap.appendChild(s);
+      sheets.push(s);
+      return s;
+    }
+
+    /**
+     * Límite Y (en coords de viewport) donde puede llegar el contenido
+     * útil sin invadir la zona reservada al footer. La zona es fija
+     * (padding-bottom extra), no medida — es imposible equivocarse.
+     */
+    function maxContentBottom(sheet) {
+      var r = sheet.getBoundingClientRect();
+      return r.bottom - mmToPx(PADDING_BOTTOM_MM + FOOTER_AREA_MM);
+    }
+
+    function nodeFits(node, sheet) {
+      return node.getBoundingClientRect().bottom <= maxContentBottom(sheet);
+    }
+
+    /**
+     * Coloca un nodo en la sheet actual. Si no cabe, abre sheet nueva
+     * y lo coloca ahí. Devuelve la sheet donde quedó alojado.
+     */
+    function placeNode(node, sheet) {
+      sheet.appendChild(node);
+      if (nodeFits(node, sheet)) return sheet;
+      sheet.removeChild(node);
+      var fresh = newSheet();
+      fresh.appendChild(node);
+      return fresh;
+    }
+
+    /**
+     * Paginación específica de la tabla de items: se trocea fila a fila,
+     * replicando <colgroup> y <thead> en cada trozo para que cada hoja
+     * tenga sus columnas y cabeceras completas.
+     */
+    function cloneTableShell(original) {
+      var t = document.createElement('table');
+      t.className = original.className;
+      var cg = original.querySelector('colgroup');
+      if (cg) t.appendChild(cg.cloneNode(true));
+      var th = original.querySelector('thead');
+      if (th) t.appendChild(th.cloneNode(true));
+      t.appendChild(document.createElement('tbody'));
+      return t;
+    }
+
+    function paginateItemsTable(table, startSheet) {
+      var rows = Array.prototype.slice.call(
+        table.querySelectorAll('tbody > tr')
+      );
+      if (table.parentNode) table.parentNode.removeChild(table);
+
+      var sheet = startSheet;
+      var working = cloneTableShell(table);
+      sheet.appendChild(working);
+      var tbody = working.querySelector('tbody');
+
+      for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        tbody.appendChild(row);
+        if (!nodeFits(row, sheet)) {
+          tbody.removeChild(row);
+          sheet = newSheet();
+          working = cloneTableShell(table);
+          sheet.appendChild(working);
+          tbody = working.querySelector('tbody');
+          tbody.appendChild(row);
+        }
+      }
+      return sheet;
+    }
+
+    // ── Distribución principal ──────────────────────────────────
+    var currentSheet = newSheet();
+    for (var k = 0; k < contentNodes.length; k++) {
+      var node = contentNodes[k];
+      if (node.tagName === 'TABLE' && node.classList.contains('items')) {
+        currentSheet = paginateItemsTable(node, currentSheet);
+      } else {
+        currentSheet = placeNode(node, currentSheet);
+      }
+    }
+
+    // ── Numeración real "Página X de Y" en cada footer ya clonado ──
+    for (var j = 0; j < sheets.length; j++) {
+      var pn = sheets[j].querySelector('.page-footer .page-num');
+      if (pn) pn.textContent = 'Página ' + (j + 1) + ' de ' + sheets.length;
+    }
+
+    wrap.classList.add('paginated');
+  }
+
+  ready(paginate);
+})();
+</script>
+
 </body>
 </html>`;
 }
@@ -768,7 +1000,7 @@ function escapeHtml(str: string): string {
  * If already present (e.g. persisted from invoiceService), it's preserved.
  * Returns the (possibly mutated) data — never throws.
  */
-async function ensureVerifactuHash(data: InvoiceData): Promise<InvoiceData> {
+export async function ensureVerifactuHash(data: InvoiceData): Promise<InvoiceData> {
   if (data.verifactuHash) return data;
   try {
     const content = [
@@ -910,6 +1142,7 @@ export function buildInvoiceFromOrder(
     issuerCIF: SITE_CONFIG.cif,
     issuerAddress,
     issuerCity,
+    issuerCountry: SITE_CONFIG.country,
     issuerPhone: SITE_CONFIG.phone,
     issuerEmail: SITE_CONFIG.email,
     clientName:

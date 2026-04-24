@@ -67,6 +67,12 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { STORES } from "@/data/stores";
 import { isFiscalProfileComplete } from "@/lib/validations/profileComplete";
+import { useFieldErrors } from "@/hooks/useFieldErrors";
+import { validateSpanishNIF } from "@/lib/validations/nif";
+
+// Regex locales — mismos que /registro y /cuenta/datos para coherencia UX.
+const CHECKOUT_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CHECKOUT_PHONE_REGEX = /^[\d\s\-()+]{6,20}$/;
 
 // Proyección ligera del registro central de tiendas para el checkout.
 // Fuente única: src/data/stores.ts — añadir/editar tiendas ahí.
@@ -139,6 +145,10 @@ export default function CheckoutPage() {
   const [showPointsPanel, setShowPointsPanel] = useState(false);
   const [userPoints, setUserPoints] = useState(0);
   const [triedSubmitDatos, setTriedSubmitDatos] = useState(false);
+  // Validación de FORMATO on-blur (NIF letra control, email, teléfono, CP 5
+  // dígitos). Complementa al check de "required" existente (`triedSubmitDatos`)
+  // marcando el campo en rojo en el instante en que el usuario sale de él.
+  const fmt = useFieldErrors();
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -1139,6 +1149,39 @@ export default function CheckoutPage() {
                   ] as [keyof typeof form, string, string, boolean][]
                 ).map(([key, label, type, req]) => {
                   const isNif = key === "nif";
+                  const isEmail = key === "email";
+                  const isPhone = key === "telefono";
+                  // Borde rojo si: submit intentado con campo vacío, O validación
+                  // on-blur falló (letra NIF, email, teléfono mal formateado).
+                  const missingOnSubmit =
+                    triedSubmitDatos && req && !form[key].toString().trim();
+                  const fmtInvalid = fmt.isFieldInvalid(key);
+                  const hasError = missingOnSubmit || fmtInvalid;
+                  const onBlur = () => {
+                    const v = form[key].toString().trim();
+                    if (!v) return; // vacío lo gestiona el check de required
+                    if (isNif) {
+                      const r = validateSpanishNIF(v);
+                      if (!r.valid) {
+                        fmt.failWith(
+                          "nif",
+                          r.error ?? "NIF / NIE / CIF inválido",
+                        );
+                      }
+                      return;
+                    }
+                    if (isEmail && !CHECKOUT_EMAIL_REGEX.test(v)) {
+                      fmt.failWith("email", "Email inválido.");
+                      return;
+                    }
+                    if (isPhone && !CHECKOUT_PHONE_REGEX.test(v)) {
+                      fmt.failWith(
+                        "telefono",
+                        "Teléfono: solo dígitos, espacios, + y -().",
+                      );
+                      return;
+                    }
+                  };
                   return (
                   <div key={key}>
                     <label className="mb-1.5 block text-sm font-semibold text-gray-700">
@@ -1158,7 +1201,10 @@ export default function CheckoutPage() {
                             : e.target.value,
                         }))
                       }
-                      className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${triedSubmitDatos && req && !form[key].toString().trim() ? "border-red-400" : "border-gray-200"} ${isNif ? "font-mono uppercase tracking-wider" : ""}`}
+                      onFocus={() => fmt.clearIfCurrent(key)}
+                      onBlur={onBlur}
+                      aria-invalid={hasError}
+                      className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${hasError ? "border-red-400" : "border-gray-200"} ${isNif ? "font-mono uppercase tracking-wider" : ""}`}
                     />
                     {isNif && (
                       <p className="mt-1 text-[11px] text-gray-500">
@@ -1280,10 +1326,26 @@ export default function CheckoutPage() {
                     onChange={(e) =>
                       setForm((f) => ({ ...f, cp: e.target.value }))
                     }
+                    onFocus={() => fmt.clearIfCurrent("cp")}
+                    onBlur={() => {
+                      const v = form.cp.trim();
+                      if (!v) return;
+                      if (!/^[0-9]{5}$/.test(v)) {
+                        fmt.failWith(
+                          "cp",
+                          "El código postal debe tener 5 dígitos.",
+                        );
+                      }
+                    }}
+                    aria-invalid={
+                      fmt.isFieldInvalid("cp") ||
+                      (triedSubmitDatos &&
+                        (!form.cp.trim() || !/^[0-9]{5}$/.test(form.cp)))
+                    }
                     placeholder="28001"
                     className={`h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${
                       usingSavedAddress ? "cursor-not-allowed bg-gray-50 text-gray-500" : ""
-                    } ${triedSubmitDatos && (!form.cp.trim() || !/^[0-9]{5}$/.test(form.cp)) ? "border-red-400" : "border-gray-200"}`}
+                    } ${fmt.isFieldInvalid("cp") || (triedSubmitDatos && (!form.cp.trim() || !/^[0-9]{5}$/.test(form.cp))) ? "border-red-400" : "border-gray-200"}`}
                   />
                 </div>
                 <div>
@@ -1328,6 +1390,11 @@ export default function CheckoutPage() {
                 </p>
               )}
               </>
+              )}
+              {fmt.error && (
+                <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <span className="shrink-0">⚠</span> {fmt.error}
+                </div>
               )}
               <button
                 type="submit"

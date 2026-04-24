@@ -19,6 +19,7 @@ import {
   type UserChangelogEntry,
 } from "@/services/userAdminService";
 import { loadInvoices } from "@/services/invoiceService";
+import { validateSpanishNIF } from "@/lib/validations/nif";
 
 interface UserPersonalDataPanelProps {
   userId: string;
@@ -193,6 +194,29 @@ export function UserPersonalDataPanel({ userId }: UserPersonalDataPanelProps) {
   }
   function confirmSave() {
     if (!draft) return;
+    // Validar NIF/NIE/CIF antes de persistir. `saveUserData` también lanza
+    // como defensa de segunda capa, pero aquí damos feedback antes de llegar
+    // al servicio — toast limpio en vez de excepción.
+    const nifRaw = (draft.nif ?? "").trim();
+    if (nifRaw) {
+      const v = validateSpanishNIF(nifRaw);
+      if (!v.valid) {
+        setToast(`NIF/NIE/CIF no válido: ${v.error ?? "formato incorrecto"}`);
+        setShowConfirm(false);
+        setTimeout(() => setToast(null), 4000);
+        return;
+      }
+    }
+    const billingNifRaw = (draft.billing?.nif ?? "").trim();
+    if (billingNifRaw) {
+      const v = validateSpanishNIF(billingNifRaw);
+      if (!v.valid) {
+        setToast(`NIF facturación no válido: ${v.error ?? "formato incorrecto"}`);
+        setShowConfirm(false);
+        setTimeout(() => setToast(null), 4000);
+        return;
+      }
+    }
     try {
       const changes = saveUserData(userId, draft);
       setBaseUser(draft);

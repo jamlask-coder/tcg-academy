@@ -21,6 +21,7 @@
 
 import type { User, UserRole } from "@/types/user";
 import { MOCK_USERS, type AdminUser } from "@/data/mockData";
+import { validateSpanishNIF } from "@/lib/validations/nif";
 
 const OVERRIDES_KEY = "tcgacademy_user_overrides";
 const CHANGELOG_KEY = "tcgacademy_user_changelog";
@@ -229,6 +230,30 @@ export function saveUserData(
 ): UserChangelogEntry[] {
   const prev = loadFullUser(userId);
   if (!prev) throw new Error(`Usuario ${userId} no encontrado`);
+
+  // Defense-in-depth: si el NIF/CIF cambió a un valor no vacío, validar.
+  // Bloqueamos tanto en nif principal como en billing.nif. No validamos si
+  // no cambió (un registro legacy con NIF inválido no debe impedir editar
+  // otros campos — el admin lo corregirá cuando toque el NIF).
+  const nifChanged = (prev.nif ?? "") !== (nextUser.nif ?? "");
+  if (nifChanged && nextUser.nif && nextUser.nif.trim()) {
+    const v = validateSpanishNIF(nextUser.nif);
+    if (!v.valid) {
+      throw new Error(
+        `NIF/NIE/CIF no válido: ${v.error ?? "formato incorrecto"}`,
+      );
+    }
+  }
+  const prevBillingNif = prev.billing?.nif ?? "";
+  const nextBillingNif = nextUser.billing?.nif ?? "";
+  if (prevBillingNif !== nextBillingNif && nextBillingNif.trim()) {
+    const v = validateSpanishNIF(nextBillingNif);
+    if (!v.valid) {
+      throw new Error(
+        `NIF facturación no válido: ${v.error ?? "formato incorrecto"}`,
+      );
+    }
+  }
 
   const changes = diffUsers(prev, nextUser).map((c) => ({ ...c, adminId }));
   if (changes.length === 0) return [];

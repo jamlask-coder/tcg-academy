@@ -44,6 +44,7 @@ function buildInvoiceData(inv: Invoice): InvoiceData {
     issuerCIF: SITE_CONFIG.cif,
     issuerAddress: issuer.street || SITE_CONFIG.address,
     issuerCity: issuer.cityLine,
+    issuerCountry: SITE_CONFIG.country,
     issuerPhone: SITE_CONFIG.phone,
     issuerEmail: SITE_CONFIG.email,
     clientName: inv.clientName ?? "Cliente TCG Academy",

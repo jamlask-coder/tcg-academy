@@ -56,6 +56,7 @@ function buildDummyInvoice(): InvoiceData {
     issuerCIF: SITE_CONFIG.cif,
     issuerAddress: street,
     issuerCity: cityLine,
+    issuerCountry: SITE_CONFIG.country,
     issuerPhone: SITE_CONFIG.phone,
     issuerEmail: SITE_CONFIG.email,
     clientName: "Juan Pérez García",

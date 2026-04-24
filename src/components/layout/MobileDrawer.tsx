@@ -15,7 +15,6 @@ import {
   ChevronDown,
   Gift,
   Package,
-  Heart,
   FileText,
   Mail,
   MessageCircle,
@@ -116,7 +115,6 @@ const OTROS_SLUGS = new Set(["yugioh", "panini", "digimon", "lorcana", "naruto"]
 
 const ACCOUNT_ITEMS: NavItem[] = [
   { href: "/cuenta/pedidos", label: "Mis pedidos", icon: Package },
-  { href: "/cuenta/favoritos", label: "Favoritos", icon: Heart },
   { href: "/cuenta/puntos", label: "Mis puntos", icon: Gift },
   { href: "/cuenta/facturas", label: "Facturas", icon: FileText },
   { href: "/cuenta/mensajes", label: "Mensajes", icon: MessageCircle },

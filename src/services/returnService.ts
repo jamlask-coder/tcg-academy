@@ -38,12 +38,40 @@ export type ReturnReason =
   | "otro";
 
 /**
- * Método de reembolso. Regla de negocio obligatoria:
- * TODAS las devoluciones se reembolsan por TRANSFERENCIA BANCARIA.
- * Hay un único valor en el enum para forzar esta regla en el sistema de tipos.
+ * Método de reembolso.
+ *
+ * Canales soportados:
+ *  - `transferencia` — canal por defecto para RMAs web (cliente ausente).
+ *    Requiere IBAN validado antes de emitir.
+ *  - `efectivo`      — devolución en mano en ventanilla/tienda. Solo admin
+ *    presencial. No requiere IBAN.
+ *  - `tarjeta`       — reintegro al mismo TPV por el que se cobró. Solo admin
+ *    presencial. Se registra `refundPaymentRef` si aplica.
+ *  - `bizum`         — envío Bizum al teléfono del cliente. No requiere IBAN.
+ *  - `mismo_medio`   — genérico: se reembolsa por el mismo canal con el que se
+ *    cobró la factura original. El detalle queda en `refundPaymentRef`.
+ *
+ * Regla fiscal-IBAN: IBAN es OBLIGATORIO si `refundMethod === "transferencia"`.
+ * Para cualquier otro método el IBAN es opcional (el detalle contable queda en
+ * `refundPaymentRef`).
  */
-export type RefundMethod = "transferencia";
+export type RefundMethod =
+  | "transferencia"
+  | "efectivo"
+  | "tarjeta"
+  | "bizum"
+  | "mismo_medio";
+/** Default histórico (flujo RMA web): transferencia bancaria. */
 export const REFUND_METHOD: RefundMethod = "transferencia";
+
+/** Etiquetas visibles (ES) por método de reembolso — usadas en UI y notas. */
+export const REFUND_METHOD_LABEL: Record<RefundMethod, string> = {
+  transferencia: "Transferencia bancaria",
+  efectivo: "Efectivo",
+  tarjeta: "Reintegro a tarjeta",
+  bizum: "Bizum",
+  mismo_medio: "Mismo medio que el pago original",
+};
 
 export interface ReturnItem {
   productId: number;
@@ -66,12 +94,18 @@ export interface ReturnRequest {
   createdAt: string;
   updatedAt: string;
   adminNotes?: string;
-  /** Siempre "transferencia" — regla fiscal/negocio (ver docstring RefundMethod) */
+  /** Canal de reembolso (ver docstring RefundMethod) */
   refundMethod: RefundMethod;
-  /** IBAN del cliente donde se emitirá la transferencia. Obligatorio antes de reembolsar. */
+  /** IBAN del cliente — obligatorio SI refundMethod === "transferencia". */
   refundIban?: string;
   /** Titular de la cuenta bancaria (opcional, por claridad en registros contables). */
   refundHolderName?: string;
+  /**
+   * Referencia libre del reembolso cuando el método no es transferencia.
+   * Ejemplos: "TPV ref 8472", "Bizum 612345678", "Efectivo — tienda Madrid".
+   * Sirve como rastro contable/auditoría; no reemplaza al asiento en el journal.
+   */
+  refundPaymentRef?: string;
   /** Timestamp ISO del momento en el que se marcó como reembolsada (transferencia emitida). */
   refundedAt?: string;
   trackingNumber?: string; // return shipment tracking
@@ -79,6 +113,18 @@ export interface ReturnRequest {
   rectificativeInvoiceId?: string;
   /** Número visible de la factura rectificativa (FAC-YYYY-NNNNNXXXXXE). */
   rectificativeInvoiceNumber?: string;
+  /**
+   * ID de la factura original a rectificar. Tiene prioridad sobre `orderId` en
+   * `markAsRefunded()` — útil para devoluciones iniciadas desde el libro de
+   * facturas (facturas manuales que pueden no tener `sourceOrderId`).
+   */
+  sourceInvoiceId?: string;
+  /**
+   * Iniciada directamente por admin desde el libro de facturas (atajo).
+   * `true` cuando la devolución nació en /admin/fiscal/facturas, sin pasar por
+   * el flujo RMA web solicitada→aprobada→en_transito→recibida.
+   */
+  adminInitiated?: boolean;
   statusHistory: Array<{
     status: ReturnStatus;
     timestamp: string;
@@ -414,19 +460,22 @@ export async function markAsRefunded(
     );
   }
 
-  // IBAN obligatorio antes de emitir la transferencia.
-  if (!rma.refundIban) {
-    throw new Error(
-      `No se puede marcar como reembolsada sin IBAN. ` +
-        `El cliente debe proporcionar IBAN → setRefundBankInfo() antes de continuar.`,
-    );
-  }
-  const ibanCheck = validateIban(rma.refundIban);
-  if (!ibanCheck.valid) {
-    throw new Error(
-      `El IBAN guardado (${rma.refundIban}) no es válido: ` +
-        `${ibanCheck.error}. Corrige con setRefundBankInfo() y reintenta.`,
-    );
+  // IBAN obligatorio SOLO si el reembolso es por transferencia. Para otros
+  // medios (efectivo, tarjeta, bizum, mismo_medio) el IBAN no aplica.
+  if (rma.refundMethod === "transferencia") {
+    if (!rma.refundIban) {
+      throw new Error(
+        `No se puede marcar como reembolsada sin IBAN. ` +
+          `El cliente debe proporcionar IBAN → setRefundBankInfo() antes de continuar.`,
+      );
+    }
+    const ibanCheck = validateIban(rma.refundIban);
+    if (!ibanCheck.valid) {
+      throw new Error(
+        `El IBAN guardado (${rma.refundIban}) no es válido: ` +
+          `${ibanCheck.error}. Corrige con setRefundBankInfo() y reintenta.`,
+      );
+    }
   }
 
   // Import dinámico para evitar ciclos y para que el servicio de devoluciones
@@ -435,14 +484,25 @@ export async function markAsRefunded(
     await import("@/services/invoiceService");
   const { CorrectionType, InvoiceStatus, InvoiceType } = await import("@/types/fiscal");
 
-  // 1. Localizar factura original (por sourceOrderId = rma.orderId).
+  // 1. Localizar factura original.
+  //    Si el RMA trae `sourceInvoiceId` explícito (caso del atajo admin desde
+  //    el libro de facturas, incluidas facturas manuales sin sourceOrderId),
+  //    se usa ese. Si no, se resuelve por sourceOrderId como en el flujo RMA
+  //    web clásico.
   const invoices = loadInvoices();
-  const original = invoices.find(
-    (inv) =>
-      inv.sourceOrderId === rma.orderId &&
-      inv.status !== InvoiceStatus.ANULADA &&
-      inv.invoiceType !== InvoiceType.RECTIFICATIVA,
-  );
+  const original = rma.sourceInvoiceId
+    ? invoices.find(
+        (inv) =>
+          inv.invoiceId === rma.sourceInvoiceId &&
+          inv.status !== InvoiceStatus.ANULADA &&
+          inv.invoiceType !== InvoiceType.RECTIFICATIVA,
+      )
+    : invoices.find(
+        (inv) =>
+          inv.sourceOrderId === rma.orderId &&
+          inv.status !== InvoiceStatus.ANULADA &&
+          inv.invoiceType !== InvoiceType.RECTIFICATIVA,
+      );
   if (!original) {
     throw new Error(
       `No se encontró factura original para el pedido ${rma.orderId}. ` +
@@ -489,7 +549,13 @@ export async function markAsRefunded(
       originalInvoiceDate: original.invoiceDate,
       correctionType: CorrectionType.DIFERENCIAS,
       reason:
-        `Devolución ${rma.id} — reembolso por transferencia bancaria a IBAN del cliente. ` +
+        `Devolución ${rma.id} — reembolso por ${REFUND_METHOD_LABEL[rma.refundMethod].toLowerCase()}` +
+        (rma.refundMethod === "transferencia"
+          ? " a IBAN del cliente."
+          : rma.refundPaymentRef
+            ? ` (${rma.refundPaymentRef}).`
+            : ".") +
+        " " +
         (options?.adminNote ? `Nota admin: ${options.adminNote}` : ""),
       reasonCode: "R4",
     },
@@ -529,7 +595,10 @@ export async function markAsRefunded(
         status: "reembolsada",
         timestamp: refundedAt,
         note:
-          `Transferencia emitida a IBAN ${maskIbanShort(rma.refundIban)}. ` +
+          (rma.refundMethod === "transferencia" && rma.refundIban
+            ? `Transferencia emitida a IBAN ${maskIbanShort(rma.refundIban)}. `
+            : `Reembolso por ${REFUND_METHOD_LABEL[rma.refundMethod]}` +
+              (rma.refundPaymentRef ? ` (${rma.refundPaymentRef}). ` : ". ")) +
           `Factura rectificativa ${rectificativa.invoiceNumber} generada. ` +
           (options?.adminNote ?? ""),
       },
@@ -549,7 +618,8 @@ export async function markAsRefunded(
         order_id: rma.orderId,
         refund_amount: rma.totalRefundAmount.toFixed(2),
         rectificativa_number: rectificativa.invoiceNumber,
-        iban_masked: maskIbanShort(rma.refundIban),
+        iban_masked: rma.refundIban ? maskIbanShort(rma.refundIban) : "",
+        refund_method_label: REFUND_METHOD_LABEL[rma.refundMethod],
         unsubscribe_link: "#",
       },
       preview: `Reembolso emitido · ${rma.totalRefundAmount.toFixed(2)}€ · ${rectificativa.invoiceNumber}`,
@@ -561,6 +631,123 @@ export async function markAsRefunded(
   return {
     ok: true,
     rectificativeInvoiceNumber: rectificativa.invoiceNumber,
+    refundedAt,
+  };
+}
+
+/**
+ * Atajo admin: crear devolución desde el libro de facturas y reembolsar en el
+ * mismo paso.
+ *
+ * Diferencias con el flujo RMA web (`createReturnRequest` → …):
+ *  - El RMA nace directamente en status "recibida" — no pasa por
+ *    solicitada→aprobada→en_transito→recibida (el admin lo emite directo).
+ *  - `sourceInvoiceId` apunta a la factura original (prioritario sobre
+ *    `orderId` al buscar la factura a rectificar — soporta facturas manuales
+ *    sin pedido web).
+ *  - Acepta cualquier `RefundMethod`: transferencia (obliga IBAN), efectivo,
+ *    tarjeta, bizum o mismo medio.
+ *  - Tras persistir el RMA, llama a `markAsRefunded()` para emitir la
+ *    rectificativa, restaurar stock, revertir puntos y encadenar VeriFactu.
+ *    Un único write fiscal. Un único camino.
+ */
+export async function createAdminInitiatedReturn(params: {
+  invoiceId: string;
+  customerId: string;
+  customerEmail: string;
+  customerName: string;
+  orderId?: string;
+  items: ReturnItem[];
+  refundMethod: RefundMethod;
+  refundIban?: string;
+  refundHolderName?: string;
+  refundPaymentRef?: string;
+  adminNote?: string;
+  adminUserId?: string;
+  adminUserName?: string;
+}): Promise<{ ok: true; rmaId: string; rectificativeInvoiceNumber: string; refundedAt: string }> {
+  // 1. Validaciones de entrada que queremos atajar ANTES de crear el RMA
+  //    — así no queda basura en el storage si el admin se equivocó.
+  if (params.items.length === 0) {
+    throw new Error("Debes seleccionar al menos un producto a devolver.");
+  }
+  for (const it of params.items) {
+    if (it.quantity <= 0) {
+      throw new Error(`La cantidad a devolver de "${it.productName}" debe ser > 0.`);
+    }
+    if (it.unitPrice < 0) {
+      throw new Error(`El precio unitario de "${it.productName}" no puede ser negativo.`);
+    }
+  }
+
+  // IBAN: obligatorio SOLO para transferencia.
+  let normalizedIban: string | undefined;
+  if (params.refundMethod === "transferencia") {
+    if (!params.refundIban) {
+      throw new Error(
+        "Para reembolso por transferencia, el IBAN del cliente es obligatorio.",
+      );
+    }
+    const v = validateIban(params.refundIban);
+    if (!v.valid) {
+      throw new Error(`IBAN no válido: ${v.error ?? "formato incorrecto"}.`);
+    }
+    normalizedIban = v.normalized;
+  }
+
+  // 2. Crear RMA directo en status "recibida" (bypass del flujo web).
+  const totalRefundAmount =
+    Math.round(
+      params.items.reduce((sum, it) => sum + it.unitPrice * it.quantity, 0) * 100,
+    ) / 100;
+
+  const now = new Date().toISOString();
+  const rma: ReturnRequest = {
+    id: generateRmaId(),
+    orderId: params.orderId ?? `INV-${params.invoiceId}`,
+    sourceInvoiceId: params.invoiceId,
+    customerId: params.customerId,
+    customerEmail: params.customerEmail,
+    customerName: params.customerName,
+    items: params.items,
+    totalRefundAmount,
+    status: "recibida",
+    createdAt: now,
+    updatedAt: now,
+    refundMethod: params.refundMethod,
+    refundIban: normalizedIban,
+    refundHolderName: params.refundHolderName,
+    refundPaymentRef: params.refundPaymentRef,
+    adminInitiated: true,
+    adminNotes: params.adminNote,
+    statusHistory: [
+      {
+        status: "recibida",
+        timestamp: now,
+        note:
+          `Devolución iniciada directamente por admin desde libro de facturas ` +
+          `(${REFUND_METHOD_LABEL[params.refundMethod]})` +
+          (params.adminUserName ? ` — ${params.adminUserName}` : ""),
+      },
+    ],
+  };
+
+  const returns = loadReturns();
+  returns.unshift(rma);
+  saveReturns(returns);
+
+  // 3. Emitir rectificativa + stock + puntos + VeriFactu, todo en la función
+  //    canónica. No duplicamos lógica fiscal aquí.
+  const { rectificativeInvoiceNumber, refundedAt } = await markAsRefunded(rma.id, {
+    adminNote: params.adminNote,
+    adminUserId: params.adminUserId,
+    adminUserName: params.adminUserName,
+  });
+
+  return {
+    ok: true,
+    rmaId: rma.id,
+    rectificativeInvoiceNumber,
     refundedAt,
   };
 }
