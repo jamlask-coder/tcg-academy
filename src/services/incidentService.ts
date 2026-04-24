@@ -1,4 +1,5 @@
 import type { Incident } from "@/types/incident";
+import { getOrdersByUser } from "@/lib/orderAdapter";
 
 const STORAGE_KEY = "tcgacademy_incidents";
 
@@ -37,6 +38,15 @@ export function updateIncident(id: string, updates: Partial<Incident>): void {
 
 export function getIncidentsByOrder(orderId: string): Incident[] {
   return loadIncidents().filter((i) => i.orderId === orderId);
+}
+
+/**
+ * Helper canónico "Vista 360°": todas las incidencias asociadas a pedidos
+ * de un usuario (resuelto vía FK orderId → Order.userId).
+ */
+export function getIncidentsByUser(userId: string): Incident[] {
+  const orderIds = new Set(getOrdersByUser(userId).map((o) => o.id));
+  return loadIncidents().filter((i) => orderIds.has(i.orderId));
 }
 
 export function countNewIncidents(): number {

@@ -347,6 +347,15 @@ export function getReturnById(rmaId: string): ReturnRequest | null {
 }
 
 /**
+ * Helper canónico "Vista 360°": todas las devoluciones de un usuario.
+ * Wraps getReturns({customerId}) con nombre consistente con getOrdersByUser,
+ * getInvoicesByUser, etc.
+ */
+export function getReturnsByUser(userId: string): ReturnRequest[] {
+  return getReturns({ customerId: userId });
+}
+
+/**
  * Restore stock for returned items.
  */
 export function restoreStockForReturn(items: ReturnItem[]): void {

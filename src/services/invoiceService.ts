@@ -42,6 +42,7 @@ import {
 } from "@/services/taxService";
 import { buildVerifactuQRUrl } from "@/services/verifactuService";
 import { DataHub } from "@/lib/dataHub";
+import { getOrdersByUser } from "@/lib/orderAdapter";
 import { validateSpanishNIF } from "@/lib/validations/nif";
 import { moneyRound as roundTo2, baseFromPriceWithVAT } from "@/lib/money";
 
@@ -879,6 +880,18 @@ export function loadInvoices(): InvoiceRecord[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Helper canónico "Vista 360°": todas las facturas emitidas a un usuario.
+ * El FK vive en Order (sourceOrderId → Order.userId), no en la factura
+ * — la factura es snapshot inmutable con datos del receptor, no un FK vivo.
+ */
+export function getInvoicesByUser(userId: string): InvoiceRecord[] {
+  const orderIds = new Set(getOrdersByUser(userId).map((o) => o.id));
+  return loadInvoices().filter(
+    (inv) => inv.sourceOrderId !== null && orderIds.has(inv.sourceOrderId),
+  );
 }
 
 /** Guarda una nueva factura, actualiza el hash de integridad, y genera asiento contable */

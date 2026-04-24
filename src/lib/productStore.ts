@@ -70,6 +70,18 @@ export function getMergedById(id: number): LocalProduct | undefined {
   return getMergedProducts().find((p) => p.id === id);
 }
 
+/**
+ * Helper canónico "Vista 360°": resuelve un array de IDs de producto a
+ * LocalProducts (los no encontrados se filtran). Útil para User.favorites[]
+ * y cualquier entidad que guarde solo IDs.
+ */
+export function getProductsByIds(ids: number[]): LocalProduct[] {
+  if (!ids.length) return [];
+  const all = getMergedProducts();
+  const byId = new Map(all.map((p) => [p.id, p]));
+  return ids.map((id) => byId.get(id)).filter((p): p is LocalProduct => !!p);
+}
+
 export function getMergedBySlug(slug: string): LocalProduct | undefined {
   return getMergedProducts().find((p) => p.slug === slug);
 }

@@ -378,6 +378,15 @@ export function readAdminOrdersMerged(fallback: AdminOrder[] = []): AdminOrder[]
 }
 
 /**
+ * Helper canónico "Vista 360°": devuelve todos los pedidos de un usuario.
+ * Usar en vez de `readAdminOrdersMerged().filter(o => o.userId === id)` inline.
+ * Mantiene el orden (recientes primero) heredado de readAdminOrdersMerged.
+ */
+export function getOrdersByUser(userId: string): AdminOrder[] {
+  return readAdminOrdersMerged().filter((o) => o.userId === userId);
+}
+
+/**
  * Visibilidad SSOT para el admin:
  * - Pagos diferidos (transferencia/recogida/contrarreembolso) NO se consideran
  *   pedidos reales hasta que `paymentStatus === "cobrado"`. Son intenciones.

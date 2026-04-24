@@ -121,22 +121,24 @@ Escritura: `src/context/AuthContext.tsx` + `src/services/userAdminService.ts`.
 
 Todos los datos de un usuario (pedidos, facturas, puntos, favoritos, cupones, mensajes…) están **reachable** desde su `id`. Viven en su propia entidad con `userId` como clave foránea — así evitamos duplicar. Dado un `userId`, estas son las funciones canónicas para obtener cada pieza:
 
-| Lo que quiero del usuario | Cómo se obtiene |
+| Lo que quiero del usuario | Función canónica |
 |---|---|
 | **Ficha del usuario** | `findUserByHandle(handle)` / `MOCK_USERS.find(u => u.id === userId)` |
-| **Todos sus pedidos** | `readAdminOrdersMerged().filter(o => o.userId === userId)` |
-| **Todas sus facturas** | `loadInvoices().filter(i => i.userId === userId)` |
-| **Saldo de puntos** | `loadPoints(userId)` (`pointsService`) |
-| **Historial de puntos** | `getPointsHistory(userId)` |
-| **Favoritos** | `user.favorites[]` (directo en el User) |
-| **Cupones asignados** | `getUserCoupons(userId)` (`couponService`) |
-| **Mensajes** | `getMessagesForUser(userId)` |
-| **Grupo/asociaciones** | `getAssociations(userId)` |
-| **Referidos directos** | `getDirectReferrals(userId)` |
-| **Devoluciones** | pedidos del usuario → `returns.filter(r => order.userId === userId)` |
-| **Incidencias** | pedidos del usuario → `incidents.filter(i => order.userId === userId)` |
+| **Todos sus pedidos** | `getOrdersByUser(userId)` — `@/lib/orderAdapter` |
+| **Todas sus facturas** | `getInvoicesByUser(userId)` — `@/services/invoiceService` (resuelve vía `sourceOrderId → Order.userId`, porque InvoiceRecord congela `recipient` en vez de FK directa) |
+| **Saldo de puntos** | `loadPoints(userId)` — `@/services/pointsService` |
+| **Historial de puntos** | `getPointsHistory(userId)` — `@/services/pointsService` |
+| **Favoritos (productos)** | `getProductsByIds(user.favorites)` — `@/lib/productStore` (resuelve IDs a LocalProducts) |
+| **Cupones asignados** | `getUserCoupons(userId)` — `@/services/couponService` |
+| **Mensajes** | `getMessagesForUser(userId)` — `@/services/messageService` |
+| **Grupo/asociaciones** | `getAssociations(userId)` — `@/services/associationService` |
+| **Referidos directos** | `getDirectReferrals(userId)` — `@/services/referralService` |
+| **Devoluciones** | `getReturnsByUser(userId)` — `@/services/returnService` |
+| **Incidencias** | `getIncidentsByUser(userId)` — `@/services/incidentService` (resuelve vía orderIds del usuario) |
 | **Restock subs** | `tcga_restock_subs` keyed por `userId` |
 | **Límites de compra restantes** | `getRemainingForUser({userId, productId})` |
+
+**Regla**: usa SIEMPRE estos helpers en componentes nuevos. Evita `.filter(x => x.userId === id)` inline — si el shape cambia (ej: InvoiceRecord no tiene `userId`, solo `sourceOrderId`), el filtro inline rompe silenciosamente. Los helpers absorben el shape real.
 
 **Por qué NO se guardan "dentro" del objeto User**: si metiésemos el array de pedidos dentro de `User`, cada cambio de estado de un pedido obligaría a reescribir el usuario entero → race conditions, tamaño hinchado, PII mezclada. La regla DB correcta es: **User tiene su ficha; lo demás se consulta por FK**. Eso es exactamente lo que la web ya hace.
 
