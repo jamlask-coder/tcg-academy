@@ -130,6 +130,13 @@ export default function CheckoutPage() {
     }
     setProfileGuardReady(true);
   }, [user, router]);
+
+  // ── Guard de bloqueo administrativo ──────────────────────────────────────
+  // Un usuario bloqueado por un admin no puede finalizar compras. Le mostramos
+  // un mensaje genérico (sin detalles del motivo, que solo ve el admin en el
+  // changelog) y le invitamos a contactar. NO se le redirige automáticamente
+  // para que pueda leer el mensaje.
+  const userBlocked = !!user?.blocked;
   const [pending] = useState<PendingCheckout | null>(() => {
     try {
       const raw =
@@ -986,6 +993,39 @@ export default function CheckoutPage() {
           >
             Volver al inicio
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Render: usuario bloqueado por admin ────────────────────────────────
+  if (userBlocked) {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-16 sm:px-6">
+        <div className="rounded-2xl border-2 border-red-200 bg-red-50/40 p-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
+            <Shield size={26} className="text-red-600" />
+          </div>
+          <h1 className="mb-3 text-2xl font-bold text-gray-900">
+            No se ha podido completar tu pedido
+          </h1>
+          <p className="mb-6 text-gray-700">
+            Contacta con nosotros para más información.
+          </p>
+          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/contacto"
+              className="inline-block rounded-xl bg-[#2563eb] px-6 py-3 font-bold text-white transition hover:bg-[#1d4ed8]"
+            >
+              Contactar
+            </Link>
+            <Link
+              href="/carrito"
+              className="inline-block rounded-xl border-2 border-gray-200 px-6 py-3 font-bold text-gray-700 transition hover:bg-gray-50"
+            >
+              Volver al carrito
+            </Link>
+          </div>
         </div>
       </div>
     );

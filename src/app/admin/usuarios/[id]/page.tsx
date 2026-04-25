@@ -30,6 +30,7 @@ import { SendCouponButton } from "@/components/admin/SendCouponModal";
 import { UserRoleManager } from "@/components/admin/UserRoleManager";
 import { VisitChart } from "@/components/account/VisitChart";
 import { UserPersonalDataPanel } from "@/components/admin/UserPersonalDataPanel";
+import { UserBlockPanel } from "@/components/admin/UserBlockPanel";
 
 const ROLE_COLORS: Record<string, string> = {
   cliente: "bg-gray-100 text-gray-600",
@@ -364,6 +365,9 @@ export default function AdminUsuarioDetailPage() {
               defaultRole={user.role as "cliente" | "mayorista" | "tienda"}
             />
           )}
+
+          {/* Bloqueo de cuenta — solo admins ven este panel */}
+          {user.role !== "admin" && <UserBlockPanel userId={user.id} />}
         </div>
 
         {/* Right column: orders + charts */}

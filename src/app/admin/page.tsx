@@ -241,7 +241,7 @@ export default function AdminDashboard() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">
-          Panel de administración
+          Resumen
         </h1>
         <p className="mt-1 text-sm text-gray-500">
           Vista general de TCG Academy
@@ -483,57 +483,55 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Top products */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5">
-          <h2 className="mb-4 font-bold text-gray-900">Top productos (por ingresos)</h2>
-          {topProducts.length > 0 ? (
-            <div className="space-y-2">
-              {topProducts.map((p, i) => (
-                <div key={p.id} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2">
-                  <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb]/10 text-xs font-bold text-[#2563eb]">
-                    {i + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-800">{p.name}</p>
-                    <p className="text-xs text-gray-400">{p.totalQty} uds vendidas</p>
+      {/* Top products — solo si hay datos reales (evita hueco vacío en panel limpio) */}
+      {(topProducts.length > 0 || topProductsByQty.length > 0) && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {topProducts.length > 0 && (
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <h2 className="mb-4 font-bold text-gray-900">Top productos (por ingresos)</h2>
+              <div className="space-y-2">
+                {topProducts.map((p, i) => (
+                  <div key={p.id} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2">
+                    <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb]/10 text-xs font-bold text-[#2563eb]">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-gray-800">{p.name}</p>
+                      <p className="text-xs text-gray-400">{p.totalQty} uds vendidas</p>
+                    </div>
+                    <span className="flex-shrink-0 text-sm font-bold text-gray-900">
+                      {p.totalRevenue.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
+                    </span>
                   </div>
-                  <span className="flex-shrink-0 text-sm font-bold text-gray-900">
-                    {p.totalRevenue.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          ) : (
-            <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
+          )}
+          {topProductsByQty.length > 0 && (
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <h2 className="mb-4 font-bold text-gray-900">Top productos (por unidades)</h2>
+              <div className="space-y-2">
+                {topProductsByQty.map((p, i) => (
+                  <div key={p.id} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2">
+                    <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb]/10 text-xs font-bold text-[#2563eb]">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-gray-800">{p.name}</p>
+                      <p className="text-xs text-gray-400">
+                        {p.totalRevenue.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€ facturados
+                      </p>
+                    </div>
+                    <span className="flex-shrink-0 text-sm font-bold text-gray-900">
+                      {p.totalQty} uds
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5">
-          <h2 className="mb-4 font-bold text-gray-900">Top productos (por unidades)</h2>
-          {topProductsByQty.length > 0 ? (
-            <div className="space-y-2">
-              {topProductsByQty.map((p, i) => (
-                <div key={p.id} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2">
-                  <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb]/10 text-xs font-bold text-[#2563eb]">
-                    {i + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-800">{p.name}</p>
-                    <p className="text-xs text-gray-400">
-                      {p.totalRevenue.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€ facturados
-                    </p>
-                  </div>
-                  <span className="flex-shrink-0 text-sm font-bold text-gray-900">
-                    {p.totalQty} uds
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400">Aún no hay ventas registradas.</p>
-          )}
-        </div>
-      </div>
+      )}
 
     </div>
   );

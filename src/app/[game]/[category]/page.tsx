@@ -11,7 +11,12 @@ import {
 import { MEGA_MENU_DATA } from "@/data/megaMenuData";
 import { CategoryTags } from "@/components/filters/CategoryTags";
 import { CategoryFilteredGrid } from "@/components/filters/CategoryFilteredGrid";
-import { breadcrumbJsonLd, jsonLdProps } from "@/lib/seo";
+import {
+  breadcrumbJsonLd,
+  collectionPageJsonLd,
+  itemListJsonLd,
+  jsonLdProps,
+} from "@/lib/seo";
 import type { Metadata } from "next";
 
 export function generateStaticParams() {
@@ -113,9 +118,27 @@ export default async function CategoryPage({
     { name: catLabel, url: `/${game}/${category}` },
   ]);
 
+  // ItemList + CollectionPage — declaran formalmente que esta URL lista
+  // productos. Mejora elegibilidad para "Listings" rich results y orienta
+  // a Google sobre la estructura del contenido (sin afectar a la UI).
+  const itemListLd = itemListJsonLd(
+    products.slice(0, 30).map((p) => ({
+      url: `/${game}/${category}/${p.slug}`,
+      name: p.name,
+    })),
+  );
+  const collectionLd = collectionPageJsonLd({
+    url: `/${game}/${category}`,
+    name: `${catLabel} — ${config.name}`,
+    description: `Selección de ${catLabel.toLowerCase()} de ${config.name} en TCG Academy.`,
+    numberOfItems: products.length,
+  });
+
   return (
     <div>
       <script {...jsonLdProps(breadcrumbLd)} />
+      <script {...jsonLdProps(collectionLd)} />
+      {products.length > 0 && <script {...jsonLdProps(itemListLd)} />}
 
       {/* Category nav — pegado directamente a la balda de juegos (sin sticky
           para evitar el hueco gris que aparecía entre navbar y filtros). */}

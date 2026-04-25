@@ -304,6 +304,134 @@ export function saveUserData(
 }
 
 /**
+ * Bloquea un usuario (admin only). El usuario bloqueado no podrá finalizar
+ * compras — la pasarela /finalizar-compra le mostrará un mensaje y le
+ * redirigirá. Se persiste como overlay + replicado en `tcgacademy_registered`.
+ *
+ * @returns true si el bloqueo se aplicó (o false si ya estaba bloqueado).
+ */
+export function blockUser(
+  userId: string,
+  reason: string,
+  adminId = "admin",
+): boolean {
+  const prev = loadFullUser(userId);
+  if (!prev) throw new Error(`Usuario ${userId} no encontrado`);
+  if (prev.blocked) return false;
+
+  const now = new Date().toISOString();
+
+  // 1. Overlay
+  const overrides = readJSON<Record<string, Partial<User>>>(OVERRIDES_KEY, {});
+  overrides[userId] = {
+    ...(overrides[userId] ?? {}),
+    blocked: true,
+    blockedAt: now,
+    blockedReason: reason.trim() || "Sin motivo especificado",
+    blockedBy: adminId,
+  };
+  writeJSON(OVERRIDES_KEY, overrides);
+
+  // 2. Replicar a tcgacademy_registered
+  const registered = readJSON<Record<string, { password: string; user: User }>>(
+    REGISTERED_KEY,
+    {},
+  );
+  for (const [k, v] of Object.entries(registered)) {
+    if (v.user.id === userId) {
+      registered[k] = {
+        ...v,
+        user: {
+          ...v.user,
+          blocked: true,
+          blockedAt: now,
+          blockedReason: reason.trim() || "Sin motivo especificado",
+          blockedBy: adminId,
+        },
+      };
+      writeJSON(REGISTERED_KEY, registered);
+      break;
+    }
+  }
+
+  // 3. Changelog
+  const log = readJSON<Record<string, UserChangelogEntry[]>>(CHANGELOG_KEY, {});
+  log[userId] = [
+    ...(log[userId] ?? []),
+    {
+      timestamp: now,
+      field: "blocked",
+      oldValue: "false",
+      newValue: `true (motivo: ${reason.trim() || "—"})`,
+      adminId,
+    },
+  ];
+  writeJSON(CHANGELOG_KEY, log);
+
+  emitUsersUpdated();
+  return true;
+}
+
+/**
+ * Desbloquea un usuario (admin only). Limpia los flags y deja entrada en
+ * el changelog para trazabilidad.
+ *
+ * @returns true si se desbloqueó (false si no estaba bloqueado).
+ */
+export function unblockUser(userId: string, adminId = "admin"): boolean {
+  const prev = loadFullUser(userId);
+  if (!prev) throw new Error(`Usuario ${userId} no encontrado`);
+  if (!prev.blocked) return false;
+
+  const now = new Date().toISOString();
+  const prevReason = prev.blockedReason ?? "";
+
+  // 1. Overlay
+  const overrides = readJSON<Record<string, Partial<User>>>(OVERRIDES_KEY, {});
+  overrides[userId] = {
+    ...(overrides[userId] ?? {}),
+    blocked: false,
+    blockedAt: undefined,
+    blockedReason: undefined,
+    blockedBy: undefined,
+  };
+  writeJSON(OVERRIDES_KEY, overrides);
+
+  // 2. Replicar a registered
+  const registered = readJSON<Record<string, { password: string; user: User }>>(
+    REGISTERED_KEY,
+    {},
+  );
+  for (const [k, v] of Object.entries(registered)) {
+    if (v.user.id === userId) {
+      const { blocked: _b, blockedAt: _ba, blockedReason: _br, blockedBy: _bby, ...rest } =
+        v.user;
+      void _b; void _ba; void _br; void _bby;
+      registered[k] = { ...v, user: { ...rest, blocked: false } };
+      writeJSON(REGISTERED_KEY, registered);
+      break;
+    }
+  }
+
+  // 3. Changelog
+  const log = readJSON<Record<string, UserChangelogEntry[]>>(CHANGELOG_KEY, {});
+  log[userId] = [
+    ...(log[userId] ?? []),
+    {
+      timestamp: now,
+      field: "blocked",
+      oldValue: `true (motivo: ${prevReason || "—"})`,
+      newValue: "false",
+      adminId,
+    },
+  ];
+  writeJSON(CHANGELOG_KEY, log);
+
+  emitUsersUpdated();
+  return true;
+}
+
+/**
  * Devuelve el historial de cambios (más reciente primero).
  */
 export function loadUserChangelog(userId: string): UserChangelogEntry[] {

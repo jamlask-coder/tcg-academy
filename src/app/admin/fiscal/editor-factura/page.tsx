@@ -23,16 +23,16 @@ import {
 } from "lucide-react";
 import {
   DEFAULT_TEMPLATE,
-  InvoiceTemplate,
   loadInvoiceTemplate,
   resetInvoiceTemplate,
   saveInvoiceTemplate,
 } from "@/lib/invoiceTemplate";
+import type { InvoiceTemplate } from "@/lib/invoiceTemplate";
 import {
   generateInvoiceHTML,
   printInvoice,
-  InvoiceData,
 } from "@/utils/invoiceGenerator";
+import type { InvoiceData } from "@/utils/invoiceGenerator";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { getIssuerAddress } from "@/lib/fiscalAddress";
 

@@ -69,6 +69,15 @@ export interface User {
   emailVerified?: boolean;
   emailVerifiedAt?: string; // ISO timestamp
   /**
+   * Bloqueo administrativo. Si `blocked === true` el usuario NO puede
+   * finalizar pedidos (gate en /finalizar-compra). Solo admins pueden
+   * activar/desactivar este flag desde /admin/usuarios/[id].
+   */
+  blocked?: boolean;
+  blockedAt?: string;       // ISO timestamp
+  blockedReason?: string;   // motivo introducido por el admin
+  blockedBy?: string;       // userId del admin que aplicó el bloqueo
+  /**
    * URL pública de la foto de perfil del usuario.
    * Actualmente se rellena automáticamente desde el claim `picture` del
    * ID token de Google OIDC al iniciar sesión con Google. Puede sobrescribirse

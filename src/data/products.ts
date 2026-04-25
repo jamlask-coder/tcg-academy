@@ -42,6 +42,17 @@ export interface LocalProduct {
   packsPerBox?: number;
   /** Nº de cartas por sobre (solo para sobres) */
   cardsPerPack?: number;
+  /**
+   * EAN-13 / GTIN — código de barras del producto. Opcional pero, si está
+   * presente, alimenta el `gtin13` del JSON-LD Product → mejora rich results
+   * en Google Shopping y SERPs.
+   */
+  gtin13?: string;
+  /**
+   * Manufacturer Part Number — referencia del fabricante. Opcional. Se
+   * incluye como `mpn` en el JSON-LD si está presente.
+   */
+  mpn?: string;
 }
 
 // ─── Game config ──────────────────────────────────────────────────────────────

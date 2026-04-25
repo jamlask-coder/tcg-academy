@@ -159,6 +159,11 @@ export function productJsonLd(
 ) {
   const inStock =
     typeof product.stock === "number" ? product.stock > 0 : true;
+  // Identificadores de producto opcionales — Google premia con rich results
+  // si están presentes. EAN-13 es el barcode estándar UE.
+  const gtinFields: Record<string, string> = {};
+  if (product.gtin13) gtinFields.gtin13 = product.gtin13;
+  if (product.mpn) gtinFields.mpn = product.mpn;
   return {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -166,6 +171,7 @@ export function productJsonLd(
     description: product.description,
     image: product.images.map((i) => abs(i)),
     sku: product.slug,
+    ...gtinFields,
     brand: { "@type": "Brand", name: product.game },
     offers: {
       "@type": "Offer",
@@ -178,6 +184,55 @@ export function productJsonLd(
       priceValidUntil: nextYearIso(),
       itemCondition: "https://schema.org/NewCondition",
       seller: { "@id": `${SITE_URL}/#organization` },
+    },
+  };
+}
+
+/**
+ * ItemList — usado tanto en páginas de catálogo (/[game]/[category]) como
+ * en /tiendas para declarar la lista de elementos visibles. Mejora SERPs y
+ * elegibilidad para "Listings" rich results.
+ */
+export interface ItemListEntry {
+  url: string;
+  name: string;
+}
+
+export function itemListJsonLd(items: ItemListEntry[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: items.map((item, idx) => ({
+      "@type": "ListItem",
+      position: idx + 1,
+      url: abs(item.url),
+      name: item.name,
+    })),
+  };
+}
+
+/**
+ * CollectionPage — wrapper para páginas que listan productos de una categoría.
+ * Se inyecta junto al ItemList para clarificar a Google que la URL es una
+ * colección, no una página de detalle.
+ */
+export function collectionPageJsonLd(opts: {
+  url: string;
+  name: string;
+  description: string;
+  numberOfItems: number;
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "@id": `${abs(opts.url)}#collection`,
+    url: abs(opts.url),
+    name: opts.name,
+    description: opts.description,
+    isPartOf: { "@id": `${SITE_URL}/#website` },
+    mainEntity: {
+      "@type": "ItemList",
+      numberOfItems: opts.numberOfItems,
     },
   };
 }

@@ -261,7 +261,7 @@ function HeaderTagline() {
     return () => clearInterval(id);
   }, []);
   return (
-    <span className="mt-0.5 ml-2 flex h-[14px] items-center gap-2 whitespace-nowrap text-[11px] font-semibold tracking-wide lg:hidden">
+    <span className="mt-0.5 flex h-[14px] items-center gap-2 whitespace-nowrap text-[11px] font-semibold tracking-wide lg:mt-1 lg:ml-0 lg:text-[12px]">
       <span
         aria-hidden="true"
         className="relative flex h-[7px] w-[7px] shrink-0"
@@ -594,7 +594,7 @@ export function Header() {
           (no con el centro del bloque logo+tagline). pt y pb simétricos para
           que el tagline tenga el mismo aire arriba (hacia TCG Academy) que
           abajo (hacia la imagen). */}
-      <Container className="flex h-14 items-start justify-between gap-3 py-[6px] lg:h-14 lg:items-center lg:justify-center lg:py-0">
+      <Container className="flex h-14 items-start justify-between gap-3 py-[6px] lg:h-16 lg:items-center lg:justify-center lg:py-0">
         {/* Hamburger + Logo */}
         <div className="flex shrink-0 items-start gap-2 lg:items-center">
           <button
@@ -607,12 +607,12 @@ export function Header() {
           </button>
           <Link
             href="/"
-            className="flex flex-col items-start leading-none lg:flex-row lg:items-center"
+            className="flex flex-col items-start leading-none"
           >
             <span className="text-[1.9rem] font-black tracking-tight text-white lg:text-3xl">
               TCG <span className="text-amber-300">Academy</span>
             </span>
-            {/* Tagline rotativa — sólo móvil, efecto fade+slide + dot "live" */}
+            {/* Tagline rotativa con dot "live" — visible en móvil y desktop, debajo del título */}
             <HeaderTagline />
           </Link>
         </div>
@@ -647,7 +647,7 @@ export function Header() {
             >
               <ShoppingCart size={24} className="text-white" />
               {mounted && count > 0 && (
-                <span className="absolute top-0 right-0 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                <span className="absolute top-0 right-0 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-amber-300 px-1 text-[10px] font-bold leading-none text-gray-900 shadow-[0_0_6px_rgba(252,211,77,0.6)]">
                   {count > 99 ? "99+" : count}
                 </span>
               )}
@@ -737,10 +737,10 @@ export function Header() {
           {user && user.role === "admin" && mounted && (
             <>
               {([
-                { count: pendingOrders, href: "/admin/pedidos", Icon: Package, label: "pedidos pendientes por enviar", color: "bg-red-500", title: "Pedidos pendientes por enviar" },
-                { count: pendingNotifs, href: "/admin/notificaciones", Icon: Bell, label: "incidencias nuevas", color: "bg-red-500", title: "Incidencias nuevas" },
-                { count: pendingSolicitudes, href: "/admin/solicitudes", Icon: Inbox, label: "solicitudes nuevas", color: "bg-red-500", title: "Solicitudes nuevas" },
-              ] as const).filter(({ count }) => count > 0).map(({ count, href, Icon, label, color, title }) => (
+                { count: pendingOrders, href: "/admin/pedidos", Icon: Package, label: "pedidos pendientes por enviar", title: "Pedidos pendientes por enviar" },
+                { count: pendingNotifs, href: "/admin/notificaciones", Icon: Bell, label: "incidencias nuevas", title: "Incidencias nuevas" },
+                { count: pendingSolicitudes, href: "/admin/solicitudes", Icon: Inbox, label: "solicitudes nuevas", title: "Solicitudes nuevas" },
+              ] as const).filter(({ count }) => count > 0).map(({ count, href, Icon, label, title }) => (
                 <Link
                   key={href}
                   href={href}
@@ -749,9 +749,9 @@ export function Header() {
                   aria-label={`${count} ${label}`}
                 >
                   <Icon size={18} className="text-white" />
-                  {/* Ancho mínimo 18px + padding 1.5 para que 2-3 dígitos
-                      (94, 150, 999+) se vean completos sin recortar. */}
-                  <span className={`absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full ${color} px-1.5 text-[10px] leading-none font-bold text-white whitespace-nowrap`}>
+                  {/* Badge amarillo Academy — ancho mínimo 18px + padding 1.5 para
+                      que 2-3 dígitos (94, 150, 999+) se vean completos sin recortar. */}
+                  <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-300 px-1.5 text-[10px] leading-none font-bold text-gray-900 shadow-[0_0_6px_rgba(252,211,77,0.6)] whitespace-nowrap">
                     {count > 999 ? "999+" : count}
                   </span>
                 </Link>
@@ -768,7 +768,7 @@ export function Header() {
             >
               <Bell size={18} className="text-white" />
               {mounted && unreadCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-amber-300 px-1 text-[10px] font-bold leading-none text-gray-900 shadow-[0_0_6px_rgba(252,211,77,0.6)]">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
@@ -786,7 +786,7 @@ export function Header() {
             >
               <ShoppingCart size={22} className="text-white" />
               {mounted && count > 0 && (
-                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white">
+                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-amber-300 px-1 text-[10px] font-bold leading-none text-gray-900 shadow-[0_0_6px_rgba(252,211,77,0.6)]">
                   {count > 99 ? "99+" : count}
                 </span>
               )}
@@ -812,12 +812,12 @@ export function Header() {
               }}
               onFocus={() => setMobileDropdownOpen(true)}
               placeholder="Buscar cartas, sobres..."
-              className="h-9 w-full rounded-xl border-0 bg-white/15 pr-10 pl-4 text-sm text-white placeholder:text-white/60 focus:bg-white/25 focus:outline-none"
+              className="h-9 w-full rounded-xl border-0 bg-white pr-10 pl-4 text-sm text-gray-800 shadow-sm placeholder:text-gray-400 focus:shadow-md focus:outline-none"
               autoComplete="off"
             />
             <button
               type="submit"
-              className="absolute top-1/2 right-3 -translate-y-1/2 text-white/70 hover:text-white"
+              className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               aria-label="Buscar"
             >
               <Search size={18} />

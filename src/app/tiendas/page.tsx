@@ -2,15 +2,39 @@ import Link from "next/link";
 import { MapPin, Phone, Clock, ArrowRight, Sparkles } from "lucide-react";
 import type { Metadata } from "next";
 import { STORES } from "@/data/stores";
+import {
+  SITE_URL,
+  itemListJsonLd,
+  jsonLdProps,
+  breadcrumbJsonLd,
+} from "@/lib/seo";
 
-export const metadata: Metadata = { title: "Nuestras Tiendas — TCG Academy" };
+export const metadata: Metadata = {
+  title: "Nuestras Tiendas — TCG Academy",
+  description:
+    "Tiendas físicas TCG Academy en Calpe, Béjar y Madrid. Magic, Pokémon, One Piece, Yu-Gi-Oh y más. Torneos, eventos y atención experta.",
+  alternates: { canonical: `${SITE_URL}/tiendas` },
+};
 
 const STORE_LIST = Object.values(STORES);
 const OPEN_COUNT = STORE_LIST.filter((s) => !s.comingSoon).length;
 
+const STORE_LIST_LD = itemListJsonLd(
+  STORE_LIST.filter((s) => !s.comingSoon).map((s) => ({
+    url: `/tiendas/${s.id}`,
+    name: s.name,
+  })),
+);
+const STORES_BREADCRUMB_LD = breadcrumbJsonLd([
+  { name: "Inicio", url: "/" },
+  { name: "Tiendas", url: "/tiendas" },
+]);
+
 export default function StoresPage() {
   return (
     <div>
+      <script {...jsonLdProps(STORE_LIST_LD)} />
+      <script {...jsonLdProps(STORES_BREADCRUMB_LD)} />
       {/* Hero */}
       <div className="border-b border-gray-100 bg-white py-12 sm:py-14">
         <div className="mx-auto max-w-[1400px] px-6 text-center">
