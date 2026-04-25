@@ -18,6 +18,7 @@ import {
   closeParentLink,
   type DerivationMode,
 } from "@/lib/productDerivation";
+import { persistNewProduct } from "@/lib/productPersist";
 
 function NuevoProductoInner() {
   const router = useRouter();
@@ -85,18 +86,11 @@ function NuevoProductoInner() {
 
   const persist = (product: ReturnType<typeof buildProduct>) => {
     if (!product) return false;
-    const stored = JSON.parse(
-      localStorage.getItem("tcgacademy_new_products") ?? "[]",
-    );
-    localStorage.setItem(
-      "tcgacademy_new_products",
-      JSON.stringify([...stored, product]),
-    );
+    persistNewProduct(product as LocalProduct);
     // Cierra la vinculación bidireccional actualizando el override del padre.
     if (parent && mode) {
       closeParentLink(parent.id, mode, product.id, derived?.extra.packsPerBox);
     }
-    window.dispatchEvent(new Event("tcga:products:updated"));
     return true;
   };
 

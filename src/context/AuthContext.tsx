@@ -18,6 +18,7 @@ import {
 import { pushUserNotification } from "@/services/notificationService";
 import { sanitizeString } from "@/utils/sanitize";
 import { recordBulkConsent, type ConsentType } from "@/services/consentService";
+import { DataHub } from "@/lib/dataHub";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { isHandleReserved, generateUniqueUsername } from "@/lib/userHandle";
 import {
@@ -78,7 +79,7 @@ const REMEMBER_ME_MS = SITE_CONFIG.rememberMeDays * 24 * 60 * 60 * 1000;
 /** Persist the registered-users map and notify reactive consumers (admin dashboard). */
 function persistRegistered(registered: Record<string, unknown>): void {
   try { localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered)); } catch { /* ignore */ }
-  try { window.dispatchEvent(new Event("tcga:users:updated")); } catch { /* non-fatal */ }
+  DataHub.emit("users");
 }
 
 /** Normalize username: lowercase, trim */

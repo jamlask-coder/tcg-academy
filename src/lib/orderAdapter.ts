@@ -35,6 +35,7 @@
 
 import { getMergedById } from "@/lib/productStore";
 import { safeRead, robustWrite } from "@/lib/safeStorage";
+import { DataHub } from "@/lib/dataHub";
 import type {
   AdminOrder,
   AdminOrderStatus,
@@ -311,9 +312,7 @@ export function appendToAdminInbox(order: CheckoutOrder): boolean {
       : [admin, ...existing];
     const ok = robustWrite(ADMIN_KEY, next);
     // SSOT: cualquier entrada al inbox notifica a las vistas.
-    if (ok && typeof window !== "undefined") {
-      try { window.dispatchEvent(new Event("tcga:orders:updated")); } catch { /* non-fatal */ }
-    }
+    if (ok) DataHub.emit("orders");
     return ok;
   } catch {
     return false;
@@ -464,11 +463,7 @@ export function setOrderPaymentStatus(
   if (admin[idx].paymentStatus === next) return true; // no-op
   admin[idx] = { ...admin[idx], paymentStatus: next };
   const ok = robustWrite(ADMIN_KEY, admin);
-  if (ok) {
-    try {
-      window.dispatchEvent(new Event("tcga:orders:updated"));
-    } catch { /* non-fatal */ }
-  }
+  if (ok) DataHub.emit("orders");
   return ok;
 }
 
@@ -496,15 +491,12 @@ export function getPaymentStatusMap(): Record<string, AdminPaymentStatus> {
 }
 
 /**
- * Dispara el evento canónico `tcga:orders:updated`.
+ * Dispara el evento canónico `tcga:orders:updated` vía DataHub.
  * Usar tras CUALQUIER escritura sobre el inbox admin o sobre `tcgacademy_orders`
  * (checkout, seed, admin edits…). Centralizado para evitar olvidos.
  */
 export function notifyOrdersUpdated(): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.dispatchEvent(new Event("tcga:orders:updated"));
-  } catch { /* non-fatal */ }
+  DataHub.emit("orders");
 }
 
 /**
@@ -526,6 +518,46 @@ export function patchCheckoutOrder(
     if (idx < 0) return false;
     orders[idx] = { ...orders[idx], ...patch };
     const ok = robustWrite("tcgacademy_orders", orders);
+    if (ok) notifyOrdersUpdated();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Mutación canónica del `adminStatus` de un AdminOrder en el inbox admin
+ * (`tcgacademy_admin_orders`). Si el pedido existe, actualiza el estado,
+ * añade entrada al `statusHistory` y dispara el evento del DataHub.
+ *
+ * Devuelve `false` si el pedido no se encuentra (caso típico: facturas
+ * manuales emitidas sin pedido web — no hay nada que sincronizar).
+ *
+ * Uso principal: side-effect de `markAsRefunded()` para que el KPI
+ * "Devoluciones" de `/admin/pedidos` refleje los RMA reembolsados.
+ */
+export function setAdminOrderStatus(
+  orderId: string,
+  next: AdminOrderStatus,
+  note?: string,
+  by: "sistema" | "admin" = "sistema",
+): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const orders = safeRead<AdminOrder[]>(ADMIN_KEY, []);
+    const idx = orders.findIndex((o) => o?.id === orderId);
+    if (idx < 0) return false;
+    const current = orders[idx];
+    if (current.adminStatus === next) return true; // no-op
+    orders[idx] = {
+      ...current,
+      adminStatus: next,
+      statusHistory: [
+        ...current.statusHistory,
+        { status: next, date: new Date().toISOString(), by, note },
+      ],
+    };
+    const ok = robustWrite(ADMIN_KEY, orders);
     if (ok) notifyOrdersUpdated();
     return ok;
   } catch {

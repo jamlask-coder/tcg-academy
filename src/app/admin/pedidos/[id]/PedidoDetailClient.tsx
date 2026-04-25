@@ -449,9 +449,6 @@ export default function PedidoDetailClient() {
       }
       setOrder(updatedOrder);
       DataHub.emit("orders");
-      try {
-        window.dispatchEvent(new Event("tcga:orders:updated"));
-      } catch { /* ignore */ }
 
       // Email "Pedido enviado" al comprador con tracking + carrier
       if (next === "enviado" && tracking) {

@@ -31,6 +31,7 @@ import { tripleCheckInvoice } from "@/lib/fiscalAudit";
 import { getDeadLetterQueue, resolveDeadLetter } from "@/lib/circuitBreaker";
 import { safeRead, safeWrite } from "@/lib/safeStorage";
 import { getPaymentStatusMap, getOrderPaymentStatus, isDeferredPayment } from "@/lib/orderAdapter";
+import { DataHub } from "@/lib/dataHub";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -586,6 +587,7 @@ export async function regenerateInvoiceForOrder(
     if (orderIdx !== -1) {
       updatedOrders[orderIdx].invoiceId = invoice.invoiceId;
       safeWrite("tcgacademy_orders", updatedOrders);
+      DataHub.emit("orders");
     }
 
     // Resolver la incidencia

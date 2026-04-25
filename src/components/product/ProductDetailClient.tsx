@@ -26,7 +26,7 @@ import {
   LANGUAGE_NAMES,
   LANGUAGE_FLAGS,
 } from "@/data/products";
-import { getMergedProducts, getMergedById, getProductUrl } from "@/lib/productStore";
+import { getMergedProducts, getMergedById, getProductUrl, softDeleteProduct } from "@/lib/productStore";
 import { persistProductPatch } from "@/lib/productPersist";
 import { SetHighlightCards } from "@/components/product/SetHighlightCards";
 import { LanguageFlag } from "@/components/ui/LanguageFlag";
@@ -576,13 +576,12 @@ export function ProductDetailClient({ product: initialProduct, config, catLabel 
   //
   // Ver: feedback_catalog_detail_consistency.md GOTCHA 5.
   const persistPatch = useCallback((patch: Partial<LocalProduct>) => {
-    persistProductPatch(product.id, patch);
-    // Suprime el listener propio durante el dispatch síncrono para romper
-    // el loop persist → evento → setProduct → sync effect → setInline* →
-    // persist. Otros listeners (admin/catálogo/carrito) reciben el evento
-    // con normalidad.
+    // Suprime el listener propio durante el dispatch síncrono que emite
+    // `persistProductPatch` para romper el loop persist → evento →
+    // setProduct → sync effect → setInline* → persist. Otros listeners
+    // (admin/catálogo/carrito) reciben el evento con normalidad.
     isSelfDispatchingRef.current = true;
-    window.dispatchEvent(new Event("tcga:products:updated"));
+    persistProductPatch(product.id, patch);
     isSelfDispatchingRef.current = false;
   }, [product.id]);
 
@@ -658,11 +657,7 @@ export function ProductDetailClient({ product: initialProduct, config, catLabel 
   ]);
 
   const handleDelete = useCallback(() => {
-    const deleted = JSON.parse(
-      localStorage.getItem("tcgacademy_deleted_products") ?? "[]",
-    ) as number[];
-    if (!deleted.includes(product.id)) deleted.push(product.id);
-    localStorage.setItem("tcgacademy_deleted_products", JSON.stringify(deleted));
+    softDeleteProduct(product.id);
     router.push(`/${product.game}`);
   }, [product.id, product.game, router]);
 

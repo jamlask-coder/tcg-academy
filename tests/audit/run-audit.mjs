@@ -172,10 +172,13 @@ run("Test 16 — ProductDetail: precio no usa text-4xl (reducido a text-2xl)", (
 })
 
 // ── Test 17: Admin layout uses role check ─────────────────────────────────────
-run("Test 17 — Rutas admin tienen verificación de rol (layout)", () => {
+run("Test 17 — Rutas admin tienen verificación de rol (layout o shell)", () => {
+  // El gate puede estar en layout.tsx o delegado al AdminShell que renderiza el layout.
   const adminLayout = readFileSync(join(SRC, "app/admin/layout.tsx"), "utf8")
-  if (!adminLayout.includes("useAuth") && !adminLayout.includes("role")) {
-    throw new Error("layout.tsx de /admin sin verificación de rol (useAuth/role)")
+  const adminShell = readFileSync(join(SRC, "app/admin/_AdminShell.tsx"), "utf8")
+  const combined = adminLayout + "\n" + adminShell
+  if (!combined.includes("useAuth") && !combined.includes("role")) {
+    throw new Error("Ni layout.tsx ni _AdminShell.tsx hacen verificación de rol")
   }
 })
 
@@ -364,10 +367,10 @@ run("Test 24 — /api/auth register envía verificar_email server-side", () => {
 
 run("Test 25 — Invariante de envío: shipping/total coherentes + sin hardcodes", () => {
   // 1) No hardcoded shipping cost / threshold fuera de SITE_CONFIG + priceVerification
-  // El umbral 149 y los costes 3.99 / 6.99 SSOT viven en siteConfig.ts. Cualquier
+  // El umbral 149 y los costes 4.95 / 6.99 SSOT viven en siteConfig.ts. Cualquier
   // otro sitio que los repita es una fuga que tarde o temprano desincroniza.
   const siteConfig = readFileSync(join(SRC, "config/siteConfig.ts"), "utf8")
-  for (const literal of ["149", "3.99", "6.99"]) {
+  for (const literal of ["149", "4.95", "6.99"]) {
     if (!siteConfig.includes(literal)) {
       throw new Error(`SITE_CONFIG no contiene ${literal} — actualiza este test si cambias valores`)
     }
@@ -376,7 +379,7 @@ run("Test 25 — Invariante de envío: shipping/total coherentes + sin hardcodes
     join(SRC, "config/siteConfig.ts"),
     join(SRC, "lib/priceVerification.ts"),
   ])
-  const forbiddenShippingLiterals = /(^|[^0-9.])(3\.99|6\.99)([^0-9]|$)/
+  const forbiddenShippingLiterals = /(^|[^0-9.])(4\.95|6\.99)([^0-9]|$)/
   const forbiddenThresholdLiteral = /(^|[^0-9.])149([^0-9]|$)/
   function scan(dir) {
     const leaks = []

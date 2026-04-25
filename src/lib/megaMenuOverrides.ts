@@ -18,6 +18,7 @@ import {
   type MegaMenuColumn,
   type MegaMenuGame,
 } from "@/data/megaMenuData";
+import { DataHub } from "@/lib/dataHub";
 
 const STORAGE_KEY = "tcgacademy_megamenu_overrides";
 
@@ -42,11 +43,7 @@ export function loadMegaMenuOverrides(): MegaMenuOverrideMap {
 export function saveMegaMenuOverrides(map: MegaMenuOverrideMap): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-  try {
-    window.dispatchEvent(new Event("tcga:megamenu:updated"));
-  } catch {
-    /* non-fatal */
-  }
+  DataHub.emit("megamenu");
 }
 
 /**

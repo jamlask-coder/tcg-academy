@@ -6,7 +6,11 @@ import {
   ProductForm,
   type ProductFormValues,
 } from "@/components/admin/ProductForm";
-import { findProductBySlugExcluding, getMergedById } from "@/lib/productStore";
+import {
+  findProductBySlugExcluding,
+  getMergedById,
+  softDeleteProduct,
+} from "@/lib/productStore";
 import { persistProductPatch } from "@/lib/productPersist";
 
 export default function EditProductClient({
@@ -36,17 +40,7 @@ export default function EditProductClient({
   }, [productId]);
 
   const handleDelete = () => {
-    const deleted = JSON.parse(
-      localStorage.getItem("tcgacademy_deleted_products") ?? "[]",
-    ) as number[];
-    if (!deleted.includes(productId)) {
-      deleted.push(productId);
-    }
-    localStorage.setItem(
-      "tcgacademy_deleted_products",
-      JSON.stringify(deleted),
-    );
-    window.dispatchEvent(new Event("tcga:products:updated"));
+    softDeleteProduct(productId);
     router.push("/admin/stock");
   };
 
@@ -72,7 +66,7 @@ export default function EditProductClient({
         tags,
         images,
       } as Partial<LocalProduct>);
-      window.dispatchEvent(new Event("tcga:products:updated"));
+      // persistProductPatch ya emite DataHub("products").
     } catch {
       /* empty */
     }

@@ -3,6 +3,8 @@
  * Editable visualmente en /admin/fiscal/editor-factura
  */
 
+import { DataHub } from "@/lib/dataHub";
+
 export interface InvoiceTemplate {
   // ── Márgenes de página ──
   paddingTop: number; // mm — distancia desde el borde superior hasta el logo
@@ -111,10 +113,7 @@ export function loadInvoiceTemplate(): InvoiceTemplate {
 }
 
 function notifyTemplateUpdated(): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.dispatchEvent(new Event("tcga:invoice_template:updated"));
-  } catch { /* non-fatal */ }
+  DataHub.emit("invoice_template");
 }
 
 export function saveInvoiceTemplate(t: InvoiceTemplate): void {

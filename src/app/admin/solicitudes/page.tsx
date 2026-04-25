@@ -18,19 +18,13 @@ import {
   X,
   AlertTriangle,
 } from "lucide-react";
-
-const SOLICITUDES_KEY = "tcgacademy_solicitudes";
-
-type TipoSolicitud = "b2b" | "franquicia" | "vending";
-type EstadoSolicitud = "nueva" | "revision" | "aprobada" | "rechazada";
-
-interface Solicitud {
-  id: string;
-  tipo: TipoSolicitud;
-  estado: EstadoSolicitud;
-  fechaSolicitud: string;
-  datos: Record<string, unknown>;
-}
+import {
+  loadSolicitudes as loadSolicitudesSvc,
+  saveSolicitudes as saveSolicitudesSvc,
+  type Solicitud,
+  type TipoSolicitud,
+  type EstadoSolicitud,
+} from "@/services/solicitudService";
 
 const SEED_SOLICITUD: Solicitud = {
   id: "demo-b2b-001",
@@ -76,22 +70,18 @@ const SEED_SOLICITUD: Solicitud = {
 };
 
 function loadSolicitudes(): Solicitud[] {
-  try {
-    const raw = localStorage.getItem(SOLICITUDES_KEY);
-    if (!raw || raw === "[]") {
-      // Seed con solicitud demo si no hay ninguna
-      const seeded = [SEED_SOLICITUD];
-      localStorage.setItem(SOLICITUDES_KEY, JSON.stringify(seeded));
-      return seeded;
-    }
-    return JSON.parse(raw) as Solicitud[];
-  } catch {
-    return [];
+  const list = loadSolicitudesSvc();
+  if (list.length === 0) {
+    // Seed con solicitud demo si no hay ninguna
+    const seeded = [SEED_SOLICITUD];
+    saveSolicitudesSvc(seeded);
+    return seeded;
   }
+  return list;
 }
 
 function saveSolicitudes(list: Solicitud[]) {
-  localStorage.setItem(SOLICITUDES_KEY, JSON.stringify(list));
+  saveSolicitudesSvc(list);
 }
 
 const TIPO_CONFIG: Record<

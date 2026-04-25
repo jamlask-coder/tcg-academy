@@ -52,6 +52,7 @@ import {
   type Carrier,
 } from "@/components/admin/ShipModal";
 import { clickableProps } from "@/lib/a11y";
+import { DataHub } from "@/lib/dataHub";
 import { userIdToHandle } from "@/lib/userHandle";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1160,7 +1161,7 @@ export default function AdminPedidosPage() {
     try {
       localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(next));
       // Notifica al sidebar/badge/dashboard para que reflejen el cambio sin refrescar.
-      window.dispatchEvent(new Event("tcga:orders:updated"));
+      DataHub.emit("orders");
     } catch {}
   };
 
@@ -1352,7 +1353,7 @@ export default function AdminPedidosPage() {
             });
           }
         }
-        window.dispatchEvent(new Event("tcga:products:updated"));
+        // persistProductPatch ya emite DataHub("products") por iteración.
       } catch {
         /* ignore */
       }
@@ -1601,11 +1602,29 @@ export default function AdminPedidosPage() {
         </div>
       )}
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Gestión de pedidos</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Todos los pedidos de clientes
-        </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Gestión de pedidos</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Todos los pedidos de clientes
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/admin/pedidos/nuevo-albaran"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#16a34a] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#15803d]"
+          >
+            <Truck size={15} />
+            Emitir albarán
+          </Link>
+          <Link
+            href="/admin/pedidos/albaranes"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#16a34a] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#15803d]"
+          >
+            <Package size={15} />
+            Libro albaranes
+          </Link>
+        </div>
       </div>
 
       {/* Time range selector */}

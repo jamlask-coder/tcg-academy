@@ -6,8 +6,13 @@ import {
   CATEGORY_LABELS,
   type LocalProduct,
 } from "@/data/products";
-import { getMergedProducts, getProductUrl } from "@/lib/productStore";
-import { persistProductPatch } from "@/lib/productPersist";
+import {
+  getMergedProducts,
+  getProductUrl,
+  softDeleteProduct,
+  generateLocalProductId,
+} from "@/lib/productStore";
+import { persistProductPatch, persistNewProduct } from "@/lib/productPersist";
 import { getStockInfo } from "@/utils/stockStatus";
 import {
   Search,
@@ -74,30 +79,24 @@ export default function AdminStockPage() {
 
   const handleDuplicate = (p: LocalProduct) => {
     try {
-      const existing = JSON.parse(
-        localStorage.getItem("tcgacademy_new_products") ?? "[]",
-      );
-      const newId = Date.now();
-      existing.push({
+      const newId = generateLocalProductId();
+      persistNewProduct({
         ...p,
         id: newId,
         name: `${p.name} (copia)`,
         slug: `${p.slug}-copia-${newId}`,
       });
-      localStorage.setItem("tcgacademy_new_products", JSON.stringify(existing));
-      window.dispatchEvent(new Event("tcga:products:updated"));
       alert(`Duplicado: "${p.name} (copia)"`);
     } catch {}
   };
 
   const handleDelete = (id: number) => {
-    const next = new Set(deletedIds);
-    next.add(id);
-    setDeletedIds(next);
-    localStorage.setItem(
-      "tcgacademy_deleted_products",
-      JSON.stringify([...next]),
-    );
+    softDeleteProduct(id);
+    setDeletedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
     setConfirmDelete(null);
     setSelected((prev) => {
       const s = new Set(prev);
@@ -117,13 +116,12 @@ export default function AdminStockPage() {
 
   const handleBulkDelete = () => {
     if (selected.size === 0) return;
-    const next = new Set(deletedIds);
-    selected.forEach((id) => next.add(id));
-    setDeletedIds(next);
-    localStorage.setItem(
-      "tcgacademy_deleted_products",
-      JSON.stringify([...next]),
-    );
+    selected.forEach((id) => softDeleteProduct(id));
+    setDeletedIds((prev) => {
+      const next = new Set(prev);
+      selected.forEach((id) => next.add(id));
+      return next;
+    });
     setSelected(new Set());
     setConfirmBulkDelete(false);
   };
@@ -229,7 +227,6 @@ export default function AdminStockPage() {
       }
     }
 
-    window.dispatchEvent(new Event("tcga:products:updated"));
     setEdits({});
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);

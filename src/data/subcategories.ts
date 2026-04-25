@@ -2,6 +2,8 @@
 // Used by: sidebar filters on category pages, admin subcategories panel.
 // Storage: localStorage["tcgacademy_subcategories"] (keyed by game slug).
 
+import { DataHub } from "@/lib/dataHub";
+
 export interface Subcategory {
   id: string;
   label: string;
@@ -45,6 +47,6 @@ export function loadSubcategories(): SubcategoryMap {
 export function saveSubcategories(map: SubcategoryMap): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-    window.dispatchEvent(new Event("tcga:subcategories:updated"));
+    DataHub.emit("subcategories");
   } catch {}
 }

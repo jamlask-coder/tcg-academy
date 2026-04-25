@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -17,6 +17,14 @@ import {
   Download,
   Plus,
   Palette,
+  Settings,
+  ListChecks,
+  Circle,
+  RotateCcw,
+  Trash2,
+  Truck,
+  LayoutDashboard,
+  Banknote,
 } from "lucide-react";
 import { loadInvoices } from "@/services/invoiceService";
 import {
@@ -27,6 +35,15 @@ import {
 import { VerifactuStatus, InvoiceStatus } from "@/types/fiscal";
 import { VERIFACTU_CONFIG } from "@/config/verifactuConfig";
 import type { Quarter } from "@/types/tax";
+import {
+  loadFiscalConfig,
+  seedKnownStateIfMissing,
+  resolvePendingTask,
+  reopenPendingTask,
+  deletePendingTask,
+} from "@/services/fiscalConfigService";
+import type { PendingFiscalTask } from "@/types/fiscalConfig";
+import { DataHub } from "@/lib/dataHub";
 
 // ─── Nav cards ────────────────────────────────────────────────────────────────
 
@@ -44,6 +61,20 @@ const FISCAL_SECTIONS = [
     title: "Libro de Facturas",
     desc: "Todas las facturas emitidas con filtros y exportación",
     color: "#2563eb",
+  },
+  {
+    href: "/admin/fiscal/proveedores",
+    icon: Truck,
+    title: "Facturas de Proveedores",
+    desc: "Libro de compras: IVA soportado, retenciones 111/115 y gastos deducibles",
+    color: "#475569",
+  },
+  {
+    href: "/admin/fiscal/conciliacion",
+    icon: Banknote,
+    title: "Conciliación bancaria",
+    desc: "Importa el extracto del banco y empareja cobros con pedidos / pagos con facturas",
+    color: "#0891b2",
   },
   {
     href: "/admin/fiscal/contabilidad",
@@ -67,6 +98,13 @@ const FISCAL_SECTIONS = [
     color: "#9333ea",
   },
   {
+    href: "/admin/fiscal/anual-dashboard",
+    icon: LayoutDashboard,
+    title: "Dashboard Anual",
+    desc: "Vista 360º del ejercicio: IVA, IS, retenciones, vinculadas y dividendos",
+    color: "#0ea5e9",
+  },
+  {
     href: "/admin/fiscal/intracomunitario",
     icon: Globe,
     title: "Intracomunitario",
@@ -79,6 +117,13 @@ const FISCAL_SECTIONS = [
     title: "Calendario Fiscal",
     desc: "Obligaciones tributarias, plazos, instrucciones y alertas automáticas",
     color: "#7c3aed",
+  },
+  {
+    href: "/admin/fiscal/configuracion",
+    icon: Settings,
+    title: "Configuración fiscal",
+    desc: "Alquileres, dividendos, OSS, 720, vinculadas, método 202 — alimenta los borradores automáticos",
+    color: "#0891b2",
   },
   {
     href: "/admin/fiscal/control",
@@ -110,10 +155,103 @@ const FISCAL_SECTIONS = [
   },
 ];
 
+// ─── Pending tasks helpers ────────────────────────────────────────────────────
+
+const PRIORITY_ORDER: Record<PendingFiscalTask["priority"], number> = {
+  urgent: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
+const PRIORITY_STYLES: Record<
+  PendingFiscalTask["priority"],
+  { dot: string; label: string; badge: string }
+> = {
+  urgent: {
+    dot: "text-red-600",
+    label: "URGENTE",
+    badge: "bg-red-100 text-red-700",
+  },
+  high: {
+    dot: "text-amber-600",
+    label: "Alta",
+    badge: "bg-amber-100 text-amber-800",
+  },
+  medium: {
+    dot: "text-blue-600",
+    label: "Media",
+    badge: "bg-blue-100 text-blue-800",
+  },
+  low: {
+    dot: "text-gray-400",
+    label: "Baja",
+    badge: "bg-gray-100 text-gray-700",
+  },
+};
+
+function PendingTaskRow({
+  task,
+  onResolve,
+  onDelete,
+}: {
+  task: PendingFiscalTask;
+  onResolve: () => void;
+  onDelete: () => void;
+}) {
+  const style = PRIORITY_STYLES[task.priority];
+  return (
+    <li className="flex items-start gap-3 rounded-lg border border-gray-100 px-3 py-2.5">
+      <button
+        type="button"
+        onClick={onResolve}
+        className={`mt-0.5 flex-shrink-0 ${style.dot} hover:text-green-600`}
+        aria-label="Marcar como resuelto"
+        title="Marcar como resuelto"
+      >
+        <Circle size={16} />
+      </button>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold text-gray-900">{task.title}</p>
+          <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${style.badge}`}>
+            {style.label}
+          </span>
+        </div>
+        {task.description && (
+          <p className="mt-0.5 text-xs text-gray-600">{task.description}</p>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={onDelete}
+        className="mt-0.5 text-gray-300 hover:text-red-500"
+        aria-label="Eliminar"
+        title="Eliminar"
+      >
+        <Trash2 size={14} />
+      </button>
+    </li>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminFiscalPage() {
   const [yearFilter] = useState(new Date().getFullYear());
+  const [pendingTasks, setPendingTasks] = useState<PendingFiscalTask[]>([]);
+  const [showCompleted, setShowCompleted] = useState(false);
+
+  useEffect(() => {
+    seedKnownStateIfMissing();
+    const reload = () => setPendingTasks(loadFiscalConfig().pendingTasks);
+    reload();
+    return DataHub.on("fiscal_config", reload);
+  }, []);
+
+  const openTasks = pendingTasks.filter((t) => !t.resolvedAt);
+  const doneTasks = pendingTasks.filter((t) => !!t.resolvedAt);
+  const urgentCount = openTasks.filter((t) => t.priority === "urgent").length;
 
   const invoices = useMemo(() => loadInvoices(), []);
 
@@ -307,6 +445,92 @@ export default function AdminFiscalPage() {
                 Ver →
               </Link>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Datos fiscales pendientes */}
+      {pendingTasks.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ListChecks size={18} className="text-[#0891b2]" />
+              <h2 className="font-bold text-gray-900">
+                Datos fiscales pendientes
+              </h2>
+              {urgentCount > 0 && (
+                <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                  {urgentCount} urgente{urgentCount !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+            {doneTasks.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowCompleted((v) => !v)}
+                className="text-xs font-semibold text-gray-500 underline"
+              >
+                {showCompleted ? "Ocultar" : "Mostrar"} {doneTasks.length} resueltos
+              </button>
+            )}
+          </div>
+
+          {openTasks.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              No hay datos pendientes. Buen trabajo.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {openTasks
+                .slice()
+                .sort(
+                  (a, b) =>
+                    PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority],
+                )
+                .map((t) => (
+                  <PendingTaskRow
+                    key={t.id}
+                    task={t}
+                    onResolve={() => resolvePendingTask(t.id)}
+                    onDelete={() => deletePendingTask(t.id)}
+                  />
+                ))}
+            </ul>
+          )}
+
+          {showCompleted && doneTasks.length > 0 && (
+            <ul className="mt-4 space-y-2 border-t border-gray-100 pt-4">
+              {doneTasks.map((t) => (
+                <li
+                  key={t.id}
+                  className="flex items-start gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm"
+                >
+                  <CheckCircle2
+                    size={16}
+                    className="mt-0.5 flex-shrink-0 text-green-600"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-gray-700 line-through">
+                      {t.title}
+                    </p>
+                    {t.description && (
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {t.description}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => reopenPendingTask(t.id)}
+                    className="text-xs text-gray-400 hover:text-gray-700"
+                    aria-label="Reabrir"
+                    title="Reabrir"
+                  >
+                    <RotateCcw size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}

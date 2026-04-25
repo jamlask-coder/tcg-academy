@@ -414,17 +414,24 @@ export function generateInvoiceHTML(
       user-select: none;
       z-index: 0;
     }
-    /* Marca de agua ALBARÁN — texto diagonal rojo, inmenso, para que nunca
-       se confunda con una factura real. Se renderiza en lugar de la imagen
-       watermark estándar cuando isDeliveryNote es true. */
+    /* Marca de agua ALBARÁN — texto diagonal rojo, para que nunca se
+       confunda con una factura real. Se renderiza en lugar de la imagen
+       watermark estándar cuando isDeliveryNote es true.
+       Dimensionado para que la proyección horizontal del texto rotado -30°
+       quepa dentro de los 210mm del folio (.sheet tiene overflow:hidden). */
     .watermark-albaran {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%) rotate(-30deg);
-      font-size: 160pt;
+      font-size: 105pt;
       font-weight: 900;
-      letter-spacing: 14px;
+      /* letter-spacing añade espacio DETRÁS de cada letra incluida la última,
+         creando una "cola" invisible a la derecha que desplaza visualmente
+         el texto hacia la derecha. margin-right negativo la compensa para
+         que el centro óptico coincida con el centro del folio. */
+      letter-spacing: 4px;
+      margin-right: -4px;
       color: rgba(220, 38, 38, 0.14);
       white-space: nowrap;
       pointer-events: none;
@@ -809,7 +816,7 @@ export function generateInvoiceHTML(
     ${globalDiscountAmount > 0 ? `<div class="row discount"><span>Descuento general${globalDiscountPct > 0 ? ` (${globalDiscountPct}%)` : ""}</span><span>-${globalDiscountAmount.toFixed(2)}&nbsp;€</span></div>` : ""}
     ${couponDiscount > 0 ? `<div class="row discount"><span>Dto. cupón${couponCode ? ` (${escapeHtml(couponCode)})` : ""}</span><span>-${couponDiscount.toFixed(2)}&nbsp;€</span></div>` : ""}
     ${pointsDiscount > 0 ? `<div class="row discount"><span>Dto. canje de puntos</span><span>-${pointsDiscount.toFixed(2)}&nbsp;€</span></div>` : ""}
-    <div class="row final"><span>TOTAL</span><span>${totalFinal.toFixed(2)}&nbsp;€</span></div>
+    <div class="row final"><span>TOTAL CON IVA</span><span>${totalFinal.toFixed(2)}&nbsp;€</span></div>
   </div>
 
   <!-- PIE DE PÁGINA — el script de paginación clona este nodo al pie de

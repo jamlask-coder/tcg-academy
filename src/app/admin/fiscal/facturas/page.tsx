@@ -15,7 +15,6 @@ import {
   Info,
   CheckCircle2,
   XCircle,
-  FileWarning,
   RotateCcw,
 } from "lucide-react";
 import DevolucionModal from "@/components/admin/fiscal/DevolucionModal";
@@ -933,27 +932,16 @@ export default function FacturasPage() {
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         {inv.status !== InvoiceStatus.ANULADA &&
                         inv.invoiceType !== InvoiceType.RECTIFICATIVA ? (
-                          <div className="inline-flex flex-col items-stretch gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setRefundingInvoice(inv)}
-                              className="inline-flex items-center justify-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700 transition hover:border-red-400 hover:bg-red-100"
-                              title="Emitir devolución — genera factura rectificativa"
-                              aria-label={`Devolución de ${inv.invoiceNumber}`}
-                            >
-                              <RotateCcw size={11} />
-                              Devolución
-                            </button>
-                            <Link
-                              href={`/admin/fiscal/rectificar/${inv.invoiceId}`}
-                              className="inline-flex items-center justify-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 transition hover:border-amber-400 hover:bg-amber-100"
-                              title="Emitir factura rectificativa (corrección de datos)"
-                              aria-label={`Rectificar ${inv.invoiceNumber}`}
-                            >
-                              <FileWarning size={11} />
-                              Rectificar
-                            </Link>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setRefundingInvoice(inv)}
+                            className="inline-flex items-center justify-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700 transition hover:border-red-400 hover:bg-red-100"
+                            title="Emitir devolución — genera factura rectificativa"
+                            aria-label={`Devolución de ${inv.invoiceNumber}`}
+                          >
+                            <RotateCcw size={11} />
+                            Devolución
+                          </button>
                         ) : (
                           <span className="text-xs text-gray-300">—</span>
                         )}

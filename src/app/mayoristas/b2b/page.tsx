@@ -14,9 +14,7 @@ import {
 } from "lucide-react";
 import { checkRateLimit } from "@/utils/sanitize";
 import { SITE_CONFIG } from "@/config/siteConfig";
-
-// ─── Storage ──────────────────────────────────────────────────────────────────
-const SOLICITUDES_KEY = "tcgacademy_solicitudes";
+import { addSolicitud } from "@/services/solicitudService";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 const schema = z.object({
@@ -221,18 +219,10 @@ export default function B2BPage() {
         }
       }
 
-      const saved = JSON.parse(
-        localStorage.getItem(SOLICITUDES_KEY) ?? "[]",
-      ) as unknown[];
-      const newSolicitud = {
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+      addSolicitud({
         tipo: "b2b",
-        estado: "nueva",
-        fechaSolicitud: new Date().toISOString(),
         datos: { ...data, documentos: docData },
-      };
-      saved.push(newSolicitud);
-      localStorage.setItem(SOLICITUDES_KEY, JSON.stringify(saved));
+      });
     } catch {
       // localStorage may be unavailable in some environments
     }

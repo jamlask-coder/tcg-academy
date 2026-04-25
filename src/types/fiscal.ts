@@ -371,6 +371,211 @@ export interface VerifactuStatusDetail {
 
 // ─── Albaranes (delivery notes) ──────────────────────────────────────────────
 
+// ─── Facturas recibidas (proveedores) ───────────────────────────────────────
+
+/**
+ * Estado de pago de una factura de proveedor.
+ * - PENDIENTE: registrada pero aún sin pagar.
+ * - PAGADA: liquidada (transferencia/efectivo/etc.).
+ * - DISPUTADA: en disputa con el proveedor (no se considera deducible hasta resolverse).
+ */
+export enum SupplierInvoiceStatus {
+  PENDIENTE = "pendiente",
+  PAGADA = "pagada",
+  DISPUTADA = "disputada",
+}
+
+/**
+ * Categoría operativa de la compra — útil para reporting interno y para el
+ * libro registro IRPF/IS, no afecta al cálculo IVA.
+ */
+export type SupplierInvoiceCategory =
+  | "mercaderias" // sobres/cartas/displays para reventa
+  | "alquiler" // local físico (genera Mod 115)
+  | "suministros" // luz/agua/internet
+  | "servicios_profesionales" // gestoría, abogados (genera Mod 111)
+  | "transporte"
+  | "marketing"
+  | "material_oficina"
+  | "amortizable" // inmovilizado (>300€ y >1 año vida útil)
+  | "otros";
+
+/**
+ * Línea de una factura de proveedor.
+ * Estructura simétrica a {@link InvoiceLineItem} pero pensada para el lado
+ * "soportado": deductiblePct permite reflejar prorrata o gastos mixtos
+ * (ej: móvil 50% empresa / 50% personal).
+ */
+export interface SupplierInvoiceLine {
+  description: string;
+  /** Cantidad — opcional, normalmente 1 para servicios */
+  quantity: number;
+  /** Importe sin IVA */
+  taxableBase: number;
+  vatRate: 0 | 4 | 10 | 21;
+  vatAmount: number;
+  /**
+   * Porcentaje deducible (0-100). Habitual: 100 para mercadería, 50 para
+   * gastos mixtos (ej. móvil), 0 para gastos no deducibles fiscalmente.
+   */
+  deductiblePct: number;
+  /** vatAmount × deductiblePct/100 */
+  deductibleVAT: number;
+  /**
+   * Retención IRPF practicada en factura (solo proveedores profesionales,
+   * habitualmente 15% — alimenta Modelo 111). 0 si no aplica.
+   */
+  retentionPct: number;
+  retentionAmount: number;
+  /** Total de la línea = base + IVA − retención */
+  totalLine: number;
+}
+
+/**
+ * Factura recibida de proveedor.
+ *
+ * NO entra en la cadena VeriFactu (esa es solo para emitidas). Pero alimenta:
+ *  - Modelo 303 → IVA soportado deducible (casillas 28-39)
+ *  - Modelo 390 → resumen anual IVA soportado
+ *  - Modelo 347 → terceros con quien se opera >3.005,06€/año
+ *  - Modelo 111/115 → retenciones practicadas a profesionales/arrendadores
+ *  - P&G → gastos deducibles (afecta Modelo 200/202)
+ *
+ * Inmutable una vez registrada (excepto status de pago); para correcciones,
+ * registrar una nueva línea con valores negativos o anular y re-registrar.
+ */
+export interface SupplierInvoiceRecord {
+  /** ID interno (sin relevancia fiscal externa) */
+  id: string;
+  /**
+   * Número de factura tal como lo emitió el proveedor — texto libre porque no
+   * controlamos su numeración (puede ser "F2026/123", "INV-0001", etc.).
+   */
+  supplierInvoiceNumber: string;
+  /** Fecha de expedición (la del documento del proveedor) */
+  invoiceDate: string; // ISO date "YYYY-MM-DD"
+  /** Fecha de recepción (cuándo nos llegó/registramos) */
+  receivedDate: string;
+  /** Datos completos del proveedor (snapshot inmutable) */
+  supplier: CompanyData;
+  category: SupplierInvoiceCategory;
+  lines: SupplierInvoiceLine[];
+  /** Suma de todas las bases imponibles */
+  totalTaxableBase: number;
+  /** Suma de cuotas de IVA */
+  totalVAT: number;
+  /** Suma de IVA realmente deducible (puede ser inferior si hay prorrata) */
+  totalDeductibleVAT: number;
+  /** Suma de retenciones practicadas */
+  totalRetention: number;
+  /** Total a pagar al proveedor */
+  totalInvoice: number;
+  status: SupplierInvoiceStatus;
+  paymentMethod: PaymentMethod | null;
+  paymentDate: string | null;
+  /** Notas internas (no fiscales) */
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Conciliación bancaria ───────────────────────────────────────────────────
+
+/**
+ * Tipo de movimiento bancario.
+ * - "income": ingreso (cobros de clientes, devoluciones de proveedor, etc.).
+ * - "expense": cargo (pagos a proveedores, comisiones, transferencias salientes).
+ */
+export type BankMovementType = "income" | "expense";
+
+/**
+ * Estado de conciliación de un movimiento bancario.
+ * - "unmatched": sin emparejar — no hay candidato claro.
+ * - "auto-matched": el sistema sugiere un emparejamiento (pendiente de revisar).
+ * - "confirmed": el admin lo confirmó — se aplicaron los efectos (orden cobrada / factura pagada).
+ * - "ignored": movimiento descartado (comisiones bancarias, transferencias internas, etc.).
+ */
+export type BankMovementStatus =
+  | "unmatched"
+  | "auto-matched"
+  | "confirmed"
+  | "ignored";
+
+/** Confianza del emparejamiento automático. */
+export type BankMatchConfidence = "exact" | "high" | "low";
+
+/** Tipo de objetivo emparejado (a qué entidad apunta el movimiento). */
+export type BankMatchTargetType = "order" | "supplier_invoice";
+
+/**
+ * Vínculo movimiento ↔ entidad.
+ * `confidence` describe la calidad del match cuando es automático.
+ * `method` distingue auto vs intervención manual del admin.
+ */
+export interface BankMatchTarget {
+  type: BankMatchTargetType;
+  /** ID de la entidad (orderId o supplierInvoiceId). */
+  id: string;
+  /** Importe del documento emparejado (para detectar discrepancias). */
+  expectedAmount: number;
+  confidence: BankMatchConfidence;
+  method: "auto" | "manual";
+}
+
+/**
+ * Movimiento bancario individual (una línea del extracto).
+ *
+ * `amount` es siempre con signo: positivo = ingreso, negativo = cargo.
+ * `concept` es el campo de texto libre del banco (referencia, contrapartida, etc.).
+ */
+export interface BankMovement {
+  id: string;
+  /** Fecha contable (YYYY-MM-DD) */
+  date: string;
+  /** Fecha valor opcional (YYYY-MM-DD) */
+  valueDate: string | null;
+  /** Importe con signo: + ingreso, − cargo */
+  amount: number;
+  /** Tipo derivado del signo del importe */
+  type: BankMovementType;
+  /** Concepto/descripción del banco */
+  concept: string;
+  /** Referencia/numero documento si lo da el banco */
+  reference: string;
+  /** Contrapartida (titular del otro lado de la transferencia) */
+  counterparty: string;
+  /** IBAN contrapartida (si está) */
+  counterpartyIban: string;
+  status: BankMovementStatus;
+  /** Vínculo con pedido o factura proveedor (si aplica) */
+  matchedTo: BankMatchTarget | null;
+  /** ID del lote de importación */
+  importBatchId: string;
+  importedAt: string;
+  /** Notas manuales del admin */
+  notes: string;
+}
+
+/**
+ * Lote de importación CSV — agrupa los movimientos cargados juntos
+ * para auditar y permitir deshacer.
+ */
+export interface BankImportBatch {
+  id: string;
+  importedAt: string;
+  /** Origen del fichero (nombre del CSV o etiqueta) */
+  source: string;
+  /** Banco detectado (BBVA, Santander, etc.) o "generic" */
+  bank: string;
+  movementCount: number;
+  totalIncome: number;
+  totalExpense: number;
+  /** Filas que no se pudieron parsear */
+  errors: string[];
+}
+
+// ─── Albaranes (delivery notes) ──────────────────────────────────────────────
+
 /**
  * Estado del albarán.
  * - PENDIENTE: emitido pero todavía sin facturar.

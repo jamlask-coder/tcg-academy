@@ -5,6 +5,7 @@
 // Replace localStorage calls with API calls when backend is ready.
 
 import { MOCK_ADMIN_COUPONS, type AdminCoupon } from "@/data/mockData";
+import { DataHub } from "@/lib/dataHub";
 
 // Re-export para que consumidores no tengan que importar de mockData.
 export type { AdminCoupon };
@@ -319,7 +320,7 @@ export function saveAdminCoupons(coupons: AdminCoupon[]): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(ADMIN_COUPONS_KEY, JSON.stringify(coupons));
-    window.dispatchEvent(new Event("tcga:coupons:updated"));
+    DataHub.emit("coupons");
   } catch { /* non-fatal */ }
 }
 

@@ -24,6 +24,7 @@ import {
 import { openInvitationEmail } from "./emailService";
 import { pushUserNotification } from "./notificationService";
 import type { User } from "@/types/user";
+import { DataHub } from "@/lib/dataHub";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -100,9 +101,7 @@ function saveCooldowns(data: Record<string, number>): void {
 }
 
 function dispatch(): void {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("tcga:assoc:updated"));
-  }
+  DataHub.emit("assoc");
 }
 
 // ─── User lookup ──────────────────────────────────────────────────────────────

@@ -24,6 +24,7 @@ import type { AdminOrder, AdminOrderStatus, OrderItem as AdminItem } from "@/dat
 import { POINTS_PER_EURO, addPoints } from "@/services/pointsService";
 import { derivePaymentStatus } from "@/lib/orderAdapter";
 import { calculateShipping } from "@/lib/priceVerification";
+import { DataHub } from "@/lib/dataHub";
 
 // ─── PRNG determinista (mulberry32) ─────────────────────────────────────────
 
@@ -721,12 +722,8 @@ export function runSeed(): SeedResult {
   if (!stockOk) errors.push("No se pudo aplicar stock=300 (cuota llena)");
 
   // ── Notificar a pantallas activas (admin/pedidos, estadísticas, usuarios) ──
-  try {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("tcga:orders:updated"));
-      window.dispatchEvent(new Event("tcga:products:updated"));
-    }
-  } catch { /* ignore */ }
+  DataHub.emit("orders");
+  DataHub.emit("products");
 
   return {
     users: seededUsers.length,

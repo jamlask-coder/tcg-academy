@@ -26,6 +26,7 @@ import { getPaymentStatusMap } from "@/lib/orderAdapter";
 import {
   buildIntegrityReport,
   removeOrphanKey,
+  DataHub,
   type IntegrityReport,
 } from "@/lib/dataHub";
 import { HeroImagesManager } from "@/components/admin/HeroImagesManager";
@@ -190,6 +191,7 @@ function importUsersJSON(file: File, onDone: (count: number) => void) {
         if (!current[email]) { current[email] = entry; count++; }
       }
       localStorage.setItem("tcgacademy_registered", JSON.stringify(current));
+      DataHub.emit("users");
       onDone(count);
     } catch { onDone(-1); }
   };

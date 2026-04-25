@@ -1,5 +1,6 @@
 import type { Incident } from "@/types/incident";
 import { getOrdersByUser } from "@/lib/orderAdapter";
+import { DataHub } from "@/lib/dataHub";
 
 const STORAGE_KEY = "tcgacademy_incidents";
 
@@ -24,7 +25,7 @@ export function saveIncident(incident: Incident): void {
   if (idx >= 0) all[idx] = incident;
   else all.unshift(incident);
   saveAll(all);
-  try { window.dispatchEvent(new Event("tcga:incidents:updated")); } catch { /* ignore */ }
+  DataHub.emit("incidents");
 }
 
 export function updateIncident(id: string, updates: Partial<Incident>): void {
@@ -33,7 +34,7 @@ export function updateIncident(id: string, updates: Partial<Incident>): void {
   if (idx < 0) return;
   all[idx] = { ...all[idx], ...updates };
   saveAll(all);
-  try { window.dispatchEvent(new Event("tcga:incidents:updated")); } catch { /* ignore */ }
+  DataHub.emit("incidents");
 }
 
 export function getIncidentsByOrder(orderId: string): Incident[] {

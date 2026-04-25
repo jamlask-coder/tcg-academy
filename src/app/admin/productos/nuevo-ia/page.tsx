@@ -9,26 +9,25 @@
 import { useRouter } from "next/navigation";
 import { SmartProductCreator } from "@/components/admin/SmartProductCreator";
 import type { ProductFormValues } from "@/components/admin/ProductForm";
+import type { LocalProduct } from "@/data/products";
+import { generateLocalProductId } from "@/lib/productStore";
+import { persistNewProduct } from "@/lib/productPersist";
 import { logger } from "@/lib/logger";
-
-const STORAGE_KEY = "tcgacademy_new_products";
 
 function persist(
   data: ProductFormValues,
   tags: string[],
   images: string[],
 ): void {
-  const product = {
+  const product: LocalProduct = {
     ...data,
-    id: Date.now(),
+    id: generateLocalProductId(),
     tags,
     images,
     createdAt: new Date().toISOString().slice(0, 10),
-  };
+  } as LocalProduct;
   try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...stored, product]));
-    window.dispatchEvent(new Event("tcga:products:updated"));
+    persistNewProduct(product);
   } catch (e) {
     logger.error("no se pudo guardar el producto", "nuevo-ia", { err: String(e) });
   }

@@ -1,6 +1,20 @@
 import Link from "next/link";
 import { SITE_CONFIG } from "@/config/siteConfig";
 
+/**
+ * Construye la línea "Registro Mercantil de X, Tomo Y, Folio Z, Hoja H".
+ * Mientras los datos no estén rellenos en SITE_CONFIG.registroMercantil,
+ * mostramos el aviso de inscripción en trámite (legalmente válido para SL
+ * recién constituidas pendientes de publicación BORME).
+ */
+function formatInscripcionRegistral(): string {
+  const r = SITE_CONFIG.registroMercantil;
+  if (!r.tomo || !r.folio || !r.hoja) {
+    return `Registro Mercantil de ${r.provincia} — en trámite de inscripción`;
+  }
+  return `Registro Mercantil de ${r.provincia}, Tomo ${r.tomo}, Folio ${r.folio}, Hoja ${r.hoja}`;
+}
+
 export const metadata = {
   title: "Aviso legal | TCG Academy",
   description:
@@ -41,7 +55,7 @@ export default function AvisoLegalPage() {
                 <Row label="Correo electrónico" value={SITE_CONFIG.email} link={`mailto:${SITE_CONFIG.email}`} />
                 <Row label="Teléfono" value={SITE_CONFIG.phone} />
                 <Row label="Sitio web" value="https://tcgacademy.es" />
-                <Row label="Inscripción registral" value="Registro Mercantil de Alicante, Tomo XXXX, Folio XX, Hoja A-XXXXX" />
+                <Row label="Inscripción registral" value={formatInscripcionRegistral()} />
               </dl>
             </div>
           </Section>

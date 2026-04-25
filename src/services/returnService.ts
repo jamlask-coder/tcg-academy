@@ -568,6 +568,21 @@ export async function markAsRefunded(
   // 5. Restaurar stock.
   restoreStockForReturn(rma.items);
 
+  // 5a. Sincronizar el AdminOrder original con `adminStatus = "devolucion"`
+  //     para que el KPI "Devoluciones" de /admin/pedidos refleje los RMA
+  //     reembolsados. Non-blocking: si el RMA viene de una factura manual
+  //     sin pedido web, simplemente no encuentra nada que actualizar.
+  try {
+    const { setAdminOrderStatus } = await import("@/lib/orderAdapter");
+    setAdminOrderStatus(
+      rma.orderId,
+      "devolucion",
+      `RMA ${rma.id} reembolsado · rectificativa ${rectificativa.invoiceNumber}`,
+    );
+  } catch {
+    // Non-blocking — la rectificativa ya es el documento vinculante.
+  }
+
   // 5b. Revertir los puntos de fidelidad ganados en la compra devuelta.
   //     Sin esto el cliente conservaba puntos por un importe que ya no le
   //     corresponde — discrepancia entre saldo de puntos y ventas netas.
@@ -675,9 +690,9 @@ export async function createAdminInitiatedReturn(params: {
     if (it.quantity <= 0) {
       throw new Error(`La cantidad a devolver de "${it.productName}" debe ser > 0.`);
     }
-    if (it.unitPrice < 0) {
-      throw new Error(`El precio unitario de "${it.productName}" no puede ser negativo.`);
-    }
+    // NOTA: permitimos unitPrice negativo porque representa líneas-descuento
+    // (cupones, descuento general, canje de puntos) reflejadas en la factura
+    // original. La rectificativa debe mirroring fielmente la original.
   }
 
   // IBAN: obligatorio SOLO para transferencia.

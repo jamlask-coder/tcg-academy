@@ -22,6 +22,7 @@
 import type { User, UserRole } from "@/types/user";
 import { MOCK_USERS, type AdminUser } from "@/data/mockData";
 import { validateSpanishNIF } from "@/lib/validations/nif";
+import { DataHub } from "@/lib/dataHub";
 
 const OVERRIDES_KEY = "tcgacademy_user_overrides";
 const CHANGELOG_KEY = "tcgacademy_user_changelog";
@@ -33,12 +34,7 @@ const NIFS_KEY = "tcgacademy_nifs";
 
 /** Dispara el evento canónico de la entidad `users` para refrescar consumidores. */
 function emitUsersUpdated(): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.dispatchEvent(new Event("tcga:users:updated"));
-  } catch {
-    /* non-fatal */
-  }
+  DataHub.emit("users");
 }
 
 function normalizeNif(nif: string): string {

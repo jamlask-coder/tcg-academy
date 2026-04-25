@@ -21,6 +21,8 @@ import {
   generateTaxCalendar,
   exportTaxCalendarCSV,
 } from "@/accounting/advancedAccounting";
+import { generateDraft, type FiscalDraft } from "@/services/fiscalDrafts";
+import { downloadDraftCsv, printDraftAsPdf } from "@/lib/fiscalExport";
 
 const SEV_STYLE = {
   info: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-800", dot: "bg-blue-400", label: "Próximo" },
@@ -28,6 +30,123 @@ const SEV_STYLE = {
   urgent: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-800", dot: "bg-orange-500", label: "Urgente" },
   overdue: { bg: "bg-red-50", border: "border-red-200", text: "text-red-800", dot: "bg-red-500", label: "Vencido" },
 };
+
+const MONTH_NAMES_ES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+const WEEKDAYS_ES = ["L", "M", "X", "J", "V", "S", "D"];
+
+function formatDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+interface MonthGridProps {
+  year: number;
+  month: number; // 0-11
+  todayKey: string;
+  obligationsByDate: Map<string, Array<{ modelo: string; description: string; deadline: string }>>;
+}
+
+function MonthGrid({ year, month, todayKey, obligationsByDate }: MonthGridProps) {
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  // getDay(): 0=Dom, 1=Lun ... convertimos a Lunes=0 ... Domingo=6
+  const startWeekday = (firstDay.getDay() + 6) % 7;
+
+  const cells: Array<{ day: number; key: string } | null> = [];
+  for (let i = 0; i < startWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dt = new Date(year, month, d);
+    cells.push({ day: d, key: formatDateKey(dt) });
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-4">
+      <h3 className="mb-3 text-center text-sm font-bold text-gray-800">
+        {MONTH_NAMES_ES[month]} {year}
+      </h3>
+      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold text-gray-400 uppercase">
+        {WEEKDAYS_ES.map((w) => (
+          <div key={w} className="py-1">{w}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((cell, idx) => {
+          if (!cell) return <div key={idx} className="aspect-square" />;
+          const isToday = cell.key === todayKey;
+          const obs = obligationsByDate.get(cell.key) ?? [];
+          const hasObs = obs.length > 0;
+          const tooltip = hasObs
+            ? obs.map((o) => `${o.modelo} — ${o.description}`).join("\n")
+            : undefined;
+
+          let cellCls =
+            "relative aspect-square flex flex-col items-center justify-center rounded-lg text-xs font-medium transition";
+          if (isToday) {
+            cellCls += " bg-[#2563eb] text-white font-bold ring-2 ring-[#2563eb] ring-offset-1";
+          } else if (hasObs) {
+            cellCls += " bg-amber-50 text-amber-900 border border-amber-300 cursor-help hover:bg-amber-100";
+          } else {
+            cellCls += " text-gray-600 hover:bg-gray-50";
+          }
+
+          return (
+            <div key={idx} className={cellCls} title={tooltip}>
+              <span>{cell.day}</span>
+              {hasObs && (
+                <div className="mt-0.5 flex gap-0.5">
+                  {obs.slice(0, 3).map((_, i) => (
+                    <span
+                      key={i}
+                      className={`h-1 w-1 rounded-full ${isToday ? "bg-white" : "bg-amber-500"}`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {/* Lista compacta de obligaciones del mes */}
+      {(() => {
+        const monthEvents = Array.from(obligationsByDate.entries())
+          .filter(([key]) => {
+            const [y, m] = key.split("-").map(Number);
+            return y === year && m - 1 === month;
+          })
+          .sort(([a], [b]) => a.localeCompare(b));
+        if (monthEvents.length === 0) {
+          return (
+            <p className="mt-3 border-t border-gray-100 pt-3 text-xs text-gray-400 text-center">
+              Sin obligaciones este mes
+            </p>
+          );
+        }
+        return (
+          <ul className="mt-3 space-y-1 border-t border-gray-100 pt-3 text-xs">
+            {monthEvents.flatMap(([key, items]) =>
+              items.map((ob, i) => (
+                <li key={`${key}-${i}`} className="flex items-start gap-2">
+                  <span className="mt-0.5 font-mono font-bold text-amber-600">
+                    {key.slice(8, 10)}
+                  </span>
+                  <span className="text-gray-600">
+                    <span className="font-bold text-[#2563eb]">{ob.modelo}</span> — {ob.description}
+                  </span>
+                </li>
+              )),
+            )}
+          </ul>
+        );
+      })()}
+    </div>
+  );
+}
 
 function downloadCSV(content: string, filename: string) {
   const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
@@ -68,6 +187,28 @@ export default function CalendarioFiscalPage() {
 
   const fullCalendar = generateTaxCalendar(year);
 
+  // Para el grid visual: agrupamos obligaciones (del año actual + siguiente)
+  // por fecha exacta YYYY-MM-DD, para los próximos 3 meses.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayKey = formatDateKey(today);
+
+  const calendarThisYear = generateTaxCalendar(today.getFullYear());
+  const calendarNextYear = generateTaxCalendar(today.getFullYear() + 1);
+  const allObligations = [...calendarThisYear, ...calendarNextYear];
+
+  const obligationsByDate = new Map<string, typeof allObligations>();
+  for (const ob of allObligations) {
+    const list = obligationsByDate.get(ob.deadline) ?? [];
+    list.push(ob);
+    obligationsByDate.set(ob.deadline, list);
+  }
+
+  const months = [0, 1, 2].map((offset) => {
+    const d = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+
   return (
     <div>
       {/* Header */}
@@ -97,6 +238,36 @@ export default function CalendarioFiscalPage() {
           >
             <Download size={14} /> CSV
           </button>
+        </div>
+      </div>
+
+      {/* Vista de 3 meses (mes actual + 2 siguientes) */}
+      <div className="mb-6">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+            Próximos 3 meses
+          </h2>
+          <div className="flex items-center gap-3 text-xs text-gray-500">
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-[#2563eb]" />
+              Hoy
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full border border-amber-300 bg-amber-50" />
+              Con obligación
+            </span>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {months.map((m) => (
+            <MonthGrid
+              key={`${m.year}-${m.month}`}
+              year={m.year}
+              month={m.month}
+              todayKey={todayKey}
+              obligationsByDate={obligationsByDate}
+            />
+          ))}
         </div>
       </div>
 
@@ -235,6 +406,10 @@ export default function CalendarioFiscalPage() {
                       <p className="text-xs text-blue-600">{notif.preparedData}</p>
                     </div>
 
+                    {/* Borrador auto-generado */}
+                    <DraftPreview modelo={notif.modelo} period={notif.period} />
+
+
                     {/* Where to present */}
                     <div className="flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
                       <FileText size={16} className="mt-0.5 flex-shrink-0 text-gray-400" />
@@ -308,6 +483,159 @@ export default function CalendarioFiscalPage() {
   );
 }
 
+// ─── Borrador auto-generado del modelo ─────────────────────────────────────
+
+function DraftPreview({ modelo, period }: { modelo: string; period: string }) {
+  const [draft, setDraft] = useState<FiscalDraft | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    try {
+      setDraft(generateDraft(modelo, period));
+    } catch {
+      setDraft(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [modelo, period]);
+
+  if (loading) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-400">
+        Generando borrador...
+      </div>
+    );
+  }
+
+  if (!draft) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-400">
+        No hay borrador disponible para este modelo / período.
+      </div>
+    );
+  }
+
+  const statusBadge =
+    draft.status === "ok"
+      ? { label: "Borrador listo", cls: "bg-green-100 text-green-700" }
+      : draft.status === "incomplete"
+        ? { label: "Faltan datos", cls: "bg-amber-100 text-amber-700" }
+        : { label: "No procede", cls: "bg-gray-100 text-gray-600" };
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-bold text-gray-700">Borrador generado</p>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusBadge.cls}`}>
+            {statusBadge.label}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          {draft.resultado !== 0 && (
+            <span className="text-xs font-bold text-gray-700">
+              {draft.resultado >= 0 ? "A ingresar:" : "A devolver:"}{" "}
+              <span className="text-[#2563eb]">
+                {Math.abs(draft.resultado).toLocaleString("es-ES", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}€
+              </span>
+            </span>
+          )}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => downloadDraftCsv(draft)}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-[10px] font-semibold text-gray-700 hover:bg-gray-50"
+              aria-label="Descargar borrador en CSV"
+              title="Descargar CSV"
+            >
+              <Download className="h-3 w-3" />
+              CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => printDraftAsPdf(draft)}
+              className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-[10px] font-semibold text-gray-700 hover:bg-gray-50"
+              aria-label="Imprimir o guardar borrador como PDF"
+              title="Imprimir / Guardar PDF"
+            >
+              <FileText className="h-3 w-3" />
+              PDF
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3 px-3 py-3">
+        <p className="text-xs italic text-gray-500">{draft.summary}</p>
+
+        {draft.skipReason && (
+          <p className="rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-500">
+            {draft.skipReason}
+          </p>
+        )}
+
+        {draft.sections.map((section, si) => (
+          <div key={si} className="rounded-md border border-gray-100">
+            <p className="border-b border-gray-100 bg-gray-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+              {section.title}
+            </p>
+            <table className="w-full text-xs">
+              <tbody>
+                {section.fields.map((f, fi) => (
+                  <tr key={fi} className="border-b border-gray-50 last:border-0">
+                    <td className="px-3 py-1.5">
+                      {f.box && (
+                        <span className="mr-2 inline-block rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-500">
+                          {f.box}
+                        </span>
+                      )}
+                      <span className="text-gray-700">{f.label}</span>
+                      {f.hint && (
+                        <p className="mt-0.5 text-[10px] text-gray-400">{f.hint}</p>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-1.5 text-right font-mono font-semibold text-gray-800">
+                      {typeof f.value === "number"
+                        ? f.value.toLocaleString("es-ES", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })
+                        : f.value}
+                      {typeof f.value === "number" && f.label.toLowerCase().includes("%") ? "" : ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+
+        {draft.warnings.length > 0 && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-amber-700">Avisos</p>
+            <ul className="list-disc space-y-0.5 pl-4 text-xs text-amber-700">
+              {draft.warnings.map((w, i) => <li key={i}>{w}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {draft.missing.length > 0 && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-red-700">Datos pendientes</p>
+            <ul className="list-disc space-y-0.5 pl-4 text-xs text-red-700">
+              {draft.missing.map((m, i) => <li key={i}>{m}</li>)}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Info map for "where to present" (subset of fiscal notifications data)
 const MODELO_INFO_MAP: Record<string, { where: string }> = {
   "303": { where: "Sede electrónica AEAT → IVA → Modelo 303" },
@@ -316,6 +644,15 @@ const MODELO_INFO_MAP: Record<string, { where: string }> = {
   "347": { where: "Sede electrónica AEAT → Declaraciones informativas → Modelo 347" },
   "111": { where: "Sede electrónica AEAT → IRPF → Modelo 111" },
   "190": { where: "Sede electrónica AEAT → IRPF → Modelo 190" },
+  "115": { where: "Sede electrónica AEAT → IRPF → Modelo 115 (alquileres)" },
+  "180": { where: "Sede electrónica AEAT → IRPF → Modelo 180 (resumen alquileres)" },
+  "123": { where: "Sede electrónica AEAT → IRPF → Modelo 123 (capital mobiliario)" },
+  "193": { where: "Sede electrónica AEAT → IRPF → Modelo 193 (resumen capital mobiliario)" },
   "200": { where: "Sede electrónica AEAT → Sociedades → Modelo 200" },
+  "202": { where: "Sede electrónica AEAT → Sociedades → Modelo 202 (pago fraccionado IS)" },
+  "232": { where: "Sede electrónica AEAT → Sociedades → Modelo 232 (operaciones vinculadas)" },
+  "369": { where: "Sede electrónica AEAT → IVA → OSS Ventanilla Única → Modelo 369" },
+  "720": { where: "Sede electrónica AEAT → Declaraciones informativas → Modelo 720" },
+  "INTRASTAT": { where: "Aduanas (Mº Industria) — aduanas.serviciosmin.gob.es/intrastat" },
   "CCAA": { where: "Registro Mercantil (registradores.org)" },
 };

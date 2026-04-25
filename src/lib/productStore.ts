@@ -1,5 +1,6 @@
 import type { LocalProduct } from "@/data/products";
 import { PRODUCTS } from "@/data/products";
+import { DataHub } from "@/lib/dataHub";
 
 const LS_NEW = "tcgacademy_new_products";
 const LS_OVERRIDES = "tcgacademy_product_overrides";
@@ -88,6 +89,25 @@ export function getMergedBySlug(slug: string): LocalProduct | undefined {
 
 export function isLocalProduct(id: number): boolean {
   return id > 1_700_000_000_000; // Date.now() IDs are > 1.7 trillion
+}
+
+/**
+ * Soft-delete canónico de un producto (cualquier origen: estático o admin).
+ * Marca el id como borrado y emite el evento DataHub correspondiente para
+ * que el catálogo, carrito y wishlists se actualicen.
+ */
+export function softDeleteProduct(id: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    const deleted = safeGet<number[]>(LS_DELETED, []);
+    if (!deleted.includes(id)) {
+      deleted.push(id);
+      localStorage.setItem(LS_DELETED, JSON.stringify(deleted));
+      DataHub.emit("products");
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 /**

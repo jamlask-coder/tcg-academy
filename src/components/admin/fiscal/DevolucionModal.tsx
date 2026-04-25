@@ -16,8 +16,10 @@
  * componente solo recoge inputs, valida mínimos y llama.
  */
 import { useMemo, useState } from "react";
-import { X, AlertTriangle, CheckCircle2 } from "lucide-react";
-import type { InvoiceRecord } from "@/types/fiscal";
+import { X, AlertTriangle, CheckCircle2, ShieldCheck } from "lucide-react";
+import type { InvoiceRecord, CompanyData, CustomerData } from "@/types/fiscal";
+import { InvoiceType } from "@/types/fiscal";
+import { validateSpanishNIF } from "@/lib/validations/nif";
 import {
   createAdminInitiatedReturn,
   REFUND_METHOD_LABEL,
@@ -60,23 +62,31 @@ const METHOD_OPTIONS: RefundMethod[] = [
 ];
 
 export default function DevolucionModal({ invoice, onClose, onSuccess }: Props) {
-  // Semilla: todas las líneas del libro — exclusivo items reales (ya vienen
-  // filtradas por invoiceService al buildear líneas).
+  // Alcance: "completa" (default — devuelve toda la factura sin tocar nada)
+  // o "parcial" (admin elige líneas y cantidades).
+  const [scope, setScope] = useState<"completa" | "parcial">("completa");
+
+  // Líneas editables: SOLO productos reales (precio positivo). Las líneas
+  // negativas (cupón / descuento general / canje de puntos) viven en
+  // `invoice.items` pero no son seleccionables por el admin — se incluyen
+  // íntegras en modo "completa" para reflejar fielmente la factura original.
   const [lines, setLines] = useState<LineDraft[]>(() =>
-    invoice.items.map((l) => {
-      const pid = Number.parseInt(l.productId, 10);
-      const unitPriceWithVAT =
-        l.quantity > 0 ? l.totalLine / l.quantity : l.unitPrice;
-      return {
-        selected: true,
-        returnQty: l.quantity,
-        maxQty: l.quantity,
-        productId: Number.isFinite(pid) ? pid : 0,
-        productName: l.description,
-        unitPrice: Math.round(unitPriceWithVAT * 100) / 100,
-        unitPriceBase: l.unitPrice,
-      };
-    }),
+    invoice.items
+      .filter((l) => l.unitPrice >= 0 && l.totalLine >= 0)
+      .map((l) => {
+        const pid = Number.parseInt(l.productId, 10);
+        const unitPriceWithVAT =
+          l.quantity > 0 ? l.totalLine / l.quantity : l.unitPrice;
+        return {
+          selected: true,
+          returnQty: l.quantity,
+          maxQty: l.quantity,
+          productId: Number.isFinite(pid) ? pid : 0,
+          productName: l.description,
+          unitPrice: Math.round(unitPriceWithVAT * 100) / 100,
+          unitPriceBase: l.unitPrice,
+        };
+      }),
   );
   const [reason, setReason] = useState<ReturnReason>("defectuoso");
   const [reasonDetail, setReasonDetail] = useState("");
@@ -90,15 +100,19 @@ export default function DevolucionModal({ invoice, onClose, onSuccess }: Props) 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const totalRefund = useMemo(
-    () =>
-      lines
-        .filter((l) => l.selected && l.returnQty > 0)
-        .reduce((sum, l) => sum + l.unitPrice * l.returnQty, 0),
-    [lines],
-  );
+  const totalRefund = useMemo(() => {
+    if (scope === "completa") {
+      // Modo completa: reembolsamos exactamente lo que el cliente pagó.
+      return invoice.totals.totalInvoice;
+    }
+    return lines
+      .filter((l) => l.selected && l.returnQty > 0)
+      .reduce((sum, l) => sum + l.unitPrice * l.returnQty, 0);
+  }, [scope, lines, invoice.totals.totalInvoice]);
 
-  const hasSelection = lines.some((l) => l.selected && l.returnQty > 0);
+  const hasSelection =
+    scope === "completa" ||
+    lines.some((l) => l.selected && l.returnQty > 0);
   const canSubmit =
     hasSelection &&
     confirmIrreversible &&
@@ -127,16 +141,68 @@ export default function DevolucionModal({ invoice, onClose, onSuccess }: Props) 
     setError(null);
     if (!canSubmit) return;
 
-    const items: ReturnItem[] = lines
-      .filter((l) => l.selected && l.returnQty > 0)
-      .map((l) => ({
-        productId: l.productId,
-        productName: l.productName,
-        quantity: l.returnQty,
-        unitPrice: l.unitPrice, // con IVA — criterio del ReturnItem existente
-        reason,
-        reasonDetail: reasonDetail.trim() || undefined,
-      }));
+    // Validación legal previa (Art. 6.1 RD 1619/2012) — la rectificativa hereda
+    // el receptor de la original. Si los datos no son completos, el documento
+    // no es válido. Solo bloqueamos cuando el original es FACTURA COMPLETA;
+    // las simplificadas tienen requisitos relajados.
+    if (invoice.invoiceType === InvoiceType.COMPLETA) {
+      const r = invoice.recipient as Partial<CompanyData & CustomerData>;
+      const missing: string[] = [];
+      if (!r.name?.trim()) missing.push("Nombre / Razón social");
+      if (!r.taxId?.toString().trim()) missing.push("NIF / NIE / CIF");
+      const addr = (r as Partial<CompanyData>).address;
+      if (!addr?.street?.trim()) missing.push("Dirección");
+      if (!addr?.city?.trim()) missing.push("Ciudad");
+      if (!addr?.postalCode?.trim()) missing.push("Código postal");
+      if (!addr?.province?.trim()) missing.push("Provincia");
+      if (missing.length > 0) {
+        setError(
+          `La factura original no tiene los datos legalmente exigidos para emitir la rectificativa (Art. 6.1 RD 1619/2012): ${missing.join(", ")}. Edita el receptor de la factura original antes de devolver.`,
+        );
+        return;
+      }
+      const countryCode =
+        addr?.countryCode ?? (r as Partial<CompanyData>).countryCode ?? "ES";
+      if (countryCode === "ES" && r.taxId) {
+        const v = validateSpanishNIF(String(r.taxId).trim());
+        if (!v.valid) {
+          setError(
+            `NIF/NIE/CIF del receptor no válido: ${v.error ?? "formato incorrecto"}.`,
+          );
+          return;
+        }
+      }
+    }
+
+    // Modo "completa": incluimos TODAS las líneas de la factura (también las
+    // negativas: cupón/descuento general/puntos) para que la rectificativa
+    // sea espejo exacto de la original.
+    // Modo "parcial": solo las líneas-producto seleccionadas.
+    const items: ReturnItem[] =
+      scope === "completa"
+        ? invoice.items.map((l) => {
+            const pid = Number.parseInt(l.productId, 10);
+            const unitPriceWithVAT =
+              l.quantity > 0 ? l.totalLine / l.quantity : l.unitPrice;
+            return {
+              productId: Number.isFinite(pid) ? pid : 0,
+              productName: l.description,
+              quantity: l.quantity,
+              unitPrice: Math.round(unitPriceWithVAT * 100) / 100,
+              reason,
+              reasonDetail: reasonDetail.trim() || undefined,
+            };
+          })
+        : lines
+            .filter((l) => l.selected && l.returnQty > 0)
+            .map((l) => ({
+              productId: l.productId,
+              productName: l.productName,
+              quantity: l.returnQty,
+              unitPrice: l.unitPrice, // con IVA — criterio del ReturnItem existente
+              reason,
+              reasonDetail: reasonDetail.trim() || undefined,
+            }));
 
     // Datos del receptor resueltos desde la factura. Para particulares
     // (CustomerData) no hay userId — usamos email como fallback de customerId.
@@ -236,7 +302,68 @@ export default function DevolucionModal({ invoice, onClose, onSuccess }: Props) 
 
         {/* BODY */}
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-gray-50 p-6">
-          {/* Alcance */}
+          {/* Datos legales fijos de la rectificativa que se va a emitir.
+              Política fiscal: AEAT R4 (devolución de mercancía) + tipo
+              "por diferencias" (la original sigue vigente; la rectificativa
+              anota la diferencia con cantidades negativas en el Modelo 303). */}
+          <section className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-xs text-blue-900">
+            <ShieldCheck size={16} className="mt-0.5 shrink-0 text-blue-700" />
+            <div className="space-y-1">
+              <p className="font-semibold">
+                Rectificativa por devolución — datos fiscales
+              </p>
+              <p>
+                <strong>Código AEAT:</strong> R4 (devolución de mercancía) ·{" "}
+                <strong>Tipo:</strong> por diferencias · <strong>Original:</strong>{" "}
+                <span className="font-mono">{invoice.invoiceNumber}</span> (
+                {new Date(invoice.invoiceDate).toLocaleDateString("es-ES")})
+              </p>
+              <p className="text-blue-800/80">
+                Se emite cumpliendo el Art. 6 RD 1619/2012 — la original NO se
+                anula y permanece vigente; la rectificativa entra en la cadena
+                VeriFactu y se refleja en el Modelo 303 del trimestre.
+              </p>
+            </div>
+          </section>
+
+          {/* Selector de alcance — devolución completa (toda la factura) o
+              parcial (admin elige líneas y cantidades). */}
+          <section className="rounded-xl border border-gray-200 bg-white p-4">
+            <h4 className="mb-3 text-sm font-semibold text-gray-900">Alcance</h4>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setScope("completa")}
+                className={`rounded-lg border px-4 py-3 text-left text-sm transition ${
+                  scope === "completa"
+                    ? "border-blue-600 bg-blue-50 text-blue-900"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                <div className="font-semibold">Devolución completa</div>
+                <div className="text-xs text-gray-500">
+                  Reembolsa toda la factura ({invoice.totals.totalInvoice.toFixed(2)} €).
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setScope("parcial")}
+                className={`rounded-lg border px-4 py-3 text-left text-sm transition ${
+                  scope === "parcial"
+                    ? "border-blue-600 bg-blue-50 text-blue-900"
+                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                <div className="font-semibold">Devolución parcial</div>
+                <div className="text-xs text-gray-500">
+                  Elige líneas y cantidades a devolver.
+                </div>
+              </button>
+            </div>
+          </section>
+
+          {/* Productos: solo en modo parcial. */}
+          {scope === "parcial" && (
           <section className="rounded-xl border border-gray-200 bg-white p-4">
             <div className="mb-3 flex items-center justify-between">
               <h4 className="text-sm font-semibold text-gray-900">
@@ -282,33 +409,57 @@ export default function DevolucionModal({ invoice, onClose, onSuccess }: Props) 
                       {l.productName}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {l.unitPrice.toFixed(2)} € · facturado {l.maxQty} ud.
+                      facturado {l.maxQty} ud. a {l.unitPriceBase ? (l.unitPrice).toFixed(2) : "—"} €
                     </div>
                   </div>
-                  <input
-                    type="number"
-                    min={0}
-                    max={l.maxQty}
-                    step={1}
-                    value={l.returnQty}
-                    onChange={(e) => {
-                      const raw = Number.parseInt(e.target.value, 10);
-                      const clamped = Number.isFinite(raw)
-                        ? Math.max(0, Math.min(l.maxQty, raw))
-                        : 0;
-                      updateLine(idx, {
-                        returnQty: clamped,
-                        selected: clamped > 0,
-                      });
-                    }}
-                    disabled={!l.selected}
-                    className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm font-semibold text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
-                    aria-label={`Cantidad a devolver de ${l.productName}`}
-                  />
+                  {/* Precio unitario editable (con IVA) — admite ajuste si la
+                      rectificativa debe reflejar un importe distinto al original
+                      (p.ej. devolución parcial de valor de la línea). */}
+                  <label className="flex flex-col items-end text-[10px] text-gray-500">
+                    <span>€/ud (IVA incl.)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={l.unitPrice}
+                      onChange={(e) => {
+                        const raw = Number.parseFloat(e.target.value);
+                        const next = Number.isFinite(raw) && raw >= 0 ? raw : 0;
+                        updateLine(idx, { unitPrice: Math.round(next * 100) / 100 });
+                      }}
+                      disabled={!l.selected}
+                      className="w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm font-semibold text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
+                      aria-label={`Precio unitario para ${l.productName}`}
+                    />
+                  </label>
+                  <label className="flex flex-col items-end text-[10px] text-gray-500">
+                    <span>Cantidad</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={l.maxQty}
+                      step={1}
+                      value={l.returnQty}
+                      onChange={(e) => {
+                        const raw = Number.parseInt(e.target.value, 10);
+                        const clamped = Number.isFinite(raw)
+                          ? Math.max(0, Math.min(l.maxQty, raw))
+                          : 0;
+                        updateLine(idx, {
+                          returnQty: clamped,
+                          selected: clamped > 0,
+                        });
+                      }}
+                      disabled={!l.selected}
+                      className="w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-right text-sm font-semibold text-gray-900 disabled:bg-gray-100 disabled:text-gray-400"
+                      aria-label={`Cantidad a devolver de ${l.productName}`}
+                    />
+                  </label>
                 </div>
               ))}
             </div>
           </section>
+          )}
 
           {/* Motivo */}
           <section className="rounded-xl border border-gray-200 bg-white p-4">

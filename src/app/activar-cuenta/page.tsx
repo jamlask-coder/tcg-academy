@@ -21,6 +21,7 @@ import {
   type ActivationTokenRecord,
 } from "@/services/userAdminService";
 import { loadFullUser } from "@/services/userAdminService";
+import { DataHub } from "@/lib/dataHub";
 
 const USERNAMES_KEY = "tcgacademy_usernames";
 
@@ -131,11 +132,7 @@ function ActivationForm() {
         phone: needsPhone ? phone.trim() : undefined,
       });
       indexUsername(trimmedUser, updated.email);
-      try {
-        window.dispatchEvent(new Event("tcga:users:updated"));
-      } catch {
-        /* non-fatal */
-      }
+      DataHub.emit("users");
       setSuccess(true);
       setTimeout(() => {
         router.push("/login?activated=ok");

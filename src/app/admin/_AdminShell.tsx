@@ -31,7 +31,6 @@ import {
   Gift,
   Bell,
   Send,
-  Undo2,
   FilePlus,
   FileText,
   BookOpen,
@@ -41,9 +40,9 @@ import {
   BookMarked,
 } from "lucide-react";
 
-const SOLICITUDES_KEY = "tcgacademy_solicitudes";
 import { countPendingOrdersToShip } from "@/lib/orderAdapter";
 import { countNewIncidents } from "@/services/incidentService";
+import { countNuevasSolicitudes } from "@/services/solicitudService";
 import { DataHub } from "@/lib/dataHub";
 import { AdminFiscalGuard } from "@/components/AdminFiscalGuard";
 import { runAutoBackupIfDue } from "@/lib/backupScheduler";
@@ -59,11 +58,26 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/admin", label: "Resumen", icon: LayoutDashboard, exact: true },
-  { href: "/admin/pedidos", label: "Pedidos", icon: Package },
-  { href: "/admin/devoluciones", label: "Devoluciones", icon: Undo2 },
-  { href: "/admin/stock", label: "Stock", icon: Boxes },
+  {
+    href: "/admin/pedidos",
+    label: "Pedidos",
+    icon: Package,
+    sub: [
+      { href: "/admin/pedidos", label: "Gestión de pedidos", icon: Package, exact: true },
+      { href: "/admin/pedidos/nuevo-albaran", label: "Emitir albarán", icon: Truck },
+      { href: "/admin/pedidos/albaranes", label: "Libro de albaranes", icon: FileText },
+    ],
+  },
   { href: "/admin/precios", label: "Precios", icon: Euro },
-  { href: "/admin/productos/nuevo", label: "Añadir producto", icon: PackagePlus },
+  {
+    href: "/admin/productos/nuevo",
+    label: "Productos",
+    icon: PackagePlus,
+    sub: [
+      { href: "/admin/productos/nuevo", label: "Añadir producto", icon: PackagePlus },
+      { href: "/admin/stock", label: "Control de Stock", icon: Boxes },
+    ],
+  },
   {
     href: "/admin/usuarios",
     label: "Usuarios",
@@ -80,9 +94,7 @@ const NAV_ITEMS: NavItem[] = [
     sub: [
       { href: "/admin/fiscal", label: "Panel fiscal", icon: LayoutDashboard, exact: true },
       { href: "/admin/fiscal/nueva-factura", label: "Emitir factura", icon: FilePlus },
-      { href: "/admin/fiscal/nuevo-albaran", label: "Emitir albarán", icon: Truck },
       { href: "/admin/fiscal/facturas", label: "Libro de facturas", icon: BookOpen },
-      { href: "/admin/fiscal/albaranes", label: "Libro de albaranes", icon: FileText },
       { href: "/admin/fiscal/trimestral", label: "Modelo 303 (IVA)", icon: BarChart2 },
       { href: "/admin/fiscal/anual", label: "Modelo 390 (anual)", icon: BarChart2 },
       { href: "/admin/fiscal/intracomunitario", label: "Modelo 349 (UE)", icon: BarChart2 },
@@ -144,11 +156,7 @@ function useSidebarBadges() {
     const calc = () => {
       try {
         setNewOrders(countPendingOrdersToShip());
-        const sols = JSON.parse(localStorage.getItem(SOLICITUDES_KEY) ?? "[]");
-        setNewSolicitudes(
-          (sols as { estado: string }[]).filter((s) => s.estado === "nueva")
-            .length,
-        );
+        setNewSolicitudes(countNuevasSolicitudes());
         setNewIncidents(countNewIncidents());
       } catch {}
     };
@@ -156,13 +164,12 @@ function useSidebarBadges() {
     // Reacción event-driven via DataHub (canónico). Fallback poll cada 15s por seguridad.
     const offOrders = DataHub.on("orders", calc);
     const offIncidents = DataHub.on("incidents", calc);
-    const onStorage = (e: StorageEvent) => { if (e.key === SOLICITUDES_KEY) calc(); };
-    window.addEventListener("storage", onStorage);
+    const offSolicitudes = DataHub.on("solicitudes", calc);
     const id = setInterval(calc, 15000);
     return () => {
       offOrders?.();
       offIncidents?.();
-      window.removeEventListener("storage", onStorage);
+      offSolicitudes?.();
       clearInterval(id);
     };
   }, []);

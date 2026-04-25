@@ -42,20 +42,16 @@ function toCatalogId(productId: string): number | null {
  */
 export function deductStockForInvoiceItems(items: InvoiceLineItem[]): void {
   if (typeof window === "undefined") return;
-  let touched = false;
   for (const item of items) {
     const catalogId = toCatalogId(item.productId);
     if (catalogId === null) continue;
     const product = getMergedById(catalogId);
     if (!product || typeof product.stock !== "number") continue;
     const newStock = Math.max(0, product.stock - item.quantity);
+    // persistProductPatch emite DataHub("products") por iteración.
     persistProductPatch(catalogId, {
       stock: newStock,
       inStock: newStock > 0,
     });
-    touched = true;
-  }
-  if (touched) {
-    window.dispatchEvent(new Event("tcga:products:updated"));
   }
 }

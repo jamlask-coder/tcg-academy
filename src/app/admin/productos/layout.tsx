@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PackagePlus, Sparkles } from "lucide-react";
+import { PackagePlus, Sparkles, Boxes } from "lucide-react";
 
 const TABS = [
   {
@@ -26,6 +26,13 @@ const TABS = [
     match: "/admin/productos/nuevo-ia",
     exact: true,
   },
+  {
+    href: "/admin/productos/importar",
+    label: "Importar CSV",
+    icon: Boxes,
+    match: "/admin/productos/importar",
+    exact: true,
+  },
 ] as const;
 
 export default function ProductosLayout({
@@ -36,7 +43,8 @@ export default function ProductosLayout({
   const pathname = usePathname();
   const showTabs =
     pathname === "/admin/productos/nuevo" ||
-    pathname === "/admin/productos/nuevo-ia";
+    pathname === "/admin/productos/nuevo-ia" ||
+    pathname === "/admin/productos/importar";
 
   return (
     <div>

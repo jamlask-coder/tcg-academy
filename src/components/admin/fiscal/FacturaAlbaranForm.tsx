@@ -197,7 +197,7 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
     docNoun: isAlbaran ? "albarán" : "factura",
     docNounCap: isAlbaran ? "Albarán" : "Factura",
     pageTitle: isAlbaran ? "Nuevo albarán" : "Nueva factura manual",
-    backHref: isAlbaran ? "/admin/fiscal/albaranes" : "/admin/fiscal/facturas",
+    backHref: isAlbaran ? "/admin/pedidos/albaranes" : "/admin/fiscal/facturas",
     backLabel: isAlbaran ? "Albaranes" : "Facturas",
     sectionData: isAlbaran ? "Datos del albarán" : "Datos de la factura",
     previewButton: isAlbaran ? "Previsualizar albarán" : "Previsualizar factura",
@@ -903,7 +903,7 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
         // factura vía convertToInvoice(), NO se vuelve a restar.
         deductStockForInvoiceItems(builtItems);
         setSaved(true);
-        setTimeout(() => router.push("/admin/fiscal/albaranes"), 1500);
+        setTimeout(() => router.push("/admin/pedidos/albaranes"), 1500);
         return;
       }
 
@@ -1839,7 +1839,7 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
           {/* TOTAL: barra destacada. El padding derecho px-4 del bloque más
               pr-5 extra iguala los ~36px del offset de la columna papelera. */}
           <div className="mt-4 flex items-center justify-end gap-6 rounded-xl bg-blue-50 py-3 pl-4 pr-9 text-lg font-bold text-gray-900">
-            <span>TOTAL</span>
+            <span>TOTAL CON IVA</span>
             <span className="tabular-nums">
               {totals.finalTotal.toFixed(2)} €
             </span>
@@ -1851,7 +1851,6 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
             <span>
               IVA: <span className="tabular-nums">{totals.vat.toFixed(2)} €</span>
             </span>
-            <span className="text-gray-400">IVA incluido</span>
           </div>
         </div>
 

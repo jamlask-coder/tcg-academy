@@ -20,6 +20,7 @@
 // Ver: feedback_catalog_detail_consistency.md GOTCHA 5.
 
 import type { LocalProduct } from "@/data/products";
+import { DataHub } from "@/lib/dataHub";
 
 const OVERRIDES_KEY = "tcgacademy_product_overrides";
 const NEW_PRODUCTS_KEY = "tcgacademy_new_products";
@@ -58,4 +59,25 @@ export function persistProductPatch(
     overrides[key] = { ...(overrides[key] ?? {}), ...patch };
     localStorage.setItem(OVERRIDES_KEY, JSON.stringify(overrides));
   }
+
+  DataHub.emit("products");
+}
+
+/**
+ * Añade un producto admin-creado nuevo al store y emite el evento canónico.
+ * El llamador es responsable de generar el `id` único (ver `generateLocalProductId`).
+ */
+export function persistNewProduct(product: LocalProduct): void {
+  if (typeof window === "undefined") return;
+  let adminCreated: LocalProduct[] = [];
+  try {
+    adminCreated = JSON.parse(
+      localStorage.getItem(NEW_PRODUCTS_KEY) ?? "[]",
+    ) as LocalProduct[];
+  } catch {
+    adminCreated = [];
+  }
+  adminCreated.push(product);
+  localStorage.setItem(NEW_PRODUCTS_KEY, JSON.stringify(adminCreated));
+  DataHub.emit("products");
 }

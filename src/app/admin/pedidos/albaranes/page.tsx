@@ -236,7 +236,7 @@ export default function LibroAlbaranesPage() {
           </h1>
         </div>
         <Link
-          href="/admin/fiscal/nuevo-albaran"
+          href="/admin/pedidos/nuevo-albaran"
           className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"
         >
           <Plus size={15} /> Emitir albarán
@@ -339,7 +339,7 @@ export default function LibroAlbaranesPage() {
                   </p>
                   {notes.length === 0 && (
                     <Link
-                      href="/admin/fiscal/nuevo-albaran"
+                      href="/admin/pedidos/nuevo-albaran"
                       className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800"
                     >
                       <Plus size={13} /> Crear el primer albarán

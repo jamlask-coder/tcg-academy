@@ -41,6 +41,7 @@ import { tripleCheckInvoice, checkMissingNIFs } from "@/lib/fiscalAudit";
 import { getDeadLetterQueue, resolveDeadLetter } from "@/lib/circuitBreaker";
 import { safeRead, safeWrite } from "@/lib/safeStorage";
 import { getPaymentStatusMap } from "@/lib/orderAdapter";
+import { DataHub } from "@/lib/dataHub";
 import { InvoiceStatus, VerifactuStatus, PaymentMethod } from "@/types/fiscal";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -312,6 +313,7 @@ export async function runFiscalAutopilot(): Promise<AutopilotReport> {
         if (orderIdx !== -1) {
           updatedOrders[orderIdx].invoiceId = invoice.invoiceId;
           safeWrite("tcgacademy_orders", updatedOrders);
+          DataHub.emit("orders");
         }
 
         // VERIFICAR: triple conteo de la factura generada

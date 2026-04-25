@@ -27,6 +27,8 @@
  *   - En producción, mover toda la lógica al backend.
  */
 
+import { DataHub } from "@/lib/dataHub";
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 // ⚠️ CAMBIO ADMIN-ONLY con aviso fuerte — afecta al balance económico global.
@@ -82,9 +84,7 @@ function saveMap(key: string, data: Record<string, unknown>): boolean {
       key === ATTR_KEY ||
       key === ASSOC_KEY
     ) {
-      try {
-        window.dispatchEvent(new Event("tcga:points:updated"));
-      } catch { /* non-fatal */ }
+      DataHub.emit("points");
     }
     return true;
   } catch (err) {

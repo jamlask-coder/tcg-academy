@@ -387,7 +387,7 @@ export default function PreciosPage() {
           comparePrice: row.comparePrice,
         });
       }
-      window.dispatchEvent(new Event("tcga:products:updated"));
+      // persistProductPatch ya emite DataHub("products") por iteración.
     } catch {
       // non-fatal: el admin puede reintentar
     }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { Send, CheckCircle } from "lucide-react";
+import { addComplaint, type ComplaintTipo } from "@/services/complaintService";
 
 export default function ReclamacionesPage() {
   const [form, setForm] = useState({
@@ -20,18 +21,15 @@ export default function ReclamacionesPage() {
     e.preventDefault();
     setLoading(true);
 
-    // Log the complaint
+    // Log the complaint via canonical service (emits tcga:complaints:updated)
     try {
-      const complaints = JSON.parse(
-        localStorage.getItem("tcgacademy_complaints") ?? "[]",
-      ) as Array<Record<string, unknown>>;
-      complaints.unshift({
-        id: `REC-${Date.now()}`,
-        ...form,
-        status: "recibida",
-        createdAt: new Date().toISOString(),
+      addComplaint({
+        nombre: form.nombre,
+        email: form.email,
+        pedido: form.pedido,
+        tipo: form.tipo as ComplaintTipo,
+        descripcion: form.descripcion,
       });
-      localStorage.setItem("tcgacademy_complaints", JSON.stringify(complaints));
     } catch { /* ignore */ }
 
     setLoading(false);

@@ -28,4 +28,13 @@ export const SITE_CONFIG = {
   // Sesión
   sessionExpiryHours: 24, // duración por defecto de la sesión
   rememberMeDays: 30, // duración con "Recordarme"
+
+  // Registro Mercantil — rellenar cuando la SL termine de inscribirse.
+  // Mientras esté vacío, el aviso legal muestra "En trámite de inscripción".
+  registroMercantil: {
+    provincia: "Alicante",
+    tomo: "",
+    folio: "",
+    hoja: "",
+  },
 };

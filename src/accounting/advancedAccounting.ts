@@ -263,8 +263,52 @@ export function generateTaxCalendar(year: number): TaxObligation[] {
   addObligation("111", "Retenciones IRPF T3", `${year}-10-20`, `T3 ${year}`, "Art. 108 RIRPF");
   addObligation("111", "Retenciones IRPF T4", `${year + 1}-01-20`, `T4 ${year}`, "Art. 108 RIRPF");
 
-  // Modelo 190 — Resumen anual retenciones
-  addObligation("190", "Resumen anual retenciones", `${year + 1}-01-31`, `Anual ${year}`, "Art. 108 RIRPF");
+  // Modelo 190 — Resumen anual retenciones IRPF
+  addObligation("190", "Resumen anual retenciones IRPF", `${year + 1}-01-31`, `Anual ${year}`, "Art. 108 RIRPF");
+
+  // Modelo 115 — Retenciones por arrendamientos urbanos (alquiler local)
+  addObligation("115", "Retenciones alquileres T1", `${year}-04-20`, `T1 ${year}`, "Art. 100 LIRPF");
+  addObligation("115", "Retenciones alquileres T2", `${year}-07-20`, `T2 ${year}`, "Art. 100 LIRPF");
+  addObligation("115", "Retenciones alquileres T3", `${year}-10-20`, `T3 ${year}`, "Art. 100 LIRPF");
+  addObligation("115", "Retenciones alquileres T4", `${year + 1}-01-20`, `T4 ${year}`, "Art. 100 LIRPF");
+
+  // Modelo 180 — Resumen anual del 115
+  addObligation("180", "Resumen anual alquileres", `${year + 1}-01-31`, `Anual ${year}`, "Art. 100 LIRPF");
+
+  // Modelo 123 — Retenciones capital mobiliario (intereses, dividendos)
+  addObligation("123", "Retenciones capital mobiliario T1", `${year}-04-20`, `T1 ${year}`, "Art. 105 LIRPF");
+  addObligation("123", "Retenciones capital mobiliario T2", `${year}-07-20`, `T2 ${year}`, "Art. 105 LIRPF");
+  addObligation("123", "Retenciones capital mobiliario T3", `${year}-10-20`, `T3 ${year}`, "Art. 105 LIRPF");
+  addObligation("123", "Retenciones capital mobiliario T4", `${year + 1}-01-20`, `T4 ${year}`, "Art. 105 LIRPF");
+
+  // Modelo 193 — Resumen anual del 123
+  addObligation("193", "Resumen anual capital mobiliario", `${year + 1}-01-31`, `Anual ${year}`, "Art. 105 LIRPF");
+
+  // Modelo 202 — Pago fraccionado Impuesto Sociedades (3 plazos al año)
+  addObligation("202", "Pago fraccionado IS (1P)", `${year}-04-20`, `1P ${year}`, "Art. 40 LIS");
+  addObligation("202", "Pago fraccionado IS (2P)", `${year}-10-20`, `2P ${year}`, "Art. 40 LIS");
+  addObligation("202", "Pago fraccionado IS (3P)", `${year}-12-20`, `3P ${year}`, "Art. 40 LIS");
+
+  // Modelo 232 — Operaciones vinculadas y paraísos fiscales
+  addObligation("232", "Operaciones vinculadas", `${year + 1}-11-30`, `Anual ${year}`, "Art. 13.4 RIS");
+
+  // Modelo 369 — OSS Ventanilla Única (B2C UE)
+  addObligation("369", "OSS Ventanilla Única T1", `${year}-04-30`, `T1 ${year}`, "Reg. UE 2017/2455");
+  addObligation("369", "OSS Ventanilla Única T2", `${year}-07-31`, `T2 ${year}`, "Reg. UE 2017/2455");
+  addObligation("369", "OSS Ventanilla Única T3", `${year}-10-31`, `T3 ${year}`, "Reg. UE 2017/2455");
+  addObligation("369", "OSS Ventanilla Única T4", `${year + 1}-01-31`, `T4 ${year}`, "Reg. UE 2017/2455");
+
+  // Modelo 720 — Bienes en el extranjero (>50.000€)
+  addObligation("720", "Bienes en el extranjero", `${year + 1}-03-31`, `Anual ${year}`, "DA 18ª LGT");
+
+  // Intrastat — Estadística comercial intracomunitaria (mensual si supera umbral)
+  for (let m = 1; m <= 12; m++) {
+    const mm = String(m).padStart(2, "0");
+    // Plazo: día 12 del mes siguiente
+    const next = new Date(year, m, 12);
+    const dKey = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-12`;
+    addObligation("INTRASTAT", `Intrastat ${mm}/${year}`, dKey, `${mm}/${year}`, "Reg. UE 638/2004");
+  }
 
   // Cuentas anuales
   addObligation("CCAA", "Depósito cuentas anuales", `${year + 1}-07-30`, `Anual ${year}`, "Art. 279 LSC");

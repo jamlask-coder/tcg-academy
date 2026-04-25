@@ -7,8 +7,7 @@ import Link from "next/link";
 import { Store, CheckCircle2, AlertCircle, Mail, Phone } from "lucide-react";
 import { checkRateLimit } from "@/utils/sanitize";
 import { SITE_CONFIG } from "@/config/siteConfig";
-
-const SOLICITUDES_KEY = "tcgacademy_solicitudes";
+import { addSolicitud } from "@/services/solicitudService";
 
 const schema = z.object({
   nombre: z.string().min(2, "Mínimo 2 caracteres").max(200),
@@ -61,17 +60,11 @@ export default function FranquiciasPage() {
     await new Promise((r) => setTimeout(r, 600));
 
     try {
-      const saved = JSON.parse(
-        localStorage.getItem(SOLICITUDES_KEY) ?? "[]",
-      ) as unknown[];
-      saved.push({
+      addSolicitud({
         id: crypto.randomUUID(),
         tipo: "franquicia",
-        estado: "nueva",
-        fechaSolicitud: new Date().toISOString(),
         datos: data,
       });
-      localStorage.setItem(SOLICITUDES_KEY, JSON.stringify(saved));
     } catch {
       // localStorage may be unavailable
     }

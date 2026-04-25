@@ -34,6 +34,7 @@ import {
   orderFingerprint,
 } from "@/lib/checkoutGuard";
 import { safeWrite, safeRead, emergencyTrimStorage, aggressiveCleanup } from "@/lib/safeStorage";
+import { DataHub } from "@/lib/dataHub";
 import {
   appendToAdminInbox,
   patchCheckoutOrder,
@@ -627,6 +628,7 @@ export default function CheckoutPage() {
           error: err instanceof Error ? err.message : "Unknown error",
         });
         safeWrite("tcgacademy_incidents", incidentLog);
+        DataHub.emit("incidents");
       }
     }
 
@@ -748,6 +750,7 @@ export default function CheckoutPage() {
           total: safeFinalTotal,
         });
         safeWrite("tcgacademy_incidents", incidentLog);
+        DataHub.emit("incidents");
       }
     }
 
@@ -799,7 +802,7 @@ export default function CheckoutPage() {
           });
         }
       }
-      window.dispatchEvent(new Event("tcga:products:updated"));
+      DataHub.emit("products");
     } catch { /* stock update is non-critical */ }
 
     // ── PHASE 7: Record coupon usage ──

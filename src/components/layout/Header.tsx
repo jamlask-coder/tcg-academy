@@ -28,10 +28,10 @@ import { getMergedProducts, getProductUrl } from "@/lib/productStore";
 import { useNotifications } from "@/context/NotificationContext";
 import { useDebounce } from "@/hooks/useDebounce";
 import { MobileDrawer } from "./MobileDrawer";
-import { checkRateLimit } from "@/utils/sanitize";
 import { countPendingOrdersToShip } from "@/lib/orderAdapter";
 import { DataHub } from "@/lib/dataHub";
 import { countNewIncidents } from "@/services/incidentService";
+import { countNuevasSolicitudes } from "@/services/solicitudService";
 
 // ─── Recent search history helpers ────────────────────────────────────────────
 const RECENT_KEY = "tcga_recent_searches";
@@ -291,17 +291,17 @@ function HeaderTagline() {
   );
 }
 
-// ─── Inline login form / logged-in greeting (desktop only) ───────────────────
+// ─── Logged-in greeting / "Entrar" button (desktop only) ──────────────────────
+//
+// Diseño 2026-04-25 (alineado con imagen aprobada): cuando el usuario NO está
+// logado mostramos un único botón amarillo "Entrar" como CTA limpio (en vez del
+// formulario inline email+contraseña anterior, que saturaba la cabecera).
+// Cuando SÍ está logado mantenemos el saludo + dropdown idénticos.
 
 function HeaderInlineAuth() {
-  const { user, login, logout } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
-  const [pwd, setPwd] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
-  const [shake, setShake] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -316,29 +316,6 @@ function HeaderInlineAuth() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!checkRateLimit("header-login", 5, 60_000)) return;
-      setLoading(true);
-      setError(false);
-      const { ok } = await login(email, pwd);
-      setLoading(false);
-      if (ok) {
-        setEmail("");
-        setPwd("");
-      } else {
-        setError(true);
-        setShake(true);
-        setTimeout(() => {
-          setError(false);
-          setShake(false);
-        }, 2000);
-      }
-    },
-    [email, pwd, login],
-  );
-
   const firstName = user?.name.split(" ")[0] ?? "";
 
   // ── Logged in: greeting + account dropdown ────────────────────────────────
@@ -349,7 +326,7 @@ function HeaderInlineAuth() {
           onClick={() => setMenuOpen((o) => !o)}
           aria-label="Mi cuenta"
           aria-expanded={menuOpen}
-          className="flex h-8 items-center gap-1 px-2 transition"
+          className="flex h-11 items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-4 transition hover:bg-white/15"
         >
           <span className="text-xs text-blue-200">Bienvenido,&nbsp;</span>
           <span className="text-xs font-bold text-white">{firstName}</span>
@@ -404,65 +381,15 @@ function HeaderInlineAuth() {
     );
   }
 
-  // ── Not logged in: inline login pill ─────────────────────────────────────
+  // ── No logado: botón amarillo "Entrar" estilo CTA limpio ─────────────────
   return (
-    <div
-      ref={menuRef}
-      className="hidden items-center lg:flex"
-      style={{ animation: shake ? "headerShake 0.45s ease" : "none" }}
+    <Link
+      href="/login"
+      className="hidden h-11 items-center justify-center rounded-full bg-amber-300 px-7 text-sm font-bold text-[#0a1628] shadow-md transition hover:bg-amber-200 hover:shadow-lg active:scale-[0.98] lg:inline-flex"
+      aria-label="Iniciar sesión"
     >
-      <form onSubmit={handleSubmit} className="flex items-stretch">
-        <div
-          className={`flex h-8 items-stretch overflow-hidden rounded-xl border transition-colors ${
-            error ? "border-red-400" : "border-white/25"
-          }`}
-        >
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-            required
-            maxLength={254}
-            autoComplete="email"
-            aria-label="Email de acceso"
-            className={`h-full w-[90px] border-r px-3 text-xs text-white transition-colors placeholder:text-white/50 focus:outline-none xl:w-[118px] ${
-              error
-                ? "border-red-400 bg-red-900/30"
-                : "border-white/20 bg-white/10 focus:bg-white/20"
-            }`}
-          />
-          <input
-            type="password"
-            value={pwd}
-            onChange={(e) => setPwd(e.target.value)}
-            placeholder="Contraseña"
-            required
-            maxLength={128}
-            autoComplete="current-password"
-            aria-label="Contraseña"
-            className={`h-full w-[90px] border-r px-3 text-xs text-white transition-colors placeholder:text-white/50 focus:outline-none xl:w-[118px] ${
-              error
-                ? "border-red-400 bg-red-900/30"
-                : "border-white/20 bg-white/10 focus:bg-white/20"
-            }`}
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="h-full border-r border-amber-600 bg-amber-500 px-4 text-xs font-semibold whitespace-nowrap text-white transition hover:bg-amber-400 disabled:opacity-60"
-          >
-            {loading ? "…" : "Entrar"}
-          </button>
-          <Link
-            href="/registro"
-            className="flex h-full items-center bg-white/15 px-4 text-xs font-semibold whitespace-nowrap text-white transition hover:bg-white/25"
-          >
-            Registrarse
-          </Link>
-        </div>
-      </form>
-    </div>
+      Entrar
+    </Link>
   );
 }
 
@@ -490,23 +417,19 @@ export function Header() {
     const calc = () => {
       setPendingOrders(countPendingOrdersToShip());
       setPendingNotifs(countNewIncidents());
-      try {
-        const sols = JSON.parse(localStorage.getItem("tcgacademy_solicitudes") ?? "[]");
-        setPendingSolicitudes((sols as { estado: string }[]).filter((s) => s.estado === "nueva").length);
-      } catch { /* ignore */ }
+      setPendingSolicitudes(countNuevasSolicitudes());
     };
     calc();
     // Canonical: react al evento del DataHub en vez de polling corto.
     const offOrders = DataHub.on("orders", calc);
     const offIncidents = DataHub.on("incidents", calc);
-    const onStorage = (e: StorageEvent) => { if (e.key === "tcgacademy_solicitudes") calc(); };
-    window.addEventListener("storage", onStorage);
+    const offSolicitudes = DataHub.on("solicitudes", calc);
     // Fallback poll cada 15s por si algún write legacy no emite evento.
     const id = setInterval(calc, 15000);
     return () => {
       offOrders?.();
       offIncidents?.();
-      window.removeEventListener("storage", onStorage);
+      offSolicitudes?.();
       clearInterval(id);
     };
   }, [user]);
@@ -731,12 +654,17 @@ export function Header() {
             </Link>
           </div>
 
-          {/* Desktop search — ancho fijo */}
+          {/* Desktop search — píldora blanca grande (diseño 2026-04-25) */}
           <div
-            className={`relative hidden lg:block ${mounted && user ? "w-[600px]" : "w-[380px]"}`}
+            className="relative hidden w-[600px] lg:block"
             ref={desktopSearchRef}
           >
           <form onSubmit={handleDesktopSubmit}>
+            <Search
+              size={18}
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 left-5 -translate-y-1/2 text-gray-400"
+            />
             <input
               type="search"
               value={desktopQuery}
@@ -748,15 +676,16 @@ export function Header() {
                 setDesktopDropdownOpen(true);
               }}
               placeholder="Buscar cartas, sobres..."
-              className="h-8 w-full rounded-xl border-2 border-white/25 bg-white/12 pr-8 pl-3 text-xs text-white transition placeholder:text-white/50 focus:border-white/60 focus:bg-white/20 focus:outline-none"
+              className="h-11 w-full rounded-full border-0 bg-white pr-5 pl-12 text-sm text-gray-800 shadow-sm transition placeholder:text-gray-400 focus:shadow-md focus:outline-none"
               autoComplete="off"
+              aria-label="Buscar productos"
             />
             <button
               type="submit"
-              className="absolute top-1/2 right-2.5 -translate-y-1/2 text-white/50 hover:text-white"
+              className="sr-only"
               aria-label="Buscar"
             >
-              <Search size={14} />
+              Buscar
             </button>
           </form>
 

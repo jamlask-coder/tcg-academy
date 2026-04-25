@@ -16,6 +16,7 @@ import { ADMIN_ORDERS } from "@/data/mockData";
 import { readAdminOrdersMerged } from "@/lib/orderAdapter";
 import { loadIncidents } from "@/services/incidentService";
 import { loadMessages as loadAllMessages } from "@/services/messageService";
+import { loadSolicitudes } from "@/services/solicitudService";
 import type { Incident } from "@/types/incident";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -89,7 +90,6 @@ const TYPE_CONFIG: Record<
   },
 };
 
-const SOLICITUDES_KEY = "tcgacademy_solicitudes";
 const READ_KEY = "tcgacademy_admin_notifs_read";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -118,14 +118,6 @@ function loadReadIds(): Set<string> {
 
 function saveReadIds(ids: Set<string>) {
   localStorage.setItem(READ_KEY, JSON.stringify([...ids]));
-}
-
-interface Solicitud {
-  id: string;
-  tipo: "b2b" | "franquicia" | "vending";
-  estado: "nueva" | "revision" | "aprobada" | "rechazada";
-  fechaSolicitud: string;
-  datos: Record<string, unknown>;
 }
 
 interface RegisteredUser {
@@ -187,9 +179,7 @@ function buildAdminNotifications(): AdminNotification[] {
 
   // 3. Solicitudes nuevas (B2B, franquicia, vending)
   try {
-    const sols: Solicitud[] = JSON.parse(
-      localStorage.getItem(SOLICITUDES_KEY) ?? "[]",
-    );
+    const sols = loadSolicitudes();
     sols
       .filter((s) => s.estado === "nueva")
       .forEach((s) => {

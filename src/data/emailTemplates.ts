@@ -747,6 +747,49 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     `),
   },
   {
+    id: "fiscal_recordatorio",
+    name: "Recordatorio fiscal urgente (interno)",
+    subject: "[Fiscal] {{severidad_label}} — Modelo {{modelo}} {{period}} ({{dias_texto}})",
+    description:
+      "Email interno automático que se envía al responsable fiscal cuando un modelo AEAT entra en estado urgente o vencido. Solo se envía una vez por notificación.",
+    variables: [
+      "nombre",
+      "modelo",
+      "period",
+      "dias_texto",
+      "deadline",
+      "severidad_label",
+      "instrucciones",
+      "where",
+      "aeat_url",
+      "panel_url",
+    ],
+    html: wrapEmail(`
+      <div class="hero" style="background: linear-gradient(135deg, #dc2626 0%, #f97316 100%);">
+        <h1>⚠️ {{severidad_label}}</h1>
+        <p>Modelo {{modelo}} — {{period}}</p>
+      </div>
+      <div class="content">
+        <p>Hola {{nombre}},</p>
+        <p>Te avisamos de que el <strong>Modelo {{modelo}}</strong> correspondiente al período <strong>{{period}}</strong> está en estado <strong>{{severidad_label}}</strong>.</p>
+        <div class="info-box" style="border-left-color:#dc2626; background:#fef2f2;">
+          <p style="margin:0;"><strong>Plazo:</strong> {{dias_texto}}</p>
+          <p style="margin:8px 0 0;"><strong>Fecha límite:</strong> {{deadline}}</p>
+          <p style="margin:8px 0 0;"><strong>Dónde presentar:</strong> {{where}}</p>
+        </div>
+        <p style="margin-top:20px"><strong>Pasos:</strong></p>
+        <pre style="background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:14px; font-family:'Courier New', monospace; font-size:12px; color:#374151; white-space:pre-wrap;">{{instrucciones}}</pre>
+        <p style="text-align:center; margin: 24px 0;">
+          <a href="{{panel_url}}" class="btn">Abrir panel fiscal</a>
+          &nbsp;
+          <a href="{{aeat_url}}" class="btn-secondary">Ir a la sede AEAT</a>
+        </p>
+        <p style="color:#6b7280; font-size:13px">Este aviso lo genera automáticamente el motor fiscal de TCG Academy. El borrador del modelo ya está pre-calculado en el panel; solo necesitas validarlo y presentarlo.</p>
+        <p><strong>Sistema fiscal — TCG Academy</strong></p>
+      </div>
+    `),
+  },
+  {
     id: "invitacion_cuenta",
     name: "Invitación a crear cuenta (factura manual)",
     subject: "Activa tu cuenta en TCG Academy — factura {{numeroFactura}}",
