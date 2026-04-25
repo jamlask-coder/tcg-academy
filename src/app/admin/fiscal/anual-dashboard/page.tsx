@@ -60,6 +60,7 @@ export default function FiscalAnnualDashboardPage() {
   }, []);
 
   const data = useMemo(() => {
+    void tick; // dep marker — fuerza recompute al recibir eventos DataHub
     const invoices = loadInvoices();
     const cfg = loadFiscalConfig();
     const annualReport = generateAnnualReport(invoices, year);

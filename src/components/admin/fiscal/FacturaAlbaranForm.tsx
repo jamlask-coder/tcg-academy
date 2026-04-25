@@ -568,9 +568,26 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
       roundTo2(subtotalBeforeGlobal - subtotal),
     );
     const finalTotal = Math.max(0, roundTo2(subtotal - coupon));
+
+    // ── Prorrateo del cupón sobre base/IVA ────────────────────────────────
+    // El cupón es un importe fijo en € (con IVA) que se resta del total.
+    // Para mantener coherencia fiscal (Art. 78.3.2º LIVA: los descuentos
+    // reducen la base imponible) prorrateamos el cupón entre base y cuota
+    // proporcionalmente al peso de cada uno. Así la regla
+    // `base + vat === finalTotal` se cumple SIEMPRE.
+    const baseWithShip = base + shippingBase;
+    const vatWithShip = vat + shippingVat;
+    const subtotalGross = roundTo2(baseWithShip + vatWithShip);
+    const couponEffective = Math.min(coupon, subtotalGross);
+    const couponBase =
+      subtotalGross > 0
+        ? roundTo2((baseWithShip / subtotalGross) * couponEffective)
+        : 0;
+    const couponVat = roundTo2(couponEffective - couponBase);
+
     return {
-      base: roundTo2(base + shippingBase),
-      vat: roundTo2(vat + shippingVat),
+      base: roundTo2(baseWithShip - couponBase),
+      vat: roundTo2(vatWithShip - couponVat),
       linesTotal: roundTo2(total),
       // Subtotal de líneas SIN aplicar el descuento general — es el que se
       // muestra arriba ("Subtotal productos") para que el admin vea el importe
@@ -582,6 +599,8 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
       subtotalBeforeGlobal,
       globalDiscountAmount,
       coupon,
+      couponBase,
+      couponVat,
       finalTotal,
     };
   }, [lines, globalDiscountPct, couponAmount, shippingEnabled, shippingAmount]);
@@ -1846,7 +1865,8 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
           </div>
           <div className="mt-2 flex items-center justify-end gap-4 text-[11px] text-gray-500">
             <span>
-              Base: <span className="tabular-nums">{totals.base.toFixed(2)} €</span>
+              Base imponible:{" "}
+              <span className="tabular-nums">{totals.base.toFixed(2)} €</span>
             </span>
             <span>
               IVA: <span className="tabular-nums">{totals.vat.toFixed(2)} €</span>

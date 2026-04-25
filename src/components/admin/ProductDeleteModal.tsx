@@ -1,5 +1,6 @@
 "use client";
 import { X } from "lucide-react";
+import Image from "next/image";
 import { type LocalProduct } from "@/data/products";
 
 interface ProductDeleteModalProps {
@@ -41,9 +42,12 @@ export function ProductDeleteModal({
         {/* Product preview */}
         <div className="mb-5 flex items-center gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
           {img ? (
-            <img
+            <Image
               src={img}
               alt={product.name}
+              width={56}
+              height={56}
+              unoptimized
               className="h-14 w-14 rounded-lg bg-white object-contain"
             />
           ) : (

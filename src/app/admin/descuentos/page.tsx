@@ -288,8 +288,17 @@ export default function AdminDescuentosPage() {
         <div className="flex items-center gap-4">
           <label className="flex cursor-pointer items-center gap-2">
             <div
+              role="checkbox"
+              aria-checked={bulk.active}
+              tabIndex={0}
               className={`flex h-5 w-5 items-center justify-center rounded border-2 transition ${bulk.active ? "border-[#2563eb] bg-[#2563eb]" : "border-gray-300"}`}
               onClick={() => setBulk((b) => ({ ...b, active: !b.active }))}
+              onKeyDown={(e) => {
+                if (e.key === " " || e.key === "Enter") {
+                  e.preventDefault();
+                  setBulk((b) => ({ ...b, active: !b.active }));
+                }
+              }}
             >
               {bulk.active && (
                 <svg

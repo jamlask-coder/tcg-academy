@@ -1,7 +1,7 @@
 "use client";
 // Selected-state color for filters is ALWAYS blue across all games (user rule).
 const FILTER_ACCENT = "#2563eb";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { SlidersHorizontal, X, ChevronDown, ChevronUp, Check } from "lucide-react";
@@ -33,7 +33,10 @@ function useFilters() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const langs = params.get("lang")?.split(",").filter(Boolean) ?? [];
+  const langs = useMemo(
+    () => params.get("lang")?.split(",").filter(Boolean) ?? [],
+    [params],
+  );
   const inStock = params.get("inStock") !== "0";
   const priceMin = params.get("priceMin")
     ? Number(params.get("priceMin"))

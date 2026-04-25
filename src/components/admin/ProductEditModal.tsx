@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { X, Save, AlertTriangle } from "lucide-react";
+import Image from "next/image";
 import {
   GAME_CONFIG,
   CATEGORY_LABELS,
@@ -196,9 +197,12 @@ export function ProductEditModal({
             <FieldLabel>Imagen (URL)</FieldLabel>
             <div className="flex gap-3">
               {imageUrl && (
-                <img
+                <Image
                   src={imageUrl}
                   alt="preview"
+                  width={64}
+                  height={64}
+                  unoptimized
                   className="h-16 w-16 shrink-0 rounded-xl border border-gray-200 bg-gray-50 object-contain"
                 />
               )}

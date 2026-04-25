@@ -675,12 +675,21 @@ export default function AdminStockPage() {
       {/* Bulk delete confirmation */}
       {confirmBulkDelete && (
         <div
+          role="presentation"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
           onClick={() => setConfirmBulkDelete(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setConfirmBulkDelete(false);
+          }}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirmar eliminación"
+            tabIndex={-1}
             className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center gap-2">
               <AlertTriangle size={18} className="text-red-500" />

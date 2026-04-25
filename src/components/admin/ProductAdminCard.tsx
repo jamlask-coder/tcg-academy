@@ -1,5 +1,6 @@
 "use client";
 import { Pencil, Trash2 } from "lucide-react";
+import Image from "next/image";
 import { InlineEdit } from "./InlineEdit";
 import { type LocalProduct } from "@/data/products";
 
@@ -65,12 +66,15 @@ export function ProductAdminCard({
       </div>
 
       {/* Image */}
-      <div className="aspect-[4/3] overflow-hidden bg-gray-50">
+      <div className="relative aspect-[4/3] overflow-hidden bg-gray-50">
         {img ? (
-          <img
+          <Image
             src={img}
             alt={product.name}
-            className="h-full w-full object-contain p-2"
+            fill
+            unoptimized
+            sizes="(max-width: 640px) 50vw, 240px"
+            className="object-contain p-2"
           />
         ) : (
           <div className="flex h-full items-center justify-center text-4xl opacity-40">
