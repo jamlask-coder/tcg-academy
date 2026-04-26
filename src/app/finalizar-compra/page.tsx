@@ -14,6 +14,8 @@ import {
   getAssociations,
   POINTS_PER_EURO,
   POINTS_MAX_DISCOUNT_PCT,
+  POINTS_PENDING_DAYS,
+  POINTS_PENDING_MS,
   REFERRAL_ASSOC_PTS_PER_100,
 } from "@/services/pointsService";
 import { pushUserNotification } from "@/services/notificationService";
@@ -770,7 +772,7 @@ export default function CheckoutPage() {
       // Award on pointsBase (subtotal minus discounts, excluding shipping)
       // This prevents earning points on free orders from stacked discounts
       if (pointsBase > 0) {
-        awardPurchasePoints(user.id, pointsBase);
+        awardPurchasePoints(user.id, pointsBase, id);
 
         // Notify every group member that this buyer just purchased
         const buyerDisplay = `${user.name} ${user.lastName.charAt(0)}.`;
@@ -951,14 +953,25 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        {user?.role === "cliente" && finalTotal > 0 && !pickupStore && (
-          <div className="mx-auto mb-6 flex max-w-xs items-center justify-center gap-2 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
-            <Trophy size={16} className="flex-shrink-0 text-amber-500" />
-            <span>
+        {user?.role === "cliente" && finalTotal > 0 && !pickupStore && pointsBase > 0 && (
+          <div className="mx-auto mb-6 max-w-md rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <p className="flex items-center justify-center gap-2 font-semibold">
+              <Trophy size={16} className="flex-shrink-0 text-amber-500" aria-hidden="true" />
               Has ganado{" "}
-              <strong>+{Math.floor(pointsBase * POINTS_PER_EURO)} puntos</strong>{" "}
+              <strong>+{Math.floor(pointsBase * POINTS_PER_EURO).toLocaleString("es-ES")} puntos</strong>{" "}
               por esta compra
-            </span>
+            </p>
+            <p className="mt-1.5 text-center text-xs text-amber-700">
+              Estarán disponibles en tu saldo el{" "}
+              <strong>
+                {new Intl.DateTimeFormat("es-ES", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric",
+                }).format(new Date(Date.now() + POINTS_PENDING_MS))}
+              </strong>{" "}
+              ({POINTS_PENDING_DAYS} días) por seguridad ante posibles devoluciones.
+            </p>
           </div>
         )}
         {/* Right of withdrawal notice — Art. 102 TRLGDCU */}

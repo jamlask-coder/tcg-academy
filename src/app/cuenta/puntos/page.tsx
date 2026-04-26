@@ -3,13 +3,19 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   loadPoints,
+  loadPendingPoints,
+  getNextMaturationDate,
+  getPointsHistory,
   pointsToEuros,
   ensureReferralCode,
   POINTS_PER_EURO,
   POINTS_MAX_DISCOUNT_PCT,
+  POINTS_PENDING_DAYS,
   REFERRAL_INVITER_BONUS,
   REFERRAL_NEW_USER_BONUS,
+  type HistoryEntry,
 } from "@/services/pointsService";
+import { DataHub } from "@/lib/dataHub";
 import {
   Trophy,
   Clock,
@@ -19,30 +25,52 @@ import {
   Share2,
   TrendingUp,
   Copy,
+  ShieldCheck,
+  Hourglass,
 } from "lucide-react";
 import Link from "next/link";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
 
-// ─── Points history (simulated from orders) ───────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const HISTORY_ITEMS = [
-  { label: "Compra #TCG-20260310", points: 15000, type: "earn" as const, date: "10 mar" },
-  { label: "Canje de puntos", points: -10000, type: "spend" as const, date: "5 mar" },
-  { label: "Compra #TCG-20260228", points: 8000, type: "earn" as const, date: "28 feb" },
-  { label: "Referido: María G. compró", points: 5000, type: "referral" as const, date: "20 feb" },
-];
+const DATE_FMT = new Intl.DateTimeFormat("es-ES", {
+  day: "2-digit",
+  month: "short",
+});
+
+function formatHistoryDate(ts: number): string {
+  return DATE_FMT.format(new Date(ts));
+}
+
+function formatMaturationDate(ts: number): string {
+  return new Intl.DateTimeFormat("es-ES", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(ts));
+}
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function PuntosPage() {
   const { user } = useAuth();
   const [balance, setBalance] = useState(0);
+  const [pending, setPending] = useState(0);
+  const [nextMaturation, setNextMaturation] = useState<number | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  // Snapshot de "ahora" para mostrar pendientes consistentemente durante el
+  // render (Date.now en JSX rompe react-hooks/purity y produce flicker).
+  const [nowTs, setNowTs] = useState(0);
   const [myCode, setMyCode] = useState("");
   const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(() => {
     if (!user) return;
     setBalance(loadPoints(user.id));
+    setPending(loadPendingPoints(user.id));
+    setNextMaturation(getNextMaturationDate(user.id));
+    setHistory(getPointsHistory(user.id));
+    setNowTs(Date.now());
     setMyCode(ensureReferralCode(user.id));
   }, [user]);
 
@@ -54,8 +82,9 @@ export default function PuntosPage() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carga inicial síncrona desde localStorage tras montar
     refresh();
+    return DataHub.on("points", refresh);
   }, [refresh]);
 
   if (!user || user.role !== "cliente") {
@@ -107,6 +136,42 @@ export default function PuntosPage() {
           </div>
         </div>
       </div>
+
+      {/* Pending points (hold 14d) */}
+      {pending > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100">
+              <Hourglass size={20} className="text-amber-600" aria-hidden="true" />
+            </div>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="font-bold text-amber-900">
+                  {pending.toLocaleString("es-ES")} pts pendientes
+                  <span className="ml-2 text-sm font-medium text-amber-700">
+                    (= {pointsToEuros(pending).toFixed(2)}€)
+                  </span>
+                </p>
+                {nextMaturation !== null && (
+                  <p className="text-xs font-semibold text-amber-700">
+                    Disponibles desde el {formatMaturationDate(nextMaturation)}
+                  </p>
+                )}
+              </div>
+              <p className="mt-1 flex items-start gap-1.5 text-sm text-amber-800">
+                <ShieldCheck size={14} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+                <span>
+                  Por seguridad, los puntos de cada compra se acreditan{" "}
+                  <strong>{POINTS_PENDING_DAYS} días después</strong> para cubrir
+                  posibles devoluciones. Si devuelves el pedido durante ese
+                  periodo, los puntos pendientes se anulan automáticamente y tu
+                  saldo disponible no cambia.
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Referral code */}
       {myCode && (
@@ -179,6 +244,12 @@ export default function PuntosPage() {
             <p className="mt-1.5 text-xs text-gray-400">
               Compra de €100 → 10.000 pts → €1 de descuento
             </p>
+            <p className="mt-2 flex items-start gap-1 text-xs text-amber-700">
+              <Hourglass size={11} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+              <span>
+                Disponibles a los {POINTS_PENDING_DAYS} días por si hay devolución
+              </span>
+            </p>
           </div>
 
           {/* Asociaciones — needs bilateral explanation */}
@@ -212,23 +283,64 @@ export default function PuntosPage() {
             <Clock size={16} className="text-gray-400" /> Historial reciente
           </h2>
         </div>
-        <div className="divide-y divide-gray-50">
-          {HISTORY_ITEMS.map((item, i) => (
-            <div key={i} className="flex items-center justify-between px-5 py-3.5 text-sm">
-              <div>
-                <p className="font-medium text-gray-800">{item.label}</p>
-                <p className="text-xs text-gray-400">{item.date}</p>
-              </div>
-              <span
-                className={`text-base font-bold ${
-                  item.type === "spend" ? "text-red-500" : item.type === "referral" ? "text-green-600" : "text-[#2563eb]"
-                }`}
-              >
-                {item.points > 0 ? "+" : ""}{item.points.toLocaleString("es-ES")} pts
-              </span>
-            </div>
-          ))}
-        </div>
+        {history.length === 0 ? (
+          <p className="px-5 py-8 text-center text-sm text-gray-400">
+            Aún no hay movimientos en tu cuenta de puntos.
+          </p>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {history.slice(0, 12).map((item) => {
+              const isPending =
+                item.type === "compra" &&
+                typeof item.availableAt === "number" &&
+                !item.released &&
+                !item.cancelled &&
+                item.availableAt > nowTs;
+              const isCancelled = item.cancelled === true;
+              const ptsClass = isCancelled
+                ? "text-gray-400 line-through"
+                : isPending
+                ? "text-amber-600"
+                : item.pts < 0
+                ? "text-red-500"
+                : item.type === "asociacion" || item.type === "bienvenida"
+                ? "text-green-600"
+                : "text-[#2563eb]";
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between px-5 py-3.5 text-sm"
+                >
+                  <div className="min-w-0 flex-1 pr-3">
+                    <p className="truncate font-medium text-gray-800">
+                      {item.desc}
+                    </p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                      <span className="text-gray-400">
+                        {formatHistoryDate(item.ts)}
+                      </span>
+                      {isPending && item.availableAt && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-700">
+                          <Hourglass size={10} aria-hidden="true" />
+                          Disponible {formatMaturationDate(item.availableAt)}
+                        </span>
+                      )}
+                      {isCancelled && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 font-semibold text-gray-500">
+                          Anulado por devolución
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className={`text-base font-bold tabular-nums ${ptsClass}`}>
+                    {item.pts > 0 ? "+" : ""}
+                    {item.pts.toLocaleString("es-ES")} pts
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Info box */}
@@ -238,6 +350,14 @@ export default function PuntosPage() {
           <p>
             <strong>Condiciones del programa de puntos:</strong> Los puntos son personales e intransferibles.
             Caducan a los 24 meses sin actividad. No aplicable a usuarios profesionales (mayoristas/tiendas).
+          </p>
+          <p>
+            <strong>Acreditación de {POINTS_PENDING_DAYS} días:</strong> Los puntos
+            obtenidos por compras se acreditan en tu saldo disponible{" "}
+            <strong>{POINTS_PENDING_DAYS} días después</strong> de la compra. Es
+            una medida de seguridad: si solicitas una devolución durante ese
+            periodo, los puntos pendientes se anulan automáticamente sin
+            descontar de tu saldo previo.
           </p>
           <p>
             <strong>Límite de canje:</strong> Los puntos pueden descontar como máximo el{" "}

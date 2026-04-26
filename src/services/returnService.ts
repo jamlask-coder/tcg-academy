@@ -590,7 +590,9 @@ export async function markAsRefunded(
   //     fiscal vinculante. Los puntos se pueden ajustar manualmente si falla.
   try {
     const { refundPurchasePoints } = await import("@/services/pointsService");
-    refundPurchasePoints(rma.customerId, rma.totalRefundAmount);
+    // Pasamos rma.orderId para que, si los pts aún están en hold (≤ 14d desde
+    // la compra), la entry pendiente se anule sin tocar el balance del cliente.
+    refundPurchasePoints(rma.customerId, rma.totalRefundAmount, rma.orderId);
   } catch {
     // Non-blocking — el admin puede ajustar saldo desde /admin/usuarios.
   }

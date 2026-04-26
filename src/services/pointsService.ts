@@ -8,6 +8,15 @@
  *   CANJEAR:  10.000 puntos = 1€ de descuento  (1 punto = 0,0001€)
  *   ⇒ Cashback efectivo: 1%
  *
+ *   HOLD 14 DÍAS (POINTS_PENDING_DAYS):
+ *     Los puntos por compra del COMPRADOR no son inmediatamente canjeables.
+ *     Quedan "pendientes" durante 14 días por seguridad ante posibles
+ *     devoluciones. Si se devuelve el pedido durante esa ventana → la entry
+ *     se marca `cancelled` y nunca llega al saldo. Si no hay devolución →
+ *     `releaseMaturedPoints()` mueve los pts al balance disponible.
+ *     Los puntos de los miembros del GRUPO (asociados) sí se acreditan al
+ *     instante — las devoluciones los descuentan vía deductPoints.
+ *
  *   Ejemplo de referencia:
  *     Pedido 104€ = 99€ productos + 4€ envío + 1€ descuento puntos
  *     ⇒ Base efectiva 99€ → gana 9.900 pts → equivale a 0,99€ próximo pedido
@@ -34,6 +43,11 @@ import { DataHub } from "@/lib/dataHub";
 // ⚠️ CAMBIO ADMIN-ONLY con aviso fuerte — afecta al balance económico global.
 export const POINTS_PER_EURO = 100;          // 100 pts por €1 gastado en productos puros
 export const POINTS_PER_EURO_REDEMPTION = 10000; // 10.000 pts = €1 de descuento
+
+// Hold de seguridad: los puntos del comprador maduran a los 14 días para cubrir
+// la ventana de devolución. Aprobado por admin 2026-04-26.
+export const POINTS_PENDING_DAYS = 14;
+export const POINTS_PENDING_MS = POINTS_PENDING_DAYS * 24 * 60 * 60 * 1000;
 
 // Regla de negocio (aprobada 2026-04-17): los puntos son 1% de cashback
 // y el cliente puede canjearlos SIEMPRE, sin mínimo de pedido y hasta
@@ -121,6 +135,15 @@ export interface HistoryEntry {
   desc: string;
   sourceUserId?: string;  // para "asociacion": el comprador
   euroAmount?: number;
+  // ─── Hold 14 días (solo entries type==="compra" del comprador) ──────────────
+  // availableAt: timestamp en que la entry pasa de "pendiente" a "disponible".
+  // released:    true cuando releaseMaturedPoints ya añadió los pts al balance.
+  // cancelled:   true cuando una devolución anuló los pts antes de madurar.
+  // orderId:     vincula la entry con el pedido (necesario para revert pre-mature).
+  availableAt?: number;
+  released?: boolean;
+  cancelled?: boolean;
+  orderId?: string;
 }
 
 function addHistory(userId: string, entry: Omit<HistoryEntry, "id">): void {
@@ -140,11 +163,113 @@ export function getPointsHistory(userId: string): HistoryEntry[] {
   return map[userId] ?? [];
 }
 
+/** Actualiza una entry concreta del historial (por id) y persiste. */
+function patchHistoryEntry(
+  userId: string,
+  entryId: string,
+  patch: Partial<HistoryEntry>,
+): boolean {
+  const map = loadMap<HistoryEntry[]>(HISTORY_KEY);
+  const entries = map[userId] ?? [];
+  const idx = entries.findIndex((e) => e.id === entryId);
+  if (idx < 0) return false;
+  entries[idx] = { ...entries[idx], ...patch };
+  map[userId] = entries;
+  return saveMap(HISTORY_KEY, map);
+}
+
 // ─── Points CRUD ──────────────────────────────────────────────────────────────
 
 export function loadPoints(userId: string): number {
+  // Maduración lazy: cada lectura libera los lotes pendientes que ya cumplieron
+  // los 14 días. Idempotente (entries con `released:true` se ignoran).
+  releaseMaturedPoints(userId);
   const map = loadMap<number>(POINTS_KEY);
   return Math.max(0, Math.floor(map[userId] ?? 0));
+}
+
+/**
+ * Suma de puntos en hold (compras < 14 días, no canceladas, no liberadas).
+ * Estos pts NO son canjeables todavía — solo informativos para la UI.
+ */
+export function loadPendingPoints(userId: string): number {
+  const history = getPointsHistory(userId);
+  const now = Date.now();
+  let pending = 0;
+  for (const h of history) {
+    if (h.type !== "compra") continue;
+    if (h.released || h.cancelled) continue;
+    if (typeof h.availableAt !== "number") continue;
+    if (h.availableAt > now) pending += Math.max(0, h.pts);
+  }
+  return pending;
+}
+
+/**
+ * Devuelve la fecha (timestamp) en que madurará el siguiente lote de puntos
+ * pendientes, o `null` si no hay lotes en hold. Útil para la UI: "tus puntos
+ * estarán disponibles el DD/MM/YYYY".
+ */
+export function getNextMaturationDate(userId: string): number | null {
+  const history = getPointsHistory(userId);
+  const now = Date.now();
+  let next: number | null = null;
+  for (const h of history) {
+    if (h.type !== "compra") continue;
+    if (h.released || h.cancelled) continue;
+    if (typeof h.availableAt !== "number") continue;
+    if (h.availableAt > now && (next === null || h.availableAt < next)) {
+      next = h.availableAt;
+    }
+  }
+  return next;
+}
+
+/**
+ * Recorre el historial del usuario, libera los lotes de "compra" cuya
+ * `availableAt` ya cumplió → suma esos pts al balance + marca `released:true`.
+ * Idempotente: las entries ya liberadas se ignoran. Si falla el write del
+ * balance, NO marca released → el siguiente intento lo reintentará.
+ */
+export function releaseMaturedPoints(userId: string): {
+  releasedPts: number;
+  releasedCount: number;
+} {
+  if (typeof window === "undefined") return { releasedPts: 0, releasedCount: 0 };
+  const history = getPointsHistory(userId);
+  const now = Date.now();
+  let totalPts = 0;
+  let count = 0;
+  for (const entry of history) {
+    if (entry.type !== "compra") continue;
+    if (entry.released || entry.cancelled) continue;
+    if (typeof entry.availableAt !== "number") continue;
+    if (entry.availableAt > now) continue;
+    // Madura: añade al balance y marca released ATÓMICAMENTE.
+    const ptsToAdd = Math.max(0, Math.floor(entry.pts));
+    if (ptsToAdd <= 0) {
+      // Defensivo: si pts ≤ 0 marcamos released para no reintentar siempre.
+      patchHistoryEntry(userId, entry.id, { released: true });
+      continue;
+    }
+    const map = loadMap<number>(POINTS_KEY);
+    const current = Math.max(0, Math.floor(map[userId] ?? 0));
+    map[userId] = current + ptsToAdd;
+    const okBalance = saveMap(POINTS_KEY, map);
+    if (!okBalance) continue; // reintenta en la próxima llamada
+    const okHist = patchHistoryEntry(userId, entry.id, { released: true });
+    if (!okHist) {
+      // Si no podemos marcar released, revertimos el balance para no doble-contar.
+      const m2 = loadMap<number>(POINTS_KEY);
+      m2[userId] = Math.max(0, Math.floor(m2[userId] ?? 0) - ptsToAdd);
+      saveMap(POINTS_KEY, m2);
+      continue;
+    }
+    totalPts += ptsToAdd;
+    count++;
+  }
+  if (count > 0) DataHub.emit("points");
+  return { releasedPts: totalPts, releasedCount: count };
 }
 
 /**
@@ -231,9 +356,24 @@ export function reconcilePointsFromHistory(userId: string): {
 } {
   const storedBalance = loadPoints(userId);
   const history = getPointsHistory(userId);
+  // Compras pendientes (no liberadas) y entries canceladas no contribuyen al
+  // balance disponible. Las "compra" sin availableAt son legacy → cuentan
+  // como antes.
   const derived = Math.max(
     0,
-    Math.floor(history.reduce((sum, h) => sum + h.pts, 0)),
+    Math.floor(
+      history.reduce((sum, h) => {
+        if (h.cancelled) return sum;
+        if (
+          h.type === "compra" &&
+          typeof h.availableAt === "number" &&
+          !h.released
+        ) {
+          return sum;
+        }
+        return sum + h.pts;
+      }, 0),
+    ),
   );
 
   if (storedBalance === derived) {
@@ -486,33 +626,53 @@ function removeAttribution(beneficiaryId: string, sourceId: string, pts: number)
 
 /**
  * Otorga puntos por compra:
- *   - Comprador: POINTS_PER_EURO × euros (10 pts por €10)
- *   - Cada asociado: REFERRAL_ASSOC_PTS_PER_100 × euros / 100 (5 pts por €10)
+ *   - Comprador: POINTS_PER_EURO × euros — EN HOLD durante POINTS_PENDING_DAYS.
+ *                Solo se registra entry de historial con `availableAt`. NO se
+ *                añade al balance hasta que `releaseMaturedPoints()` los libere.
+ *                Si hay devolución antes de madurar, `refundPurchasePoints()`
+ *                marca la entry `cancelled:true` y los pts nunca llegan al saldo.
+ *   - Cada asociado: REFERRAL_ASSOC_PTS_PER_100 × euros / 100 — INMEDIATOS
+ *                (regla heredada). Si hay devolución, se descuentan vía
+ *                `deductPoints` como hasta ahora.
+ *
+ * @param orderId opcional pero RECOMENDADO — vincula la entry con el pedido
+ *                para que la devolución pueda anularla pre-mature en lugar
+ *                de descontar del saldo (ver `refundPurchasePoints`).
  *
  * NOTE (backend): mover al servidor para evitar manipulación client-side.
  */
-export function awardPurchasePoints(userId: string, euroAmount: number): void {
+export function awardPurchasePoints(
+  userId: string,
+  euroAmount: number,
+  orderId?: string,
+): void {
   const euros = Math.floor(euroAmount);
   if (euros <= 0) return;
 
-  // Comprador
+  const ts = Date.now();
+  const availableAt = ts + POINTS_PENDING_MS;
+
+  // Comprador → pendiente (no toca balance)
   const buyerPts = euros * POINTS_PER_EURO;
-  addPoints(userId, buyerPts);
   addHistory(userId, {
-    ts: Date.now(),
+    ts,
     pts: buyerPts,
     type: "compra",
     desc: `Compra de €${euros}`,
     euroAmount: euros,
+    availableAt,
+    released: false,
+    ...(orderId ? { orderId } : {}),
   });
+  // El balance no cambió, pero la UI debe refrescar el "pending".
+  DataHub.emit("points");
 
-  // Cada asociado (hasta MAX_ASSOCIATIONS)
+  // Cada asociado (hasta MAX_ASSOCIATIONS) → inmediato
   const assocMap = loadMap<AssociationRecord[]>(ASSOC_KEY);
   const userAssocs = assocMap[userId] ?? [];
   const assocPts = Math.floor(euros * REFERRAL_ASSOC_PTS_PER_100 / 100);
   if (assocPts <= 0) return;
 
-  const ts = Date.now();
   for (const assoc of userAssocs) {
     addPoints(assoc.referrerId, assocPts);
     addAttribution(assoc.referrerId, userId, assocPts);
@@ -523,39 +683,85 @@ export function awardPurchasePoints(userId: string, euroAmount: number): void {
       desc: `Tu asociado compró €${euros}`,
       sourceUserId: userId,
       euroAmount: euros,
+      ...(orderId ? { orderId } : {}),
     });
   }
 }
 
 /**
  * Revierte los puntos de una compra devuelta.
- * Descuenta al comprador y a sus asociados actuales.
+ *
+ * Comprador:
+ *   - Si la entry de compra original aún está en hold (pre-mature) y no fue
+ *     liberada, se marca `cancelled:true` y NO se toca el balance: los pts
+ *     pendientes simplemente no maduran. Se registra una entry "devolucion"
+ *     con pts=0 a efectos de trazabilidad.
+ *   - Si los pts ya maduraron (post-mature) o la entry no se puede localizar
+ *     (legacy / sin orderId), se descuenta del balance como hasta ahora.
+ *
+ * Asociados: descuenta del balance (los suyos no estaban en hold).
+ *
+ * @param orderId si se proporciona, permite localizar la entry exacta para
+ *                cancelar pre-mature. Si no, fallback a deduct directo.
  *
  * NOTE (backend): en producción, usar los asociados del momento de la compra
  * guardados en el registro de la transacción, no los actuales.
  */
-export function refundPurchasePoints(userId: string, euroAmount: number): void {
+export function refundPurchasePoints(
+  userId: string,
+  euroAmount: number,
+  orderId?: string,
+): void {
   const euros = Math.floor(euroAmount);
   if (euros <= 0) return;
 
-  // Comprador
   const buyerPts = euros * POINTS_PER_EURO;
-  deductPoints(userId, buyerPts);
-  addHistory(userId, {
-    ts: Date.now(),
-    pts: -buyerPts,
-    type: "devolucion",
-    desc: `Devolución de €${euros}`,
-    euroAmount: euros,
-  });
+  const ts = Date.now();
 
-  // Asociados
+  // ── Comprador: intentar cancelar pre-mature primero ──────────────────────
+  let cancelledPreMature = false;
+  if (orderId) {
+    const history = getPointsHistory(userId);
+    const entry = history.find(
+      (h) =>
+        h.type === "compra" &&
+        h.orderId === orderId &&
+        !h.released &&
+        !h.cancelled,
+    );
+    if (entry) {
+      patchHistoryEntry(userId, entry.id, { cancelled: true });
+      addHistory(userId, {
+        ts,
+        pts: 0,
+        type: "devolucion",
+        desc: `Devolución de €${euros} — puntos pendientes anulados`,
+        euroAmount: euros,
+        ...(orderId ? { orderId } : {}),
+      });
+      cancelledPreMature = true;
+    }
+  }
+
+  if (!cancelledPreMature) {
+    // Post-mature o legacy: descontar del saldo disponible
+    deductPoints(userId, buyerPts);
+    addHistory(userId, {
+      ts,
+      pts: -buyerPts,
+      type: "devolucion",
+      desc: `Devolución de €${euros}`,
+      euroAmount: euros,
+      ...(orderId ? { orderId } : {}),
+    });
+  }
+
+  // ── Asociados: siempre del balance (sus pts no estaban en hold) ──────────
   const assocMap = loadMap<AssociationRecord[]>(ASSOC_KEY);
   const userAssocs = assocMap[userId] ?? [];
   const assocPts = Math.floor(euros * REFERRAL_ASSOC_PTS_PER_100 / 100);
   if (assocPts <= 0) return;
 
-  const ts = Date.now();
   for (const assoc of userAssocs) {
     deductPoints(assoc.referrerId, assocPts);
     removeAttribution(assoc.referrerId, userId, assocPts);
@@ -566,6 +772,7 @@ export function refundPurchasePoints(userId: string, euroAmount: number): void {
       desc: `Devolución de tu asociado (€${euros})`,
       sourceUserId: userId,
       euroAmount: euros,
+      ...(orderId ? { orderId } : {}),
     });
   }
 }
