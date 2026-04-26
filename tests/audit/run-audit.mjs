@@ -52,7 +52,7 @@ function allFiles(dir, ext = ".tsx") {
 }
 
 console.log("\n══════════════════════════════════════════")
-console.log("  TCG Academy — Audit (25 tests)")
+console.log("  TCG Academy — Audit (30 tests)")
 console.log("══════════════════════════════════════════\n")
 
 // ── Test 1: TypeScript compilation ─────────────────────────────────────────────
@@ -456,9 +456,101 @@ run("Test 25 — Invariante de envío: shipping/total coherentes + sin hardcodes
   }
 })
 
+// ── Test 26: backups/ no rastreado en git ──────────────────────────────────────
+run("Test 26 — backups/ no está rastreado en git (PII riesgo)", () => {
+  let tracked = ""
+  try {
+    tracked = execSync(`cd "${ROOT}" && git ls-files backups/ 2>/dev/null`, { encoding: "utf8" }).trim()
+  } catch {
+    tracked = ""
+  }
+  if (tracked) {
+    throw new Error(`backups/ contiene archivos rastreados (riesgo PII):\n       ${tracked.split("\n").slice(0, 5).join("\n       ")}`)
+  }
+  const gitignore = readFileSync(join(ROOT, ".gitignore"), "utf8")
+  if (!/^\/?backups\/?$/m.test(gitignore)) {
+    throw new Error(".gitignore debe contener una entrada para backups/")
+  }
+})
+
+// ── Test 27: og-default.png existe ─────────────────────────────────────────────
+run("Test 27 — public/og-default.png existe (referenciada por metadata)", () => {
+  const og = join(ROOT, "public", "og-default.png")
+  try {
+    const st = statSync(og)
+    if (!st.isFile() || st.size < 1024) {
+      throw new Error(`og-default.png existe pero es sospechosamente pequeño (${st.size} bytes)`)
+    }
+  } catch (e) {
+    throw new Error(`public/og-default.png no existe — preview social rota. Generar con: node scripts/generate-og-image.mjs`)
+  }
+})
+
+// ── Test 28: DEMO_USERS gateado en producción ──────────────────────────────────
+run("Test 28 — DEMO_USERS gateado por NODE_ENV/flag (no expuesto en prod)", () => {
+  const files = [
+    join(SRC, "context/AuthContext.tsx"),
+    join(SRC, "app/restablecer-contrasena/page.tsx"),
+  ]
+  for (const f of files) {
+    const c = readFileSync(f, "utf8")
+    if (!/DEMO_USERS_ENABLED/.test(c)) {
+      throw new Error(`${relative(ROOT, f)}: falta gate DEMO_USERS_ENABLED`)
+    }
+    if (!/NEXT_PUBLIC_ENABLE_DEMO_USERS/.test(c)) {
+      throw new Error(`${relative(ROOT, f)}: falta override NEXT_PUBLIC_ENABLE_DEMO_USERS`)
+    }
+    if (!/NODE_ENV\s*!==\s*["']production["']/.test(c)) {
+      throw new Error(`${relative(ROOT, f)}: falta condicional NODE_ENV !== "production"`)
+    }
+  }
+})
+
+// ── Test 29: /api/orders valida descuentos server-side ────────────────────────
+run("Test 29 — /api/orders usa validateAndComputeDiscounts (anti-fraude)", () => {
+  const route = readFileSync(join(SRC, "app/api/orders/route.ts"), "utf8")
+  if (!/validateAndComputeDiscounts/.test(route)) {
+    throw new Error("/api/orders no llama validateAndComputeDiscounts — fraude descuentos posible")
+  }
+  // Sanidad: ya no debe restar coupon.discount o pointsDiscount sin validar
+  const naive = /subtotal\s*=\s*Math\.max\(0,\s*subtotal\s*-\s*coupon\.discount/
+  if (naive.test(route)) {
+    throw new Error("/api/orders sigue restando coupon.discount sin validar")
+  }
+  const naive2 = /subtotal\s*=\s*Math\.max\(0,\s*subtotal\s*-\s*pointsDiscount\s*\)/
+  if (naive2.test(route)) {
+    throw new Error("/api/orders sigue restando pointsDiscount sin validar")
+  }
+})
+
+// ── Test 30: ServerDbAdapter.getCouponByCode/getPoints implementados ──────────
+run("Test 30 — ServerDbAdapter no tiene stubs null en getCouponByCode/getPoints", () => {
+  const db = readFileSync(join(SRC, "lib/db.ts"), "utf8")
+  // Localiza la sección ServerDbAdapter
+  const idx = db.indexOf("class ServerDbAdapter")
+  if (idx < 0) throw new Error("ServerDbAdapter no encontrado en src/lib/db.ts")
+  const tail = db.slice(idx)
+  // Patrones de stub: una función que solo hace `return null`
+  const stubCoupon = /getCouponByCode\s*\([^)]*\)\s*:[^{]*\{\s*return\s+null;?\s*\}/.test(tail)
+  if (stubCoupon) {
+    throw new Error("ServerDbAdapter.getCouponByCode sigue siendo stub (return null) — descuentos no se validan en prod")
+  }
+  const stubPoints = /getPoints\s*\([^)]*\)\s*:[^{]*\{\s*return\s+null;?\s*\}/.test(tail)
+  if (stubPoints) {
+    throw new Error("ServerDbAdapter.getPoints sigue siendo stub (return null) — canje de puntos no se valida en prod")
+  }
+  // Sanidad positiva: debe consultar Supabase
+  if (!/from\(\s*"coupons"\s*\)/.test(tail)) {
+    throw new Error("ServerDbAdapter.getCouponByCode debería leer de la tabla 'coupons' en Supabase")
+  }
+  if (!/from\(\s*"points"\s*\)/.test(tail)) {
+    throw new Error("ServerDbAdapter.getPoints debería leer de la tabla 'points' en Supabase")
+  }
+})
+
 // ── Summary ────────────────────────────────────────────────────────────────────
 console.log("\n══════════════════════════════════════════")
-console.log(`  Resultado: ${passed}/25 tests pasados`)
+console.log(`  Resultado: ${passed}/30 tests pasados`)
 if (failed > 0) {
   console.log(`  FALLOS (${failed}):`)
   failures.forEach(({ name }) => console.log(`    - ${name}`))

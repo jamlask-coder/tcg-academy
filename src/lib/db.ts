@@ -1256,12 +1256,45 @@ export class ServerDbAdapter implements DbAdapter {
   async addFavorite(): Promise<void> { /* stub */ }
   async removeFavorite(): Promise<void> { /* stub */ }
   async getCoupons(): Promise<CouponRecord[]> { return []; }
-  async getCouponByCode(): Promise<CouponRecord | null> { return null; }
+  /**
+   * SERVER-SIDE coupon lookup — fuente canónica para validar `coupon.discount`
+   * en /api/orders. Implementación real (Supabase) — ya no es stub: el código
+   * del cliente jamás se debe creer; se contrasta SIEMPRE contra esta fila.
+   */
+  async getCouponByCode(code: string): Promise<CouponRecord | null> {
+    if (!code) return null;
+    const { data, error } = await this.db
+      .from("coupons")
+      .select("*")
+      .ilike("code", code)
+      .maybeSingle();
+    if (error || !data) return null;
+    return mapCouponRow(data as DbRow);
+  }
   async upsertCoupon(c: CouponRecord): Promise<CouponRecord> { return c; }
   async deleteCoupon(): Promise<void> { /* stub */ }
   async recordCouponUsage(): Promise<void> { /* stub */ }
   async countCouponUsageByUser(): Promise<number> { return 0; }
-  async getPoints(): Promise<PointsRecord | null> { return null; }
+  /**
+   * SERVER-SIDE points balance lookup — fuente canónica para validar
+   * `pointsDiscount` en /api/orders. Implementación real (Supabase).
+   */
+  async getPoints(userId: string): Promise<PointsRecord | null> {
+    if (!userId) return null;
+    const { data, error } = await this.db
+      .from("points")
+      .select("user_id, balance, total_earned, total_spent")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error || !data) return null;
+    const row = data as DbRow;
+    return {
+      userId: asStr(row.user_id),
+      balance: asNum(row.balance),
+      totalEarned: asNum(row.total_earned),
+      totalSpent: asNum(row.total_spent),
+    };
+  }
   async appendPointsHistory(): Promise<void> { /* stub */ }
   async getPointsHistory(): Promise<PointsHistoryEntry[]> { return []; }
   async getIncidents(): Promise<IncidentRecord[]> { return []; }
@@ -1408,6 +1441,24 @@ function mapUserRow(row: DbRow): UserRecord {
     birthDate: asOpt<string>(row.birth_date),
     createdAt: asStr(row.created_at),
     updatedAt: asStr(row.updated_at),
+  };
+}
+
+function mapCouponRow(row: DbRow): CouponRecord {
+  return {
+    id: asStr(row.id),
+    code: asStr(row.code),
+    discountType: row.discount_type as CouponRecord["discountType"],
+    discountValue: asNum(row.discount_value),
+    minOrder: asNum(row.min_order),
+    maxUses: row.max_uses === null || row.max_uses === undefined
+      ? undefined
+      : Number(row.max_uses),
+    maxPerUser: Number(row.max_per_user ?? 1),
+    usedCount: Number(row.used_count ?? 0),
+    validFrom: asStr(row.valid_from),
+    validUntil: asOpt<string>(row.valid_until),
+    isActive: Boolean(row.is_active),
   };
 }
 

@@ -1,6 +1,6 @@
 import type { NextRequest} from "next/server";
 import { NextResponse } from "next/server";
-import { verifyOrder } from "@/lib/priceVerification";
+import { verifyOrder, validateAndComputeDiscounts } from "@/lib/priceVerification";
 import { getApiUser, requireAuth } from "@/lib/apiAuth";
 import { generateOrderId } from "@/lib/orderIds";
 import { serverRateLimit } from "@/utils/sanitize";
@@ -167,16 +167,40 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Calculate final total ─────────────────────────────────────────────
+    // BLINDAJE ANTI-FRAUDE: nunca aplicamos `coupon.discount` ni `pointsDiscount`
+    // tal cual los envió el cliente. Pasamos por validateAndComputeDiscounts
+    // que recalcula desde la fuente canónica (BD en server / clamps en local).
+    // Si el cliente intentó descontar más de lo permitido, lo registramos en
+    // `discountValidation.warnings` y devolvemos los valores reales.
     const subtotalBeforeDiscounts = verification.priceResult.verifiedTotal;
-    let subtotal = subtotalBeforeDiscounts;
     const shippingCost = verification.shipping;
+    const backendModeForDiscounts = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
 
-    if (coupon?.discount && coupon.discount > 0) {
-      subtotal = Math.max(0, subtotal - coupon.discount);
+    const discountValidation = await validateAndComputeDiscounts({
+      subtotal: subtotalBeforeDiscounts,
+      coupon,
+      pointsDiscount,
+      userId: apiUser?.id,
+      serverMode: backendModeForDiscounts === "server",
+    });
+
+    if (discountValidation.errors.length > 0) {
+      return NextResponse.json(
+        {
+          error: discountValidation.errors[0],
+          discountErrors: discountValidation.errors,
+        },
+        { status: 400 },
+      );
     }
-    if (pointsDiscount && pointsDiscount > 0) {
-      subtotal = Math.max(0, subtotal - pointsDiscount);
-    }
+
+    const safeCouponDiscount = discountValidation.couponDiscount;
+    const safePointsDiscount = discountValidation.pointsDiscount;
+
+    let subtotal = Math.max(
+      0,
+      subtotalBeforeDiscounts - safeCouponDiscount - safePointsDiscount,
+    );
     subtotal = Math.round(subtotal * 100) / 100;
 
     const total = Math.round((subtotal + shippingCost) * 100) / 100;
@@ -230,9 +254,9 @@ export async function POST(req: NextRequest) {
       })),
       subtotal: verification.priceResult.verifiedTotal,
       shippingCost,
-      couponCode: coupon?.code,
-      couponDiscount: coupon?.discount ?? 0,
-      pointsDiscount: pointsDiscount ?? 0,
+      couponCode: discountValidation.resolvedCoupon?.code ?? coupon?.code,
+      couponDiscount: safeCouponDiscount,
+      pointsDiscount: safePointsDiscount,
       total,
       totalVat,
       totalDiscount,

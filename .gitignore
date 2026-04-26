@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# backups locales — pueden contener PII histórica + configuración sensible.
+# Generados por scripts/backup.js y `npm run backup`. Nunca al repositorio.
+/backups/
+
+# audit handoff transitorio (memoria de sesiones de auditoría)
+/.claude/audit-handoff.md

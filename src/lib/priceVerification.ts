@@ -2,6 +2,8 @@ import { PRODUCTS, type LocalProduct } from "@/data/products";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { getRoleLimit, getPurchasedQty } from "@/services/purchaseLimitService";
 import type { UserRole } from "@/types/user";
+import { getDb, type CouponRecord } from "@/lib/db";
+import { POINTS_PER_EURO_REDEMPTION } from "@/services/pointsService";
 
 interface CartItem {
   product_id: number;
@@ -270,6 +272,201 @@ export function verifyPurchaseLimits(
   }
 
   return { valid: issues.length === 0, issues };
+}
+
+// ─── Discount validation (canonical, server-side) ────────────────────────────
+// Antes de este bloque, /api/orders confiaba en `body.coupon.discount` y
+// `body.pointsDiscount` tal cual los enviaba el cliente — un atacante podía
+// poner 99999€ y obtener el pedido gratis. La regla ahora es:
+//
+//   1. Cualquier cantidad enviada por el cliente se IGNORA y se RECALCULA aquí.
+//   2. En modo `server`, el cupón se busca en BD (DbAdapter.getCouponByCode)
+//      y los puntos se leen de BD (DbAdapter.getPoints). El valor canónico
+//      se usa siempre.
+//   3. En modo `local`, no podemos contrastar contra BD (todo vive en
+//      localStorage del cliente). Aplicamos clamps duros para que ni un
+//      `pointsDiscount` ni un `coupon.discount` puedan superar el subtotal,
+//      y rechazamos cualquier intento de aplicar puntos sin usuario logueado.
+//   4. Si el cliente envía un valor distinto al canónico, registramos el
+//      hecho en `warnings` para que la respuesta lo refleje.
+
+export interface DiscountValidationInput {
+  /** Subtotal verificado en servidor — base sobre la que aplicar descuentos. */
+  subtotal: number;
+  /** Cupón enviado por el cliente — solo el `code` se respeta. */
+  coupon?: { code: string; discount: number };
+  /** Puntos a canjear declarados por el cliente — solo se respeta el límite. */
+  pointsDiscount?: number;
+  /** Usuario autenticado (server-side). Sin él, no se aceptan puntos. */
+  userId?: string;
+  /** Indica si la API está en modo server (Supabase) o local (localStorage). */
+  serverMode: boolean;
+}
+
+export interface DiscountValidationResult {
+  /** Descuento del cupón aplicable (€), recalculado server-side. */
+  couponDiscount: number;
+  /** Descuento por puntos aplicable (€), validado contra el saldo real. */
+  pointsDiscount: number;
+  /** Lista de motivos por los que se rechazaron descuentos solicitados. */
+  errors: string[];
+  /** Avisos no bloqueantes (p. ej. cliente envió 50€ pero canónico es 30€). */
+  warnings: string[];
+  /** Cupón canónico encontrado en BD, si existe. */
+  resolvedCoupon: CouponRecord | null;
+}
+
+function calcCanonicalCouponDiscount(
+  coupon: CouponRecord,
+  subtotal: number,
+): number {
+  if (!coupon.isActive) return 0;
+  if (coupon.minOrder && subtotal < coupon.minOrder) return 0;
+  if (coupon.validUntil) {
+    const expiry = new Date(coupon.validUntil).getTime();
+    if (Number.isFinite(expiry) && Date.now() > expiry) return 0;
+  }
+  if (coupon.discountType === "percentage") {
+    return Math.round(subtotal * (coupon.discountValue / 100) * 100) / 100;
+  }
+  if (coupon.discountType === "fixed") {
+    return Math.min(
+      Math.round(coupon.discountValue * 100) / 100,
+      subtotal,
+    );
+  }
+  return 0;
+}
+
+/**
+ * Valida + recalcula los descuentos (cupón + puntos) ANTES de aplicarlos al
+ * pedido. Reemplaza el patrón inseguro `subtotal -= body.coupon.discount`.
+ *
+ * Promesas:
+ *   - Devuelve siempre valores ≥ 0 y ≤ subtotal.
+ *   - En server mode, ignora valores del cliente y usa BD.
+ *   - En local mode, aplica clamps duros + bloqueo de puntos sin sesión.
+ *   - Nunca lanza — los problemas se reportan en `errors[]`.
+ */
+export async function validateAndComputeDiscounts(
+  input: DiscountValidationInput,
+): Promise<DiscountValidationResult> {
+  const { subtotal, coupon, pointsDiscount, userId, serverMode } = input;
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // ── Cupón ──────────────────────────────────────────────────────────────
+  let resolvedCoupon: CouponRecord | null = null;
+  let canonicalCouponDiscount = 0;
+
+  if (coupon?.code) {
+    if (serverMode) {
+      try {
+        resolvedCoupon = await getDb().getCouponByCode(coupon.code);
+      } catch {
+        resolvedCoupon = null;
+      }
+      if (!resolvedCoupon) {
+        errors.push(`Cupón "${coupon.code}" no existe o está inactivo`);
+      } else {
+        canonicalCouponDiscount = calcCanonicalCouponDiscount(
+          resolvedCoupon,
+          subtotal,
+        );
+        if (canonicalCouponDiscount === 0) {
+          errors.push(
+            `Cupón "${coupon.code}" no aplicable (caducado, mínimo no alcanzado o inactivo)`,
+          );
+        }
+        // Si el cliente envió otro valor, lo registramos como warning.
+        const claimed = Number(coupon.discount);
+        if (
+          Number.isFinite(claimed) &&
+          claimed > 0 &&
+          Math.abs(claimed - canonicalCouponDiscount) > 0.01
+        ) {
+          warnings.push(
+            `Cliente declaró cupón ${claimed.toFixed(2)}€ pero canónico es ${canonicalCouponDiscount.toFixed(2)}€`,
+          );
+        }
+      }
+    } else {
+      // Modo local: no hay BD server-side; nos limitamos a clamps. La
+      // verificación dura del cupón se hace en cliente vía validateCoupon().
+      // Esto es coherente con el modelo (local = demo, server = producción).
+      const claimed = Number(coupon.discount ?? 0);
+      if (Number.isFinite(claimed) && claimed > 0) {
+        canonicalCouponDiscount = Math.min(claimed, subtotal);
+        if (canonicalCouponDiscount !== claimed) {
+          warnings.push(
+            `Descuento de cupón limitado al subtotal (${claimed.toFixed(2)}€ → ${canonicalCouponDiscount.toFixed(2)}€)`,
+          );
+        }
+      }
+    }
+  }
+
+  // ── Puntos ─────────────────────────────────────────────────────────────
+  let canonicalPointsDiscount = 0;
+  const claimedPoints = Number(pointsDiscount ?? 0);
+
+  if (Number.isFinite(claimedPoints) && claimedPoints > 0) {
+    if (!userId) {
+      errors.push("Para canjear puntos hay que iniciar sesión");
+    } else if (serverMode) {
+      let balance = 0;
+      try {
+        const record = await getDb().getPoints(userId);
+        balance = record?.balance ?? 0;
+      } catch {
+        balance = 0;
+      }
+      // 10.000 pts = 1 €. El saldo en € es lo máximo que puede canjear.
+      const maxFromBalance =
+        Math.floor(balance) / POINTS_PER_EURO_REDEMPTION;
+      // Cap por subtotal restante (después del cupón).
+      const remainingAfterCoupon = Math.max(
+        0,
+        subtotal - canonicalCouponDiscount,
+      );
+      const cap = Math.min(maxFromBalance, remainingAfterCoupon);
+      canonicalPointsDiscount = Math.min(claimedPoints, cap);
+      canonicalPointsDiscount =
+        Math.round(canonicalPointsDiscount * 100) / 100;
+      if (claimedPoints > cap + 0.01) {
+        warnings.push(
+          `Cliente intentó canjear ${claimedPoints.toFixed(2)}€ en puntos; máximo permitido ${cap.toFixed(2)}€ (saldo ${balance} pts)`,
+        );
+      }
+      if (cap === 0 && claimedPoints > 0) {
+        errors.push(
+          balance === 0
+            ? "No tienes puntos disponibles para canjear"
+            : "El subtotal restante no permite canjear puntos",
+        );
+      }
+    } else {
+      // Modo local: clamp al subtotal restante. El balance real lo gestionará
+      // el cliente al `deductPoints` tras crear el pedido.
+      const remaining = Math.max(0, subtotal - canonicalCouponDiscount);
+      canonicalPointsDiscount = Math.min(claimedPoints, remaining);
+      canonicalPointsDiscount =
+        Math.round(canonicalPointsDiscount * 100) / 100;
+      if (canonicalPointsDiscount !== claimedPoints) {
+        warnings.push(
+          `Descuento de puntos limitado al subtotal (${claimedPoints.toFixed(2)}€ → ${canonicalPointsDiscount.toFixed(2)}€)`,
+        );
+      }
+    }
+  }
+
+  return {
+    couponDiscount: Math.max(0, canonicalCouponDiscount),
+    pointsDiscount: Math.max(0, canonicalPointsDiscount),
+    errors,
+    warnings,
+    resolvedCoupon,
+  };
 }
 
 /**

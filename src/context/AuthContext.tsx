@@ -286,7 +286,18 @@ async function sessionHash(u: User & { _loginAt?: number }): Promise<string> {
 // ─── Demo users (client-side simulation) ─────────────────────────────────────
 // In a real backend these would be server-verified. For the static demo, we
 // pre-seed four role accounts so the buyer experience can be shown end-to-end.
-const DEMO_USERS: Record<string, { password: string; user: User }> = {
+//
+// SEGURIDAD: en producción este mapa se vacía obligatoriamente. Sólo se rellena
+// cuando estamos fuera de producción O cuando se pide explícitamente con la
+// flag NEXT_PUBLIC_ENABLE_DEMO_USERS=true (útil para Vercel preview/staging).
+// Así, una build de producción jamás expone "admin@tcgacademy.es / test123".
+//
+// Auditado por tests/audit/run-audit.mjs (Test 26).
+const DEMO_USERS_ENABLED =
+  process.env.NODE_ENV !== "production" ||
+  process.env.NEXT_PUBLIC_ENABLE_DEMO_USERS === "true";
+
+const DEMO_USERS_FULL: Record<string, { password: string; user: User }> = {
   "cliente@test.com": {
     password: "test123",
     user: {
@@ -405,6 +416,13 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
     },
   },
 };
+
+/**
+ * Mapa de demo expuesto al runtime. En producción, salvo activación explícita,
+ * es {} — los logins demo (admin/cliente/mayorista/tienda/luri/font) NO existen.
+ */
+const DEMO_USERS: Record<string, { password: string; user: User }> =
+  DEMO_USERS_ENABLED ? DEMO_USERS_FULL : {};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
