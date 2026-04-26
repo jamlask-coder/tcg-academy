@@ -38,8 +38,6 @@ import {
   deleteSnapshot,
   previewRestore,
   restoreSnapshot,
-  snapshotToBlob,
-  snapshotFileName,
   parseSnapshotFile,
   getBackupStats,
   TRACKED_KEYS,
@@ -196,12 +194,16 @@ export default function AdminCopiasPage() {
           text: "Descarga cifrada iniciada. GUARDA la frase de paso en otro sitio.",
         });
       } else {
-        const blob = snapshotToBlob(full);
-        triggerDownload(blob, snapshotFileName(full));
+        // Audit P0 F-02 — cifrado obligatorio. Una descarga JSON plana de
+        // backup contiene NIFs, emails, direcciones, IBANs. Si llega a un
+        // disco compartido / USB / mail = brecha RGPD masiva. Quitamos la
+        // rama "sin cifrar"; el operador debe usar la rama cifrada.
         setMessage({
-          kind: "ok",
-          text: "Descarga en claro iniciada. Contiene PII — manéjalo con cuidado.",
+          kind: "err",
+          text: "Política de seguridad: las copias deben descargarse cifradas (AES-GCM). Activa la opción 'Cifrado'.",
         });
+        setBusy(null);
+        return;
       }
       setDownloadTarget(null);
       setDownloadPass("");

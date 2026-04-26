@@ -370,6 +370,10 @@ function PointsTable({
   attribution: Record<string, number>;
   history: HistoryEntry[];
 }) {
+  // Snapshot del "ahora" en montaje (para cálculo de pendientes/madurados sin
+  // violar react-hooks/purity). Se refresca cada vez que el padre re-renderiza
+  // por DataHub events.
+  const [nowTs] = useState(() => Date.now());
   const totalFromAssocs = Object.values(attribution).reduce((s, v) => s + v, 0);
   const assocHistory = history.filter((h) => h.type === "asociacion" || h.type === "devolucion");
 
@@ -471,6 +475,13 @@ function PointsTable({
               const sourceInfo = entry.sourceUserId
                 ? getUserDisplayInfo(entry.sourceUserId)
                 : null;
+              const isPending =
+                entry.type === "asociacion" &&
+                typeof entry.availableAt === "number" &&
+                !entry.released &&
+                !entry.cancelled &&
+                entry.availableAt > nowTs;
+              const isCancelled = entry.cancelled === true;
               return (
                 <div key={entry.id} className="flex items-center justify-between px-5 py-3 text-sm">
                   <div className="min-w-0 flex-1">
@@ -480,6 +491,16 @@ function PointsTable({
                     <p className="text-[10px] text-gray-400">{formatDateTime(entry.ts)}</p>
                   </div>
                   <div className="ml-3 flex items-center gap-2">
+                    {isPending && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                        Pendiente
+                      </span>
+                    )}
+                    {isCancelled && (
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500">
+                        Anulado
+                      </span>
+                    )}
                     <span
                       className="rounded-full px-2 py-0.5 text-[10px] font-bold"
                       style={{ color: cfg.color, backgroundColor: `${cfg.color}15` }}
@@ -487,7 +508,15 @@ function PointsTable({
                       {cfg.label}
                     </span>
                     <span
-                      className={`font-black ${entry.pts < 0 ? "text-red-500" : "text-green-600"}`}
+                      className={`font-black ${
+                        isCancelled
+                          ? "text-gray-400 line-through"
+                          : isPending
+                          ? "text-amber-600"
+                          : entry.pts < 0
+                          ? "text-red-500"
+                          : "text-green-600"
+                      }`}
                     >
                       {entry.pts > 0 ? "+" : ""}{entry.pts}
                     </span>

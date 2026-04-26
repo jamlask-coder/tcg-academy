@@ -34,7 +34,6 @@ import {
   FilePlus,
   FileText,
   BookOpen,
-  Truck,
   Calendar,
   Landmark,
   BookMarked,
@@ -58,16 +57,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/admin", label: "Resumen", icon: LayoutDashboard, exact: true },
-  {
-    href: "/admin/pedidos",
-    label: "Pedidos",
-    icon: Package,
-    sub: [
-      { href: "/admin/pedidos", label: "Gestión de pedidos", icon: Package, exact: true },
-      { href: "/admin/pedidos/nuevo-albaran", label: "Emitir albarán", icon: Truck },
-      { href: "/admin/pedidos/albaranes", label: "Libro de albaranes", icon: FileText },
-    ],
-  },
+  { href: "/admin/pedidos", label: "Pedidos", icon: Package },
   { href: "/admin/precios", label: "Precios", icon: Euro },
   {
     href: "/admin/productos/nuevo",

@@ -548,9 +548,167 @@ run("Test 30 — ServerDbAdapter no tiene stubs null en getCouponByCode/getPoint
   }
 })
 
+// Test 31 — ESLint warnings = baseline (no regresión)
+run("Test 31 — ESLint warnings count == baseline (.warnings-baseline.json)", () => {
+  const baselinePath = join(ROOT, ".warnings-baseline.json")
+  const baseline = JSON.parse(readFileSync(baselinePath, "utf8"))
+  let stdout = ""
+  try {
+    stdout = execSync("npx eslint src/ --format json", {
+      cwd: ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      maxBuffer: 32 * 1024 * 1024,
+    })
+  } catch (err) {
+    // eslint exits non-zero with errors; stdout still has JSON
+    stdout = err.stdout?.toString?.() ?? ""
+    if (!stdout) throw new Error("eslint falló sin stdout: " + err.message)
+  }
+  const results = JSON.parse(stdout)
+  let warnings = 0
+  for (const r of results) warnings += r.warningCount ?? 0
+  if (warnings > baseline.warnings) {
+    throw new Error(
+      `Warnings subieron: ${warnings} > baseline ${baseline.warnings}. ` +
+      `Arreglarlos o ejecutar 'node scripts/count-warnings.mjs --baseline' tras justificar.`,
+    )
+  }
+  if (warnings < baseline.warnings) {
+    throw new Error(
+      `Warnings bajaron a ${warnings} (baseline ${baseline.warnings}). ` +
+      `Ejecuta 'node scripts/count-warnings.mjs --baseline' para congelar el nuevo mínimo.`,
+    )
+  }
+})
+
+// Test 32 — NEXT_PUBLIC_*_(SECRET|TOKEN|PRIVATE) prohibido en código vivo
+// (cualquier secret expuesto al bundle cliente es P0 de seguridad).
+run("Test 32 — Sin NEXT_PUBLIC_*_(SECRET|TOKEN|PRIVATE_KEY) en src/", () => {
+  const offenders = []
+  function walk(dir) {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name)
+      const st = statSync(full)
+      if (st.isDirectory()) {
+        if (name === "node_modules" || name === ".next") continue
+        walk(full)
+      } else if (/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(name)) {
+        const text = readFileSync(full, "utf8")
+        // SECRET, TOKEN, PRIVATE, PASS — todos son patrones de credencial.
+        // Excluye TURNSTILE_SITE_KEY (Cloudflare site keys son públicas por diseño)
+        // y SUPABASE_ANON_KEY (anon key con RLS está pensada para client).
+        const lines = text.split("\n")
+        // Denylist explícita: APIs de terceros cuya key debe ser server-only
+        // aunque técnicamente sean rate-limit boosters (pokemontcg, MKM, TCGplayer).
+        const SENSITIVE_API_DENYLIST = [
+          "NEXT_PUBLIC_POKEMON_TCG_KEY",
+          "NEXT_PUBLIC_POKEMON_TCG_API_KEY",
+          "NEXT_PUBLIC_MKM_",
+          "NEXT_PUBLIC_TCGPLAYER_",
+          "NEXT_PUBLIC_RESEND",
+          "NEXT_PUBLIC_STRIPE_SECRET",
+        ]
+        lines.forEach((line, i) => {
+          const m = line.match(/NEXT_PUBLIC_[A-Z0-9_]*(SECRET|TOKEN|PRIVATE)/)
+          const denyHit = SENSITIVE_API_DENYLIST.some((k) => line.includes(k))
+          if (!m && !denyHit) return
+          // Allow-list verificada manualmente:
+          if (line.includes("NEXT_PUBLIC_TURNSTILE_SITE_KEY")) return
+          offenders.push(`${relative(ROOT, full)}:${i + 1}  → ${line.trim()}`)
+        })
+      }
+    }
+  }
+  walk(SRC)
+  if (offenders.length > 0) {
+    throw new Error(
+      `Secret/token expuesto al bundle cliente vía NEXT_PUBLIC_*:\n  ` +
+      offenders.join("\n  ") +
+      `\nSolución: renombrar la env var SIN prefijo NEXT_PUBLIC_ y mover el uso a server (API route).`,
+    )
+  }
+})
+
+// Test 33 — Proxy admin guard activo (bloqueo server-side de /admin y /api/admin)
+// Verifica que src/proxy.ts contiene la sección de bloqueo, no solo header X-Admin-Route.
+run("Test 33 — proxy.ts bloquea /admin/* y /api/admin/* server-side", () => {
+  const proxyPath = join(SRC, "proxy.ts")
+  const text = readFileSync(proxyPath, "utf8")
+  const required = [
+    "verifySessionToken",            // valida JWT en server mode
+    "ADMIN_PANEL_TOKEN",             // gate adicional en local mode + producción
+    "denyAdmin",                     // función de denegación común
+    "isIpAllowedForAdmin",           // hook IP allowlist
+    "no-store",                      // header anti-cache en /admin
+  ]
+  const missing = required.filter((s) => !text.includes(s))
+  if (missing.length > 0) {
+    throw new Error(
+      `proxy.ts no tiene la guardia admin completa. Falta: ${missing.join(", ")}`,
+    )
+  }
+  // Anti-regresión: el comentario "this would check JWT" indicaba que el guard
+  // era solo TODO. Si vuelve a aparecer es que alguien revirtió el cierre.
+  if (text.includes("In server mode, this would check JWT")) {
+    throw new Error("proxy.ts tiene el TODO antiguo. La guardia admin se revirtió.")
+  }
+})
+
+// Test 34 — Toda ruta /api/admin/* usa requireAdmin
+run("Test 34 — /api/admin/* siempre llama a requireAdmin", () => {
+  const adminApiDir = join(SRC, "app", "api", "admin")
+  const offenders = []
+  function walk(dir) {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name)
+      const st = statSync(full)
+      if (st.isDirectory()) walk(full)
+      else if (name === "route.ts" || name === "route.tsx") {
+        const text = readFileSync(full, "utf8")
+        // Cada ruta debe importar requireAdmin O un guard alternativo válido.
+        const hasGuard =
+          text.includes("requireAdmin") ||
+          text.includes("verifyAdminAuth") ||
+          text.includes("verifyBackupAdmin") ||  // breach/backup compartido token
+          text.includes("ADMIN_BACKUP_TOKEN")     // backup tiene su propio token
+        if (!hasGuard) {
+          offenders.push(relative(ROOT, full))
+        }
+      }
+    }
+  }
+  try { walk(adminApiDir) } catch { /* dir no existe = sin rutas admin = OK */ }
+  if (offenders.length > 0) {
+    throw new Error(
+      `API admin sin guard:\n  ${offenders.join("\n  ")}\n` +
+      `Cada route.ts dentro de src/app/api/admin/ DEBE llamar a requireAdmin().`,
+    )
+  }
+})
+
+// Test 35 — Server Component guard en admin/layout.tsx
+run("Test 35 — admin/layout.tsx valida sesión server-side en producción", () => {
+  const layoutPath = join(SRC, "app", "admin", "layout.tsx")
+  const text = readFileSync(layoutPath, "utf8")
+  const required = [
+    "cookies()",                  // lee cookies server-side
+    "verifySessionToken",         // valida JWT
+    "redirect(",                  // redirige si no admin
+    "ADMIN_PANEL_TOKEN",          // gate local-mode prod
+    "process.env.NODE_ENV",       // gate por entorno
+  ]
+  const missing = required.filter((s) => !text.includes(s))
+  if (missing.length > 0) {
+    throw new Error(
+      `admin/layout.tsx no tiene la guardia server-side. Falta: ${missing.join(", ")}`,
+    )
+  }
+})
+
 // ── Summary ────────────────────────────────────────────────────────────────────
 console.log("\n══════════════════════════════════════════")
-console.log(`  Resultado: ${passed}/30 tests pasados`)
+console.log(`  Resultado: ${passed}/35 tests pasados`)
 if (failed > 0) {
   console.log(`  FALLOS (${failed}):`)
   failures.forEach(({ name }) => console.log(`    - ${name}`))

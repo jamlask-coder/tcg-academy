@@ -24,7 +24,10 @@ export const API_KEYS = {
 
   /**
    * Pokemon TCG API key (optional — raises rate limit from 1000 to 20 000 req/day).
+   * ⚠️ SERVER-ONLY. Lectura directa solo desde código que corra en server (cron,
+   * route handlers). Desde código cliente, usa la proxy `/api/pokemon-tcg/*`
+   * vía `pokemonTcgUrl()` / `pokemonTcgInit()` (`@/lib/pokemonTcgClient`).
    * Obtain at https://dev.pokemontcg.io/
    */
-  pokemonTcg: process.env.NEXT_PUBLIC_POKEMON_TCG_KEY ?? "",
+  pokemonTcg: process.env.POKEMON_TCG_API_KEY ?? "",
 } as const;

@@ -343,9 +343,13 @@ export function Navbar() {
                         onClick={handleLinkClick}
                         className="relative z-10 flex items-center justify-center px-3"
                         style={{
+                          // ellipse 60px×30px (radio) → 120×60 total. Cabe holgado
+                          // dentro de cualquier caja de logo (≥130px de ancho con
+                          // px-3) → el borde transparente queda dentro de la
+                          // caja y no se ve el corte vertical lateral.
                           background:
                             active || open
-                              ? `radial-gradient(ellipse 78px 48px at center, ${color}DD 0%, ${color}44 60%, transparent 100%)`
+                              ? `radial-gradient(ellipse 60px 30px at center, ${color}DD 0%, ${color}55 55%, transparent 95%)`
                               : "transparent",
                         }}
                         title={label}

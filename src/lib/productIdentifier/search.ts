@@ -12,6 +12,7 @@
 // que nos quedamos con las pistas del extract layer y marcamos confianza media.
 
 import { bestFuzzyMatch, enrichForMatch } from "@/lib/setHighlights/matching";
+import { pokemonTcgInit, pokemonTcgUrl } from "@/lib/pokemonTcgClient";
 import type { CanonicalMatch, Clues } from "./types";
 
 // ─── Scryfall (Magic) ─────────────────────────────────────────────────────────
@@ -92,17 +93,10 @@ interface PokemonSet {
 
 async function searchPokemonSet(clues: Clues): Promise<CanonicalMatch | null> {
   try {
-    const apiKey =
-      typeof process !== "undefined"
-        ? process.env.NEXT_PUBLIC_POKEMON_TCG_API_KEY
-        : undefined;
-    const init: RequestInit = apiKey
-      ? { headers: { "X-Api-Key": apiKey } }
-      : {};
-    const r = await fetch("https://api.pokemontcg.io/v2/sets", {
-      ...init,
-      cache: "force-cache",
-    });
+    const r = await fetch(
+      pokemonTcgUrl("v2/sets"),
+      pokemonTcgInit({ cache: "force-cache" }),
+    );
     if (!r.ok) return null;
     const json = (await r.json()) as { data?: PokemonSet[] };
     const sets = json?.data ?? [];

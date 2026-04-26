@@ -100,6 +100,42 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: "Email y contraseña requeridos" }, { status: 400 });
         }
 
+        // Rate-limit reforzado para emails admin (configurables vía env).
+        // Cualquier intento (válido o no) cuenta. Tras 5 fallos en 15 min, IP
+        // bloqueada por la ventana completa. Esto es ADEMÁS del rate-limit
+        // general/granular de arriba — los limits se aplican secuencialmente.
+        const adminEmails = (process.env.ADMIN_EMAILS ?? "")
+          .split(",")
+          .map((e) => e.trim().toLowerCase())
+          .filter(Boolean);
+        const candidateEmail = email.includes("@") ? email.toLowerCase().trim() : "";
+        const isAdminAttempt =
+          candidateEmail && adminEmails.includes(candidateEmail);
+        if (isAdminAttempt) {
+          const adminRl = await persistentRateLimit(
+            `auth:login:admin:${ip}`,
+            5,
+            900_000, // 15 min
+          );
+          if (!adminRl.allowed) {
+            // Log explícito: intento de fuerza bruta sobre cuenta admin.
+            // eslint-disable-next-line no-console
+            console.warn(
+              `[admin-bruteforce] ip=${ip} email=${candidateEmail} blocked-until=${new Date(adminRl.resetAt).toISOString()}`,
+            );
+            await enforceMinDuration(loginStart, 500);
+            return NextResponse.json(
+              { error: "Demasiados intentos. Cuenta protegida temporalmente." },
+              {
+                status: 429,
+                headers: {
+                  "Retry-After": String(Math.ceil((adminRl.resetAt - Date.now()) / 1000)),
+                },
+              },
+            );
+          }
+        }
+
         // Resolve username → email
         let user;
         if (email.includes("@")) {
@@ -124,6 +160,12 @@ export async function POST(req: NextRequest) {
             action: "login_failed",
             ipAddress: ip,
           });
+          if (user.role === "admin") {
+            // eslint-disable-next-line no-console
+            console.warn(
+              `[admin-bruteforce] login_failed ip=${ip} email=${user.email} userId=${user.id}`,
+            );
+          }
           await enforceMinDuration(loginStart, 500);
           return NextResponse.json({ error: "Usuario o contraseña incorrectos" }, { status: 401 });
         }

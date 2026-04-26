@@ -222,6 +222,34 @@ html {
   }
 }
 
+/* ── Solid-action buttons (verde/azul = SIEMPRE letras blancas) ─────────────
+   Regla del usuario: todo botón verde o azul debe tener texto e iconos en
+   blanco. Forzamos vía !important para evitar overrides de clases utilitarias
+   o estilos heredados. Aplicar: añadir .btn-solid-green o .btn-solid-blue al
+   className y dejar que la utilidad gestione bg + color (no añadir text-* ni
+   bg-* arbitrarios encima).
+   ────────────────────────────────────────────────────────────────────────── */
+.btn-solid-green,
+.btn-solid-green * {
+  color: #ffffff !important;
+}
+.btn-solid-green {
+  background-color: #16a34a !important;
+}
+.btn-solid-green:hover {
+  background-color: #15803d !important;
+}
+.btn-solid-blue,
+.btn-solid-blue * {
+  color: #ffffff !important;
+}
+.btn-solid-blue {
+  background-color: #2563eb !important;
+}
+.btn-solid-blue:hover {
+  background-color: #1d4ed8 !important;
+}
+
 /* ── Microanimations ────────────────────────────────────────────────────────
    All durations ≤ 300ms. Reduced-motion: no animation at all.
    ────────────────────────────────────────────────────────────────────────── */

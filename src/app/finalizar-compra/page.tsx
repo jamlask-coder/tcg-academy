@@ -537,6 +537,18 @@ export default function CheckoutPage() {
         return;
       }
 
+    // ── PHASE 0.5: Atomic coupon claim (audit P0 C-05) ──
+    // Reclamar el cupón ANTES de persistir el pedido. Si dos checkouts
+    // concurrentes intentan redimir el mismo cupón single-use, sólo uno
+    // gana — el otro debe abortar antes de descontar puntos / stock.
+    if (pending?.appliedCoupon?.code && form.email) {
+      const claimed = markCouponUsed(pending.appliedCoupon.code, form.email);
+      if (!claimed) {
+        setOrderError("El cupón aplicado ya ha sido utilizado. Recarga la página y revisa tu carrito.");
+        return;
+      }
+    }
+
     // ── PHASE 1: Save order (CRITICAL — must succeed) ──
     const orderSaved = safeWrite(
       "tcgacademy_orders",
@@ -814,11 +826,12 @@ export default function CheckoutPage() {
       DataHub.emit("products");
     } catch { /* stock update is non-critical */ }
 
-    // ── PHASE 7: Record coupon usage ──
+    // ── PHASE 7: Record coupon usage (audit log) ──
+    // El cupón ya fue reclamado atómicamente en PHASE 0.5 (audit P0 C-05).
+    // Aquí solo dejamos rastro contable en `tcgacademy_coupon_usage`.
     if (pending?.appliedCoupon?.code && user?.id) {
       try {
         recordCouponUsage(pending.appliedCoupon.code, user.id, id);
-        markCouponUsed(pending.appliedCoupon.code, form.email);
       } catch { /* coupon tracking is non-critical */ }
     }
 

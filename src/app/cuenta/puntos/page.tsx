@@ -291,7 +291,7 @@ export default function PuntosPage() {
           <div className="divide-y divide-gray-50">
             {history.slice(0, 12).map((item) => {
               const isPending =
-                item.type === "compra" &&
+                (item.type === "compra" || item.type === "asociacion") &&
                 typeof item.availableAt === "number" &&
                 !item.released &&
                 !item.cancelled &&

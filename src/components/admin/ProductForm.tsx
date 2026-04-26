@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
@@ -205,7 +205,7 @@ export function ProductForm({
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<ProductFormValues>({
@@ -218,10 +218,10 @@ export function ProductForm({
     },
   });
 
-  const watchedName = watch("name");
-  const watchedGame = watch("game");
-  const watchedLanguage = watch("language");
-  const watchedCategory = watch("category");
+  const watchedName = useWatch({ control, name: "name" });
+  const watchedGame = useWatch({ control, name: "game" });
+  const watchedLanguage = useWatch({ control, name: "language" });
+  const watchedCategory = useWatch({ control, name: "category" });
 
   useEffect(() => {
     if (!watchedName) return;

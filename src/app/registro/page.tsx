@@ -1,8 +1,8 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -136,7 +136,14 @@ export default function RegistroPage() {
   const router = useRouter();
   const [showPwd, setShowPwd] = useState(false);
   const [serverError, setServerError] = useState("");
-  const [mounted, setMounted] = useState(false);
+  // Mounted flag para fade-in (evita hydration mismatch). Usa
+  // useSyncExternalStore para cumplir react-hooks/set-state-in-effect:
+  // server snapshot=false, client snapshot=true → no setState en useEffect.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
   const [captchaToken, setCaptchaToken] = useState("");
   const [phoneCountryCode, setPhoneCountryCode] = useState("ES");
@@ -144,7 +151,7 @@ export default function RegistroPage() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -164,10 +171,11 @@ export default function RegistroPage() {
     },
   });
 
-  const watchedPassword = watch("password") ?? "";
-  const watchedTerminos = watch("terminos");
-  const watchedComunicaciones = watch("comunicaciones");
-  const watchedUsername = watch("username") ?? "";
+  const watchedPassword = useWatch({ control, name: "password" }) ?? "";
+  const watchedTerminos = useWatch({ control, name: "terminos" });
+  const watchedComunicaciones = useWatch({ control, name: "comunicaciones" });
+  const watchedUsername = useWatch({ control, name: "username" }) ?? "";
+  const watchedTratamiento = useWatch({ control, name: "tratamiento" });
 
   // Debounced username availability check
   const checkUsername = useCallback((value: string) => {
@@ -182,10 +190,6 @@ export default function RegistroPage() {
     const id = setTimeout(() => checkUsername(watchedUsername), 400);
     return () => clearTimeout(id);
   }, [watchedUsername, checkUsername]);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (user) router.push("/cuenta");
@@ -330,7 +334,7 @@ export default function RegistroPage() {
                   <label
                     key={opt.value}
                     className={`flex cursor-pointer items-center gap-2 rounded-xl border-2 px-4 py-2.5 text-sm transition select-none ${
-                      watch("tratamiento") === opt.value
+                      watchedTratamiento === opt.value
                         ? "border-[#2563eb] bg-blue-50 font-semibold text-[#2563eb]"
                         : "border-gray-200 text-gray-600 hover:border-gray-300"
                     }`}

@@ -19,6 +19,15 @@ import { appendSnapshot, getSeries, listCardIds } from "@/lib/priceHistoryStore"
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 minutos — suficiente para centenares de cartas.
 
+// Lock global de cron (audit P0 I-01).
+// Si Vercel/Netlify dispara el cron 2 veces el mismo día (retries, scheduling
+// duplicado) cada cara abre fetch al proveedor y race en appendSnapshot.
+// Con este flag bloqueamos invocaciones concurrentes y devolvemos 409.
+// Nota: vive en memoria del worker — si hay múltiples instancias podría haber
+// solapamiento. Para producción robusta, mover a tabla `cron_runs(date PK)`.
+let CRON_RUNNING = false;
+let CRON_LAST_RUN_DATE: string | null = null;
+
 export async function POST(req: Request) {
   const secret = process.env.CRON_SECRET;
   const provided = req.headers.get("x-cron-secret");
@@ -27,6 +36,19 @@ export async function POST(req: Request) {
   }
 
   const today = new Date().toISOString().slice(0, 10);
+  if (CRON_RUNNING) {
+    return NextResponse.json(
+      { ok: false, error: "cron-already-running", date: today },
+      { status: 409 },
+    );
+  }
+  if (CRON_LAST_RUN_DATE === today) {
+    return NextResponse.json(
+      { ok: true, deduped: true, date: today, message: "Cron ya completado hoy" },
+    );
+  }
+  CRON_RUNNING = true;
+
   const ids = await listCardIds();
 
   const results = {
@@ -36,6 +58,8 @@ export async function POST(req: Request) {
     failed: 0,
     alreadyToday: 0,
   };
+
+  try {
 
   // Procesamos en lotes para no saturar los proveedores (250ms entre llamadas).
   for (const cardId of ids) {
@@ -66,5 +90,9 @@ export async function POST(req: Request) {
     await new Promise((r) => setTimeout(r, 250));
   }
 
-  return NextResponse.json({ ok: true, date: today, ...results });
+    CRON_LAST_RUN_DATE = today;
+    return NextResponse.json({ ok: true, date: today, ...results });
+  } finally {
+    CRON_RUNNING = false;
+  }
 }

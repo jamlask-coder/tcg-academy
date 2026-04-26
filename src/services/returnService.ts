@@ -108,6 +108,26 @@ export interface ReturnRequest {
   refundPaymentRef?: string;
   /** Timestamp ISO del momento en el que se marcó como reembolsada (transferencia emitida). */
   refundedAt?: string;
+  /**
+   * Lock temporal que se setea al inicio de markAsRefunded() y se limpia al
+   * final (éxito) o on-error. Evita ejecuciones concurrentes (TOCTTOU) que
+   * podrían crear DOS rectificativas para el mismo RMA. Si ves un RMA con
+   * `_refundLockAt` antiguo (>5min) y status != "reembolsada" significa que
+   * un proceso anterior crasheó — admin debe revisar manualmente antes de
+   * limpiar el lock.
+   */
+  _refundLockAt?: string;
+  /**
+   * Audit log de cambios de IBAN (RGPD/contable). Cada entry refleja un
+   * cambio en `refundIban` para detectar manipulaciones del importe destino
+   * antes del reembolso. Append-only.
+   */
+  ibanAuditLog?: Array<{
+    timestamp: string;
+    fromMasked: string;
+    toMasked: string;
+    actor?: string; // admin userId si está disponible
+  }>;
   trackingNumber?: string; // return shipment tracking
   /** ID interno de la factura rectificativa generada al marcar como reembolsada. */
   rectificativeInvoiceId?: string;
@@ -235,11 +255,21 @@ export function createReturnRequest(
  *
  * Se usa cuando el cliente manda el IBAN después de haber creado la solicitud,
  * o cuando el admin lo corrige tras comunicarse con el cliente.
+ *
+ * **Inmutabilidad post-reembolso**: Una vez emitida la rectificativa
+ * (`status === "reembolsada"` o `refundedAt` set) el IBAN queda congelado —
+ * cualquier ajuste posterior exige cancelar y abrir nuevo RMA. Razón: la
+ * factura rectificativa ya cita el IBAN como destino del reembolso; modificarlo
+ * a posteriori desincronizaría la auditoría contable. Audit P0 (C-02).
+ *
+ * **Audit log**: Cada cambio se registra en `ibanAuditLog` para detectar
+ * manipulaciones (atacante cambia IBAN justo antes de aprobación).
  */
 export function setRefundBankInfo(
   rmaId: string,
   iban: string,
   holderName?: string,
+  actorUserId?: string,
 ): ReturnRequest {
   const v = validateIban(iban);
   if (!v.valid) {
@@ -255,14 +285,42 @@ export function setRefundBankInfo(
     throw new Error(`Devolución ${rmaId} no encontrada`);
   }
 
-  returns[idx].refundIban = v.normalized;
-  if (holderName !== undefined) {
-    returns[idx].refundHolderName = holderName;
+  // Bloqueo post-reembolso: rectificativa ya emitida, IBAN inmutable.
+  const target = returns[idx];
+  if (target.status === "reembolsada" || target.refundedAt) {
+    throw new Error(
+      `La devolución ${rmaId} ya está reembolsada. El IBAN no se puede ` +
+        `modificar — la rectificativa cita el IBAN original como destino. ` +
+        `Si hay error, abre nuevo RMA y referencia esta operación en notas.`,
+    );
   }
-  returns[idx].updatedAt = new Date().toISOString();
+
+  // Audit log append-only de cambios de IBAN.
+  const normalizedIban = v.normalized ?? iban;
+  const previousMasked = target.refundIban
+    ? maskIbanShort(target.refundIban)
+    : "(vacío)";
+  const newMasked = maskIbanShort(normalizedIban);
+  if (previousMasked !== newMasked) {
+    target.ibanAuditLog = [
+      ...(target.ibanAuditLog ?? []),
+      {
+        timestamp: new Date().toISOString(),
+        fromMasked: previousMasked,
+        toMasked: newMasked,
+        actor: actorUserId,
+      },
+    ];
+  }
+
+  target.refundIban = normalizedIban;
+  if (holderName !== undefined) {
+    target.refundHolderName = holderName;
+  }
+  target.updatedAt = new Date().toISOString();
 
   saveReturns(returns);
-  return returns[idx];
+  return target;
 }
 
 /**
@@ -448,18 +506,63 @@ export async function markAsRefunded(
   rmaId: string,
   options?: { adminNote?: string; adminUserId?: string; adminUserName?: string },
 ): Promise<{ ok: true; rectificativeInvoiceNumber: string; refundedAt: string }> {
+  // ── Lock atómico anti-replay (audit P0 C-01) ─────────────────────────────
+  // Antes había TOCTTOU: dos llamadas simultáneas pasaban el check de status
+  // y emitían DOS rectificativas. Ahora setemos `_refundLockAt` ANTES de
+  // hacer el trabajo costoso (rectifyInvoice + stock + puntos + email).
+  // Si el lock está set por otra invocación dentro de los últimos 5min, esta
+  // llamada falla. Si crashea anteriormente con el lock todavía set, el admin
+  // puede limpiarlo desde el panel manualmente tras revisar facturas.
+  const LOCK_STALE_MS = 5 * 60 * 1000;
   const returns = loadReturns();
   const idx = returns.findIndex((r) => r.id === rmaId);
   if (idx === -1) throw new Error(`Devolución ${rmaId} no encontrada`);
   const rma = returns[idx];
 
-  if (rma.status === "reembolsada") {
+  if (rma.status === "reembolsada" || rma.refundedAt) {
     throw new Error(
       `La devolución ${rmaId} ya está marcada como reembolsada. ` +
         `Las operaciones fiscales son irreversibles — no se pueden reejecutar.`,
     );
   }
+  if (rma._refundLockAt) {
+    const lockedAt = new Date(rma._refundLockAt).getTime();
+    if (!Number.isNaN(lockedAt) && Date.now() - lockedAt < LOCK_STALE_MS) {
+      throw new Error(
+        `Reembolso de ${rmaId} en curso (lock ${rma._refundLockAt}). ` +
+          `Espera a que termine la operación previa antes de reintentar.`,
+      );
+    }
+    // Lock stale (>5min): probablemente crash previo. Logueamos y seguimos.
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[returnService] Lock obsoleto en ${rmaId} (${rma._refundLockAt}) — ` +
+        `forzando reintento. Revisa si quedó factura huérfana.`,
+    );
+  }
+  // Adquirir lock antes de cualquier work fiscal.
+  returns[idx] = { ...rma, _refundLockAt: new Date().toISOString() };
+  saveReturns(returns);
 
+  // Helper para liberar el lock si algo falla a mitad. Re-leemos por si otra
+  // tab modificó el storage. Si el RMA ya está "reembolsada" no tocamos nada
+  // (el path de éxito ya lo dejó coherente).
+  const releaseLock = () => {
+    try {
+      const refresh = loadReturns();
+      const ridx = refresh.findIndex((r) => r.id === rmaId);
+      if (ridx === -1) return;
+      if (refresh[ridx].status === "reembolsada") return;
+      const cleaned: ReturnRequest = { ...refresh[ridx] };
+      delete cleaned._refundLockAt;
+      refresh[ridx] = cleaned;
+      saveReturns(refresh);
+    } catch {
+      /* nada que hacer — admin debe limpiar manualmente si esto falla */
+    }
+  };
+
+  try {
   // IBAN obligatorio SOLO si el reembolso es por transferencia. Para otros
   // medios (efectivo, tarjeta, bizum, mismo_medio) el IBAN no aplica.
   if (rma.refundMethod === "transferencia") {
@@ -650,6 +753,13 @@ export async function markAsRefunded(
     rectificativeInvoiceNumber: rectificativa.invoiceNumber,
     refundedAt,
   };
+  } catch (err) {
+    // Si algo falla entre la adquisición del lock y el save final del estado
+    // "reembolsada", liberamos el lock para no dejar el RMA bloqueado eternamente.
+    // No tragamos el error — lo re-lanzamos para que la UI muestre el fallo.
+    releaseLock();
+    throw err;
+  }
 }
 
 /**

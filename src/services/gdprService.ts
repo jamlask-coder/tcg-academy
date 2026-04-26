@@ -106,19 +106,22 @@ export function exportUserData(userId: string): UserDataExport {
     (o) => o.userId === userId || o.userId === userEmail,
   );
 
-  // Invoices
+  // Invoices (audit P0 F-01).
+  // ANTES: filtraba por email OR name OR taxId → podía leak facturas de
+  // homónimos o emails parciales. Ahora estricto: solo facturas cuyo
+  // `sourceOrderId` corresponde a un Order propiedad de este userId.
   const allInvoices = safeGetJSON<Array<Record<string, unknown>>>(
     INVOICES_KEY,
     [],
   );
+  const userOrderIds = new Set(
+    userOrders
+      .map((o) => (typeof o.id === "string" ? o.id : null))
+      .filter((x): x is string => !!x),
+  );
   const userInvoices = allInvoices.filter((inv) => {
-    const recipient = inv.recipient as Record<string, unknown> | undefined;
-    if (!recipient) return false;
-    return (
-      recipient.email === userEmail ||
-      recipient.name === userInfo?.profile?.name ||
-      recipient.taxId === userInfo?.profile?.cif
-    );
+    const sourceOrderId = inv.sourceOrderId;
+    return typeof sourceOrderId === "string" && userOrderIds.has(sourceOrderId);
   });
 
   // Points

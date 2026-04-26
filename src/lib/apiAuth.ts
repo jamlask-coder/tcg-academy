@@ -99,11 +99,41 @@ export async function requireAuth(req: NextRequest): Promise<ApiUser | NextRespo
 
 /**
  * Require admin role. Returns error response if not admin.
+ *
+ * Defensa en profundidad además del proxy:
+ *   - Local mode + production → 403 absoluto en /api/admin/*. La auth fiable
+ *     en producción exige modo server (JWT firmado). En local mode los headers
+ *     `X-User-*` son trivialmente forjables, así que ni los miramos para admin.
+ *   - Server mode → exige JWT válido con role=admin.
  */
 export async function requireAdmin(req: NextRequest): Promise<ApiUser | NextResponse> {
+  // Cierre adicional: en producción + local mode, /api/admin/* nunca pasa.
+  if (isProduction() && !isServerMode()) {
+    const url = new URL(req.url);
+    if (url.pathname.startsWith("/api/admin/")) {
+      logger.warn(
+        "Bloqueado /api/admin/* en local-mode + producción (requiere server mode)",
+        "apiAuth",
+        {
+          path: url.pathname,
+          ip: req.headers.get("x-forwarded-for") ?? "unknown",
+        },
+      );
+      return NextResponse.json(
+        { error: "Acceso denegado. Configuración insegura — usar modo server." },
+        { status: 403 },
+      );
+    }
+  }
+
   const result = await requireAuth(req);
   if (result instanceof NextResponse) return result;
   if (result.role !== "admin") {
+    logger.warn("Intento de acceso admin sin rol", "apiAuth", {
+      userId: result.id,
+      role: result.role,
+      ip: req.headers.get("x-forwarded-for") ?? "unknown",
+    });
     return NextResponse.json(
       { error: "Acceso denegado. Se requiere rol de administrador." },
       { status: 403 },

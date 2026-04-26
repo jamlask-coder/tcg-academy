@@ -87,18 +87,31 @@ export function getActiveCouponsByEmail(email: string): UserCoupon[] {
   );
 }
 
-export function markCouponUsed(code: string, userEmail: string): void {
+/**
+ * Atomic mark-as-used (audit P0 C-05).
+ *
+ * Devuelve `true` si este caller "reclamó" el cupón, `false` si ya estaba
+ * usado o no existe. El consumidor (checkout) DEBE llamar antes de crear el
+ * pedido y abortar si retorna `false`. Esto evita que dos checkouts
+ * concurrentes redimieran el mismo cupón single-use.
+ *
+ * Para cupones admin (no user-specific) el ownership/single-use no aplica
+ * en este servicio — su `usageLimit` se gestiona en validate+recordUsage
+ * y aquí simplemente devolvemos `true` (no hay user coupon que bloquear).
+ */
+export function markCouponUsed(code: string, userEmail: string): boolean {
   const all = loadAllUserCoupons();
   const idx = all.findIndex(
     (c) =>
       c.code.toUpperCase() === code.toUpperCase() &&
       c.userEmail.toLowerCase() === userEmail.toLowerCase(),
   );
-  if (idx >= 0) {
-    all[idx].usedAt = new Date().toISOString();
-    all[idx].active = false;
-    persistUserCoupons(all);
-  }
+  if (idx === -1) return true; // no es user-coupon: lo gestiona admin coupons
+  if (all[idx].usedAt || !all[idx].active) return false; // ya redimido: race detectada
+  all[idx].usedAt = new Date().toISOString();
+  all[idx].active = false;
+  persistUserCoupons(all);
+  return true;
 }
 
 // ── Validation ─────────────────────────────────────────────────────────────────

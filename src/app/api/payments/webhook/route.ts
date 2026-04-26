@@ -8,6 +8,29 @@ import { logger } from "@/lib/logger";
 // Stripe sends raw body — disable Next.js body parsing for signature verification
 export const dynamic = "force-dynamic";
 
+// ── Idempotencia de webhooks (audit P0 C-09) ──────────────────────────────
+// Stripe reintenta hasta 3 días si no recibimos 200. Sin dedupe el mismo
+// `payment_intent.succeeded` doblaría la confirmación, mailing y crédito de
+// puntos. Mantenemos un Set en memoria con TTL — suficiente para los rangos
+// de retry de Stripe (segundos a minutos), evita migración DB.
+//
+// LIMITACIÓN: si el proceso reinicia, perdemos el Set. Para producción se
+// recomienda persistir en una tabla `processed_webhooks(event_id PK, seen_at)`
+// con `ON CONFLICT DO NOTHING`. La función `markWebhookSeen()` está aislada
+// para reemplazo trivial cuando se conecte la tabla.
+const PROCESSED_WEBHOOKS = new Map<string, number>();
+const WEBHOOK_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+function markWebhookSeen(eventId: string): boolean {
+  // Limpieza: borra entries > TTL.
+  const now = Date.now();
+  for (const [id, ts] of PROCESSED_WEBHOOKS) {
+    if (now - ts > WEBHOOK_TTL_MS) PROCESSED_WEBHOOKS.delete(id);
+  }
+  if (PROCESSED_WEBHOOKS.has(eventId)) return false;
+  PROCESSED_WEBHOOKS.set(eventId, now);
+  return true;
+}
+
 // POST /api/payments/webhook — Stripe webhook handler
 export async function POST(req: NextRequest) {
   try {
@@ -40,6 +63,12 @@ export async function POST(req: NextRequest) {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch {
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+    }
+
+    // Idempotencia: Stripe reintenta hasta 3 días si no recibimos 200. Sin dedupe
+    // el mismo `payment_intent.succeeded` doblaría confirmación, mailing y créditos.
+    if (!markWebhookSeen(event.id)) {
+      return NextResponse.json({ received: true, deduped: true, eventId: event.id });
     }
 
     const db = getDb();

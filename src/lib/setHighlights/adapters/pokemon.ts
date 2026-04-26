@@ -4,6 +4,7 @@ import type { HighlightCard, LocalProduct, ResolveResult, SetAdapter } from "../
 import { dedup } from "../cache";
 import { getJson } from "../fetcher";
 import { bestFuzzyMatch, enrichForMatch } from "../matching";
+import { hasPokemonTcgKey, pokemonTcgInit, pokemonTcgUrl } from "@/lib/pokemonTcgClient";
 import {
   POKEMON_SET_MAP,
   TCGDEX_EN_SET,
@@ -24,12 +25,10 @@ let pokemonSetsCache: PokemonSet[] | null = null;
 
 async function getPokemonSets(): Promise<PokemonSet[]> {
   if (pokemonSetsCache) return pokemonSetsCache;
-  const apiKey = process.env.NEXT_PUBLIC_POKEMON_TCG_API_KEY;
-  const init: RequestInit = apiKey ? { headers: { "X-Api-Key": apiKey } } : {};
   const list = await dedup("pokemon:sets", async () => {
     const data = await getJson<{ data?: PokemonSet[] }>(
-      "https://api.pokemontcg.io/v2/sets",
-      init,
+      pokemonTcgUrl("v2/sets"),
+      pokemonTcgInit(),
     );
     return data?.data ?? [];
   });
@@ -115,10 +114,10 @@ interface PtcgCard {
 }
 
 async function fetchFromPtcg(setId: string): Promise<HighlightCard[]> {
-  const apiKey = process.env.NEXT_PUBLIC_POKEMON_TCG_API_KEY;
-  const init: RequestInit = apiKey ? { headers: { "X-Api-Key": apiKey } } : {};
-  const url = `https://api.pokemontcg.io/v2/cards?q=set.id:${encodeURIComponent(setId)}&orderBy=-cardmarket.prices.trendPrice&pageSize=20`;
-  const data = await getJson<{ data?: PtcgCard[] }>(url, init);
+  const url = pokemonTcgUrl(
+    `v2/cards?q=set.id:${encodeURIComponent(setId)}&orderBy=-cardmarket.prices.trendPrice&pageSize=20`,
+  );
+  const data = await getJson<{ data?: PtcgCard[] }>(url, pokemonTcgInit());
   const cards = data?.data ?? [];
   return cards
     .map<HighlightCard>((c) => ({
@@ -167,10 +166,10 @@ async function fetchTopCards(
   _product: LocalProduct,
   errors: string[],
 ): Promise<HighlightCard[]> {
-  // Intenta pokemontcg.io primero si tenemos API key. Sin key la mayoría de
+  // Intenta pokemontcg.io primero si tenemos API key (en cliente, asumimos que
+  // la proxy puede tenerla — getJson maneja fallback). Sin key la mayoría de
   // tiempo da 429, así que usamos hardcoded + TCGDex directamente.
-  const apiKey = process.env.NEXT_PUBLIC_POKEMON_TCG_API_KEY;
-  if (apiKey && (lang === "EN" || lang === "ES" || lang === "FR" || lang === "DE" || lang === "IT" || lang === "PT")) {
+  if (hasPokemonTcgKey() && (lang === "EN" || lang === "ES" || lang === "FR" || lang === "DE" || lang === "IT" || lang === "PT")) {
     try {
       const r = await fetchFromPtcg(setId);
       if (r.length > 0) return r;

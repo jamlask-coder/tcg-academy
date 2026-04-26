@@ -11,9 +11,10 @@ import {
   Settings,
   Bell,
   Package,
+  Truck,
   Zap,
   ShieldCheck,
-  BadgeCheck,
+  CheckCircle2,
   ChevronDown,
   LogOut,
   LayoutDashboard,
@@ -223,22 +224,97 @@ function SearchDropdown({
 
 function MobileTrustBar() {
   // Mensaje fijo en móvil: "Envío gratis desde X€" siempre visible, sin
-  // rotación. Decisión del usuario — el threshold se lee de SITE_CONFIG.
+  // rotación. Color sólido uniforme — coherente con la trust bar desktop.
   return (
     <div
-      className="px-4 py-1 text-center text-xs text-white lg:hidden"
-      style={{
-        background:
-          "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #1d4ed8 100%)",
-      }}
+      className="flex h-7 items-end justify-center px-4 text-xs leading-none text-white lg:hidden"
+      style={{ backgroundColor: "#132B5F" }}
     >
-      <span className="inline-flex items-center gap-1.5 font-medium">
-        <span className="inline-flex text-amber-300">
-          <Package size={12} />
-        </span>
-        Envío gratis desde{" "}
-        <strong className="text-amber-300">{SITE_CONFIG.shippingThreshold}€</strong>
+      <span className="inline-flex items-center gap-1.5 font-medium leading-none">
+        <Truck
+          size={12}
+          className="shrink-0 text-amber-400"
+          aria-hidden="true"
+        />
+        <span className="text-white">Envío gratis desde</span>
+        <strong className="text-amber-400">{SITE_CONFIG.shippingThreshold}€</strong>
       </span>
+    </div>
+  );
+}
+
+// Desktop trust bar: 1 mensaje a la vez, centrado, con slide-up entre ellos.
+// Color sólido uniforme #132B5F — sin gradiente.
+function DesktopTrustBar() {
+  const items = [
+    {
+      key: "envio-gratis",
+      Icon: Truck,
+      label: "Envío gratis desde",
+      highlight: `${SITE_CONFIG.shippingThreshold}€`,
+    },
+    {
+      key: "envio-rapido",
+      Icon: Zap,
+      label: "Envío en",
+      highlight: `${SITE_CONFIG.dispatchHours}h`,
+    },
+    {
+      key: "pago-seguro",
+      Icon: ShieldCheck,
+      label: "Pago",
+      highlight: "100% seguro",
+    },
+    {
+      key: "originales",
+      Icon: CheckCircle2,
+      label: "Productos",
+      highlight: "100% originales",
+    },
+  ];
+  const [idx, setIdx] = useState(0);
+  useEffect(() => {
+    const id = setInterval(
+      () => setIdx((i) => (i + 1) % items.length),
+      3500,
+    );
+    return () => clearInterval(id);
+  }, [items.length]);
+  const total = items.length;
+  return (
+    <div
+      className="hidden text-xs leading-none text-white lg:block"
+      style={{ backgroundColor: "#132B5F" }}
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      <Container className="flex h-7 items-center justify-center">
+        <div className="relative h-5 w-full max-w-[420px] overflow-hidden">
+          {items.map((item, i) => {
+            const offset = (i - idx + total) % total;
+            const positionCls =
+              offset === 0
+                ? "opacity-100 translate-y-0"
+                : offset === total - 1
+                  ? "opacity-0 -translate-y-full"
+                  : "opacity-0 translate-y-full";
+            return (
+              <span
+                key={item.key}
+                className={`absolute inset-0 flex items-center justify-center gap-1.5 font-medium leading-none transition-all duration-500 ease-out ${positionCls}`}
+              >
+                <item.Icon
+                  size={13}
+                  className="shrink-0 text-amber-400"
+                  aria-hidden="true"
+                />
+                <span className="text-white">{item.label}</span>
+                <strong className="text-amber-400">{item.highlight}</strong>
+              </span>
+            );
+          })}
+        </div>
+      </Container>
     </div>
   );
 }
@@ -261,13 +337,13 @@ function HeaderTagline() {
     return () => clearInterval(id);
   }, []);
   return (
-    <span className="mt-0.5 flex h-[14px] items-center gap-2 whitespace-nowrap text-[11px] font-semibold tracking-wide lg:mt-1 lg:ml-0 lg:text-[12px]">
+    <span className="-mt-0.5 flex h-[12px] items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold tracking-wide lg:mt-0 lg:ml-0 lg:text-[10px]">
       <span
         aria-hidden="true"
-        className="relative flex h-[7px] w-[7px] shrink-0"
+        className="relative flex h-[6px] w-[6px] shrink-0"
       >
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300 opacity-70" />
-        <span className="relative inline-flex h-[7px] w-[7px] rounded-full bg-amber-300 shadow-[0_0_6px_rgba(252,211,77,0.85)]" />
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-70" />
+        <span className="relative inline-flex h-[6px] w-[6px] rounded-full bg-amber-400 shadow-[0_0_5px_rgba(252,211,77,0.85)]" />
       </span>
       {/* Crossfade: todos los mensajes siempre en el DOM, apilados. El activo
           tiene opacity:1, los demás 0. No hay momento sin texto visible. */}
@@ -326,7 +402,7 @@ function HeaderInlineAuth() {
           onClick={() => setMenuOpen((o) => !o)}
           aria-label="Mi cuenta"
           aria-expanded={menuOpen}
-          className="flex h-11 items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-4 transition hover:bg-white/15"
+          className="flex h-9 items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-4 transition hover:bg-white/15"
         >
           <span className="text-xs text-blue-200">Bienvenido,&nbsp;</span>
           <span className="text-xs font-bold text-white">{firstName}</span>
@@ -385,7 +461,7 @@ function HeaderInlineAuth() {
   return (
     <Link
       href="/login"
-      className="hidden h-11 items-center justify-center rounded-full bg-amber-300 px-7 text-sm font-bold text-[#0a1628] shadow-md transition hover:bg-amber-200 hover:shadow-lg active:scale-[0.98] lg:inline-flex"
+      className="hidden h-9 items-center justify-center rounded-full bg-amber-400 px-7 text-sm font-bold text-[#0a1628] shadow-md transition hover:bg-amber-300 hover:shadow-lg active:scale-[0.98] lg:inline-flex"
       aria-label="Iniciar sesión"
     >
       Entrar
@@ -533,58 +609,14 @@ export function Header() {
     <header
       className="sticky top-0 z-50 overflow-visible"
       style={{
-        background:
-          "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #1d4ed8 100%)",
+        // Color sólido azul marino (#132B5F) en todo el header — desktop y
+        // móvil. Comparte color con la trust bar para que el bloque superior
+        // se lea como una sola pieza uniforme.
+        backgroundColor: "#132B5F",
       }}
     >
-      {/* Topbar — desktop */}
-      <div
-        className="hidden py-2.5 text-xs text-white lg:block"
-        style={{
-          background:
-            "linear-gradient(to right, #0a0f1a 0%, #1e3a8a 55%, #1d4ed8 100%)",
-        }}
-      >
-        <Container className="flex items-center justify-center gap-8">
-          <span
-            className="trust-item flex items-center gap-1.5 font-medium"
-            style={{ "--shimmer-delay": "0s" } as React.CSSProperties}
-          >
-            <Package size={12} className="trust-icon text-amber-300" />
-            Envío gratis desde{" "}
-            <strong className="ml-1 text-amber-300">
-              {SITE_CONFIG.shippingThreshold}€
-            </strong>
-          </span>
-          <span className="h-3 border-l border-white/20" />
-          <span
-            className="trust-item flex items-center gap-1.5 font-medium"
-            style={{ "--shimmer-delay": "2.5s" } as React.CSSProperties}
-          >
-            <Zap size={12} className="trust-icon text-amber-300" />
-            Envío en{" "}
-            <strong className="ml-1 text-amber-300">
-              {SITE_CONFIG.dispatchHours}h
-            </strong>
-          </span>
-          <span className="h-3 border-l border-white/20" />
-          <span
-            className="trust-item flex items-center gap-1.5 font-medium"
-            style={{ "--shimmer-delay": "5s" } as React.CSSProperties}
-          >
-            <ShieldCheck size={12} className="trust-icon text-amber-300" />
-            Pago <strong className="ml-1 text-amber-300">100% seguro</strong>
-          </span>
-          <span className="h-3 border-l border-white/20" />
-          <span
-            className="trust-item flex items-center gap-1.5 font-medium"
-            style={{ "--shimmer-delay": "7.5s" } as React.CSSProperties}
-          >
-            <BadgeCheck size={12} className="trust-icon text-amber-300" />
-            Productos <strong className="ml-1 text-amber-300">100% originales</strong>
-          </span>
-        </Container>
-      </div>
+      {/* Topbar — desktop rotating */}
+      <DesktopTrustBar />
       {/* Topbar — mobile rotating */}
       <MobileTrustBar />
 
@@ -594,9 +626,9 @@ export function Header() {
           (no con el centro del bloque logo+tagline). pt y pb simétricos para
           que el tagline tenga el mismo aire arriba (hacia TCG Academy) que
           abajo (hacia la imagen). */}
-      <Container className="flex h-14 items-start justify-between gap-3 py-[6px] lg:h-16 lg:items-center lg:justify-center lg:py-0">
+      <Container className="flex h-14 items-start justify-between gap-3 py-[6px] lg:grid lg:h-14 lg:grid-cols-[1fr_auto_1fr] lg:items-start lg:gap-3 lg:py-0">
         {/* Hamburger + Logo */}
-        <div className="flex shrink-0 items-start gap-2 lg:items-center">
+        <div className="flex shrink-0 items-start gap-2 lg:items-center lg:justify-self-end">
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
@@ -610,7 +642,7 @@ export function Header() {
             className="flex flex-col items-start leading-none"
           >
             <span className="text-[1.9rem] font-black tracking-tight text-white lg:text-3xl">
-              TCG <span className="text-amber-300">Academy</span>
+              TCG <span className="text-amber-400">Academy</span>
             </span>
             {/* Tagline rotativa con dot "live" — visible en móvil y desktop, debajo del título */}
             <HeaderTagline />
@@ -647,14 +679,17 @@ export function Header() {
             >
               <ShoppingCart size={24} className="text-white" />
               {mounted && count > 0 && (
-                <span className="absolute top-0 right-0 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-amber-300 px-1 text-[10px] font-bold leading-none text-gray-900 shadow-[0_0_6px_rgba(252,211,77,0.6)]">
+                <span className="absolute top-0 right-0 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold leading-none text-gray-900 shadow-[0_0_6px_rgba(252,211,77,0.6)]">
                   {count > 99 ? "99+" : count}
                 </span>
               )}
             </Link>
           </div>
 
-          {/* Desktop search — píldora blanca grande (diseño 2026-04-25) */}
+          {/* Desktop search — píldora blanca grande (diseño 2026-04-25).
+              Va sola en la columna middle del grid `[1fr_auto_1fr]` → su
+              centro coincide con el centro de la página y por tanto con el
+              de la trust bar superior. */}
           <div
             className="relative hidden w-[600px] lg:block"
             ref={desktopSearchRef}
@@ -676,7 +711,7 @@ export function Header() {
                 setDesktopDropdownOpen(true);
               }}
               placeholder="Buscar cartas, sobres..."
-              className="h-11 w-full rounded-full border-0 bg-white pr-5 pl-12 text-sm text-gray-800 shadow-sm transition placeholder:text-gray-400 focus:shadow-md focus:outline-none"
+              className="h-9 w-full rounded-full border-0 bg-white pr-5 pl-12 text-sm text-gray-800 shadow-sm transition placeholder:text-gray-400 focus:shadow-md focus:outline-none"
               autoComplete="off"
               aria-label="Buscar productos"
             />
@@ -701,22 +736,27 @@ export function Header() {
           )}
           </div>
 
-          {/* Desktop inline login / greeting */}
-          <HeaderInlineAuth />
         </div>
         {/* Fin zona central */}
 
         {/* Iconos — siempre a la derecha, con margen para el badge.
             En móvil alineados al top para cuadrar con "TCG Academy".
-            Orden invariante: Perfil (izquierda del todo) → [atajos admin
-            / bell notificaciones] → Carrito (derecha del todo). */}
-        <div className="flex shrink-0 items-start gap-0.5 pr-2 lg:items-center">
+            Orden invariante: HeaderInlineAuth (login/greeting pill, solo desktop)
+            → Perfil → [atajos admin / bell notificaciones] → Carrito.
+            HeaderInlineAuth vive aquí (no en la zona central) para que el
+            buscador quede SIEMPRE centrado en la página, independiente de si
+            el usuario está logueado y del ancho del pill. */}
+        <div className="flex shrink-0 items-start gap-0.5 pr-2 lg:items-start lg:justify-self-start lg:gap-2 lg:pr-0">
+          {/* Desktop login/greeting pill — único elemento que cambia entre
+              estados logueado / no logueado. Su ancho variable NO afecta al
+              centrado del buscador porque está en la columna derecha del grid. */}
+          <HeaderInlineAuth />
           {/* 1. User icon — SIEMPRE el primero (izquierda del todo).
               Desktop only: en móvil el login/cuenta vive en la píldora estilo
               YouTube del centro (middle zone). */}
           <Link
             href={user ? (user.role === "admin" ? "/admin" : "/cuenta") : "/login"}
-            className="hidden items-center justify-center gap-1.5 rounded-lg p-2 transition hover:bg-white/10 lg:flex lg:min-h-[44px]"
+            className="hidden items-center justify-center gap-1.5 rounded-lg p-2 transition hover:bg-white/10 lg:flex lg:min-h-9"
             aria-label={user?.role === "admin" ? "Panel de administración" : "Mi cuenta"}
           >
             <User size={22} className="text-white" />
@@ -745,13 +785,13 @@ export function Header() {
                   key={href}
                   href={href}
                   title={`${title}: ${count}`}
-                  className="relative hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10 lg:flex"
+                  className="relative hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10 lg:flex lg:min-h-9"
                   aria-label={`${count} ${label}`}
                 >
                   <Icon size={18} className="text-white" />
                   {/* Badge amarillo Academy — ancho mínimo 18px + padding 1.5 para
                       que 2-3 dígitos (94, 150, 999+) se vean completos sin recortar. */}
-                  <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-300 px-1.5 text-[10px] leading-none font-bold text-gray-900 shadow-[0_0_6px_rgba(252,211,77,0.6)] whitespace-nowrap">
+                  <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-400 px-1.5 text-[10px] leading-none font-bold text-gray-900 shadow-[0_0_6px_rgba(252,211,77,0.6)] whitespace-nowrap">
                     {count > 999 ? "999+" : count}
                   </span>
                 </Link>
@@ -763,12 +803,12 @@ export function Header() {
           {user && user.role !== "admin" && (
             <Link
               href="/cuenta/notificaciones"
-              className="relative hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10 lg:flex"
+              className="relative hidden min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 transition hover:bg-white/10 lg:flex lg:min-h-9"
               aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ""}`}
             >
               <Bell size={18} className="text-white" />
               {mounted && unreadCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-amber-300 px-1 text-[10px] font-bold leading-none text-gray-900 shadow-[0_0_6px_rgba(252,211,77,0.6)]">
+                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold leading-none text-gray-900 shadow-[0_0_6px_rgba(252,211,77,0.6)]">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
@@ -781,12 +821,12 @@ export function Header() {
           {user?.role !== "admin" && (
             <Link
               href="/carrito"
-              className="relative hidden items-center justify-center overflow-visible rounded-lg transition hover:bg-white/10 lg:flex lg:min-h-[44px] lg:min-w-[44px] lg:p-2"
+              className="relative hidden items-center justify-center overflow-visible rounded-lg transition hover:bg-white/10 lg:flex lg:min-h-9 lg:min-w-[44px] lg:p-2"
               aria-label={mounted ? `Carrito (${count} artículos)` : "Carrito"}
             >
               <ShoppingCart size={22} className="text-white" />
               {mounted && count > 0 && (
-                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-amber-300 px-1 text-[10px] font-bold leading-none text-gray-900 shadow-[0_0_6px_rgba(252,211,77,0.6)]">
+                <span className="absolute top-0.5 right-0.5 flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-amber-400 px-1 text-[10px] font-bold leading-none text-gray-900 shadow-[0_0_6px_rgba(252,211,77,0.6)]">
                   {count > 99 ? "99+" : count}
                 </span>
               )}

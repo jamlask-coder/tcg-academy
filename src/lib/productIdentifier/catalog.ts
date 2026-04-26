@@ -12,6 +12,7 @@
 // y `cache: "force-cache"` para que navegador/CDN las reutilicen.
 
 import { enrichForMatch, normalizeForMatch } from "@/lib/setHighlights/matching";
+import { pokemonTcgInit, pokemonTcgUrl } from "@/lib/pokemonTcgClient";
 import type { CatalogHit } from "./types";
 
 const DEFAULT_TIMEOUT_MS = 6000;
@@ -207,20 +208,13 @@ interface PokemonTcgSet {
 
 async function searchPokemonTcg(query: string, errors: string[]): Promise<CatalogHit[]> {
   try {
-    const apiKey =
-      typeof process !== "undefined"
-        ? process.env.NEXT_PUBLIC_POKEMON_TCG_API_KEY
-        : undefined;
-    const init: RequestInit = apiKey
-      ? { headers: { "X-Api-Key": apiKey }, cache: "force-cache" }
-      : { cache: "force-cache" };
     // Fetch-all: pokemontcg.io tiene ~150 sets. El prefix-search previo
     // (name:"<query>*") fallaba si la query incluía palabras extra (ETB,
     // caja...) o estaba en español. Mucho más robusto scorear localmente
     // con scoreMatch (que aplica sinónimos ES→EN y filtra tokens genéricos).
     const r = await timedFetch(
-      `https://api.pokemontcg.io/v2/sets?pageSize=250`,
-      init,
+      pokemonTcgUrl("v2/sets?pageSize=250"),
+      pokemonTcgInit({ cache: "force-cache" }),
     );
     if (!r.ok) {
       errors.push(`pokemontcg:${r.status}`);

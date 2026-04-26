@@ -1,6 +1,6 @@
 "use client";
 import { useState, useCallback } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
@@ -162,7 +162,7 @@ export default function B2BPage() {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     trigger,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
@@ -179,8 +179,8 @@ export default function B2BPage() {
     },
   });
 
-  const tiendaFisica = watch("tiendaFisica");
-  const ventaOnline = watch("ventaOnline");
+  const tiendaFisica = useWatch({ control, name: "tiendaFisica" });
+  const ventaOnline = useWatch({ control, name: "ventaOnline" });
 
   const toggleGame = (game: string) => {
     let next: string[];

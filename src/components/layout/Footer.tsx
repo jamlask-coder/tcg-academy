@@ -60,17 +60,17 @@ function FooterLink({
 
 export function Footer() {
   return (
-    <footer className="relative overflow-hidden text-white" style={{ background: "#050810" }}>
+    <footer className="relative overflow-hidden text-white" style={{ background: "#0a1530" }}>
       {/* Gradient overlay — lo más claro se concentra en la esquina inferior
-          derecha (azul #1e3a8a). La capa superior linear-gradient mantiene el
+          derecha (azul #2549a8). La capa superior linear-gradient mantiene el
           borde de arriba al color base para empalmar sin línea con la sección
-          anterior. */}
+          anterior. Paleta alineada con el header (#15306b). */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{
         background: `
-          linear-gradient(to bottom, #050810 0%, #050810 80px, rgba(5,8,16,0) 220px),
-          radial-gradient(ellipse at 100% 100%, #1e3a8a 0%, transparent 65%),
-          radial-gradient(ellipse at 75% 85%, #0c1a3a 0%, transparent 55%),
-          radial-gradient(ellipse at 0% 100%, #050810 0%, transparent 60%)
+          linear-gradient(to bottom, #0a1530 0%, #0a1530 80px, rgba(10,21,48,0) 220px),
+          radial-gradient(ellipse at 100% 100%, #2549a8 0%, transparent 65%),
+          radial-gradient(ellipse at 75% 85%, #15306b 0%, transparent 55%),
+          radial-gradient(ellipse at 0% 100%, #0a1530 0%, transparent 60%)
         `,
       }} />
 

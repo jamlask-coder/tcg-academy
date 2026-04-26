@@ -98,9 +98,18 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  // Audit P0 I-02 — DoS via `storeIds[]` ilimitado. Cap a 10.
+  const MAX_STORES = 10;
+  if (body.storeIds && (!Array.isArray(body.storeIds) || body.storeIds.length > MAX_STORES)) {
+    return NextResponse.json(
+      { ok: false, error: `storeIds máximo ${MAX_STORES} elementos` },
+      { status: 400 },
+    );
+  }
+
   const query = normalizeProductName(body.productName);
   const stores = body.storeIds?.length
-    ? body.storeIds.map(getCompetitorStore).filter((s): s is NonNullable<typeof s> => Boolean(s && s.enabled))
+    ? body.storeIds.slice(0, MAX_STORES).map(getCompetitorStore).filter((s): s is NonNullable<typeof s> => Boolean(s && s.enabled))
     : listEnabledCompetitorStores();
 
   // Pre-hasheamos NUESTRA imagen una sola vez por request — los adapters

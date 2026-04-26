@@ -1612,14 +1612,14 @@ export default function AdminPedidosPage() {
         <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/admin/pedidos/nuevo-albaran"
-            className="inline-flex items-center gap-2 rounded-xl bg-[#16a34a] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#15803d]"
+            className="btn-solid-green inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition"
           >
             <Truck size={15} />
             Emitir albarán
           </Link>
           <Link
             href="/admin/pedidos/albaranes"
-            className="inline-flex items-center gap-2 rounded-xl bg-[#16a34a] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#15803d]"
+            className="btn-solid-green inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition"
           >
             <Package size={15} />
             Libro albaranes

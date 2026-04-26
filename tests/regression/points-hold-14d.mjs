@@ -34,6 +34,7 @@ function check(name, fn) {
 const POINTS_PER_EURO = 100;
 const POINTS_PENDING_DAYS = 14;
 const POINTS_PENDING_MS = POINTS_PENDING_DAYS * 24 * 60 * 60 * 1000;
+const REFERRAL_ASSOC_PTS_PER_100 = 5000; // 5000 pts/€100 (= 0,50€/100€)
 
 /**
  * Simulador minimalista del store de puntos (balance + history).
@@ -42,6 +43,7 @@ const POINTS_PENDING_MS = POINTS_PENDING_DAYS * 24 * 60 * 60 * 1000;
 function makeStore() {
   const balance = new Map(); // userId -> number
   const history = new Map(); // userId -> HistoryEntry[]
+  const assocs  = new Map(); // userId -> [{ referrerId }]
 
   const get = (userId) => balance.get(userId) ?? 0;
   const setBal = (userId, n) => balance.set(userId, Math.max(0, Math.floor(n)));
@@ -51,6 +53,10 @@ function makeStore() {
     arr.push({ id: `h${arr.length}`, ...entry });
     history.set(userId, arr);
   };
+
+  function setAssocs(userId, list) {
+    assocs.set(userId, list);
+  }
 
   function awardPurchasePoints(userId, euroAmount, orderId, now = Date.now()) {
     const euros = Math.floor(euroAmount);
@@ -67,13 +73,32 @@ function makeStore() {
       orderId,
     });
     // NO toca balance del comprador.
+
+    // Asociados: también pendiente con mismo hold 14d
+    const userAssocs = assocs.get(userId) ?? [];
+    const assocPts = Math.floor((euros * REFERRAL_ASSOC_PTS_PER_100) / 100);
+    if (assocPts > 0) {
+      for (const a of userAssocs) {
+        addHist(a.referrerId, {
+          ts: now,
+          pts: assocPts,
+          type: "asociacion",
+          desc: `Tu asociado compró €${euros}`,
+          sourceUserId: userId,
+          euroAmount: euros,
+          availableAt: now + POINTS_PENDING_MS,
+          released: false,
+          orderId,
+        });
+      }
+    }
   }
 
   function loadPendingPoints(userId, now = Date.now()) {
     return hist(userId)
       .filter(
         (h) =>
-          h.type === "compra" &&
+          (h.type === "compra" || h.type === "asociacion") &&
           !h.released &&
           !h.cancelled &&
           typeof h.availableAt === "number" &&
@@ -87,7 +112,7 @@ function makeStore() {
     let released = 0;
     let count = 0;
     for (const e of arr) {
-      if (e.type !== "compra") continue;
+      if (e.type !== "compra" && e.type !== "asociacion") continue;
       if (e.released || e.cancelled) continue;
       if (typeof e.availableAt !== "number") continue;
       if (e.availableAt > now) continue;
@@ -110,6 +135,8 @@ function makeStore() {
     const euros = Math.floor(euroAmount);
     if (euros <= 0) return;
     const buyerPts = euros * POINTS_PER_EURO;
+
+    // ── Comprador ─────────────────────────────────────────────────────────
     let cancelledPreMature = false;
     if (orderId) {
       const arr = hist(userId);
@@ -144,6 +171,51 @@ function makeStore() {
         orderId,
       });
     }
+
+    // ── Asociados: misma estrategia ───────────────────────────────────────
+    const userAssocs = assocs.get(userId) ?? [];
+    const assocPts = Math.floor((euros * REFERRAL_ASSOC_PTS_PER_100) / 100);
+    if (assocPts <= 0) return;
+
+    for (const a of userAssocs) {
+      let cancelledAssoc = false;
+      if (orderId) {
+        const arr = hist(a.referrerId);
+        const e = arr.find(
+          (h) =>
+            h.type === "asociacion" &&
+            h.orderId === orderId &&
+            h.sourceUserId === userId &&
+            !h.released &&
+            !h.cancelled,
+        );
+        if (e) {
+          e.cancelled = true;
+          addHist(a.referrerId, {
+            ts: now,
+            pts: 0,
+            type: "devolucion",
+            desc: `Devolución de tu asociado (€${euros}) — pts pendientes anulados`,
+            sourceUserId: userId,
+            euroAmount: euros,
+            orderId,
+          });
+          cancelledAssoc = true;
+        }
+      }
+      if (!cancelledAssoc) {
+        setBal(a.referrerId, get(a.referrerId) - assocPts);
+        addHist(a.referrerId, {
+          ts: now,
+          pts: -assocPts,
+          type: "devolucion",
+          desc: `Devolución de tu asociado (€${euros})`,
+          sourceUserId: userId,
+          euroAmount: euros,
+          orderId,
+        });
+      }
+    }
   }
 
   return {
@@ -152,6 +224,7 @@ function makeStore() {
     loadPendingPoints,
     refundPurchasePoints,
     releaseMaturedPoints,
+    setAssocs,
     _hist: hist,
   };
 }
@@ -291,6 +364,88 @@ check("Invariante: balance siempre ≥ 0", () => {
   // Sobre-deducir
   s.refundPurchasePoints("u1", 200, undefined, t14);
   if (s.loadPoints("u1", t14) < 0) throw new Error("balance negativo");
+});
+
+// ─── ASOCIADOS — mismo hold 14d ───────────────────────────────────────────────
+
+// 11. Compra con asociado → asociado también va a pending, no balance
+check("Asociado: compra de €100 → balance asociado 0, pending 5000", () => {
+  const s = makeStore();
+  const t0 = 1_700_000_000_000;
+  s.setAssocs("buyer", [{ referrerId: "friend" }]);
+  s.awardPurchasePoints("buyer", 100, "TCG-1", t0);
+  if (s.loadPoints("friend", t0) !== 0)
+    throw new Error("asociado recibió pts al instante");
+  if (s.loadPendingPoints("friend", t0) !== 5000)
+    throw new Error(`pending asociado=${s.loadPendingPoints("friend", t0)}, esperado 5000`);
+});
+
+// 12. Asociado: día 14 → maduran al saldo
+check("Asociado: día 14 → maduran al saldo (5000), pending=0", () => {
+  const s = makeStore();
+  const t0 = 1_700_000_000_000;
+  s.setAssocs("buyer", [{ referrerId: "friend" }]);
+  s.awardPurchasePoints("buyer", 100, "TCG-1", t0);
+  const t14 = t0 + POINTS_PENDING_MS;
+  if (s.loadPoints("friend", t14) !== 5000)
+    throw new Error(`balance asociado=${s.loadPoints("friend", t14)}, esperado 5000`);
+  if (s.loadPendingPoints("friend", t14) !== 0)
+    throw new Error("pending asociado no se vació");
+});
+
+// 13. Asociado: refund pre-mature → cancela su entry, balance sigue 0
+check("Asociado: refund pre-mature cancela su entry, balance sigue 0", () => {
+  const s = makeStore();
+  const t0 = 1_700_000_000_000;
+  s.setAssocs("buyer", [{ referrerId: "friend" }]);
+  s.awardPurchasePoints("buyer", 100, "TCG-1", t0);
+  const t5 = t0 + 5 * 24 * 60 * 60 * 1000;
+  s.refundPurchasePoints("buyer", 100, "TCG-1", t5);
+  if (s.loadPoints("friend", t5) !== 0)
+    throw new Error(`balance asociado=${s.loadPoints("friend", t5)}, esperado 0 (cancelled)`);
+  // Aunque pase el tiempo, NO debe madurar
+  const t30 = t0 + 30 * 24 * 60 * 60 * 1000;
+  if (s.loadPoints("friend", t30) !== 0)
+    throw new Error("entry asociado cancelled no debió madurar");
+});
+
+// 14. Asociado: refund post-mature → deduct del balance del asociado
+check("Asociado: refund post-mature → balance asociado descontado", () => {
+  const s = makeStore();
+  const t0 = 1_700_000_000_000;
+  s.setAssocs("buyer", [{ referrerId: "friend" }]);
+  s.awardPurchasePoints("buyer", 100, "TCG-1", t0);
+  const t14 = t0 + POINTS_PENDING_MS;
+  s.loadPoints("friend", t14); // fuerza maduración: friend = 5000
+  const t20 = t0 + 20 * 24 * 60 * 60 * 1000;
+  s.refundPurchasePoints("buyer", 100, "TCG-1", t20);
+  if (s.loadPoints("friend", t20) !== 0)
+    throw new Error(`balance asociado=${s.loadPoints("friend", t20)}, esperado 0`);
+});
+
+// 15. Múltiples asociados (3): todos reciben pending y todos se cancelan pre-mature
+check("3 asociados: todos pending → todos cancelados en refund pre-mature", () => {
+  const s = makeStore();
+  const t0 = 1_700_000_000_000;
+  s.setAssocs("buyer", [
+    { referrerId: "f1" },
+    { referrerId: "f2" },
+    { referrerId: "f3" },
+  ]);
+  s.awardPurchasePoints("buyer", 100, "TCG-1", t0);
+  // Los 3 tienen 5000 pending
+  for (const f of ["f1", "f2", "f3"]) {
+    if (s.loadPendingPoints(f, t0) !== 5000)
+      throw new Error(`${f} pending=${s.loadPendingPoints(f, t0)}, esperado 5000`);
+  }
+  // Refund pre-mature → todos cancelan
+  const t5 = t0 + 5 * 24 * 60 * 60 * 1000;
+  s.refundPurchasePoints("buyer", 100, "TCG-1", t5);
+  const t30 = t0 + 30 * 24 * 60 * 60 * 1000;
+  for (const f of ["f1", "f2", "f3"]) {
+    if (s.loadPoints(f, t30) !== 0)
+      throw new Error(`${f} balance=${s.loadPoints(f, t30)} en t30, esperado 0`);
+  }
 });
 
 console.log("\n══════════════════════════════════════════");
