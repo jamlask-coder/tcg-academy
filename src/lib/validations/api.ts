@@ -94,6 +94,21 @@ export const authResendVerificationSchema = z.object({
   email: z.string().email().max(254),
 });
 
+/**
+ * Envío server-side del email de verificación cuando la cuenta vive en
+ * localStorage (modo local). El cliente genera el token (vía
+ * `issueVerificationToken`) y envía aquí el `verifyUrl` resultante. El
+ * servidor solo reenvía vía Resend — no toca BD. Sirve para que el correo
+ * real salga aunque NEXT_PUBLIC_BACKEND_MODE=local, ya que RESEND_API_KEY
+ * solo existe en el servidor.
+ */
+export const authSendVerificationEmailSchema = z.object({
+  action: z.literal("send-verification-email"),
+  email: z.string().email().max(254),
+  name: z.string().min(1).max(120),
+  verifyUrl: z.string().url().max(2048),
+});
+
 export const authBodySchema = z.discriminatedUnion("action", [
   authLoginSchema,
   authRegisterSchema,
@@ -103,6 +118,7 @@ export const authBodySchema = z.discriminatedUnion("action", [
   authLogoutSchema,
   authVerifyEmailSchema,
   authResendVerificationSchema,
+  authSendVerificationEmailSchema,
 ]);
 
 // ─── Orders ──────────────────────────────────────────────────────────────

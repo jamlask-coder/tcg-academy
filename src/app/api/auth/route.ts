@@ -85,8 +85,43 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Acciones que solo necesitan email (no BD) ──────────────────────────
+    // Funcionan en cualquier modo, siempre que RESEND_API_KEY esté configurado.
+    // Permite que en modo local (cuenta en localStorage) los emails reales
+    // salgan vía servidor — RESEND_API_KEY nunca se expone al cliente.
+    if (action === "send-verification-email") {
+      const { email: vEmail, name: vName, verifyUrl } = body;
+      if (!vEmail || !vName || !verifyUrl) {
+        return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
+      }
+      // Validamos que el host del verifyUrl coincida con NEXT_PUBLIC_APP_URL
+      // (o sea localhost en dev). Evita que un actor pueda usar este endpoint
+      // para mandar URLs phishing arbitrarias desde nuestro dominio.
+      try {
+        const expected = new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000");
+        const got = new URL(verifyUrl);
+        if (got.host !== expected.host) {
+          return NextResponse.json({ error: "URL de verificación no permitida" }, { status: 400 });
+        }
+      } catch {
+        return NextResponse.json({ error: "URL inválida" }, { status: 400 });
+      }
+      try {
+        const emailService = getEmailService();
+        await emailService.sendTemplatedEmail("verificar_email", vEmail.toLowerCase().trim(), {
+          nombre: sanitizeString(vName),
+          verify_url: verifyUrl,
+          expires_in: "7 días",
+        });
+        return NextResponse.json({ ok: true });
+      } catch {
+        // No revelar el motivo concreto al cliente.
+        return NextResponse.json({ ok: false, error: "No se pudo enviar el email" }, { status: 500 });
+      }
+    }
+
     if (!isServerMode()) {
-      // Local mode: return acknowledgment, client handles everything
+      // Resto de acciones en local mode: return acknowledgment, cliente lo maneja.
       return NextResponse.json({ ok: true, mode: "local", message: "Modo local activo." });
     }
 

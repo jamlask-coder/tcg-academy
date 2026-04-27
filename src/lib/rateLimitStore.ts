@@ -28,7 +28,7 @@ export interface RateLimitResult {
 const isServerMode = () =>
   (process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local") === "server";
 const hasSupabase = () =>
-  Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY);
+  Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 /**
  * Rate limiting atómico sobre Postgres. Usa UPSERT + check-and-increment en

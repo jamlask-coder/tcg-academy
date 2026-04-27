@@ -1241,25 +1241,185 @@ export class ServerDbAdapter implements DbAdapter {
   }
 
   // ── Extended entities ──────────────────────────────────────────────────────
-  // NOTE: Implementaciones Supabase pendientes. Los servicios de negocio todavía
-  // leen/escriben a localStorage incluso en modo server. Los stubs siguientes
-  // existen para satisfacer el contrato de DbAdapter y mantener el build.
-  // Cuando se migre cada servicio, reemplazar el stub por la query real.
+  // Implementaciones Supabase reales. Cada método mapea el shape Record (camelCase
+  // estable para servicios) a las columnas snake_case de la BD. La sintaxis y
+  // convenciones siguen el mismo patrón que las secciones anteriores (Orders,
+  // Users, Invoices) para que el adapter sea homogéneo.
 
-  async getProducts(): Promise<ProductRecord[]> { return []; }
-  async getProduct(): Promise<ProductRecord | null> { return null; }
-  async upsertProduct(p: ProductRecord): Promise<ProductRecord> { return p; }
-  async softDeleteProduct(): Promise<void> { /* stub */ }
-  async getCategories(): Promise<CategoryRecord[]> { return []; }
-  async upsertCategory(c: CategoryRecord): Promise<CategoryRecord> { return c; }
-  async getCart(): Promise<CartItemRecord[]> { return []; }
-  async setCartItem(): Promise<void> { /* stub */ }
-  async removeCartItem(): Promise<void> { /* stub */ }
-  async clearCart(): Promise<void> { /* stub */ }
-  async getFavorites(): Promise<FavoriteRecord[]> { return []; }
-  async addFavorite(): Promise<void> { /* stub */ }
-  async removeFavorite(): Promise<void> { /* stub */ }
-  async getCoupons(): Promise<CouponRecord[]> { return []; }
+  async getProducts(opts?: { categoryId?: string; includeDeleted?: boolean }): Promise<ProductRecord[]> {
+    let query = this.db.from("products").select("*").order("created_at", { ascending: false });
+    if (opts?.categoryId) query = query.eq("category_id", opts.categoryId);
+    if (!opts?.includeDeleted) query = query.is("deleted_at", null);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map(mapProductRow);
+  }
+
+  async getProduct(id: number): Promise<ProductRecord | null> {
+    const { data, error } = await this.db.from("products").select("*").eq("id", id).maybeSingle();
+    if (error || !data) return null;
+    return mapProductRow(data);
+  }
+
+  async upsertProduct(p: ProductRecord): Promise<ProductRecord> {
+    const meta = (p.metadata ?? {}) as Record<string, unknown>;
+    // Limites por rol viajan en metadata para no inflar el schema con columnas
+    // que pueden cambiar (cliente/mayorista/tienda). max_per_user queda como
+    // fallback genérico.
+    if (p.maxPerClient !== undefined) meta.maxPerClient = p.maxPerClient;
+    if (p.maxPerWholesaler !== undefined) meta.maxPerWholesaler = p.maxPerWholesaler;
+    if (p.maxPerStore !== undefined) meta.maxPerStore = p.maxPerStore;
+    const { data, error } = await this.db.from("products").upsert({
+      id: p.id,
+      slug: p.slug,
+      category_id: p.categoryId,
+      name: p.name,
+      short_description: p.shortDescription ?? null,
+      description: p.description ?? null,
+      price: p.price,
+      sale_price: p.salePrice ?? null,
+      vat_rate: p.vatRate,
+      stock: p.stock,
+      max_per_user: p.maxPerUser ?? null,
+      language: p.language ?? null,
+      barcode: p.barcode ?? null,
+      images: p.images,
+      metadata: meta,
+      updated_at: new Date().toISOString(),
+    }).select().single();
+    if (error) throw error;
+    return mapProductRow(data);
+  }
+
+  async softDeleteProduct(id: number): Promise<void> {
+    const { error } = await this.db
+      .from("products")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) throw error;
+  }
+
+  async getCategories(): Promise<CategoryRecord[]> {
+    const { data, error } = await this.db
+      .from("categories")
+      .select("*")
+      .order("sort_order", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(mapCategoryRow);
+  }
+
+  async upsertCategory(c: CategoryRecord): Promise<CategoryRecord> {
+    const { data, error } = await this.db.from("categories").upsert({
+      id: c.id,
+      parent_id: c.parentId ?? null,
+      slug: c.slug,
+      name: c.name,
+      description: c.description ?? null,
+      emoji: c.emoji ?? null,
+      color: c.color ?? null,
+      bg_color: c.bgColor ?? null,
+      sort_order: c.sortOrder,
+      is_active: c.isActive,
+      updated_at: new Date().toISOString(),
+    }).select().single();
+    if (error) throw error;
+    return mapCategoryRow(data);
+  }
+
+  // ── Cart ──────────────────────────────────────────────────────────────
+  // El carrito vive en `cart_items` con FK a `carts.user_id`. Antes de
+  // insertar items hay que asegurar que la cabecera existe (idempotente).
+
+  private async ensureCart(userId: string): Promise<void> {
+    await this.db.from("carts").upsert({ user_id: userId }, { onConflict: "user_id" });
+  }
+
+  async getCart(userId: string): Promise<CartItemRecord[]> {
+    const { data, error } = await this.db
+      .from("cart_items")
+      .select("*")
+      .eq("cart_user_id", userId)
+      .order("added_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((r: DbRow) => ({
+      userId: asStr(r.cart_user_id),
+      productId: Number(r.product_id),
+      quantity: Number(r.quantity),
+      addedAt: asStr(r.added_at),
+    }));
+  }
+
+  async setCartItem(userId: string, productId: number, quantity: number): Promise<void> {
+    await this.ensureCart(userId);
+    if (quantity <= 0) {
+      await this.removeCartItem(userId, productId);
+      return;
+    }
+    const { error } = await this.db.from("cart_items").upsert({
+      cart_user_id: userId,
+      product_id: productId,
+      quantity,
+      added_at: new Date().toISOString(),
+    }, { onConflict: "cart_user_id,product_id" });
+    if (error) throw error;
+  }
+
+  async removeCartItem(userId: string, productId: number): Promise<void> {
+    const { error } = await this.db
+      .from("cart_items")
+      .delete()
+      .eq("cart_user_id", userId)
+      .eq("product_id", productId);
+    if (error) throw error;
+  }
+
+  async clearCart(userId: string): Promise<void> {
+    const { error } = await this.db.from("cart_items").delete().eq("cart_user_id", userId);
+    if (error) throw error;
+  }
+
+  // ── Favorites ─────────────────────────────────────────────────────────
+
+  async getFavorites(userId: string): Promise<FavoriteRecord[]> {
+    const { data, error } = await this.db
+      .from("favorites")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((r: DbRow) => ({
+      userId: asStr(r.user_id),
+      productId: Number(r.product_id),
+      createdAt: asStr(r.created_at),
+    }));
+  }
+
+  async addFavorite(userId: string, productId: number): Promise<void> {
+    const { error } = await this.db.from("favorites").upsert(
+      { user_id: userId, product_id: productId },
+      { onConflict: "user_id,product_id" },
+    );
+    if (error) throw error;
+  }
+
+  async removeFavorite(userId: string, productId: number): Promise<void> {
+    const { error } = await this.db
+      .from("favorites")
+      .delete()
+      .eq("user_id", userId)
+      .eq("product_id", productId);
+    if (error) throw error;
+  }
+
+  // ── Coupons ───────────────────────────────────────────────────────────
+
+  async getCoupons(opts?: { activeOnly?: boolean }): Promise<CouponRecord[]> {
+    let query = this.db.from("coupons").select("*").order("created_at", { ascending: false });
+    if (opts?.activeOnly) query = query.eq("is_active", true);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map(mapCouponRow);
+  }
   /**
    * SERVER-SIDE coupon lookup — fuente canónica para validar `coupon.discount`
    * en /api/orders. Implementación real (Supabase) — ya no es stub: el código
@@ -1275,10 +1435,58 @@ export class ServerDbAdapter implements DbAdapter {
     if (error || !data) return null;
     return mapCouponRow(data as DbRow);
   }
-  async upsertCoupon(c: CouponRecord): Promise<CouponRecord> { return c; }
-  async deleteCoupon(): Promise<void> { /* stub */ }
-  async recordCouponUsage(): Promise<void> { /* stub */ }
-  async countCouponUsageByUser(): Promise<number> { return 0; }
+  async upsertCoupon(c: CouponRecord): Promise<CouponRecord> {
+    const { data, error } = await this.db.from("coupons").upsert({
+      id: c.id,
+      code: c.code,
+      discount_type: c.discountType,
+      discount_value: c.discountValue,
+      min_order: c.minOrder,
+      max_uses: c.maxUses ?? null,
+      max_per_user: c.maxPerUser,
+      used_count: c.usedCount,
+      valid_from: c.validFrom,
+      valid_until: c.validUntil ?? null,
+      is_active: c.isActive,
+      updated_at: new Date().toISOString(),
+    }).select().single();
+    if (error) throw error;
+    return mapCouponRow(data);
+  }
+
+  async deleteCoupon(id: string): Promise<void> {
+    const { error } = await this.db.from("coupons").delete().eq("id", id);
+    if (error) throw error;
+  }
+
+  async recordCouponUsage(usage: CouponUsageRecord): Promise<void> {
+    const { error } = await this.db.from("coupon_usage").insert({
+      coupon_id: usage.couponId,
+      user_id: usage.userId,
+      order_id: usage.orderId ?? null,
+    });
+    if (error) throw error;
+    // Incrementa contador agregado used_count (lectura + update). Race-condition
+    // tolerable: si dos pedidos casi simultáneos coinciden, el límite se aplica
+    // sobre coupon_usage real (count exact) en `countCouponUsageByUser`.
+    const { data: cur } = await this.db
+      .from("coupons")
+      .select("used_count")
+      .eq("id", usage.couponId)
+      .maybeSingle();
+    const next = Number((cur as { used_count?: number } | null)?.used_count ?? 0) + 1;
+    await this.db.from("coupons").update({ used_count: next }).eq("id", usage.couponId);
+  }
+
+  async countCouponUsageByUser(couponId: string, userId: string): Promise<number> {
+    const { count, error } = await this.db
+      .from("coupon_usage")
+      .select("*", { count: "exact", head: true })
+      .eq("coupon_id", couponId)
+      .eq("user_id", userId);
+    if (error) throw error;
+    return count ?? 0;
+  }
   /**
    * SERVER-SIDE points balance lookup — fuente canónica para validar
    * `pointsDiscount` en /api/orders. Implementación real (Supabase).
@@ -1299,68 +1507,510 @@ export class ServerDbAdapter implements DbAdapter {
       totalSpent: asNum(row.total_spent),
     };
   }
-  async appendPointsHistory(): Promise<void> { /* stub */ }
-  async getPointsHistory(): Promise<PointsHistoryEntry[]> { return []; }
-  async getIncidents(): Promise<IncidentRecord[]> { return []; }
+  // ── Points history ────────────────────────────────────────────────────
+
+  async appendPointsHistory(entry: PointsHistoryEntry): Promise<void> {
+    const { error } = await this.db.from("points_history").insert({
+      user_id: entry.userId,
+      amount: entry.amount,
+      reason: entry.reason,
+      ref_order: entry.refOrder ?? null,
+      ref_other: entry.refOther ?? null,
+    });
+    if (error) throw error;
+    // Recalcula balance/totales en `points` (upsert idempotente).
+    const { data: cur } = await this.db
+      .from("points")
+      .select("balance, total_earned, total_spent")
+      .eq("user_id", entry.userId)
+      .maybeSingle();
+    const row = (cur ?? {}) as { balance?: number; total_earned?: number; total_spent?: number };
+    const balance = Number(row.balance ?? 0) + entry.amount;
+    const totalEarned = Number(row.total_earned ?? 0) + (entry.amount > 0 ? entry.amount : 0);
+    const totalSpent = Number(row.total_spent ?? 0) + (entry.amount < 0 ? -entry.amount : 0);
+    await this.db.from("points").upsert({
+      user_id: entry.userId,
+      balance,
+      total_earned: totalEarned,
+      total_spent: totalSpent,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+  }
+
+  async getPointsHistory(userId: string): Promise<PointsHistoryEntry[]> {
+    const { data, error } = await this.db
+      .from("points_history")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((r: DbRow) => ({
+      id: asStr(r.id),
+      userId: asStr(r.user_id),
+      amount: Number(r.amount),
+      reason: asStr(r.reason),
+      refOrder: asOpt<string>(r.ref_order),
+      refOther: asOpt<string>(r.ref_other),
+      createdAt: asStr(r.created_at),
+    }));
+  }
+
+  // ── Incidents ─────────────────────────────────────────────────────────
+
+  async getIncidents(opts?: { userId?: string; orderId?: string }): Promise<IncidentRecord[]> {
+    let query = this.db.from("incidents").select("*").order("created_at", { ascending: false });
+    if (opts?.userId) query = query.eq("user_id", opts.userId);
+    if (opts?.orderId) query = query.eq("order_id", opts.orderId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map(mapIncidentRow);
+  }
+
   async createIncident(i: Omit<IncidentRecord, "id" | "createdAt" | "updatedAt">): Promise<IncidentRecord> {
-    const now = new Date().toISOString();
-    return { ...i, id: `INC-${Date.now()}`, createdAt: now, updatedAt: now };
+    const { data, error } = await this.db.from("incidents").insert({
+      order_id: i.orderId,
+      user_id: i.userId ?? null,
+      status: i.status,
+      category: i.category,
+      title: i.title,
+      body: i.body,
+      admin_note: i.adminNote ?? null,
+    }).select().single();
+    if (error) throw error;
+    return mapIncidentRow(data);
   }
-  async updateIncident(): Promise<void> { /* stub */ }
-  async getReturns(): Promise<ReturnRecord[]> { return []; }
-  async getReturn(): Promise<ReturnRecord | null> { return null; }
+
+  async updateIncident(id: string, data: Partial<IncidentRecord>): Promise<void> {
+    const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (data.status !== undefined) update.status = data.status;
+    if (data.category !== undefined) update.category = data.category;
+    if (data.title !== undefined) update.title = data.title;
+    if (data.body !== undefined) update.body = data.body;
+    if (data.adminNote !== undefined) update.admin_note = data.adminNote;
+    const { error } = await this.db.from("incidents").update(update).eq("id", id);
+    if (error) throw error;
+  }
+
+  // ── Returns (RMA) ─────────────────────────────────────────────────────
+
+  async getReturns(userId?: string): Promise<ReturnRecord[]> {
+    let query = this.db
+      .from("returns")
+      .select("*, return_items(*)")
+      .order("created_at", { ascending: false });
+    if (userId) query = query.eq("user_id", userId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map(mapReturnRow);
+  }
+
+  async getReturn(id: string): Promise<ReturnRecord | null> {
+    const { data, error } = await this.db
+      .from("returns")
+      .select("*, return_items(*)")
+      .eq("id", id)
+      .maybeSingle();
+    if (error || !data) return null;
+    return mapReturnRow(data);
+  }
+
   async createReturn(r: Omit<ReturnRecord, "createdAt" | "updatedAt">): Promise<ReturnRecord> {
-    const now = new Date().toISOString();
-    return { ...r, createdAt: now, updatedAt: now };
+    const { data: head, error } = await this.db.from("returns").insert({
+      id: r.id,
+      rma_number: r.rmaNumber,
+      order_id: r.orderId,
+      user_id: r.userId ?? null,
+      status: r.status,
+      customer_note: r.customerNote ?? null,
+      admin_note: r.adminNote ?? null,
+      refund_amount: r.refundAmount ?? null,
+      tracking_number: r.trackingNumber ?? null,
+      rectificative_id: r.rectificativeId ?? null,
+    }).select().single();
+    if (error) throw error;
+    if (r.items.length > 0) {
+      const { error: itemsErr } = await this.db.from("return_items").insert(
+        r.items.map((it) => ({
+          return_id: (head as { id: string }).id,
+          product_id: it.productId,
+          quantity: it.quantity,
+          unit_price: it.unitPrice,
+          reason: it.reason,
+          reason_detail: it.reasonDetail ?? null,
+        })),
+      );
+      if (itemsErr) throw itemsErr;
+    }
+    return mapReturnRow({ ...(head as DbRow), return_items: r.items });
   }
-  async updateReturn(): Promise<void> { /* stub */ }
-  async getMessages(): Promise<MessageRecord[]> { return []; }
+
+  async updateReturn(id: string, data: Partial<ReturnRecord>): Promise<void> {
+    const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (data.status !== undefined) update.status = data.status;
+    if (data.customerNote !== undefined) update.customer_note = data.customerNote;
+    if (data.adminNote !== undefined) update.admin_note = data.adminNote;
+    if (data.refundAmount !== undefined) update.refund_amount = data.refundAmount;
+    if (data.trackingNumber !== undefined) update.tracking_number = data.trackingNumber;
+    if (data.rectificativeId !== undefined) update.rectificative_id = data.rectificativeId;
+    const { error } = await this.db.from("returns").update(update).eq("id", id);
+    if (error) throw error;
+  }
+
+  // ── Messages ──────────────────────────────────────────────────────────
+
+  async getMessages(userId: string): Promise<MessageRecord[]> {
+    const { data, error } = await this.db
+      .from("messages")
+      .select("*")
+      .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(mapMessageRow);
+  }
+
   async sendMessage(m: Omit<MessageRecord, "id" | "createdAt" | "isRead">): Promise<MessageRecord> {
-    return { ...m, id: `MSG-${Date.now()}`, createdAt: new Date().toISOString(), isRead: false };
+    const { data, error } = await this.db.from("messages").insert({
+      from_user_id: m.fromUserId ?? null,
+      to_user_id: m.toUserId ?? null,
+      order_id: m.orderId ?? null,
+      subject: m.subject,
+      body: m.body,
+      parent_id: m.parentId ?? null,
+    }).select().single();
+    if (error) throw error;
+    return mapMessageRow(data);
   }
-  async markMessageRead(): Promise<void> { /* stub */ }
-  async getNotifications(): Promise<NotificationRecord[]> { return []; }
+
+  async markMessageRead(id: string): Promise<void> {
+    const { error } = await this.db.from("messages").update({ is_read: true }).eq("id", id);
+    if (error) throw error;
+  }
+
+  // ── Notifications ─────────────────────────────────────────────────────
+
+  async getNotifications(opts: { userId?: string; scope?: "user" | "broadcast" | "fiscal" }): Promise<NotificationRecord[]> {
+    let query = this.db.from("notifications").select("*").order("created_at", { ascending: false });
+    if (opts.userId) query = query.eq("user_id", opts.userId);
+    if (opts.scope) query = query.eq("scope", opts.scope);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map(mapNotificationRow);
+  }
+
   async createNotification(n: Omit<NotificationRecord, "id" | "createdAt" | "isRead">): Promise<NotificationRecord> {
-    return { ...n, id: `NOT-${Date.now()}`, createdAt: new Date().toISOString(), isRead: false };
+    const { data, error } = await this.db.from("notifications").insert({
+      scope: n.scope,
+      user_id: n.userId ?? null,
+      type: n.type,
+      title: n.title,
+      message: n.message,
+      link: n.link ?? null,
+    }).select().single();
+    if (error) throw error;
+    return mapNotificationRow(data);
   }
-  async markNotificationRead(): Promise<void> { /* stub */ }
-  async clearNotifications(): Promise<void> { /* stub */ }
-  async getGroupByUser(): Promise<{ group: GroupRecord; members: GroupMemberRecord[] } | null> { return null; }
+
+  async markNotificationRead(id: string): Promise<void> {
+    const { error } = await this.db.from("notifications").update({ is_read: true }).eq("id", id);
+    if (error) throw error;
+  }
+
+  async clearNotifications(userId: string): Promise<void> {
+    const { error } = await this.db.from("notifications").delete().eq("user_id", userId);
+    if (error) throw error;
+  }
+
+  // ── Groups (associations) ─────────────────────────────────────────────
+
+  async getGroupByUser(userId: string): Promise<{ group: GroupRecord; members: GroupMemberRecord[] } | null> {
+    // Buscar membership activa (left_at IS NULL).
+    const { data: mem } = await this.db
+      .from("group_members")
+      .select("group_id")
+      .eq("user_id", userId)
+      .is("left_at", null)
+      .maybeSingle();
+    const groupId = (mem as { group_id?: string } | null)?.group_id;
+    if (!groupId) return null;
+    const { data: g } = await this.db.from("groups").select("*").eq("id", groupId).maybeSingle();
+    if (!g) return null;
+    const { data: members } = await this.db
+      .from("group_members")
+      .select("*")
+      .eq("group_id", groupId);
+    return {
+      group: mapGroupRow(g),
+      members: (members ?? []).map(mapGroupMemberRow),
+    };
+  }
+
   async createGroup(g: Omit<GroupRecord, "createdAt" | "updatedAt">): Promise<GroupRecord> {
-    const now = new Date().toISOString();
-    return { ...g, createdAt: now, updatedAt: now };
+    const { data, error } = await this.db.from("groups").insert({
+      id: g.id,
+      owner_id: g.ownerId,
+      name: g.name,
+    }).select().single();
+    if (error) throw error;
+    return mapGroupRow(data);
   }
-  async addGroupMember(): Promise<void> { /* stub */ }
-  async removeGroupMember(): Promise<void> { /* stub */ }
-  async createGroupInvite(i: Omit<GroupInviteRecord, "createdAt">): Promise<GroupInviteRecord> {
-    return { ...i, createdAt: new Date().toISOString() };
+
+  async addGroupMember(member: GroupMemberRecord): Promise<void> {
+    const { error } = await this.db.from("group_members").upsert({
+      group_id: member.groupId,
+      user_id: member.userId,
+      role: member.role,
+      joined_at: member.joinedAt,
+      left_at: member.leftAt ?? null,
+      cooldown_until: member.cooldownUntil ?? null,
+    }, { onConflict: "group_id,user_id" });
+    if (error) throw error;
   }
-  async getGroupInviteByCode(): Promise<GroupInviteRecord | null> { return null; }
-  async updateGroupInvite(): Promise<void> { /* stub */ }
-  async getReviews(): Promise<ReviewRecord[]> { return []; }
+
+  async removeGroupMember(groupId: string, userId: string, cooldownUntil?: string): Promise<void> {
+    const { error } = await this.db.from("group_members").update({
+      left_at: new Date().toISOString(),
+      cooldown_until: cooldownUntil ?? null,
+    }).eq("group_id", groupId).eq("user_id", userId);
+    if (error) throw error;
+  }
+
+  async createGroupInvite(invite: Omit<GroupInviteRecord, "createdAt">): Promise<GroupInviteRecord> {
+    const { data, error } = await this.db.from("group_invites").insert({
+      id: invite.id,
+      group_id: invite.groupId,
+      invited_by: invite.invitedBy ?? null,
+      invited_email: invite.invitedEmail.toLowerCase(),
+      invite_code: invite.inviteCode,
+      status: invite.status,
+      expires_at: invite.expiresAt,
+      responded_at: invite.respondedAt ?? null,
+    }).select().single();
+    if (error) throw error;
+    return mapGroupInviteRow(data);
+  }
+
+  async getGroupInviteByCode(code: string): Promise<GroupInviteRecord | null> {
+    const { data, error } = await this.db
+      .from("group_invites")
+      .select("*")
+      .eq("invite_code", code)
+      .maybeSingle();
+    if (error || !data) return null;
+    return mapGroupInviteRow(data);
+  }
+
+  async updateGroupInvite(id: string, data: Partial<GroupInviteRecord>): Promise<void> {
+    const update: Record<string, unknown> = {};
+    if (data.status !== undefined) update.status = data.status;
+    if (data.respondedAt !== undefined) update.responded_at = data.respondedAt;
+    if (data.expiresAt !== undefined) update.expires_at = data.expiresAt;
+    if (Object.keys(update).length === 0) return;
+    const { error } = await this.db.from("group_invites").update(update).eq("id", id);
+    if (error) throw error;
+  }
+
+  // ── Reviews ───────────────────────────────────────────────────────────
+
+  async getReviews(productId?: number): Promise<ReviewRecord[]> {
+    let query = this.db.from("reviews").select("*").order("created_at", { ascending: false });
+    if (productId !== undefined) query = query.eq("product_id", productId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map(mapReviewRow);
+  }
+
   async createReview(r: Omit<ReviewRecord, "id" | "createdAt">): Promise<ReviewRecord> {
-    return { ...r, id: `REV-${Date.now()}`, createdAt: new Date().toISOString() };
+    const { data, error } = await this.db.from("reviews").insert({
+      user_id: r.userId,
+      product_id: r.productId,
+      order_id: r.orderId ?? null,
+      rating: r.rating ?? null,
+      title: r.title ?? null,
+      body: r.body ?? null,
+      is_approved: r.isApproved,
+    }).select().single();
+    if (error) throw error;
+    return mapReviewRow(data);
   }
-  async approveReview(): Promise<void> { /* stub */ }
-  async getComplaints(): Promise<ComplaintRecord[]> { return []; }
+
+  async approveReview(id: string): Promise<void> {
+    const { error } = await this.db.from("reviews").update({ is_approved: true }).eq("id", id);
+    if (error) throw error;
+  }
+
+  // ── Complaints ────────────────────────────────────────────────────────
+
+  async getComplaints(userId?: string): Promise<ComplaintRecord[]> {
+    let query = this.db.from("complaints").select("*").order("created_at", { ascending: false });
+    if (userId) query = query.eq("user_id", userId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map(mapComplaintRow);
+  }
+
   async createComplaint(c: Omit<ComplaintRecord, "id" | "createdAt" | "updatedAt">): Promise<ComplaintRecord> {
-    const now = new Date().toISOString();
-    return { ...c, id: `CMP-${Date.now()}`, createdAt: now, updatedAt: now };
+    const { data, error } = await this.db.from("complaints").insert({
+      user_id: c.userId ?? null,
+      order_id: c.orderId ?? null,
+      claimant_name: c.claimantName,
+      claimant_email: c.claimantEmail.toLowerCase(),
+      claimant_tax_id: c.claimantTaxId ?? null,
+      claimant_address: c.claimantAddress ?? null,
+      status: c.status,
+      facts: c.facts,
+      claim: c.claim,
+      resolution: c.resolution ?? null,
+      pdf_url: c.pdfUrl ?? null,
+    }).select().single();
+    if (error) throw error;
+    return mapComplaintRow(data);
   }
-  async updateComplaint(): Promise<void> { /* stub */ }
-  async getSolicitudes(): Promise<SolicitudRecord[]> { return []; }
+
+  async updateComplaint(id: string, data: Partial<ComplaintRecord>): Promise<void> {
+    const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (data.status !== undefined) update.status = data.status;
+    if (data.resolution !== undefined) update.resolution = data.resolution;
+    if (data.pdfUrl !== undefined) update.pdf_url = data.pdfUrl;
+    const { error } = await this.db.from("complaints").update(update).eq("id", id);
+    if (error) throw error;
+  }
+
+  // ── Solicitudes (B2B / franquicia / vending) ──────────────────────────
+
+  async getSolicitudes(type?: SolicitudRecord["type"]): Promise<SolicitudRecord[]> {
+    let query = this.db.from("solicitudes").select("*").order("created_at", { ascending: false });
+    if (type) query = query.eq("type", type);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data ?? []).map(mapSolicitudRow);
+  }
+
   async createSolicitud(s: Omit<SolicitudRecord, "id" | "createdAt" | "updatedAt">): Promise<SolicitudRecord> {
-    const now = new Date().toISOString();
-    return { ...s, id: `SOL-${Date.now()}`, createdAt: now, updatedAt: now };
+    const { data, error } = await this.db.from("solicitudes").insert({
+      type: s.type,
+      company_name: s.companyName,
+      cif: s.cif ?? null,
+      contact_name: s.contactName,
+      contact_email: s.contactEmail.toLowerCase(),
+      contact_phone: s.contactPhone ?? null,
+      volume: s.volume ?? null,
+      games: s.games,
+      message: s.message ?? null,
+      status: s.status,
+      admin_note: s.adminNote ?? null,
+    }).select().single();
+    if (error) throw error;
+    return mapSolicitudRow(data);
   }
-  async updateSolicitud(): Promise<void> { /* stub */ }
-  async logEmail(): Promise<void> { /* stub */ }
-  async logApp(): Promise<void> { /* stub */ }
-  async getAddresses(): Promise<AddressRecord[]> { return []; }
-  async upsertAddress(a: AddressRecord): Promise<AddressRecord> { return a; }
-  async deleteAddress(): Promise<void> { /* stub */ }
-  async getCompanyProfile(): Promise<CompanyProfileRecord | null> { return null; }
-  async upsertCompanyProfile(p: CompanyProfileRecord): Promise<CompanyProfileRecord> { return p; }
+
+  async updateSolicitud(id: string, data: Partial<SolicitudRecord>): Promise<void> {
+    const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (data.status !== undefined) update.status = data.status;
+    if (data.adminNote !== undefined) update.admin_note = data.adminNote;
+    const { error } = await this.db.from("solicitudes").update(update).eq("id", id);
+    if (error) throw error;
+  }
+
+  // ── Email + app logs ──────────────────────────────────────────────────
+
+  async logEmail(entry: EmailLogRecord): Promise<void> {
+    const { error } = await this.db.from("email_log").insert({
+      to_email: entry.toEmail.toLowerCase(),
+      to_name: entry.toName ?? null,
+      subject: entry.subject,
+      template_id: entry.templateId ?? null,
+      provider_id: entry.providerId ?? null,
+      status: entry.status,
+      error_detail: entry.errorDetail ?? null,
+      user_id: entry.userId ?? null,
+    });
+    if (error) throw error;
+  }
+
+  async logApp(entry: AppLogEntry): Promise<void> {
+    const { error } = await this.db.from("app_logs").insert({
+      level: entry.level,
+      source: entry.source ?? null,
+      message: entry.message,
+      context: entry.context ?? {},
+      user_id: entry.userId ?? null,
+    });
+    if (error) throw error;
+  }
+
+  // ── Addresses ─────────────────────────────────────────────────────────
+
+  async getAddresses(userId: string): Promise<AddressRecord[]> {
+    const { data, error } = await this.db
+      .from("addresses")
+      .select("*")
+      .eq("user_id", userId)
+      .order("is_default", { ascending: false })
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(mapAddressRow);
+  }
+
+  async upsertAddress(a: AddressRecord): Promise<AddressRecord> {
+    // Si esta dirección se marca como default, desmarcamos las demás del usuario.
+    if (a.isDefault) {
+      await this.db
+        .from("addresses")
+        .update({ is_default: false })
+        .eq("user_id", a.userId)
+        .neq("id", a.id);
+    }
+    const { data, error } = await this.db.from("addresses").upsert({
+      id: a.id,
+      user_id: a.userId,
+      label: a.label,
+      recipient: a.recipient,
+      street: a.street,
+      floor: a.floor ?? null,
+      postal_code: a.postalCode,
+      city: a.city,
+      province: a.province,
+      country: a.country,
+      phone: a.phone ?? null,
+      is_default: a.isDefault,
+      updated_at: new Date().toISOString(),
+    }).select().single();
+    if (error) throw error;
+    return mapAddressRow(data);
+  }
+
+  async deleteAddress(id: string): Promise<void> {
+    const { error } = await this.db.from("addresses").delete().eq("id", id);
+    if (error) throw error;
+  }
+
+  // ── Company profile ───────────────────────────────────────────────────
+
+  async getCompanyProfile(userId: string): Promise<CompanyProfileRecord | null> {
+    const { data, error } = await this.db
+      .from("company_profiles")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error || !data) return null;
+    return mapCompanyProfileRow(data);
+  }
+
+  async upsertCompanyProfile(p: CompanyProfileRecord): Promise<CompanyProfileRecord> {
+    const { data, error } = await this.db.from("company_profiles").upsert({
+      id: p.id,
+      user_id: p.userId,
+      cif: p.cif,
+      legal_name: p.legalName,
+      fiscal_address: p.fiscalAddress,
+      contact_person: p.contactPerson,
+      company_phone: p.companyPhone ?? null,
+      billing_email: p.billingEmail ?? null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" }).select().single();
+    if (error) throw error;
+    return mapCompanyProfileRow(data);
+  }
 }
 
 // ─── Row mappers ────────────────────────────────────────────────────────────
@@ -1495,6 +2145,234 @@ function mapInvoiceRow(row: DbRow): InvoiceRecord {
     verifactuId: asOpt<string>(row.verifactu_id),
     data: row.data as InvoiceRecord["data"],
     createdAt: asStr(row.created_at),
+  };
+}
+
+function mapProductRow(row: DbRow): ProductRecord {
+  const meta = (row.metadata ?? {}) as Record<string, unknown>;
+  const images = Array.isArray(row.images) ? (row.images as string[]) : [];
+  return {
+    id: Number(row.id),
+    slug: asStr(row.slug),
+    categoryId: asStr(row.category_id),
+    name: asStr(row.name),
+    shortDescription: asOpt<string>(row.short_description),
+    description: asOpt<string>(row.description),
+    price: asNum(row.price),
+    salePrice: row.sale_price === null || row.sale_price === undefined ? undefined : asNum(row.sale_price),
+    vatRate: asNum(row.vat_rate),
+    stock: Number(row.stock ?? 0),
+    maxPerUser: row.max_per_user === null || row.max_per_user === undefined ? undefined : Number(row.max_per_user),
+    maxPerClient: typeof meta.maxPerClient === "number" ? meta.maxPerClient : undefined,
+    maxPerWholesaler: typeof meta.maxPerWholesaler === "number" ? meta.maxPerWholesaler : undefined,
+    maxPerStore: typeof meta.maxPerStore === "number" ? meta.maxPerStore : undefined,
+    language: asOpt<string>(row.language),
+    barcode: asOpt<string>(row.barcode),
+    images,
+    metadata: meta,
+    createdAt: asStr(row.created_at),
+    updatedAt: asStr(row.updated_at),
+    deletedAt: asOpt<string>(row.deleted_at),
+  };
+}
+
+function mapCategoryRow(row: DbRow): CategoryRecord {
+  return {
+    id: asStr(row.id),
+    parentId: asOpt<string>(row.parent_id),
+    slug: asStr(row.slug),
+    name: asStr(row.name),
+    description: asOpt<string>(row.description),
+    emoji: asOpt<string>(row.emoji),
+    color: asOpt<string>(row.color),
+    bgColor: asOpt<string>(row.bg_color),
+    sortOrder: Number(row.sort_order ?? 0),
+    isActive: Boolean(row.is_active),
+  };
+}
+
+function mapIncidentRow(row: DbRow): IncidentRecord {
+  return {
+    id: asStr(row.id),
+    orderId: asStr(row.order_id),
+    userId: asOpt<string>(row.user_id),
+    status: row.status as IncidentRecord["status"],
+    category: asStr(row.category),
+    title: asStr(row.title),
+    body: asStr(row.body),
+    adminNote: asOpt<string>(row.admin_note),
+    createdAt: asStr(row.created_at),
+    updatedAt: asStr(row.updated_at),
+  };
+}
+
+function mapReturnRow(row: DbRow): ReturnRecord {
+  const items = Array.isArray(row.return_items) ? (row.return_items as DbRow[]) : [];
+  return {
+    id: asStr(row.id),
+    rmaNumber: asStr(row.rma_number),
+    orderId: asStr(row.order_id),
+    userId: asOpt<string>(row.user_id),
+    status: asStr(row.status),
+    customerNote: asOpt<string>(row.customer_note),
+    adminNote: asOpt<string>(row.admin_note),
+    refundAmount: row.refund_amount === null || row.refund_amount === undefined ? undefined : asNum(row.refund_amount),
+    trackingNumber: asOpt<string>(row.tracking_number),
+    rectificativeId: asOpt<string>(row.rectificative_id),
+    items: items.map((it) => ({
+      productId: Number(it.product_id),
+      quantity: Number(it.quantity),
+      unitPrice: asNum(it.unit_price),
+      reason: asStr(it.reason),
+      reasonDetail: asOpt<string>(it.reason_detail),
+    })),
+    createdAt: asStr(row.created_at),
+    updatedAt: asStr(row.updated_at),
+  };
+}
+
+function mapMessageRow(row: DbRow): MessageRecord {
+  return {
+    id: asStr(row.id),
+    fromUserId: asOpt<string>(row.from_user_id),
+    toUserId: asOpt<string>(row.to_user_id),
+    orderId: asOpt<string>(row.order_id),
+    subject: asStr(row.subject),
+    body: asStr(row.body),
+    isRead: Boolean(row.is_read),
+    parentId: asOpt<string>(row.parent_id),
+    createdAt: asStr(row.created_at),
+  };
+}
+
+function mapNotificationRow(row: DbRow): NotificationRecord {
+  return {
+    id: asStr(row.id),
+    scope: row.scope as NotificationRecord["scope"],
+    userId: asOpt<string>(row.user_id),
+    type: asStr(row.type),
+    title: asStr(row.title),
+    message: asStr(row.message),
+    link: asOpt<string>(row.link),
+    isRead: Boolean(row.is_read),
+    createdAt: asStr(row.created_at),
+  };
+}
+
+function mapGroupRow(row: DbRow): GroupRecord {
+  return {
+    id: asStr(row.id),
+    ownerId: asStr(row.owner_id),
+    name: asStr(row.name),
+    createdAt: asStr(row.created_at),
+    updatedAt: asStr(row.updated_at),
+  };
+}
+
+function mapGroupMemberRow(row: DbRow): GroupMemberRecord {
+  return {
+    groupId: asStr(row.group_id),
+    userId: asStr(row.user_id),
+    role: row.role as GroupMemberRecord["role"],
+    joinedAt: asStr(row.joined_at),
+    leftAt: asOpt<string>(row.left_at),
+    cooldownUntil: asOpt<string>(row.cooldown_until),
+  };
+}
+
+function mapGroupInviteRow(row: DbRow): GroupInviteRecord {
+  return {
+    id: asStr(row.id),
+    groupId: asStr(row.group_id),
+    invitedBy: asOpt<string>(row.invited_by),
+    invitedEmail: asStr(row.invited_email),
+    inviteCode: asStr(row.invite_code),
+    status: row.status as GroupInviteRecord["status"],
+    expiresAt: asStr(row.expires_at),
+    respondedAt: asOpt<string>(row.responded_at),
+    createdAt: asStr(row.created_at),
+  };
+}
+
+function mapReviewRow(row: DbRow): ReviewRecord {
+  return {
+    id: asStr(row.id),
+    userId: asStr(row.user_id),
+    productId: Number(row.product_id),
+    orderId: asOpt<string>(row.order_id),
+    rating: row.rating === null || row.rating === undefined ? undefined : Number(row.rating),
+    title: asOpt<string>(row.title),
+    body: asOpt<string>(row.body),
+    isApproved: Boolean(row.is_approved),
+    createdAt: asStr(row.created_at),
+  };
+}
+
+function mapComplaintRow(row: DbRow): ComplaintRecord {
+  return {
+    id: asStr(row.id),
+    userId: asOpt<string>(row.user_id),
+    orderId: asOpt<string>(row.order_id),
+    claimantName: asStr(row.claimant_name),
+    claimantEmail: asStr(row.claimant_email),
+    claimantTaxId: asOpt<string>(row.claimant_tax_id),
+    claimantAddress: asOpt<string>(row.claimant_address),
+    status: row.status as ComplaintRecord["status"],
+    facts: asStr(row.facts),
+    claim: asStr(row.claim),
+    resolution: asOpt<string>(row.resolution),
+    pdfUrl: asOpt<string>(row.pdf_url),
+    createdAt: asStr(row.created_at),
+    updatedAt: asStr(row.updated_at),
+  };
+}
+
+function mapSolicitudRow(row: DbRow): SolicitudRecord {
+  return {
+    id: asStr(row.id),
+    type: row.type as SolicitudRecord["type"],
+    companyName: asStr(row.company_name),
+    cif: asOpt<string>(row.cif),
+    contactName: asStr(row.contact_name),
+    contactEmail: asStr(row.contact_email),
+    contactPhone: asOpt<string>(row.contact_phone),
+    volume: asOpt<string>(row.volume),
+    games: Array.isArray(row.games) ? (row.games as string[]) : [],
+    message: asOpt<string>(row.message),
+    status: asStr(row.status),
+    adminNote: asOpt<string>(row.admin_note),
+    createdAt: asStr(row.created_at),
+    updatedAt: asStr(row.updated_at),
+  };
+}
+
+function mapAddressRow(row: DbRow): AddressRecord {
+  return {
+    id: asStr(row.id),
+    userId: asStr(row.user_id),
+    label: asStr(row.label),
+    recipient: asStr(row.recipient),
+    street: asStr(row.street),
+    floor: asOpt<string>(row.floor),
+    postalCode: asStr(row.postal_code),
+    city: asStr(row.city),
+    province: asStr(row.province),
+    country: asStr(row.country),
+    phone: asOpt<string>(row.phone),
+    isDefault: Boolean(row.is_default),
+  };
+}
+
+function mapCompanyProfileRow(row: DbRow): CompanyProfileRecord {
+  return {
+    id: asStr(row.id),
+    userId: asStr(row.user_id),
+    cif: asStr(row.cif),
+    legalName: asStr(row.legal_name),
+    fiscalAddress: asStr(row.fiscal_address),
+    contactPerson: asStr(row.contact_person),
+    companyPhone: asOpt<string>(row.company_phone),
+    billingEmail: asOpt<string>(row.billing_email),
   };
 }
 

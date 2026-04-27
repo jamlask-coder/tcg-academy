@@ -370,8 +370,16 @@ let _instance: EmailAdapter | null = null;
 
 export function getEmailService(): EmailAdapter {
   if (_instance) return _instance;
-  const mode = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
-  _instance = mode === "server" ? new ResendEmailAdapter() : new LocalEmailAdapter();
+  // Decisión:
+  //  1. En el navegador NUNCA podemos usar Resend (la API key es server-only).
+  //     → siempre LocalEmailAdapter (log a localStorage para audit).
+  //  2. En el servidor, si hay RESEND_API_KEY usamos Resend SIEMPRE, incluso
+  //     en NEXT_PUBLIC_BACKEND_MODE=local. Así los flujos local-mode pueden
+  //     pedir al servidor que mande emails reales (vía /api/auth, /api/notifications…).
+  //  3. En el servidor sin RESEND_API_KEY caemos al adapter local (log only).
+  const isBrowser = typeof window !== "undefined";
+  const hasResend = !isBrowser && Boolean(process.env.RESEND_API_KEY);
+  _instance = hasResend ? new ResendEmailAdapter() : new LocalEmailAdapter();
   return _instance;
 }
 
