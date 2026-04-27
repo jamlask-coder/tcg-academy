@@ -53,7 +53,7 @@ interface AuthContextValue {
   register: (data: RegisterData) => Promise<{ ok: boolean; error?: string }>;
   updateProfile: (
     updates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses" | "nif" | "nifType">>,
-  ) => { ok: boolean; error?: string };
+  ) => Promise<{ ok: boolean; error?: string }>;
   changePassword: (
     currentPassword: string,
     newPassword: string,
@@ -1109,7 +1109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateProfile = useCallback(
-    (updates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses" | "nif" | "nifType">>): { ok: boolean; error?: string } => {
+    async (updates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses" | "nif" | "nifType">>): Promise<{ ok: boolean; error?: string }> => {
       if (!user) return { ok: false, error: "No has iniciado sesión" };
       const sanitizedUpdates: Partial<Pick<User, "name" | "lastName" | "phone" | "addresses" | "nif" | "nifType">> = {};
       if (updates.name !== undefined) sanitizedUpdates.name = sanitizeString(updates.name);
@@ -1118,6 +1118,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (updates.addresses !== undefined) sanitizedUpdates.addresses = updates.addresses;
       if (updates.nif !== undefined) sanitizedUpdates.nif = sanitizeString(updates.nif).toUpperCase();
       if (updates.nifType !== undefined) sanitizedUpdates.nifType = updates.nifType;
+
+      // ── Server mode: persistir name/lastName/phone/nif/nifType en BD ───
+      // Las direcciones siguen viviendo en localStorage (schema Supabase no
+      // las modela todavía). El servidor también valida NIF/colisiones, así
+      // que esa lógica abajo solo aplica en local mode.
+      if (IS_SERVER_MODE) {
+        const serverFields: Record<string, unknown> = {};
+        if (sanitizedUpdates.name !== undefined) serverFields.name = sanitizedUpdates.name;
+        if (sanitizedUpdates.lastName !== undefined) serverFields.lastName = sanitizedUpdates.lastName;
+        if (sanitizedUpdates.phone !== undefined) serverFields.phone = sanitizedUpdates.phone;
+        if (sanitizedUpdates.nif !== undefined) serverFields.nif = sanitizedUpdates.nif;
+        if (sanitizedUpdates.nifType !== undefined) serverFields.nifType = sanitizedUpdates.nifType;
+
+        if (Object.keys(serverFields).length > 0) {
+          try {
+            const res = await fetch("/api/auth", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ action: "update-profile", ...serverFields }),
+            });
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
+              return { ok: false, error: data.error ?? "No se pudo guardar el perfil" };
+            }
+          } catch (err) {
+            return {
+              ok: false,
+              error: err instanceof Error ? err.message : "Error de red al guardar",
+            };
+          }
+        }
+
+        // Persistir cambios locales (incluye addresses) en sesión actual.
+        const updated = { ...user, ...sanitizedUpdates };
+        persist(updated);
+        return { ok: true };
+      }
 
       // Política "1 NIF = 1 usuario": si el NIF cambia o se añade por primera
       // vez, comprobamos que no esté asignado a otro email.

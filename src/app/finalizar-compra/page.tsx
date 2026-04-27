@@ -623,7 +623,7 @@ export default function CheckoutPage() {
             telefono: sTelefono,
             predeterminada: user.addresses.length === 0,
           };
-          updateProfile({ addresses: [...user.addresses, newAddr] });
+          void updateProfile({ addresses: [...user.addresses, newAddr] });
         }
       } catch {
         /* non-blocking — address save is best-effort */

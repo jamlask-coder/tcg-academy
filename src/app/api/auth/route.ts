@@ -11,6 +11,7 @@ import {
   setSessionCookie,
   clearSessionCookie,
   getClientIp,
+  getSessionFromRequest,
 } from "@/lib/auth";
 import { getEmailService } from "@/lib/email";
 import { sanitizeString } from "@/utils/sanitize";
@@ -716,6 +717,82 @@ export async function POST(req: NextRequest) {
 
         await enforceMinDuration(resendStart, 500);
         return NextResponse.json({ ok: true });
+      }
+
+      // ── UPDATE PROFILE ─────────────────────────────────────────────────
+      // Actualiza name/lastName/phone/nif/nifType del usuario AUTENTICADO.
+      // El userId NUNCA se lee del body — se obtiene de la cookie de sesión
+      // para impedir que un atacante modifique perfiles ajenos.
+      case "update-profile": {
+        const session = await getSessionFromRequest(req);
+        if (!session?.sub) {
+          return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+        }
+        const sessionUserId: string = session.sub;
+        const current = await db.getUser(sessionUserId);
+        if (!current) {
+          return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
+        }
+
+        const profileBody = parsed.data as {
+          action: "update-profile";
+          name?: string;
+          lastName?: string;
+          phone?: string;
+          nif?: string;
+          nifType?: "DNI" | "NIE" | "CIF";
+        };
+
+        const updates: Partial<{
+          name: string;
+          lastName: string;
+          phone: string;
+          nif: string;
+          nifType: "DNI" | "NIE" | "CIF";
+        }> = {};
+
+        if (typeof profileBody.name === "string") updates.name = sanitizeString(profileBody.name).slice(0, 80);
+        if (typeof profileBody.lastName === "string") updates.lastName = sanitizeString(profileBody.lastName).slice(0, 120);
+        if (typeof profileBody.phone === "string") updates.phone = sanitizeString(profileBody.phone).slice(0, 30);
+
+        if (typeof profileBody.nif === "string") {
+          const rawNif = sanitizeString(profileBody.nif).toUpperCase();
+          if (rawNif) {
+            const nifCheck = validateSpanishNIF(rawNif);
+            if (!nifCheck.valid) {
+              return NextResponse.json({ error: nifCheck.error ?? "NIF inválido" }, { status: 400 });
+            }
+            // 1 NIF = 1 usuario: rechazar si pertenece a otro
+            const owner = await db.getUserByNif(rawNif);
+            if (owner && owner.id !== sessionUserId) {
+              return NextResponse.json(
+                { error: "Este NIF ya está asignado a otra cuenta." },
+                { status: 409 },
+              );
+            }
+            updates.nif = rawNif;
+            if (profileBody.nifType === "DNI" || profileBody.nifType === "NIE" || profileBody.nifType === "CIF") {
+              updates.nifType = profileBody.nifType;
+            }
+          }
+        }
+
+        if (Object.keys(updates).length === 0) {
+          return NextResponse.json({ error: "Sin cambios" }, { status: 400 });
+        }
+
+        await db.updateUser(sessionUserId, updates);
+
+        await db.logAudit({
+          entityType: "user",
+          entityId: sessionUserId,
+          action: "profile_updated",
+          ipAddress: ip,
+          newValue: Object.keys(updates).join(","),
+        });
+
+        const updated = await db.getUser(sessionUserId);
+        return NextResponse.json({ ok: true, user: updated });
       }
 
       // ── LOGOUT ─────────────────────────────────────────────────────────

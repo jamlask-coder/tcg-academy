@@ -1034,7 +1034,10 @@ export class ServerDbAdapter implements DbAdapter {
     if (data.phone !== undefined) update.phone = data.phone;
     if (data.passwordHash !== undefined) update.password_hash = data.passwordHash;
     if (data.role !== undefined) update.role = data.role;
+    if (data.nif !== undefined) update.tax_id = data.nif;
+    if (data.nifType !== undefined) update.tax_id_type = data.nifType;
     if (Object.keys(update).length === 0) return;
+    update.updated_at = new Date().toISOString();
     const { error } = await this.db.from("users").update(update).eq("id", userId);
     if (error) throw error;
   }

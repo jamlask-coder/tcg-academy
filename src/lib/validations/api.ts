@@ -109,6 +109,19 @@ export const authSendVerificationEmailSchema = z.object({
   verifyUrl: z.string().url().max(2048),
 });
 
+/**
+ * Actualiza datos de perfil del usuario autenticado por la cookie de sesión.
+ * El servidor IGNORA el userId si llegara en el body — siempre usa session.userId.
+ */
+export const authUpdateProfileSchema = z.object({
+  action: z.literal("update-profile"),
+  name: z.string().max(80).optional(),
+  lastName: z.string().max(120).optional(),
+  phone: z.string().max(30).optional(),
+  nif: z.string().max(20).optional(),
+  nifType: z.enum(["DNI", "NIE", "CIF"]).optional(),
+});
+
 export const authBodySchema = z.discriminatedUnion("action", [
   authLoginSchema,
   authRegisterSchema,
@@ -119,6 +132,7 @@ export const authBodySchema = z.discriminatedUnion("action", [
   authVerifyEmailSchema,
   authResendVerificationSchema,
   authSendVerificationEmailSchema,
+  authUpdateProfileSchema,
 ]);
 
 // ─── Orders ──────────────────────────────────────────────────────────────

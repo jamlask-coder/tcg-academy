@@ -67,7 +67,7 @@ export default function DatosPage() {
   /** Persist addresses to AuthContext + localStorage and sync local state */
   const persistAddresses = (next: Address[]) => {
     setAddresses(next);
-    updateProfile({ addresses: next });
+    void updateProfile({ addresses: next });
     setAddrSaved(true);
     setTimeout(() => setAddrSaved(false), 2500);
   };
@@ -185,7 +185,7 @@ export default function DatosPage() {
       }
     }
 
-    const profileResult = updateProfile({
+    const profileResult = await updateProfile({
       name: form.name,
       lastName: form.lastName,
       phone: form.phone,

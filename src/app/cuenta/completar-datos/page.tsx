@@ -106,7 +106,7 @@ function CompletarDatosInner() {
   // alimenta el mensaje informativo del header.
   const preCheck = isFiscalProfileComplete(user);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearAll();
 
@@ -173,7 +173,7 @@ function CompletarDatosInner() {
       (a) => a.id !== newAddress.id,
     ).map((a) => ({ ...a, predeterminada: false }));
 
-    const saveResult = updateProfile({
+    const saveResult = await updateProfile({
       nif: nifResult.normalized,
       nifType: nifResult.type === "OTHER" ? undefined : nifResult.type,
       phone: composedPhone,
