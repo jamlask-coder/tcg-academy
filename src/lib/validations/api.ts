@@ -22,10 +22,13 @@ export const authLoginSchema = z.object({
 export const authRegisterSchema = z.object({
   action: z.literal("register"),
   name: z.string().min(1).max(120),
+  lastName: z.string().max(120).optional(),
   email: z.string().email().max(254),
   password: z.string().min(8).max(200),
   phone: z.string().max(40).optional(),
   username: z.string().max(40).optional(),
+  referralCode: z.string().max(40).optional(),
+  marketingConsent: z.boolean().optional(),
   /**
    * NIF/NIE/CIF obligatorio en el registro — se valida con el
    * **mismo algoritmo** que en el cliente (mod-23 DNI/NIE + checksum CIF)

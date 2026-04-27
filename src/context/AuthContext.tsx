@@ -76,6 +76,15 @@ const NIFS_KEY = "tcgacademy_nifs";           // NIF (uppercase) → email
 const SESSION_EXPIRY_MS = SITE_CONFIG.sessionExpiryHours * 60 * 60 * 1000;
 const REMEMBER_ME_MS = SITE_CONFIG.rememberMeDays * 24 * 60 * 60 * 1000;
 
+/**
+ * Modo server vs local. En server mode, register/login/logout/changePassword
+ * pasan por `/api/auth`, que persiste en Supabase y emite cookie httpOnly
+ * `tcga_session`. localStorage queda como caché optimista para que el header
+ * se pinte sin esperar al fetch — la fuente de verdad es la cookie JWT.
+ */
+const IS_SERVER_MODE =
+  (process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local") === "server";
+
 /** Persist the registered-users map and notify reactive consumers (admin dashboard). */
 function persistRegistered(registered: Record<string, unknown>): void {
   try { localStorage.setItem(REGISTERED_KEY, JSON.stringify(registered)); } catch { /* ignore */ }
@@ -428,10 +437,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Rehydrate from localStorage — expire after 24h, verify integrity hash
+  // Rehydrate from localStorage — expire after 24h, verify integrity hash.
+  // En server mode, además, intentamos hidratar desde /api/auth/me (cookie
+  // httpOnly como fuente de verdad). Si la cookie es válida, sobreescribimos
+  // el caché localStorage con los datos canónicos del backend.
   useEffect(() => {
     const verify = async () => {
       try {
+        // ── Server mode: cookie JWT es fuente de verdad ────────────────
+        if (IS_SERVER_MODE) {
+          try {
+            const res = await fetch("/api/auth/me", {
+              credentials: "include",
+              cache: "no-store",
+            });
+            if (res.ok) {
+              const data = (await res.json()) as { ok: boolean; user?: User };
+              if (data.ok && data.user) {
+                // Hidratar campos de catálogo cliente (favorites, addresses)
+                // desde el caché local — no viven en BD aún.
+                let cachedExtras: Partial<User> = {};
+                try {
+                  const stored = localStorage.getItem(STORAGE_KEY);
+                  if (stored) {
+                    const parsed = JSON.parse(stored) as Partial<User>;
+                    cachedExtras = {
+                      favorites: parsed.favorites ?? [],
+                      addresses: parsed.addresses ?? [],
+                    };
+                  }
+                } catch { /* ignore */ }
+                const merged: User = {
+                  ...data.user,
+                  favorites: cachedExtras.favorites ?? [],
+                  addresses: cachedExtras.addresses ?? [],
+                } as User;
+                setUser(merged);
+                // Actualizar caché optimista
+                try {
+                  const loginAt = Date.now();
+                  const cached = { ...merged, _loginAt: loginAt, _expiresIn: REMEMBER_ME_MS };
+                  localStorage.setItem(STORAGE_KEY, JSON.stringify(cached));
+                } catch { /* ignore */ }
+                return;
+              }
+            }
+            // 401 → cookie inválida o ausente: limpiar caché legacy.
+            if (res.status === 401) {
+              try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+              return;
+            }
+            // 204 (modo local en server) o 5xx → continuar con localStorage abajo.
+          } catch {
+            // Network error: caer al caché localStorage para no romper la UX.
+          }
+        }
+
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored) as User & {
@@ -556,6 +617,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       rememberMe?: boolean,
     ): Promise<{ ok: boolean; error?: string }> => {
       const expiresIn = rememberMe ? REMEMBER_ME_MS : SESSION_EXPIRY_MS;
+
+      // ── Server mode: pasar por /api/auth ────────────────────────────────
+      // El backend resuelve username→email, valida bcrypt timing-safe, aplica
+      // rate-limit por IP/admin y emite cookie JWT. Aquí solo refrescamos el
+      // AuthContext con el perfil devuelto.
+      if (IS_SERVER_MODE) {
+        try {
+          const res = await fetch("/api/auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              action: "login",
+              email: emailOrUsername.trim(),
+              password,
+              rememberMe: !!rememberMe,
+            }),
+          });
+          const json = (await res.json().catch(() => ({}))) as {
+            ok?: boolean;
+            user?: User;
+            error?: string;
+          };
+          if (!res.ok || !json.ok || !json.user) {
+            return { ok: false, error: json.error ?? "Usuario o contraseña incorrectos" };
+          }
+          // Hidratar favorites/addresses desde caché local (no viven en BD).
+          let cachedExtras: Partial<User> = {};
+          try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+              const parsed = JSON.parse(stored) as Partial<User>;
+              if (parsed.email?.toLowerCase() === json.user.email.toLowerCase()) {
+                cachedExtras = {
+                  favorites: parsed.favorites ?? [],
+                  addresses: parsed.addresses ?? [],
+                };
+              }
+            }
+          } catch { /* ignore */ }
+          const merged: User = {
+            ...json.user,
+            favorites: cachedExtras.favorites ?? [],
+            addresses: cachedExtras.addresses ?? [],
+          } as User;
+          persist(merged, expiresIn);
+          return { ok: true };
+        } catch {
+          return { ok: false, error: "Error de red al iniciar sesión" };
+        }
+      }
+
       // Resolve username → email if input has no @
       let resolvedEmail = emailOrUsername.trim();
       if (!resolvedEmail.includes("@")) {
@@ -750,6 +863,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    // En server mode, además de limpiar el caché local, pedimos al backend
+    // que invalide la cookie httpOnly. Si el fetch falla (offline), la
+    // cookie expirará por sí sola al sessionExpiry y la próxima llamada a
+    // /api/auth/me devolverá 401 → AuthContext quedará sin usuario.
+    if (IS_SERVER_MODE) {
+      fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "logout" }),
+        keepalive: true,
+      }).catch(() => { /* fire-and-forget */ });
+    }
     persist(null);
   }, [persist]);
 
@@ -757,6 +883,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (data: RegisterData): Promise<{ ok: boolean; error?: string }> => {
       const email = data.email.toLowerCase();
       const username = data.username ? normalizeUsername(data.username) : undefined;
+
+      // ── Server mode: delegar todo al endpoint /api/auth ────────────────
+      // El backend valida unicidad de email/username/NIF, hashea con bcrypt,
+      // graba consents en BD, emite cookie JWT y dispara emails de bienvenida
+      // + verificación. Aquí solo refrescamos el AuthContext y el caché local.
+      if (IS_SERVER_MODE) {
+        try {
+          const res = await fetch("/api/auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              action: "register",
+              name: data.name,
+              lastName: data.lastName,
+              email,
+              password: data.password,
+              phone: data.phone,
+              username,
+              nif: data.nif,
+              nifType: data.nifType,
+              referralCode: data.referralCode,
+              marketingConsent: data.marketingConsent,
+              captchaToken: data.captchaToken,
+            }),
+          });
+          const json = (await res.json().catch(() => ({}))) as {
+            ok?: boolean;
+            user?: User;
+            error?: string;
+          };
+          if (!res.ok || !json.ok || !json.user) {
+            return { ok: false, error: json.error ?? "No se pudo crear la cuenta" };
+          }
+          // El servidor no devuelve addresses/favorites — son datos cliente.
+          // La dirección del registro la guardamos local como caché para que
+          // el checkout/profile la prepoblen (el backend la persistirá en
+          // tabla addresses cuando hagamos el primer pedido).
+          const newUser: User = {
+            ...json.user,
+            addresses: [
+              {
+                id: `addr-${crypto.randomUUID()}`,
+                label: "Principal",
+                ...data.address,
+                predeterminada: true,
+              },
+            ],
+            favorites: [],
+          };
+          persist(newUser);
+          DataHub.emit("users");
+          return { ok: true };
+        } catch {
+          return { ok: false, error: "Error de red al crear la cuenta" };
+        }
+      }
 
       if (DEMO_USERS[email])
         return { ok: false, error: "Este email ya está registrado" };
@@ -986,6 +1169,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       newPassword: string,
     ): Promise<{ ok: boolean; error?: string }> => {
       if (!user) return { ok: false, error: "No has iniciado sesión" };
+
+      // ── Server mode: rotar password en BD vía /api/auth ────────────────
+      if (IS_SERVER_MODE) {
+        try {
+          const res = await fetch("/api/auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              action: "change-password",
+              userId: user.id,
+              currentPassword,
+              newPassword,
+            }),
+          });
+          const json = (await res.json().catch(() => ({}))) as {
+            ok?: boolean;
+            error?: string;
+          };
+          if (!res.ok || !json.ok) {
+            return { ok: false, error: json.error ?? "No se pudo cambiar la contraseña" };
+          }
+          return { ok: true };
+        } catch {
+          return { ok: false, error: "Error de red al cambiar la contraseña" };
+        }
+      }
 
       const email = user.email.toLowerCase();
 

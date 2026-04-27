@@ -185,7 +185,14 @@ export async function POST(req: NextRequest) {
           lastName: user.lastName,
           phone: user.phone,
           role: user.role,
+          nif: user.nif,
+          nifType: user.nifType,
           referralCode: user.referralCode,
+          referredBy: user.referredBy,
+          emailVerified: user.emailVerified,
+          emailVerifiedAt: user.emailVerifiedAt,
+          birthDate: user.birthDate,
+          createdAt: user.createdAt,
         };
 
         const response = NextResponse.json({ ok: true, user: userProfile });
@@ -203,8 +210,8 @@ export async function POST(req: NextRequest) {
 
       // ── REGISTER ───────────────────────────────────────────────────────
       case "register": {
-        const { nombre, apellidos, email, password, username, phone, nif, nifType, referralCode, marketingConsent } = body;
-        if (!nombre || !email || !password) {
+        const { name, lastName, email, password, username, phone, nif, nifType, referralCode, marketingConsent } = body;
+        if (!name || !email || !password) {
           return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
         }
         if (password.length < 8) {
@@ -261,8 +268,8 @@ export async function POST(req: NextRequest) {
           email: cleanEmail,
           username: cleanUsername || undefined,
           passwordHash,
-          name: sanitizeString(nombre),
-          lastName: sanitizeString(apellidos || ""),
+          name: sanitizeString(name),
+          lastName: sanitizeString(lastName || ""),
           phone: phone ? sanitizeString(phone) : "",
           role: "cliente",
           nif: cleanNif,
@@ -340,8 +347,15 @@ export async function POST(req: NextRequest) {
             username: newUser.username,
             name: newUser.name,
             lastName: newUser.lastName,
+            phone: newUser.phone,
             role: newUser.role,
+            nif: newUser.nif,
+            nifType: newUser.nifType,
             referralCode: newUser.referralCode,
+            referredBy: newUser.referredBy,
+            emailVerified: newUser.emailVerified,
+            emailVerifiedAt: newUser.emailVerifiedAt,
+            createdAt: newUser.createdAt,
           },
         });
         setSessionCookie(response, token);

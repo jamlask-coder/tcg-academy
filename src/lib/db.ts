@@ -114,6 +114,10 @@ export interface UserRecord {
   referralCode?: string;
   referredBy?: string;
   birthDate?: string;
+  /** Estado de verificación de email — columna `email_verified` (bool). */
+  emailVerified?: boolean;
+  /** Timestamp ISO de verificación — columna `email_verified_at`. */
+  emailVerifiedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -1439,6 +1443,12 @@ function mapUserRow(row: DbRow): UserRecord {
     referralCode: asOpt<string>(row.referral_code),
     referredBy: asOpt<string>(row.referred_by),
     birthDate: asOpt<string>(row.birth_date),
+    emailVerified: row.email_verified === true || row.email_verified === "true"
+      ? true
+      : row.email_verified === false || row.email_verified === "false"
+        ? false
+        : undefined,
+    emailVerifiedAt: asOpt<string>(row.email_verified_at),
     createdAt: asStr(row.created_at),
     updatedAt: asStr(row.updated_at),
   };
