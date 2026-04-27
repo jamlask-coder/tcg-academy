@@ -7,13 +7,6 @@ import { useAuth } from "@/context/AuthContext";
 import { checkRateLimit } from "@/utils/sanitize";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
-const DEMO_ACCOUNTS = [
-  { email: "cliente@test.com", role: "Cliente" },
-  { email: "mayorista@test.com", role: "Mayorista" },
-  { email: "tienda@test.com", role: "Tienda" },
-  { email: "admin@tcgacademy.es", role: "Admin" },
-];
-
 function LoginForm() {
   const { login, user } = useAuth();
   const router = useRouter();
@@ -273,36 +266,6 @@ function LoginForm() {
           >
             Crear cuenta nueva
           </Link>
-
-          {/* Demo credentials */}
-          <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-3">
-            <p className="mb-2.5 text-[11px] font-bold tracking-wider text-gray-400 uppercase">
-              Cuentas de demo
-            </p>
-            <div className="space-y-1.5">
-              {DEMO_ACCOUNTS.map(({ email: demoEmail, role }) => (
-                <button
-                  key={demoEmail}
-                  type="button"
-                  onClick={() => {
-                    setEmail(demoEmail);
-                    setPassword("test123");
-                  }}
-                  className="group flex w-full items-center justify-between rounded-lg border border-transparent px-2.5 py-1.5 text-xs transition-all hover:border-gray-200 hover:bg-white hover:shadow-sm"
-                >
-                  <span className="font-mono text-gray-500 transition-colors group-hover:text-gray-800">
-                    {demoEmail}
-                  </span>
-                  <span className="font-semibold text-gray-400 transition-colors group-hover:text-[#2563eb]">
-                    {role}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-center text-[10px] text-gray-400">
-              Haz clic para rellenar · contraseña: test123
-            </p>
-          </div>
         </div>
       </div>
 
