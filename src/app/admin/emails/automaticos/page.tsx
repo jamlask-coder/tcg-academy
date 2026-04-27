@@ -28,6 +28,7 @@ import {
   type SentEmailLog,
 } from "@/services/emailService";
 import { EMAIL_TEMPLATES, type EmailTemplate } from "@/data/emailTemplates";
+import { EMAIL_PREVIEW_VARS } from "@/data/emailPreviewVars";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import EmailEditor from "@/components/admin/EmailEditor";
 
@@ -43,45 +44,10 @@ const CATEGORIES: { label: string; ids: string[] }[] = [
   { label: "Asociaciones", ids: ["asociacion_invitacion"] },
 ];
 
-// Default preview values — used to render the email with realistic data
-const DEFAULT_VARS: Record<string, Record<string, string>> = {
-  bienvenida: { nombre: "María García", email: "maria@ejemplo.com", unsubscribe_link: "#" },
-  confirmacion_pedido: {
-    nombre: "María García", order_id: "TCG-260412-A3BX9K", order_date: "12 de abril de 2026",
-    items_html: `<tr><td style="padding:10px 0;font-size:14px">Pokémon EVS Booster Box ×1</td><td align="right" style="font-size:14px;font-weight:700;white-space:nowrap">89,95 €</td></tr>`,
-    subtotal: "89,95", shipping: "0,00", total: "89,95", address: "Calle Mayor 1, 28013 Madrid",
-    payment_method: "Tarjeta bancaria", unsubscribe_link: "#",
-  },
-  pedido_enviado: {
-    nombre: "María García", order_id: "TCG-260412-A3BX9K", tracking_number: "ES2026041200001",
-    carrier: "GLS", estimated_date: "14 de abril de 2026", tracking_url: "#", unsubscribe_link: "#",
-  },
-  factura_disponible: {
-    nombre: "Carlos López", invoice_id: "FAC-2026-0042", order_id: "TCG-260412-A3BX9K",
-    invoice_date: "12 de abril de 2026", total: "89,95", download_url: "#", unsubscribe_link: "#",
-  },
-  nuevo_cupon: {
-    nombre: "María García", coupon_code: "PRIMAVERA15",
-    coupon_description: "Descuento especial de primavera", coupon_value: "15%",
-    expires_at: "30 de abril de 2026", shop_url: "#", unsubscribe_link: "#",
-  },
-  puntos_anadidos: {
-    nombre: "María García", points: "90", reason: "Compra #TCG-260412-A3BX9K",
-    current_balance: "350", redeem_url: "#", unsubscribe_link: "#",
-  },
-  devolucion_aceptada: {
-    nombre: "María García", return_id: "RMA-260412-X7K2", order_id: "TCG-260412-A3BX9K",
-    refund_amount: "89,95", refund_method: "Tarjeta bancaria", refund_days: "3–5 días hábiles",
-    unsubscribe_link: "#",
-  },
-  recuperar_contrasena: { nombre: "María García", reset_url: "#", expires_in: "2 horas", unsubscribe_link: "#" },
-  carrito_abandonado: {
-    nombre: "María García",
-    items_html: `<tr><td style="padding:10px 0;font-size:14px">Pokémon EVS Booster Box ×1</td><td align="right" style="font-size:14px;font-weight:700">89,95 €</td></tr>`,
-    cart_total: "89,95", cart_url: "#", coupon_code: "VUELVE10", unsubscribe_link: "#",
-  },
-  asociacion_invitacion: { toName: "Carlos", fromName: "María García", fromInitial: "M" },
-};
+// SSOT de variables de preview movido a `@/data/emailPreviewVars` para que
+// el endpoint `/api/admin/emails/send-all-test` (server) y esta página
+// (cliente) compartan los mismos datos.
+const DEFAULT_VARS = EMAIL_PREVIEW_VARS;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -216,6 +182,53 @@ export default function AdminEmailsAutomaticosPage() {
     setSentLog(loadSentEmails());
   }, [tab]);
 
+  // ── Send-all (test) ────────────────────────────────────────────────────
+  // POST /api/admin/emails/send-all-test → envía cada plantilla del catálogo
+  // al email indicado. Sólo opera en server-mode (Resend); el endpoint
+  // bloquea si no hay backend real.
+  const [sendAllOpen, setSendAllOpen] = useState(false);
+  const [sendAllTarget, setSendAllTarget] = useState("");
+  const [sendAllLoading, setSendAllLoading] = useState(false);
+  const [sendAllResult, setSendAllResult] = useState<
+    | null
+    | {
+        ok: boolean;
+        total?: number;
+        sent?: number;
+        failed?: number;
+        error?: string;
+      }
+  >(null);
+
+  const handleSendAll = async () => {
+    if (!sendAllTarget.trim()) return;
+    setSendAllLoading(true);
+    setSendAllResult(null);
+    try {
+      const res = await fetch("/api/admin/emails/send-all-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetEmail: sendAllTarget.trim() }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        total?: number;
+        sent?: number;
+        failed?: number;
+        error?: string;
+      };
+      setSendAllResult(data);
+      if (data.ok) {
+        setSaveMsg(`Enviadas ${data.sent}/${data.total} plantillas a ${sendAllTarget}`);
+        setTimeout(() => setSaveMsg(null), 4000);
+      }
+    } catch {
+      setSendAllResult({ ok: false, error: "Error de red. Revisa la consola." });
+    } finally {
+      setSendAllLoading(false);
+    }
+  };
+
   const selectTemplate = useCallback((t: EmailTemplate) => {
     setSelected(t);
     setEditSubject(t.subject);
@@ -324,8 +337,105 @@ export default function AdminEmailsAutomaticosPage() {
           >
             <ExternalLink size={14} /> Ver email
           </button>
+          <button
+            onClick={() => {
+              setSendAllOpen(true);
+              setSendAllResult(null);
+              setSendAllTarget((prev) => prev || sender.email || SITE_CONFIG.email);
+            }}
+            className="flex items-center gap-1.5 rounded-xl bg-[#2563eb] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
+          >
+            <Send size={14} /> Enviar todos a mi correo
+          </button>
         </div>
       </div>
+
+      {/* Send-all modal */}
+      {sendAllOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          onClick={() => !sendAllLoading && setSendAllOpen(false)}
+          onKeyDown={(e) => {
+            if ((e.key === "Escape" || e.key === "Enter") && !sendAllLoading) setSendAllOpen(false);
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Enviar todas las plantillas"
+          tabIndex={0}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            role="document"
+            tabIndex={-1}
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+          >
+            <h2 className="mb-1 text-lg font-bold text-gray-900">
+              Enviar todas las plantillas
+            </h2>
+            <p className="mb-4 text-sm text-gray-500">
+              Se enviará una copia de cada plantilla del catálogo (
+              {EMAIL_TEMPLATES.length} en total) al email indicado, usando
+              datos de muestra. Útil para revisar diseño y disparadores.
+            </p>
+
+            <label className="mb-1.5 block text-xs font-bold text-gray-600 uppercase tracking-wide">
+              Destinatario
+            </label>
+            <input
+              type="email"
+              value={sendAllTarget}
+              onChange={(e) => setSendAllTarget(e.target.value)}
+              placeholder="ejemplo@gmail.com"
+              disabled={sendAllLoading}
+              className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none disabled:opacity-50"
+            />
+
+            {sendAllResult && !sendAllResult.ok && (
+              <div className="mt-3 flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+                <span>{sendAllResult.error ?? `Fallaron ${sendAllResult.failed}/${sendAllResult.total} envíos.`}</span>
+              </div>
+            )}
+
+            {sendAllResult?.ok && (
+              <div className="mt-3 flex items-center gap-2 rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">
+                <Check size={16} className="flex-shrink-0" />
+                <span>
+                  Enviadas <strong>{sendAllResult.sent}/{sendAllResult.total}</strong> plantillas correctamente.
+                </span>
+              </div>
+            )}
+
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSendAllOpen(false)}
+                disabled={sendAllLoading}
+                className="h-11 flex-1 rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-700 transition hover:border-gray-300 disabled:opacity-50"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={handleSendAll}
+                disabled={sendAllLoading || !sendAllTarget.trim()}
+                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#2563eb] text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-50"
+              >
+                {sendAllLoading ? (
+                  <><Loader2 size={16} className="animate-spin" /> Enviando…</>
+                ) : (
+                  <><Send size={16} /> Enviar ahora</>
+                )}
+              </button>
+            </div>
+
+            <p className="mt-4 text-[11px] text-gray-400">
+              Requiere modo server (Resend configurado). Si la web está en local-mode, el endpoint devolverá un error y ningún correo saldrá.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Main grid */}
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
