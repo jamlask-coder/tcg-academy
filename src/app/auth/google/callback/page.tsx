@@ -89,6 +89,9 @@ export default function GoogleCallbackPage() {
         given_name: claims.given_name,
         family_name: claims.family_name,
         picture: claims.picture,
+        // Pasamos el token crudo para que server-mode lo re-verifique contra
+        // la JWKS de Google. En modo local no se usa.
+        idToken,
       };
 
       const redirectTo = sessionStorage.getItem(REDIRECT_KEY) ?? "/cuenta";

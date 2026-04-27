@@ -1034,6 +1034,191 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true, added: toAdd.length, removed: toRemove.length });
       }
 
+      // ── GOOGLE SIGN-IN ──────────────────────────────────────────────────
+      // Server-mode reactivation: verifica el id_token de Google contra su
+      // JWKS pública (no nos fiamos de lo que decodificó el cliente), busca
+      // o crea el usuario en Supabase y emite la cookie de sesión propia.
+      case "google-signin": {
+        const { idToken } = parsed.data as { action: "google-signin"; idToken: string };
+        const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+        if (!clientId) {
+          return NextResponse.json(
+            { error: "Login con Google no configurado" },
+            { status: 500 },
+          );
+        }
+
+        // Verificar contra JWKS de Google. `jose` cachea el set internamente.
+        const { jwtVerify, createRemoteJWKSet } = await import("jose");
+        const JWKS = createRemoteJWKSet(
+          new URL("https://www.googleapis.com/oauth2/v3/certs"),
+        );
+
+        let claims: {
+          sub?: string;
+          email?: string;
+          email_verified?: boolean;
+          name?: string;
+          given_name?: string;
+          family_name?: string;
+          picture?: string;
+        };
+        try {
+          const { payload } = await jwtVerify(idToken, JWKS, {
+            issuer: ["https://accounts.google.com", "accounts.google.com"],
+            audience: clientId,
+          });
+          claims = payload as typeof claims;
+        } catch (err) {
+          logger.error("google id_token verify failed", "google-signin", {
+            err: String(err),
+          });
+          return NextResponse.json(
+            { error: "Token de Google no válido" },
+            { status: 401 },
+          );
+        }
+
+        const email = (claims.email ?? "").toLowerCase().trim();
+        if (!email) {
+          return NextResponse.json(
+            { error: "Google no devolvió un email" },
+            { status: 400 },
+          );
+        }
+        if (claims.email_verified !== true) {
+          return NextResponse.json(
+            { error: "Tu email de Google no está verificado" },
+            { status: 400 },
+          );
+        }
+
+        const cleanName = sanitizeString(
+          claims.given_name ?? claims.name?.split(" ")[0] ?? "",
+        ).slice(0, 80);
+        const cleanLastName = sanitizeString(
+          claims.family_name ??
+            claims.name?.split(" ").slice(1).join(" ") ??
+            "",
+        ).slice(0, 120);
+
+        let user = await db.getUserByEmail(email);
+        let created = false;
+
+        if (!user) {
+          // Auto-registro: cliente, email pre-verificado por Google.
+          // Password aleatoria — el usuario puede solicitar reset si quiere
+          // poder loguearse sin Google.
+          const randomPw = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+          const passwordHash = await hashPassword(randomPw);
+          user = await db.createUser({
+            id: crypto.randomUUID(),
+            email,
+            username: undefined,
+            passwordHash,
+            name: cleanName || email.split("@")[0],
+            lastName: cleanLastName,
+            phone: "",
+            role: "cliente",
+            nif: undefined,
+            nifType: undefined,
+            referralCode: undefined,
+            referredBy: undefined,
+          });
+          created = true;
+
+          // Google ya validó el email — marcamos como verificado en BD para
+          // que el banner de "verifica tu email" no aparezca a estos usuarios.
+          try {
+            await db.markEmailVerified(user.id);
+            user = (await db.getUser(user.id)) ?? user;
+          } catch (err) {
+            logger.error("markEmailVerified after google create failed", "google-signin", {
+              err: String(err),
+            });
+          }
+
+          // Consents RGPD (Art. 7 — método google_signin).
+          const consentTypes = [
+            { type: "terms", status: "granted" as const },
+            { type: "privacy", status: "granted" as const },
+            { type: "data_processing", status: "granted" as const },
+          ];
+          for (const c of consentTypes) {
+            await db.createConsent({
+              userId: user.id,
+              type: c.type,
+              status: c.status,
+              method: "google_signin",
+              version: "2026-04",
+              ipAddress: ip,
+              userAgent: req.headers.get("user-agent") ?? undefined,
+            });
+          }
+
+          await db.logAudit({
+            entityType: "user",
+            entityId: user.id,
+            action: "register",
+            ipAddress: ip,
+            newValue: "google",
+          });
+        } else {
+          // Usuario ya existía: si Google certifica el email y nosotros no
+          // lo teníamos verificado, lo subimos a verificado ahora.
+          if (!user.emailVerified) {
+            try {
+              await db.markEmailVerified(user.id);
+              user = (await db.getUser(user.id)) ?? user;
+            } catch (err) {
+              logger.error("markEmailVerified failed", "google-signin", {
+                err: String(err),
+              });
+            }
+          }
+        }
+
+        const token = await createSessionToken(
+          { id: user.id, email: user.email, role: user.role, name: user.name },
+          true, // Google login = remember me por defecto
+        );
+
+        const userProfile = {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          name: user.name,
+          lastName: user.lastName,
+          phone: user.phone,
+          role: user.role,
+          nif: user.nif,
+          nifType: user.nifType,
+          referralCode: user.referralCode,
+          referredBy: user.referredBy,
+          emailVerified: user.emailVerified,
+          emailVerifiedAt: user.emailVerifiedAt,
+          birthDate: user.birthDate,
+          createdAt: user.createdAt,
+        };
+
+        const response = NextResponse.json({
+          ok: true,
+          user: userProfile,
+          created,
+        });
+        setSessionCookie(response, token, true);
+
+        await db.logAudit({
+          entityType: "user",
+          entityId: user.id,
+          action: "login",
+          ipAddress: ip,
+          newValue: "google",
+        });
+
+        return response;
+      }
+
       // ── LOGOUT ─────────────────────────────────────────────────────────
       case "logout": {
         const response = NextResponse.json({ ok: true });

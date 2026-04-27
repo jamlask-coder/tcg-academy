@@ -83,6 +83,17 @@ export const authLogoutSchema = z.object({
   action: z.literal("logout"),
 });
 
+/**
+ * Login con Google OAuth. Cliente envía el id_token recibido de Google
+ * (vía redirect a /auth/google/callback). El servidor lo verifica con la
+ * JWKS pública de Google antes de crear/recuperar el usuario en BD y
+ * emitir la cookie de sesión propia.
+ */
+export const authGoogleSigninSchema = z.object({
+  action: z.literal("google-signin"),
+  idToken: z.string().min(20).max(8192),
+});
+
 export const authVerifyEmailSchema = z.object({
   action: z.literal("verify-email"),
   email: z.string().email().max(254),
@@ -175,6 +186,7 @@ export const authBodySchema = z.discriminatedUnion("action", [
   authResetConfirmSchema,
   authChangePasswordSchema,
   authLogoutSchema,
+  authGoogleSigninSchema,
   authVerifyEmailSchema,
   authResendVerificationSchema,
   authSendVerificationEmailSchema,

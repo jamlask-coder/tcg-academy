@@ -35,6 +35,12 @@ export interface GoogleSignInPayload {
   name?: string;
   picture?: string;
   sub: string;
+  /**
+   * id_token crudo de Google. Necesario en server-mode para que /api/auth
+   * pueda re-verificarlo contra la JWKS pública (no nos fiamos de los claims
+   * que vengan ya decodificados por el cliente).
+   */
+  idToken?: string;
 }
 
 interface AuthContextValue {
@@ -734,6 +740,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: "Tu email de Google no está verificado" };
       }
       const email = payload.email.toLowerCase();
+
+      // ── Server mode: delegamos en /api/auth ─────────────────────────────
+      // El servidor re-verifica el id_token contra la JWKS de Google y crea
+      // o recupera el usuario en Supabase. La cookie httpOnly tcga_session
+      // queda emitida; el caché localStorage se rellena con la respuesta.
+      if (IS_SERVER_MODE) {
+        if (!payload.idToken) {
+          return { ok: false, error: "Falta token de Google" };
+        }
+        try {
+          const res = await fetch("/api/auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ action: "google-signin", idToken: payload.idToken }),
+          });
+          const data = (await res.json().catch(() => ({}))) as {
+            ok?: boolean;
+            error?: string;
+            user?: User;
+            created?: boolean;
+          };
+          if (!res.ok || !data.ok || !data.user) {
+            return {
+              ok: false,
+              error: data.error ?? "Error al iniciar sesión con Google",
+            };
+          }
+          persist(data.user, REMEMBER_ME_MS);
+          return { ok: true, created: data.created };
+        } catch {
+          return { ok: false, error: "Error de red al iniciar sesión con Google" };
+        }
+      }
 
       // Existing demo account with same email → log in directly
       const demo = DEMO_USERS[email];
