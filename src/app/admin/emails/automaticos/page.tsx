@@ -178,7 +178,6 @@ export default function AdminEmailsAutomaticosPage() {
   // Log
   const [sentLog, setSentLog] = useState<SentEmailLog[]>([]);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSentLog(loadSentEmails());
   }, [tab]);
 
