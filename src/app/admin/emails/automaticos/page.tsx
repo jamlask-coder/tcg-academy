@@ -196,6 +196,7 @@ export default function AdminEmailsAutomaticosPage() {
         sent?: number;
         failed?: number;
         error?: string;
+        firstError?: string;
       }
   >(null);
 
@@ -215,6 +216,7 @@ export default function AdminEmailsAutomaticosPage() {
         sent?: number;
         failed?: number;
         error?: string;
+        firstError?: string;
       };
       setSendAllResult(data);
       if (data.ok) {
@@ -391,9 +393,16 @@ export default function AdminEmailsAutomaticosPage() {
             />
 
             {sendAllResult && !sendAllResult.ok && (
-              <div className="mt-3 flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
-                <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
-                <span>{sendAllResult.error ?? `Fallaron ${sendAllResult.failed}/${sendAllResult.total} envíos.`}</span>
+              <div className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+                  <span>{sendAllResult.error ?? `Fallaron ${sendAllResult.failed}/${sendAllResult.total} envíos.`}</span>
+                </div>
+                {sendAllResult.firstError && (
+                  <p className="mt-2 ml-6 text-[12px] text-red-600">
+                    <strong>Causa:</strong> {sendAllResult.firstError}
+                  </p>
+                )}
               </div>
             )}
 
