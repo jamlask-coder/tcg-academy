@@ -958,4 +958,169 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       </div>
     `),
   },
+  // ── Alias canónicos del flujo de pedidos (sustituyen a LEGACY_TEMPLATES).
+  //    El estilo es el mismo wrapEmail() con escudo y paleta navy.
+  {
+    id: "pedido_confirmado",
+    name: "Pedido confirmado (alias canónico)",
+    subject: "Pedido #{{orderId}} confirmado — TCG Academy",
+    description:
+      "Alias del id usado por ORDER_TEMPLATE_MAP. Reemplaza al fallback legacy. Reutiliza la plantilla rica de confirmacion_pedido.",
+    variables: ["nombre", "orderId", "total", "appUrl"],
+    html: wrapEmail(`
+      <div class="top-btns">
+        <a href="${SITE_URL}/cuenta/pedidos">Mis pedidos</a>
+        <a href="${SITE_URL}/cuenta">Mi cuenta</a>
+        <a href="${SITE_URL}/catalogo">Volver a comprar</a>
+      </div>
+      <div class="hero">
+        <h1>¡Pedido confirmado!</h1>
+        <p>Hemos recibido tu pedido y lo estamos preparando</p>
+      </div>
+      <div class="progress">
+        <div class="progress-track">
+          <div class="prog-step"><div class="prog-dot done"></div><div class="prog-label done">Pedido</div></div>
+          <div class="prog-line done"></div>
+          <div class="prog-step"><div class="prog-dot done"></div><div class="prog-label done">Pagado</div></div>
+          <div class="prog-line pending"></div>
+          <div class="prog-step"><div class="prog-dot pending"></div><div class="prog-label">Pendiente envío</div></div>
+          <div class="prog-line pending"></div>
+          <div class="prog-step"><div class="prog-dot pending"></div><div class="prog-label">Enviado</div></div>
+        </div>
+      </div>
+      <div class="content">
+        <p>Hola {{nombre}},</p>
+        <p>Hemos recibido tu pedido <strong>{{orderId}}</strong> correctamente. Total: <strong>{{total}}€</strong>.</p>
+        <p>Te enviaremos un email cuando tu pedido salga del almacén con el número de seguimiento.</p>
+        <p style="text-align:center; margin: 28px 0;">
+          <a href="{{appUrl}}/cuenta/pedidos" class="btn">Ver mis pedidos</a>
+        </p>
+        <p>¡Gracias por confiar en TCG Academy!<br/><strong>El equipo de TCG Academy</strong></p>
+      </div>
+    `),
+  },
+  {
+    id: "pedido_confirmado_recogida",
+    name: "Pedido confirmado — Recogida en tienda",
+    subject: "Pedido #{{orderId}} reservado — Recogida en {{tiendaNombre}}",
+    description:
+      "Pedido reservado para recogida en tienda. Pago al recoger. Reemplaza al legacy.",
+    variables: [
+      "nombre",
+      "orderId",
+      "total",
+      "tiendaNombre",
+      "tiendaDireccion",
+      "appUrl",
+    ],
+    html: wrapEmail(`
+      <div class="top-btns">
+        <a href="${SITE_URL}/cuenta/pedidos">Mis pedidos</a>
+        <a href="${SITE_URL}/tiendas">Nuestras tiendas</a>
+      </div>
+      <div class="hero">
+        <h1>¡Pedido reservado!</h1>
+        <p>Te avisaremos cuando esté listo para recoger</p>
+      </div>
+      <div class="content">
+        <p>Hola {{nombre}},</p>
+        <p>Hemos reservado tu pedido <strong>{{orderId}}</strong> para recogida en nuestra tienda <strong>{{tiendaNombre}}</strong>.</p>
+        <div class="info-box">
+          <strong>Total a pagar al recoger:</strong> {{total}}€<br/>
+          <strong>Dirección:</strong> {{tiendaDireccion}}
+        </div>
+        <p>Cuando tu pedido esté preparado te enviaremos un nuevo email avisándote.</p>
+        <p style="text-align:center; margin: 28px 0;">
+          <a href="{{appUrl}}/cuenta/pedidos" class="btn">Ver mis pedidos</a>
+        </p>
+        <p>¡Gracias por elegir TCG Academy!<br/><strong>El equipo de TCG Academy</strong></p>
+      </div>
+    `),
+  },
+  {
+    id: "pedido_listo_recoger",
+    name: "Pedido listo para recoger",
+    subject: "Tu pedido #{{orderId}} ya está listo para recoger",
+    description:
+      "Aviso de que el pedido está disponible en tienda para retirada. Reemplaza al legacy.",
+    variables: [
+      "nombre",
+      "orderId",
+      "total",
+      "tiendaNombre",
+      "tiendaDireccion",
+      "tiendaHorario",
+      "appUrl",
+    ],
+    html: wrapEmail(`
+      <div class="hero" style="background: linear-gradient(135deg, #0a1530 0%, #15306b 50%, #047857 100%);">
+        <h1>¡Listo para recoger!</h1>
+        <p>Tu pedido te está esperando en la tienda</p>
+      </div>
+      <div class="content">
+        <p>Hola {{nombre}},</p>
+        <p>Tu pedido <strong>{{orderId}}</strong> ya está preparado en <strong>{{tiendaNombre}}</strong>.</p>
+        <div class="info-box">
+          <strong>Total a pagar:</strong> {{total}}€<br/>
+          <strong>Dirección:</strong> {{tiendaDireccion}}<br/>
+          <strong>Horario:</strong> {{tiendaHorario}}
+        </div>
+        <p>Recuerda llevar tu DNI/NIF y el número de pedido.</p>
+        <p style="text-align:center; margin: 28px 0;">
+          <a href="{{appUrl}}/cuenta/pedidos" class="btn">Ver mi pedido</a>
+        </p>
+        <p>¡Te esperamos!<br/><strong>El equipo de TCG Academy</strong></p>
+      </div>
+    `),
+  },
+  {
+    id: "pedido_cancelado",
+    name: "Pedido cancelado",
+    subject: "Pedido #{{orderId}} cancelado — TCG Academy",
+    description: "Confirmación de cancelación del pedido. Reemplaza al legacy.",
+    variables: ["nombre", "orderId", "appUrl"],
+    html: wrapEmail(`
+      <div class="hero" style="background: linear-gradient(135deg, #0a1530 0%, #1e293b 50%, #b91c1c 100%);">
+        <h1>Pedido cancelado</h1>
+        <p>Tu pedido ha sido cancelado correctamente</p>
+      </div>
+      <div class="content">
+        <p>Hola {{nombre}},</p>
+        <p>Confirmamos que tu pedido <strong>{{orderId}}</strong> ha sido cancelado.</p>
+        <p>Si el pago se completó, el reembolso se gestionará en los próximos días por el mismo método de pago utilizado.</p>
+        <p>Si tienes cualquier duda, escríbenos a <a href="mailto:${SITE_CONFIG.email}">${SITE_CONFIG.email}</a>.</p>
+        <p style="text-align:center; margin: 28px 0;">
+          <a href="{{appUrl}}/catalogo" class="btn">Volver a la tienda</a>
+        </p>
+        <p>Gracias por tu comprensión.<br/><strong>El equipo de TCG Academy</strong></p>
+      </div>
+    `),
+  },
+  {
+    id: "admin_nuevo_pedido",
+    name: "Admin — nuevo pedido recibido",
+    subject: "[Admin] Nuevo pedido {{orderId}} ({{total}}€)",
+    description:
+      "Notificación interna a admin cuando entra un nuevo pedido. Reemplaza al legacy.",
+    variables: ["orderId", "customerName", "customerEmail", "total", "appUrl"],
+    html: wrapEmail(`
+      <div class="hero">
+        <h1>Nuevo pedido recibido</h1>
+        <p>Pedido #{{orderId}}</p>
+      </div>
+      <div class="content">
+        <p>Se ha recibido un nuevo pedido en TCG Academy:</p>
+        <div class="info-box">
+          <strong>Pedido:</strong> {{orderId}}<br/>
+          <strong>Cliente:</strong> {{customerName}}<br/>
+          <strong>Email:</strong> {{customerEmail}}<br/>
+          <strong>Total:</strong> {{total}}€
+        </div>
+        <p style="text-align:center; margin: 28px 0;">
+          <a href="{{appUrl}}/admin/pedidos" class="btn">Abrir panel de pedidos</a>
+        </p>
+        <p style="color:#475569; font-size:13px">Notificación interna del sistema TCG Academy.</p>
+      </div>
+    `),
+  },
 ];
