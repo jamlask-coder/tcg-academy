@@ -6,6 +6,10 @@ import type { Address } from "@/types/user";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
 import { validateSpanishNIF } from "@/lib/validations/nif";
 import { useFieldErrors } from "@/hooks/useFieldErrors";
+import {
+  validatePasswordForRole,
+  describePasswordRequirements,
+} from "@/lib/passwordPolicy";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[\d\s\-()+]{6,20}$/;
@@ -321,8 +325,12 @@ export default function DatosPage() {
           setPwdError("");
           setPwdSuccess(false);
 
-          if (pwdForm.next.length < 8) {
-            setPwdError("La nueva contraseña debe tener al menos 8 caracteres");
+          // Política según rol del usuario actual:
+          // admin → ≥12 chars con mayúscula, minúscula, dígito y especial.
+          // resto → ≥6 chars sin más reglas.
+          const pwdCheck = validatePasswordForRole(pwdForm.next, user?.role);
+          if (!pwdCheck.ok) {
+            setPwdError(pwdCheck.error ?? "Contraseña no válida");
             return;
           }
           if (pwdForm.next !== pwdForm.confirm) {
@@ -366,7 +374,7 @@ export default function DatosPage() {
                   onChange={(e) =>
                     setPwdForm((f) => ({ ...f, [key]: e.target.value }))
                   }
-                  placeholder={key === "next" ? "Mínimo 8 caracteres" : "••••••••"}
+                  placeholder={key === "next" ? describePasswordRequirements(user?.role) : "••••••••"}
                   maxLength={128}
                   className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 pr-10 text-sm transition focus:border-[#2563eb] focus:outline-none"
                 />

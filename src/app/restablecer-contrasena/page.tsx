@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Lock, CheckCircle, AlertCircle, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { hashPassword } from "@/context/AuthContext";
 import type { User } from "@/types/user";
+import { validatePasswordForRole } from "@/lib/passwordPolicy";
 
 const REGISTERED_KEY = "tcgacademy_registered";
 const TOKENS_KEY = "tcgacademy_reset_tokens";
@@ -79,12 +80,26 @@ function ResetForm() {
     e.preventDefault();
     setError("");
 
-    if (password.length < 8) {
-      setError("La contraseña debe tener al menos 8 caracteres");
-      return;
-    }
     if (password !== confirmPassword) {
       setError("Las contraseñas no coinciden");
+      return;
+    }
+
+    // Detectar el rol del email para aplicar la política correspondiente.
+    // Admin → ≥12 chars Aa1*. Resto → ≥6 chars cualquier cosa. En modo
+    // server este flujo no se ejecuta (server valida con la misma función),
+    // pero en local mode es la única defensa.
+    let targetRole = "cliente";
+    try {
+      const registeredPeek = JSON.parse(
+        localStorage.getItem(REGISTERED_KEY) ?? "{}",
+      ) as Record<string, { password: string; user: User }>;
+      targetRole =
+        registeredPeek[email]?.user.role ?? DEMO_USERS[email]?.role ?? "cliente";
+    } catch { /* ignore */ }
+    const pwdCheck = validatePasswordForRole(password, targetRole);
+    if (!pwdCheck.ok) {
+      setError(pwdCheck.error ?? "Contraseña no válida");
       return;
     }
 

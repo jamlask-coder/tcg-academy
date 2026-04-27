@@ -24,7 +24,9 @@ export const authRegisterSchema = z.object({
   name: z.string().min(1).max(120),
   lastName: z.string().max(120).optional(),
   email: z.string().email().max(254),
-  password: z.string().min(8).max(200),
+  // Longitud mínima delegada a validatePasswordForRole(role) server-side.
+  // Aquí solo bloqueamos vacío y payloads grandes.
+  password: z.string().min(1).max(200),
   phone: z.string().max(40).optional(),
   username: z.string().max(40).optional(),
   referralCode: z.string().max(40).optional(),
@@ -64,14 +66,17 @@ export const authResetConfirmSchema = z.object({
   action: z.literal("reset-confirm"),
   email: z.string().email().max(254),
   token: z.string().min(10).max(256),
-  newPassword: z.string().min(8).max(200),
+  // Longitud mínima delegada a validatePasswordForRole(user.role) server-side.
+  newPassword: z.string().min(1).max(200),
 });
 
 export const authChangePasswordSchema = z.object({
   action: z.literal("change-password"),
   userId: z.string().min(1).max(120),
   currentPassword: z.string().min(1).max(200),
-  newPassword: z.string().min(8).max(200),
+  // La longitud mínima real depende del rol — la valida `validatePasswordForRole`
+  // server-side. Aquí solo bloqueamos cadenas vacías y payloads enormes.
+  newPassword: z.string().min(1).max(200),
 });
 
 export const authLogoutSchema = z.object({

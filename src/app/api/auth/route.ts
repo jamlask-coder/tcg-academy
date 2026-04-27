@@ -17,6 +17,7 @@ import { sanitizeString } from "@/utils/sanitize";
 import { authBodySchema, zodMessage } from "@/lib/validations/api";
 import { verifyTurnstileToken, isTurnstileConfigured } from "@/lib/turnstile";
 import { validateSpanishNIF } from "@/lib/validations/nif";
+import { validatePasswordForRole } from "@/lib/passwordPolicy";
 
 const isServerMode = () => (process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local") === "server";
 
@@ -214,8 +215,13 @@ export async function POST(req: NextRequest) {
         if (!name || !email || !password) {
           return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
         }
-        if (password.length < 8) {
-          return NextResponse.json({ error: "La contraseña debe tener al menos 8 caracteres" }, { status: 400 });
+        // Política por rol — los registros públicos siempre crean rol "cliente"
+        // (líneas más abajo: `role: "cliente"`). Por tanto aplicamos la regla
+        // estándar (≥6). El rol admin solo se concede manualmente en BD y su
+        // contraseña se rota vía change-password con la política estricta.
+        const pwdCheck = validatePasswordForRole(password, "cliente");
+        if (!pwdCheck.ok) {
+          return NextResponse.json({ error: pwdCheck.error }, { status: 400 });
         }
 
         const cleanEmail = email.toLowerCase().trim();
@@ -444,9 +450,6 @@ export async function POST(req: NextRequest) {
         if (!confirmEmail || !token || !newPassword) {
           return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
         }
-        if (newPassword.length < 8) {
-          return NextResponse.json({ error: "La contraseña debe tener al menos 8 caracteres" }, { status: 400 });
-        }
 
         const cleanEmail = confirmEmail.toLowerCase().trim();
 
@@ -462,6 +465,13 @@ export async function POST(req: NextRequest) {
         const user = await db.getUserByEmail(cleanEmail);
         if (!user) {
           return NextResponse.json({ error: "Enlace no válido o expirado" }, { status: 400 });
+        }
+
+        // Política por rol: si el usuario es admin, la nueva contraseña debe
+        // cumplir la regla estricta (≥12 + Aa1*). Para el resto, ≥6 basta.
+        const resetPwdCheck = validatePasswordForRole(newPassword, user.role);
+        if (!resetPwdCheck.ok) {
+          return NextResponse.json({ error: resetPwdCheck.error }, { status: 400 });
         }
 
         // Hash the provided token and compare with stored hash
@@ -526,6 +536,13 @@ export async function POST(req: NextRequest) {
         const valid = await verifyPassword(currentPassword, user.passwordHash);
         if (!valid) {
           return NextResponse.json({ error: "La contraseña actual no es correcta" }, { status: 401 });
+        }
+
+        // Política por rol — si la cuenta es admin, exige Aa1*+12 chars.
+        // Para roles estándar basta con ≥6 caracteres (cualquier cosa).
+        const cpwCheck = validatePasswordForRole(newPwd, user.role);
+        if (!cpwCheck.ok) {
+          return NextResponse.json({ error: cpwCheck.error }, { status: 400 });
         }
 
         const newHash = await hashPassword(newPwd);

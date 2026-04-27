@@ -26,6 +26,7 @@ import {
   isEmailVerificationRequired,
 } from "@/services/emailVerificationService";
 import { getEmailService } from "@/lib/email";
+import { validatePasswordForRole } from "@/lib/passwordPolicy";
 
 export interface GoogleSignInPayload {
   email: string;
@@ -941,6 +942,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Política de contraseñas — modo local. Registro web siempre crea
+      // rol "cliente", así que aplica la regla estándar (≥6 chars).
+      const localPwdCheck = validatePasswordForRole(data.password, "cliente");
+      if (!localPwdCheck.ok) {
+        return { ok: false, error: localPwdCheck.error };
+      }
+
       if (DEMO_USERS[email])
         return { ok: false, error: "Este email ya está registrado" };
 
@@ -1195,6 +1203,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           return { ok: false, error: "Error de red al cambiar la contraseña" };
         }
+      }
+
+      // Política según rol del usuario actual:
+      // admin → ≥12 chars con mayúscula, minúscula, dígito y especial.
+      // resto → ≥6 chars sin más reglas.
+      const localCpwCheck = validatePasswordForRole(newPassword, user.role);
+      if (!localCpwCheck.ok) {
+        return { ok: false, error: localCpwCheck.error };
       }
 
       const email = user.email.toLowerCase();

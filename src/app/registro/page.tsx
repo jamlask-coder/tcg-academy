@@ -59,7 +59,7 @@ const schema = z
         /^[\d\s\-()]{6,20}$/,
         "Solo dígitos, espacios y los símbolos -()",
       ),
-    password: z.string().min(8, "Mínimo 8 caracteres").max(128),
+    password: z.string().min(6, "Mínimo 6 caracteres").max(128),
     confirmPassword: z.string().min(1, "Confirma tu contraseña"),
     calle: z.string().min(1, "La calle es obligatoria").max(200),
     numero: z.string().min(1, "El número es obligatorio").max(20),
