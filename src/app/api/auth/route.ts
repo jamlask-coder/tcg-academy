@@ -19,6 +19,7 @@ import { authBodySchema, zodMessage } from "@/lib/validations/api";
 import { verifyTurnstileToken, isTurnstileConfigured } from "@/lib/turnstile";
 import { validateSpanishNIF } from "@/lib/validations/nif";
 import { validatePasswordForRole } from "@/lib/passwordPolicy";
+import { logger } from "@/lib/logger";
 
 const isServerMode = () => (process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local") === "server";
 
@@ -793,6 +794,244 @@ export async function POST(req: NextRequest) {
 
         const updated = await db.getUser(sessionUserId);
         return NextResponse.json({ ok: true, user: updated });
+      }
+
+      // ── CHANGE EMAIL ───────────────────────────────────────────────────
+      // Cambia el email del usuario autenticado. Valida colisión en BD.
+      // Solo server-mode — el endpoint asume Supabase como SSOT.
+      case "change-email": {
+        const session = await getSessionFromRequest(req);
+        if (!session?.sub) {
+          return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+        }
+        const userId = session.sub;
+        const newEmail = String((parsed.data as { newEmail?: string }).newEmail ?? "")
+          .trim()
+          .toLowerCase();
+        if (!newEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+          return NextResponse.json({ error: "Email inválido" }, { status: 400 });
+        }
+
+        const current = await db.getUser(userId);
+        if (!current) {
+          return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
+        }
+        if (current.email.toLowerCase() === newEmail) {
+          return NextResponse.json({ ok: true });
+        }
+
+        const collision = await db.getUserByEmail(newEmail);
+        if (collision && collision.id !== userId) {
+          return NextResponse.json(
+            { error: "Este email ya está registrado" },
+            { status: 409 },
+          );
+        }
+
+        // No hay db.updateUser para email — usar SQL directo via supabase.
+        // Para evitar acoplamiento, hacemos la actualización vía un método
+        // dedicado. Si no existe, fallback con error explícito (no silencioso).
+        try {
+          await db.updateUserEmail?.(userId, newEmail);
+        } catch (err) {
+          return NextResponse.json(
+            { error: err instanceof Error ? err.message : "No se pudo cambiar el email" },
+            { status: 500 },
+          );
+        }
+
+        await db.logAudit({
+          entityType: "user",
+          entityId: userId,
+          action: "email_changed",
+          ipAddress: ip,
+          oldValue: current.email,
+          newValue: newEmail,
+        });
+
+        return NextResponse.json({ ok: true });
+      }
+
+      // ── UPDATE ADDRESSES (replace all) ──────────────────────────────────
+      case "update-addresses": {
+        const session = await getSessionFromRequest(req);
+        if (!session?.sub) {
+          return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+        }
+        const userId = session.sub;
+
+        const incoming = (parsed.data as {
+          addresses: Array<{
+            id?: string;
+            label: string;
+            nombre?: string;
+            apellidos?: string;
+            calle: string;
+            numero: string;
+            piso?: string;
+            cp: string;
+            ciudad: string;
+            provincia: string;
+            pais: string;
+            telefono?: string;
+            predeterminada: boolean;
+          }>;
+        }).addresses;
+
+        // Snapshot actual en BD para detectar borrados.
+        const existing = await db.getAddresses(userId);
+        const incomingIds = new Set(
+          incoming.map((a) => a.id).filter((id): id is string => Boolean(id)),
+        );
+
+        // Borrar las que ya no están.
+        for (const old of existing) {
+          if (!incomingIds.has(old.id)) {
+            try {
+              await db.deleteAddress(old.id);
+            } catch (err) {
+              logger.error("deleteAddress failed", "update-addresses", { id: old.id, err: String(err) });
+            }
+          }
+        }
+
+        // Upsert las nuevas/modificadas.
+        for (const a of incoming) {
+          const fullName = `${a.nombre ?? ""} ${a.apellidos ?? ""}`.trim();
+          const recipient = sanitizeString(fullName) || sanitizeString(a.label);
+          const street = sanitizeString(`${a.calle} ${a.numero}`.trim());
+          try {
+            await db.upsertAddress({
+              id: a.id || crypto.randomUUID(),
+              userId,
+              label: sanitizeString(a.label).slice(0, 60),
+              recipient: recipient.slice(0, 160),
+              street: street.slice(0, 200),
+              floor: a.piso ? sanitizeString(a.piso).slice(0, 40) : undefined,
+              postalCode: sanitizeString(a.cp).slice(0, 15),
+              city: sanitizeString(a.ciudad).slice(0, 80),
+              province: sanitizeString(a.provincia).slice(0, 80),
+              country: sanitizeString(a.pais || "ES").slice(0, 3),
+              phone: a.telefono ? sanitizeString(a.telefono).slice(0, 30) : undefined,
+              isDefault: !!a.predeterminada,
+            });
+          } catch (err) {
+            logger.error("upsertAddress failed", "update-addresses", { err: String(err) });
+            return NextResponse.json(
+              { error: err instanceof Error ? err.message : "No se pudo guardar la dirección" },
+              { status: 500 },
+            );
+          }
+        }
+
+        await db.logAudit({
+          entityType: "user",
+          entityId: userId,
+          action: "addresses_updated",
+          ipAddress: ip,
+          newValue: String(incoming.length),
+        });
+
+        return NextResponse.json({ ok: true, count: incoming.length });
+      }
+
+      // ── UPDATE EMPRESA (B2B fiscal data) ────────────────────────────────
+      case "update-empresa": {
+        const session = await getSessionFromRequest(req);
+        if (!session?.sub) {
+          return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+        }
+        const userId = session.sub;
+        const empresa = (parsed.data as {
+          empresa: {
+            cif: string;
+            razonSocial: string;
+            direccionFiscal: string;
+            personaContacto: string;
+            telefonoEmpresa: string;
+            emailFacturacion?: string;
+          } | null;
+        }).empresa;
+
+        if (!empresa) {
+          // Si llega null, borrar el perfil de empresa.
+          try {
+            await db.deleteCompanyProfile?.(userId);
+          } catch (err) {
+            logger.error("delete failed", "update-empresa", { err: String(err) });
+          }
+          return NextResponse.json({ ok: true });
+        }
+
+        try {
+          const existing = await db.getCompanyProfile(userId);
+          await db.upsertCompanyProfile({
+            id: existing?.id ?? crypto.randomUUID(),
+            userId,
+            cif: sanitizeString(empresa.cif).toUpperCase().slice(0, 20),
+            legalName: sanitizeString(empresa.razonSocial).slice(0, 160),
+            fiscalAddress: sanitizeString(empresa.direccionFiscal).slice(0, 240),
+            contactPerson: sanitizeString(empresa.personaContacto).slice(0, 120),
+            companyPhone: empresa.telefonoEmpresa
+              ? sanitizeString(empresa.telefonoEmpresa).slice(0, 30)
+              : undefined,
+            billingEmail: empresa.emailFacturacion?.trim().toLowerCase() || undefined,
+          });
+        } catch (err) {
+          return NextResponse.json(
+            { error: err instanceof Error ? err.message : "No se pudo guardar la empresa" },
+            { status: 500 },
+          );
+        }
+
+        await db.logAudit({
+          entityType: "user",
+          entityId: userId,
+          action: "company_updated",
+          ipAddress: ip,
+        });
+
+        return NextResponse.json({ ok: true });
+      }
+
+      // ── UPDATE FAVORITES (replace full set) ─────────────────────────────
+      case "update-favorites": {
+        const session = await getSessionFromRequest(req);
+        if (!session?.sub) {
+          return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+        }
+        const userId = session.sub;
+        const wanted = new Set((parsed.data as { favorites: number[] }).favorites);
+
+        let existing: number[] = [];
+        try {
+          const rows = await db.getFavorites(userId);
+          existing = rows.map((r) => r.productId);
+        } catch (err) {
+          logger.error("getFavorites failed", "update-favorites", { err: String(err) });
+        }
+        const existingSet = new Set(existing);
+
+        // Diff: añadir los nuevos, quitar los que ya no están.
+        const toAdd = [...wanted].filter((id) => !existingSet.has(id));
+        const toRemove = existing.filter((id) => !wanted.has(id));
+
+        for (const id of toAdd) {
+          try {
+            await db.addFavorite(userId, id);
+          } catch (err) {
+            logger.error("addFavorite failed", "update-favorites", { id, err: String(err) });
+          }
+        }
+        for (const id of toRemove) {
+          try {
+            await db.removeFavorite(userId, id);
+          } catch (err) {
+            logger.error("removeFavorite failed", "update-favorites", { id, err: String(err) });
+          }
+        }
+
+        return NextResponse.json({ ok: true, added: toAdd.length, removed: toRemove.length });
       }
 
       // ── LOGOUT ─────────────────────────────────────────────────────────

@@ -454,23 +454,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (res.ok) {
               const data = (await res.json()) as { ok: boolean; user?: User };
               if (data.ok && data.user) {
-                // Hidratar campos de catálogo cliente (favorites, addresses)
-                // desde el caché local — no viven en BD aún.
-                let cachedExtras: Partial<User> = {};
-                try {
-                  const stored = localStorage.getItem(STORAGE_KEY);
-                  if (stored) {
-                    const parsed = JSON.parse(stored) as Partial<User>;
-                    cachedExtras = {
-                      favorites: parsed.favorites ?? [],
-                      addresses: parsed.addresses ?? [],
-                    };
-                  }
-                } catch { /* ignore */ }
+                // /api/auth/me ahora devuelve addresses/empresa/favorites
+                // hidratados desde BD (Promise.all en el endpoint). El caché
+                // localStorage solo se usa como fallback para campos no
+                // serializados por el endpoint (ninguno hoy).
                 const merged: User = {
                   ...data.user,
-                  favorites: cachedExtras.favorites ?? [],
-                  addresses: cachedExtras.addresses ?? [],
+                  favorites: data.user.favorites ?? [],
+                  addresses: data.user.addresses ?? [],
                 } as User;
                 setUser(merged);
                 // Actualizar caché optimista
@@ -1119,10 +1110,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (updates.nif !== undefined) sanitizedUpdates.nif = sanitizeString(updates.nif).toUpperCase();
       if (updates.nifType !== undefined) sanitizedUpdates.nifType = updates.nifType;
 
-      // ── Server mode: persistir name/lastName/phone/nif/nifType en BD ───
-      // Las direcciones siguen viviendo en localStorage (schema Supabase no
-      // las modela todavía). El servidor también valida NIF/colisiones, así
-      // que esa lógica abajo solo aplica en local mode.
+      // ── Server mode: persistir todos los campos en BD ──────────────────
+      // - name/lastName/phone/nif/nifType → /api/auth update-profile
+      // - addresses → /api/auth update-addresses (replace atómico full)
+      // El servidor valida NIF, colisiones y cualquier regla fiscal.
       if (IS_SERVER_MODE) {
         const serverFields: Record<string, unknown> = {};
         if (sanitizedUpdates.name !== undefined) serverFields.name = sanitizedUpdates.name;
@@ -1151,7 +1142,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // Persistir cambios locales (incluye addresses) en sesión actual.
+        // Sincronizar direcciones (replace atómico full).
+        if (sanitizedUpdates.addresses !== undefined) {
+          try {
+            const res = await fetch("/api/auth", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                action: "update-addresses",
+                addresses: sanitizedUpdates.addresses,
+              }),
+            });
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
+              return { ok: false, error: data.error ?? "No se pudieron guardar las direcciones" };
+            }
+          } catch (err) {
+            return {
+              ok: false,
+              error: err instanceof Error ? err.message : "Error de red al guardar direcciones",
+            };
+          }
+        }
+
+        // Persistir cambios locales en sesión actual (caché optimista).
         const updated = { ...user, ...sanitizedUpdates };
         persist(updated);
         return { ok: true };
@@ -1316,6 +1331,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const oldEmail = user.email.toLowerCase();
       if (newEmail === oldEmail) return { ok: true };
 
+      // ── Server mode: BD valida colisión y persiste ─────────────────────
+      if (IS_SERVER_MODE) {
+        try {
+          const res = await fetch("/api/auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ action: "change-email", newEmail }),
+          });
+          const json = (await res.json().catch(() => ({}))) as {
+            ok?: boolean;
+            error?: string;
+          };
+          if (!res.ok || !json.ok) {
+            return { ok: false, error: json.error ?? "No se pudo cambiar el email" };
+          }
+          const updated: User = { ...user, email: newEmail };
+          persist(updated);
+          return { ok: true };
+        } catch {
+          return { ok: false, error: "Error de red al cambiar el email" };
+        }
+      }
+
       // Collision con demo users (admin@, luri@, font@, cliente@, etc.)
       if (DEMO_USERS[newEmail]) {
         return { ok: false, error: "Este email ya está registrado" };
@@ -1376,7 +1415,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const favorites = user.favorites.includes(productId)
         ? user.favorites.filter((id) => id !== productId)
         : [...user.favorites, productId];
+      // Cache optimista — UI inmediata.
       persist({ ...user, favorites });
+      // En server mode, persistir el array completo en BD (replace atómico).
+      if (IS_SERVER_MODE) {
+        void fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ action: "update-favorites", favorites }),
+        }).catch(() => { /* silencio: cache optimista cubre la UX */ });
+      }
     },
     [user, persist],
   );
@@ -1389,6 +1438,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const merged = Array.from(current);
       if (merged.length === user.favorites.length) return; // nada que añadir
       persist({ ...user, favorites: merged });
+      if (IS_SERVER_MODE) {
+        void fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ action: "update-favorites", favorites: merged }),
+        }).catch(() => { /* silencio */ });
+      }
     },
     [user, persist],
   );

@@ -15,6 +15,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getSessionFromRequest } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +43,55 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "user-not-found" }, { status: 401 });
     }
 
+    // Cargar entidades 1-a-N del usuario en paralelo. Si alguna falla, log y
+    // devolver array/null por defecto — no debe tirar abajo la hidratación.
+    const [addresses, company, favorites] = await Promise.all([
+      db.getAddresses(user.id).catch((err) => {
+        logger.error("getAddresses failed", "/api/auth/me", { err: String(err) });
+        return [];
+      }),
+      db.getCompanyProfile(user.id).catch((err) => {
+        logger.error("getCompanyProfile failed", "/api/auth/me", { err: String(err) });
+        return null;
+      }),
+      db.getFavorites(user.id).catch((err) => {
+        logger.error("getFavorites failed", "/api/auth/me", { err: String(err) });
+        return [];
+      }),
+    ]);
+
+    // Mapear AddressRecord (BD) → Address (cliente).
+    const mappedAddresses = addresses.map((a) => ({
+      id: a.id,
+      label: a.label,
+      // Schema BD guarda "calle número" en `street` concatenado.
+      // Para no romper el formulario, separamos en último token numérico.
+      calle: a.street.replace(/\s+\S+$/, "").trim() || a.street,
+      numero: (a.street.match(/\s+(\S+)$/)?.[1] ?? ""),
+      piso: a.floor ?? "",
+      cp: a.postalCode,
+      ciudad: a.city,
+      provincia: a.province,
+      pais: a.country,
+      telefono: a.phone ?? "",
+      predeterminada: a.isDefault,
+      // Recipient (nombre destinatario) → split en nombre/apellidos best-effort.
+      nombre: a.recipient.split(" ")[0] ?? "",
+      apellidos: a.recipient.split(" ").slice(1).join(" "),
+    }));
+
+    // Mapear CompanyProfileRecord → empresa del cliente.
+    const mappedEmpresa = company
+      ? {
+          cif: company.cif,
+          razonSocial: company.legalName,
+          direccionFiscal: company.fiscalAddress,
+          personaContacto: company.contactPerson,
+          telefonoEmpresa: company.companyPhone ?? "",
+          emailFacturacion: company.billingEmail ?? "",
+        }
+      : undefined;
+
     return NextResponse.json({
       ok: true,
       user: {
@@ -60,6 +110,9 @@ export async function GET(req: NextRequest) {
         emailVerifiedAt: user.emailVerifiedAt,
         birthDate: user.birthDate,
         createdAt: user.createdAt,
+        addresses: mappedAddresses,
+        empresa: mappedEmpresa,
+        favorites: favorites.map((f) => f.productId),
       },
     });
   } catch (err) {

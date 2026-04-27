@@ -465,6 +465,8 @@ export interface DbAdapter {
   getUserByNif(nif: string): Promise<UserRecord | null>;
   createUser(user: Omit<UserRecord, "createdAt" | "updatedAt">): Promise<UserRecord>;
   updateUser(userId: string, data: Partial<UserRecord>): Promise<void>;
+  /** Cambio de email — separado por validación de colisión y cascada de FKs. */
+  updateUserEmail(userId: string, newEmail: string): Promise<void>;
   deleteUser(userId: string): Promise<void>;
 
   // Invoices
@@ -585,6 +587,7 @@ export interface DbAdapter {
   deleteAddress(id: string): Promise<void>;
   getCompanyProfile(userId: string): Promise<CompanyProfileRecord | null>;
   upsertCompanyProfile(profile: CompanyProfileRecord): Promise<CompanyProfileRecord>;
+  deleteCompanyProfile(userId: string): Promise<void>;
 }
 
 // ─── localStorage keys ──────────────────────────────────────────────────────
@@ -627,6 +630,7 @@ interface RegisteredEntry {
     /** NIF/NIE/CIF normalizado — obligatorio en el registro nuevo. */
     nif?: string;
     nifType?: "DNI" | "NIE" | "CIF";
+    phone?: string;
   };
 }
 
@@ -735,8 +739,26 @@ export class LocalDbAdapter implements DbAdapter {
       if (entry.user.id === userId) {
         if (data.name) entry.user.name = data.name;
         if (data.lastName) entry.user.lastName = data.lastName;
+        if (data.phone !== undefined) entry.user.phone = data.phone;
+        if (data.nif !== undefined) entry.user.nif = data.nif;
+        if (data.nifType !== undefined) entry.user.nifType = data.nifType;
         if (data.passwordHash) entry.password = data.passwordHash;
         registered[email] = entry;
+        writeStorage(KEYS.users, registered);
+        return;
+      }
+    }
+  }
+
+  async updateUserEmail(userId: string, newEmail: string): Promise<void> {
+    const registered = readStorage<Record<string, RegisteredEntry>>(KEYS.users, {});
+    const lower = newEmail.toLowerCase();
+    if (registered[lower]) throw new Error("Email ya registrado");
+    for (const [email, entry] of Object.entries(registered)) {
+      if (entry.user.id === userId) {
+        entry.user.email = lower;
+        registered[lower] = entry;
+        delete registered[email];
         writeStorage(KEYS.users, registered);
         return;
       }
@@ -876,6 +898,7 @@ export class LocalDbAdapter implements DbAdapter {
   async deleteAddress(): Promise<void> { /* noop */ }
   async getCompanyProfile(): Promise<CompanyProfileRecord | null> { return null; }
   async upsertCompanyProfile(p: CompanyProfileRecord): Promise<CompanyProfileRecord> { return p; }
+  async deleteCompanyProfile(): Promise<void> { /* noop */ }
 }
 
 // ─── Server adapter (Supabase) ─────────────────────────────────────────────
@@ -1044,6 +1067,22 @@ export class ServerDbAdapter implements DbAdapter {
 
   async deleteUser(userId: string): Promise<void> {
     const { error } = await this.db.from("users").delete().eq("id", userId);
+    if (error) throw error;
+  }
+
+  async updateUserEmail(userId: string, newEmail: string): Promise<void> {
+    const lower = newEmail.toLowerCase();
+    const { data: existing } = await this.db
+      .from("users")
+      .select("id")
+      .eq("email", lower)
+      .neq("id", userId)
+      .maybeSingle();
+    if (existing) throw new Error("Email ya registrado");
+    const { error } = await this.db
+      .from("users")
+      .update({ email: lower, updated_at: new Date().toISOString() })
+      .eq("id", userId);
     if (error) throw error;
   }
 
@@ -2013,6 +2052,14 @@ export class ServerDbAdapter implements DbAdapter {
     }, { onConflict: "user_id" }).select().single();
     if (error) throw error;
     return mapCompanyProfileRow(data);
+  }
+
+  async deleteCompanyProfile(userId: string): Promise<void> {
+    const { error } = await this.db
+      .from("company_profiles")
+      .delete()
+      .eq("user_id", userId);
+    if (error) throw error;
   }
 }
 

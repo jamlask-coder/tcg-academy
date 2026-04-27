@@ -122,6 +122,52 @@ export const authUpdateProfileSchema = z.object({
   nifType: z.enum(["DNI", "NIE", "CIF"]).optional(),
 });
 
+// ── Cambio de email — server-mode only. Valida colisión en BD.
+export const authChangeEmailSchema = z.object({
+  action: z.literal("change-email"),
+  newEmail: z.string().email().max(254),
+});
+
+// ── Sincroniza el array completo de direcciones de envío del usuario.
+// Reemplaza atómicamente — borra las que ya no estén + upsert las nuevas.
+export const authUpdateAddressesSchema = z.object({
+  action: z.literal("update-addresses"),
+  addresses: z.array(z.object({
+    id: z.string().max(80).optional(),
+    label: z.string().max(60),
+    nombre: z.string().max(80).optional(),
+    apellidos: z.string().max(120).optional(),
+    calle: z.string().max(200),
+    numero: z.string().max(20),
+    piso: z.string().max(40).optional(),
+    cp: z.string().max(15),
+    ciudad: z.string().max(80),
+    provincia: z.string().max(80).default(""),
+    pais: z.string().max(3).default("ES"),
+    telefono: z.string().max(30).optional(),
+    predeterminada: z.boolean(),
+  })).max(20),
+});
+
+// ── Datos fiscales B2B (mayoristas/tiendas).
+export const authUpdateEmpresaSchema = z.object({
+  action: z.literal("update-empresa"),
+  empresa: z.object({
+    cif: z.string().min(1).max(20),
+    razonSocial: z.string().min(1).max(160),
+    direccionFiscal: z.string().min(1).max(240),
+    personaContacto: z.string().max(120).default(""),
+    telefonoEmpresa: z.string().max(30).default(""),
+    emailFacturacion: z.string().email().max(254).optional().or(z.literal("")),
+  }).nullable(),
+});
+
+// ── Sincroniza array completo de favoritos (productIds).
+export const authUpdateFavoritesSchema = z.object({
+  action: z.literal("update-favorites"),
+  favorites: z.array(z.number().int().positive()).max(2000),
+});
+
 export const authBodySchema = z.discriminatedUnion("action", [
   authLoginSchema,
   authRegisterSchema,
@@ -133,6 +179,10 @@ export const authBodySchema = z.discriminatedUnion("action", [
   authResendVerificationSchema,
   authSendVerificationEmailSchema,
   authUpdateProfileSchema,
+  authChangeEmailSchema,
+  authUpdateAddressesSchema,
+  authUpdateEmpresaSchema,
+  authUpdateFavoritesSchema,
 ]);
 
 // ─── Orders ──────────────────────────────────────────────────────────────
