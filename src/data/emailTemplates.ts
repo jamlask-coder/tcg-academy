@@ -509,6 +509,38 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     `),
   },
   {
+    id: "albaran_disponible",
+    name: "Albarán disponible",
+    subject: "Tu albarán {{albaran_id}} — TCG Academy",
+    description:
+      "Se envía cuando se emite un albarán manual al cliente. Adjunta el PDF del albarán (no es factura, no entra en VeriFactu).",
+    variables: [
+      "nombre",
+      "albaran_id",
+      "albaran_date",
+      "total",
+      "unsubscribe_link",
+    ],
+    html: wrapEmail(`
+      <div class="hero">
+        <h1>Albarán de entrega</h1>
+        <p>Documento {{albaran_id}}</p>
+      </div>
+      <div class="content">
+        <p>Hola {{nombre}},</p>
+        <p>Te adjuntamos en este email el albarán de entrega correspondiente a tu pedido:</p>
+        <div class="info-box">
+          <p style="margin:0;"><strong>Nº Albarán:</strong> {{albaran_id}}</p>
+          <p style="margin:8px 0 0;"><strong>Fecha:</strong> {{albaran_date}}</p>
+          <p style="margin:8px 0 0;"><strong>Importe:</strong> <span style="color:#15306b; font-weight:800; font-size:18px;">{{total}}€</span></p>
+        </div>
+        <p style="font-size:13px; color:#475569;">El albarán es un documento de entrega que acredita la salida de la mercancía. No es una factura ni sustituye a la factura — si necesitas factura para tus registros contables, indícanoslo y la emitiremos.</p>
+        <p>Si tienes cualquier duda sobre la entrega, escríbenos a <a href="mailto:${SITE_CONFIG.email}">${SITE_CONFIG.email}</a>.</p>
+        <p><strong>El equipo de TCG Academy</strong></p>
+      </div>
+    `),
+  },
+  {
     id: "nuevo_cupon",
     name: "Nuevo cupón",
     subject: "¡Tienes un nuevo cupón de descuento, {{nombre}}!",

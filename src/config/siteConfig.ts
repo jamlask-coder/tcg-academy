@@ -9,7 +9,7 @@ export const SITE_CONFIG = {
   cif: "B26979302",
   address: "Av. del Norte 40, 2ªB, 03710 Calpe, Alicante",
   country: "España",
-  email: "tcgacademycalpe@gmail.com",
+  email: "hola@tcgacademy.es",
   phone: "+34 648 635 723",
 
   // Logistics

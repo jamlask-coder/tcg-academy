@@ -431,8 +431,17 @@ export default function AdminShell({
           </div>
         </div>
 
-        {/* Content */}
-        <main className="min-w-0 [&_a]:text-black [&_a]:no-underline [&_a:hover]:text-[#2563eb]">
+        {/* Content
+            Reglas de tipografía para enlaces del área admin: por defecto
+            negros y sin subrayar, con hover azul. Antes usábamos
+            `[&_a]:text-black` que generaba un selector con especificidad
+            (0,1,1) — superior al `text-white` del propio botón (0,1,0) —
+            y los CTAs azules salían con letras negras (incidente "Emitir
+            albarán"). Envolvemos el selector en `:where(a)` para forzar
+            especificidad (0,1,0): así cualquier clase `text-white` /
+            `text-blue-*` / etc. del enlace gana por orden y los botones
+            con color propio se respetan. */}
+        <main className="min-w-0 [&_:where(a)]:text-black [&_:where(a)]:no-underline [&_:where(a):hover]:text-[#2563eb]">
           <div className="mb-4 hidden lg:block">
             <Breadcrumb pathname={pathname} />
           </div>

@@ -912,7 +912,7 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
 
       if (isAlbaran) {
         // Albarán — NO entra en cadena VeriFactu, NO invita usuario.
-        createDeliveryNote({
+        const dn = createDeliveryNote({
           recipient,
           items: builtItems,
           paymentMethod,
@@ -921,6 +921,107 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
         // Salida física del producto → resta stock. Si luego se convierte a
         // factura vía convertToInvoice(), NO se vuelve a restar.
         deductStockForInvoiceItems(builtItems);
+
+        // Construir InvoiceData reutilizando el generador de PDF — la
+        // bandera `isDeliveryNote: true` cambia el título y omite el CSV
+        // VeriFactu (los albaranes no llevan hash encadenado).
+        const dnPdfData: InvoiceData = {
+          invoiceNumber: dn.deliveryNoteNumber,
+          date: new Date(dn.deliveryNoteDate).toISOString(),
+          paymentMethod:
+            PAYMENT_OPTIONS.find((p) => p.value === paymentMethod)?.label ?? "",
+          paymentStatus: "paid",
+          isDeliveryNote: true,
+          issuerName: SITE_CONFIG.legalName,
+          issuerCIF: SITE_CONFIG.cif,
+          issuerAddress: getIssuerAddress().street,
+          issuerCity: getIssuerAddress().cityLine,
+          issuerCountry: SITE_CONFIG.country,
+          issuerPhone: SITE_CONFIG.phone,
+          issuerEmail: SITE_CONFIG.email,
+          clientName: clientName || "—",
+          clientCIF: clientTaxId || undefined,
+          clientEmail: clientEmail || undefined,
+          clientAddress:
+            effectiveInvoiceType === InvoiceType.COMPLETA
+              ? `${clientStreet}${clientPostal ? `, ${clientPostal}` : ""}`
+              : undefined,
+          clientCity: clientCity || undefined,
+          clientProvince: clientProvince || undefined,
+          clientCountry:
+            (COUNTRY_OPTIONS.find((c) => c.code === clientCountryCode) ??
+              COUNTRY_OPTIONS[0]).name,
+          items: dn.items
+            .filter((li) => li.productId !== "coupon")
+            .map((li) => ({
+              name: li.description,
+              quantity: li.quantity,
+              unitPriceWithVAT:
+                li.quantity > 0
+                  ? (li.taxableBase + li.vatAmount) / li.quantity
+                  : 0,
+              vatRate: li.vatRate,
+            })),
+          couponDiscount: couponAmount > 0 ? couponAmount : undefined,
+        };
+
+        // Descarga local del PDF para el admin (ambos botones la disparan).
+        try {
+          await printInvoice(dnPdfData);
+        } catch (pdfErr) {
+          logger.warn(
+            "Fallo al abrir PDF tras guardar albarán",
+            "fiscal.nuevo-albaran",
+            {
+              error: pdfErr instanceof Error ? pdfErr.message : String(pdfErr),
+              deliveryNote: dn.deliveryNoteNumber,
+            },
+          );
+        }
+
+        if (opts.sendByEmail && clientEmail.trim()) {
+          try {
+            const { generateInvoicePdfBase64 } = await import("@/lib/invoicePdf");
+            const pdfBase64 = await generateInvoicePdfBase64(dnPdfData);
+            const siteOrigin =
+              typeof window !== "undefined" ? window.location.origin : "";
+
+            await sendAppEmail({
+              toEmail: clientEmail.trim(),
+              toName: clientName.trim() || "Cliente",
+              templateId: "albaran_disponible",
+              vars: {
+                nombre:
+                  (clientName.trim().split(/\s+/)[0] || clientName.trim()) ||
+                  "cliente",
+                albaran_id: dn.deliveryNoteNumber,
+                albaran_date: new Date(dn.deliveryNoteDate).toLocaleDateString(
+                  "es-ES",
+                ),
+                total: totals.finalTotal.toFixed(2),
+                unsubscribe_link: `${siteOrigin}/cuenta/privacidad`,
+              },
+              attachments: [
+                {
+                  filename: `${dn.deliveryNoteNumber}.pdf`,
+                  content: pdfBase64,
+                  contentType: "application/pdf",
+                },
+              ],
+            });
+          } catch (mailErr) {
+            logger.warn(
+              "Fallo al enviar email de albarán al cliente",
+              "fiscal.nuevo-albaran",
+              {
+                error:
+                  mailErr instanceof Error ? mailErr.message : String(mailErr),
+                deliveryNote: dn.deliveryNoteNumber,
+              },
+            );
+          }
+        }
+
         setSaved(true);
         setTimeout(() => router.push("/admin/pedidos/albaranes"), 1500);
         return;
@@ -1974,25 +2075,23 @@ export function FacturaAlbaranForm({ mode }: { mode: FacturaAlbaranMode }) {
                   {saving
                     ? labels.savingLabel
                     : isAlbaran
-                      ? "Confirmar y guardar albarán"
+                      ? "Confirmar albarán"
                       : "Confirmar"}
                 </button>
-                {!isAlbaran && (
-                  <button
-                    type="button"
-                    onClick={() => void confirmAndCreate({ sendByEmail: true })}
-                    disabled={saving || !clientEmail.trim()}
-                    title={
-                      !clientEmail.trim()
-                        ? "Introduce un email de cliente para poder enviar"
-                        : `Confirmar y enviar a ${clientEmail}`
-                    }
-                    className="flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-green-700 disabled:opacity-60"
-                  >
-                    <Send size={14} />
-                    {saving ? "Enviando…" : "Confirmar y enviar al cliente"}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => void confirmAndCreate({ sendByEmail: true })}
+                  disabled={saving || !clientEmail.trim()}
+                  title={
+                    !clientEmail.trim()
+                      ? "Introduce un email de cliente para poder enviar"
+                      : `Confirmar y enviar a ${clientEmail}`
+                  }
+                  className="flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-green-700 disabled:opacity-60"
+                >
+                  <Send size={14} />
+                  {saving ? "Enviando…" : "Confirmar y enviar al cliente"}
+                </button>
               </div>
             </div>
           </div>

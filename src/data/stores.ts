@@ -41,7 +41,7 @@ export const STORES: Record<string, Store> = {
     city: "Calpe, Alicante",
     address: "Calle Libertad 16, 03710 Calpe",
     phone: "+34 648 635 723",
-    email: "tcgacademycalpe@gmail.com",
+    email: "hola@tcgacademy.es",
     color: "#2563eb",
     bg: "#e8f0f9",
     shortDesc:

@@ -11,24 +11,15 @@ import {
   Heart,
   LogOut,
   ChevronRight,
-  Receipt,
   Gift,
   Bell,
   Menu,
   X,
-  PlusCircle,
-  Euro,
-  Grid,
-  Users,
   MessageSquare,
-  Wrench,
-  BookOpen,
   Trophy,
-  AlertTriangle,
-  Mail,
 } from "lucide-react";
-import { countNewIncidents } from "@/services/incidentService";
 import { EmailVerificationBanner } from "@/components/account/EmailVerificationBanner";
+import AdminShell from "@/app/admin/_AdminShell";
 
 const PUBLIC_PATHS = ["/login", "/registro", "/recuperar-contrasena"];
 
@@ -64,27 +55,6 @@ const NAV_ITEMS_BASE = [
     badge: true,
   },
   { href: "/cuenta/mensajes", label: "Mensajes", icon: MessageSquare, b2bOnly: true },
-  { href: "/cuenta/datos", label: "Mis datos", icon: UserIcon, matchPaths: PERFIL_PATHS },
-];
-
-const ADMIN_NAV_ITEMS = [
-  {
-    href: "/admin/productos/nuevo",
-    label: "Añadir producto",
-    icon: PlusCircle,
-    primary: true,
-  },
-  { href: "/admin/precios", label: "Precios", icon: Euro, primary: true },
-  { href: "/admin/pedidos", label: "Pedidos", icon: Package, primary: true },
-  { href: "/admin/stock", label: "Stock", icon: Grid },
-  { href: "/admin/usuarios", label: "Usuarios", icon: Users },
-  { href: "/admin/cupones", label: "Cupones", icon: Gift },
-  { href: "/admin/fiscal", label: "Fiscal", icon: Receipt },
-  { href: "/admin/mensajes", label: "Mensajes", icon: MessageSquare },
-  { href: "/admin/emails", label: "Emails", icon: Mail },
-  { href: "/admin/incidencias", label: "Incidencias", icon: AlertTriangle },
-  { href: "/admin/herramientas", label: "Herramientas", icon: Wrench },
-  { href: "/admin/manual", label: "Manual", icon: BookOpen },
   { href: "/cuenta/datos", label: "Mis datos", icon: UserIcon, matchPaths: PERFIL_PATHS },
 ];
 
@@ -232,7 +202,6 @@ export default function CuentaShell({
   const pathname = usePathname();
   const router = useRouter();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [newIncidentCount, setNewIncidentCount] = useState(0);
 
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname === p);
 
@@ -252,21 +221,6 @@ export default function CuentaShell({
     setMobileNavOpen(false);
   }, [pathname]);
 
-  useEffect(() => {
-    const update = () => {
-      if (typeof window !== "undefined") {
-        setNewIncidentCount(countNewIncidents());
-      }
-    };
-    update();
-    window.addEventListener("tcga:incidents:updated", update);
-    window.addEventListener("storage", update);
-    return () => {
-      window.removeEventListener("tcga:incidents:updated", update);
-      window.removeEventListener("storage", update);
-    };
-  }, []);
-
   if (isPublicPath) return <>{children}</>;
 
   if (isLoading || !user) {
@@ -280,17 +234,19 @@ export default function CuentaShell({
   const isB2B = user.role === "mayorista" || user.role === "tienda";
   const isAdmin = user.role === "admin";
 
-  const navItems: NavItemConfig[] = isAdmin
-    ? ADMIN_NAV_ITEMS.map((item) =>
-        item.href === "/admin/incidencias"
-          ? { ...item, badgeCount: newIncidentCount }
-          : item,
-      )
-    : NAV_ITEMS_BASE.filter((item) => {
-        if ("clientOnly" in item && item.clientOnly && isB2B) return false;
-        if ("b2bOnly" in item && item.b2bOnly && !isB2B) return false;
-        return true;
-      });
+  // Para admins en /cuenta/*, reutilizamos AdminShell para que el menú sea
+  // SIEMPRE el mismo (Resumen, Pedidos, Precios, Productos, Usuarios,
+  // Fiscalidad…) — antes había un ADMIN_NAV_ITEMS distinto y el menú cambiaba
+  // según la sección, lo que rompía la consistencia visual.
+  if (isAdmin) {
+    return <AdminShell>{children}</AdminShell>;
+  }
+
+  const navItems: NavItemConfig[] = NAV_ITEMS_BASE.filter((item) => {
+    if ("clientOnly" in item && item.clientOnly && isB2B) return false;
+    if ("b2bOnly" in item && item.b2bOnly && !isB2B) return false;
+    return true;
+  });
 
   const handleLogout = () => {
     logout();
