@@ -458,7 +458,6 @@ export default function DatosPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-700">{(addr.nombre || user.name)} {(addr.apellidos || user.lastName)}</p>
                     <p className="text-sm text-gray-600">{addr.calle} {addr.numero}{addr.piso ? `, ${addr.piso}` : ""}</p>
                     <p className="text-sm text-gray-600">{addr.cp} {addr.ciudad}, {addr.provincia}</p>
                     <p className="text-sm text-gray-500">{addr.pais}</p>

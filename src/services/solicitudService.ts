@@ -1,6 +1,7 @@
 // ── Solicitud Service ─────────────────────────────────────────────────────────
-// SSOT canónico para solicitudes B2B / franquicia / vending. Todas las
-// escrituras pasan por aquí y disparan `tcga:solicitudes:updated`.
+// SSOT canónico para solicitudes B2B / franquicia / vending.
+// Modo dual: LS en local; en server, LS es cache + replica fire-and-forget al
+// API. Evento: `tcga:solicitudes:updated`.
 
 import { DataHub } from "@/lib/dataHub";
 
@@ -17,6 +18,14 @@ export interface Solicitud {
 
 const KEY = "tcgacademy_solicitudes";
 const MAX = 2000;
+
+function isServerMode(): boolean {
+  return process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
+}
+
+function pickStr(v: unknown): string | undefined {
+  return typeof v === "string" && v ? v : undefined;
+}
 
 export function loadSolicitudes(): Solicitud[] {
   if (typeof window === "undefined") return [];
@@ -59,6 +68,26 @@ export function addSolicitud(
   const list = loadSolicitudes();
   list.push(solicitud);
   persist(list);
+
+  if (isServerMode()) {
+    // Mapeamos `datos` (form libre) a las columnas concretas del DB.
+    const d = solicitud.datos;
+    void fetch("/api/solicitudes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: solicitud.tipo,
+        companyName: pickStr(d.companyName) ?? pickStr(d.empresa) ?? "—",
+        cif: pickStr(d.cif) ?? pickStr(d.nif),
+        contactName: pickStr(d.contactName) ?? pickStr(d.nombre) ?? "—",
+        contactEmail: pickStr(d.contactEmail) ?? pickStr(d.email) ?? "",
+        contactPhone: pickStr(d.contactPhone) ?? pickStr(d.telefono),
+        volume: pickStr(d.volume) ?? pickStr(d.volumen),
+        games: Array.isArray(d.games) ? (d.games as string[]) : [],
+        message: pickStr(d.message) ?? pickStr(d.mensaje),
+      }),
+    }).catch(() => {});
+  }
   return solicitud;
 }
 
@@ -71,6 +100,14 @@ export function updateSolicitudEstado(
   if (idx < 0) return null;
   list[idx] = { ...list[idx], estado };
   persist(list);
+
+  if (isServerMode()) {
+    void fetch("/api/solicitudes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status: estado }),
+    }).catch(() => {});
+  }
   return list[idx];
 }
 

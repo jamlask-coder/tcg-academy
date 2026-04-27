@@ -1,5 +1,5 @@
 import type { NextRequest} from "next/server";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { persistentRateLimit } from "@/lib/rateLimitStore";
 import { getDb } from "@/lib/db";
 import {
@@ -20,6 +20,29 @@ import { validateSpanishNIF } from "@/lib/validations/nif";
 import { validatePasswordForRole } from "@/lib/passwordPolicy";
 
 const isServerMode = () => (process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local") === "server";
+
+/**
+ * Devuelve la URL pública del sitio derivándola, en orden:
+ *   1. Header `origin` (lo manda el navegador en POST mismo-origen).
+ *   2. `protocol://host` reconstruido desde headers (`x-forwarded-proto` + `host`).
+ *   3. NEXT_PUBLIC_APP_URL como último recurso.
+ *
+ * Esto evita el bug "el reset link apunta a localhost en producción" cuando
+ * NEXT_PUBLIC_APP_URL está mal configurada en Vercel — el dominio real lo
+ * trae siempre el request, así que es la fuente más fiable.
+ */
+function resolvePublicUrl(req: NextRequest): string {
+  const origin = req.headers.get("origin");
+  if (origin && /^https?:\/\//.test(origin)) return origin.replace(/\/$/, "");
+
+  const host = req.headers.get("host");
+  if (host) {
+    const proto = req.headers.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+    return `${proto}://${host}`;
+  }
+
+  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+}
 
 // POST /api/auth — Unified auth endpoint
 // CSRF/origin check → aplicado globalmente en `src/proxy.ts`.
@@ -368,12 +391,13 @@ export async function POST(req: NextRequest) {
             tokenHash: verifHash,
             expiresAt: sevenDays,
           });
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+          const appUrl = resolvePublicUrl(req);
           const verifyUrl = `${appUrl}/verificar-email?token=${verifRaw}&email=${encodeURIComponent(cleanEmail)}`;
           await emailService.sendTemplatedEmail("verificar_email", cleanEmail, {
             nombre: newUser.name,
             verify_url: verifyUrl,
             expires_in: "7 días",
+            unsubscribe_link: `${appUrl}/cuenta/preferencias`,
           });
         } catch {
           // No bloquear el registro si el email de verificación falla — el
@@ -412,70 +436,68 @@ export async function POST(req: NextRequest) {
       }
 
       // ── RESET PASSWORD REQUEST ─────────────────────────────────────────
+      // Optimizado para latencia percibida: respondemos al cliente INMEDIATAMENTE
+      // (sin lookup, sin enviar email, sin padding) y todo el trabajo costoso
+      // se hace en `after()` después de que el response salga del servidor.
+      // Esto consigue dos cosas a la vez:
+      //   1. UX: el navegador recibe "revisa tu email" en ~30ms en vez de ~800ms.
+      //   2. Seguridad: el response es siempre instantáneo independientemente
+      //      de si el email existe o no — elimina por completo el timing-attack
+      //      que enumeraba emails midiendo latencias (ya no hace falta el
+      //      `enforceMinDuration` porque no hay diferencia que igualar).
       case "reset-password": {
-        const resetStart = Date.now();
         const { email: resetEmail } = body;
         if (!resetEmail) {
           return NextResponse.json({ error: "Email requerido" }, { status: 400 });
         }
 
         const cleanEmail = resetEmail.toLowerCase().trim();
-        const user = await db.getUserByEmail(cleanEmail);
+        const appUrl = resolvePublicUrl(req);
 
-        // Always return success to prevent email enumeration + timing padding
-        // (generar token + enviar email tarda ~200-400ms, la rama "no existe"
-        // respondía mucho antes y se podía enumerar midiendo latencias).
-        if (!user) {
-          await enforceMinDuration(resetStart, 600);
-          return NextResponse.json({ ok: true, message: "Si el email existe, se enviará un enlace." });
-        }
+        after(async () => {
+          try {
+            const user = await db.getUserByEmail(cleanEmail);
+            if (!user) return; // silencioso: no hay nada que enviar
 
-        // Generate crypto-random token
-        const tokenBytes = new Uint8Array(32);
-        crypto.getRandomValues(tokenBytes);
-        const rawToken = Array.from(tokenBytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+            // Token crypto-random + almacenamos solo el hash (nunca el raw).
+            const tokenBytes = new Uint8Array(32);
+            crypto.getRandomValues(tokenBytes);
+            const rawToken = Array.from(tokenBytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+            const tokenHashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rawToken));
+            const tokenHash = Array.from(new Uint8Array(tokenHashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
 
-        // Store hash of token (never store raw token in DB)
-        const tokenHashBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rawToken));
-        const tokenHash = Array.from(new Uint8Array(tokenHashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
+            await db.createResetToken({
+              userId: user.id,
+              tokenHash,
+              expiresAt: new Date(Date.now() + 3600000).toISOString(), // 1 h
+            });
 
-        await db.createResetToken({
-          userId: user.id,
-          tokenHash,
-          expiresAt: new Date(Date.now() + 3600000).toISOString(), // 1 hour
+            const resetLink = `${appUrl}/restablecer-contrasena?token=${rawToken}&email=${encodeURIComponent(cleanEmail)}`;
+            const emailService = getEmailService();
+            const sendResult = await emailService.sendTemplatedEmail("recuperar_contrasena", cleanEmail, {
+              nombre: user.name ?? cleanEmail.split("@")[0],
+              reset_url: resetLink,
+              expires_in: "1 hora",
+              unsubscribe_link: `${appUrl}/cuenta/preferencias`,
+            });
+            if (!sendResult.ok) {
+              // eslint-disable-next-line no-console
+              console.error(`[reset-password] email send failed for userId=${user.id}`);
+            }
+
+            await db.logAudit({
+              entityType: "user",
+              entityId: user.id,
+              action: "reset_password_requested",
+              ipAddress: ip,
+            });
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error("[reset-password] background error:", err);
+          }
         });
 
-        // Send reset email
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-        const resetLink = `${appUrl}/restablecer-contrasena?token=${rawToken}&email=${encodeURIComponent(cleanEmail)}`;
-
-        const emailService = getEmailService();
-        await emailService.sendEmail(
-          cleanEmail,
-          "Restablece tu contraseña — TCG Academy",
-          `
-          <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px">
-            <h2 style="color:#1e40af">TCG Academy</h2>
-            <p>Has solicitado restablecer tu contraseña.</p>
-            <p>Haz clic en el siguiente enlace (válido durante 1 hora):</p>
-            <a href="${resetLink}" style="display:inline-block;background:#2563eb;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:16px 0">
-              Restablecer contraseña
-            </a>
-            <p style="color:#666;font-size:13px">Si no has solicitado este cambio, ignora este email.</p>
-            <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
-            <p style="color:#999;font-size:11px">TCG Academy — La mejor tienda TCG de España</p>
-          </div>
-          `,
-        );
-
-        await db.logAudit({
-          entityType: "user",
-          entityId: user.id,
-          action: "reset_password_requested",
-          ipAddress: ip,
-        });
-
-        await enforceMinDuration(resetStart, 600);
+        // Response inmediato — el navegador no se queda bloqueado.
         return NextResponse.json({ ok: true, message: "Si el email existe, se enviará un enlace." });
       }
 
@@ -537,21 +559,29 @@ export async function POST(req: NextRequest) {
           ipAddress: ip,
         });
 
-        // Send confirmation email
-        const emailService = getEmailService();
-        await emailService.sendEmail(
-          cleanEmail,
-          "Contraseña actualizada — TCG Academy",
-          `
-          <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px">
-            <h2 style="color:#1e40af">TCG Academy</h2>
-            <p>Tu contraseña ha sido actualizada correctamente.</p>
-            <p>Si no has realizado este cambio, contacta con nosotros inmediatamente.</p>
-            <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
-            <p style="color:#999;font-size:11px">TCG Academy — La mejor tienda TCG de España</p>
-          </div>
-          `,
-        );
+        // Send confirmation email — fire-and-forget en after() para que el
+        // response llegue inmediato. Si Resend tarda, el usuario no se entera.
+        after(async () => {
+          try {
+            const emailService = getEmailService();
+            await emailService.sendEmail(
+              cleanEmail,
+              "Contraseña actualizada — TCG Academy",
+              `
+              <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px">
+                <h2 style="color:#15306b">TCG Academy</h2>
+                <p>Tu contraseña ha sido actualizada correctamente.</p>
+                <p>Si no has realizado este cambio, contacta con nosotros inmediatamente.</p>
+                <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0"/>
+                <p style="color:#94a3b8;font-size:11px">TCG Academy — Tu tienda de cartas coleccionables</p>
+              </div>
+              `,
+            );
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error("[reset-confirm] confirmation email failed:", err);
+          }
+        });
 
         return NextResponse.json({ ok: true, message: "Contraseña actualizada." });
       }
@@ -674,13 +704,14 @@ export async function POST(req: NextRequest) {
           expiresAt: sevenDays,
         });
 
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+        const appUrl = resolvePublicUrl(req);
         const verifyUrl = `${appUrl}/verificar-email?token=${verifRaw}&email=${encodeURIComponent(cleanEmail)}`;
         const emailService = getEmailService();
         await emailService.sendTemplatedEmail("verificar_email", cleanEmail, {
           nombre: user.name,
           verify_url: verifyUrl,
           expires_in: "7 días",
+          unsubscribe_link: `${appUrl}/cuenta/preferencias`,
         });
 
         await enforceMinDuration(resendStart, 500);

@@ -1,12 +1,15 @@
 /**
  * messageService — SSOT para mensajes cliente ↔ admin.
  *
- * Antes de este servicio: el código vivía disperso en /cuenta/mensajes,
- * /admin/mensajes, /admin/pedidos/[id] y admin/notificaciones con lecturas
- * directas a localStorage["tcgacademy_messages"] y MOCK_MESSAGES.
+ * Modo dual:
+ * - **local**: SSOT en `localStorage[MSG_STORAGE_KEY]` con fallback a
+ *   `MOCK_MESSAGES` para que la UI demo aparezca poblada.
+ * - **server**: el LS sigue siendo cache (preserva el API sync que consumen
+ *   /cuenta/mensajes, /admin/mensajes, /admin/pedidos/[id], etc.). Las
+ *   escrituras se replican a `/api/messages` y `hydrateMessagesForUser`
+ *   refresca la cache al boot.
  *
- * Ahora: todas las lecturas y escrituras pasan por aquí, con evento canónico
- * `tcga:messages:updated` dispatched tras cada mutación.
+ * Todas las mutaciones disparan `tcga:messages:updated` (DataHub).
  */
 
 import { MOCK_MESSAGES, MSG_STORAGE_KEY, type AppMessage } from "@/data/mockData";
@@ -15,6 +18,10 @@ import { DataHub } from "@/lib/dataHub";
 export type { AppMessage };
 
 const MAX_MESSAGES = 2000;
+
+function isServerMode(): boolean {
+  return process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
+}
 
 /**
  * Lee TODOS los mensajes persistidos. Si no hay ninguno en localStorage,
@@ -63,6 +70,45 @@ export function getUnreadCount(userId: string): number {
 }
 
 /**
+ * Hidrata desde el servidor en server mode. Trae los mensajes en los que
+ * `userId` participa y los mergea con el cache LS (preserva los que vienen
+ * de MOCK_MESSAGES en modo demo).
+ */
+export async function hydrateMessagesForUser(userId: string): Promise<void> {
+  if (!isServerMode() || typeof window === "undefined") return;
+  try {
+    const res = await fetch(`/api/messages?userId=${encodeURIComponent(userId)}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return;
+    const json = (await res.json()) as { messages?: Array<Record<string, unknown>> };
+    const fromServer: AppMessage[] = (json.messages ?? []).map((m) => ({
+      id: String(m.id ?? ""),
+      fromUserId: String(m.fromUserId ?? ""),
+      toUserId: String(m.toUserId ?? ""),
+      fromName: String(m.fromName ?? ""),
+      toName: String(m.toName ?? ""),
+      subject: String(m.subject ?? ""),
+      body: String(m.body ?? ""),
+      date: String(m.createdAt ?? new Date().toISOString()),
+      read: Boolean(m.isRead ?? false),
+      orderId: typeof m.orderId === "string" ? m.orderId : undefined,
+      parentId: typeof m.parentId === "string" ? m.parentId : undefined,
+    }));
+    // Merge: server mensajes ganan sobre LS por id; preservamos los que LS
+    // tiene pero server no (broadcast local, mocks).
+    const existing = loadMessages();
+    const byId = new Map<string, AppMessage>();
+    for (const m of existing) byId.set(m.id, m);
+    for (const m of fromServer) byId.set(m.id, m);
+    const merged = [...byId.values()].sort((a, b) => b.date.localeCompare(a.date));
+    saveMessages(merged);
+  } catch {
+    /* offline — cache LS sigue siendo válido */
+  }
+}
+
+/**
  * Crea y persiste un nuevo mensaje. Asigna id único y timestamp.
  * Devuelve el mensaje creado.
  */
@@ -89,6 +135,21 @@ export function sendMessage(
   };
   const all = loadMessages();
   saveMessages([msg, ...all]);
+
+  // Server mode: replica al backend (fire-and-forget). El LS ya tiene el msg.
+  if (isServerMode() && !msg.isBroadcast) {
+    void fetch("/api/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        toUserId: msg.toUserId,
+        subject: msg.subject,
+        body: msg.body,
+        orderId: msg.orderId,
+        parentId: msg.parentId,
+      }),
+    }).catch(() => {});
+  }
   return msg;
 }
 
@@ -99,19 +160,39 @@ export function markAsRead(messageId: string): void {
   if (idx < 0 || all[idx].read) return;
   all[idx] = { ...all[idx], read: true };
   saveMessages(all);
+
+  if (isServerMode() && !messageId.startsWith("msg-") /* no-op for client-only ids */) {
+    void fetch("/api/messages", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: messageId, isRead: true }),
+    }).catch(() => {});
+  }
 }
 
 /** Marca todos los mensajes dirigidos a `userId` como leídos. */
 export function markAllAsRead(userId: string): number {
   const all = loadMessages();
   let changed = 0;
+  const toReplicate: string[] = [];
   for (let i = 0; i < all.length; i++) {
     if (all[i].toUserId === userId && !all[i].read) {
       all[i] = { ...all[i], read: true };
       changed++;
+      toReplicate.push(all[i].id);
     }
   }
   if (changed > 0) saveMessages(all);
+  if (isServerMode()) {
+    for (const id of toReplicate) {
+      if (id.startsWith("msg-")) continue;
+      void fetch("/api/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, isRead: true }),
+      }).catch(() => {});
+    }
+  }
   return changed;
 }
 

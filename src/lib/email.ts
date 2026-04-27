@@ -210,7 +210,13 @@ export class ResendEmailAdapter implements EmailAdapter {
 
       const data = (await res.json()) as { id: string };
       return { ok: true, emailId: data.id };
-    } catch {
+    } catch (err) {
+      // No silenciar — los fallos de Resend (dominio no verificado, rate
+      // limit, payload mal formado) tienen que aparecer en logs para
+      // diagnosticar. Antes este catch era mudo y cualquier error de envío
+      // se perdía sin dejar rastro.
+      // eslint-disable-next-line no-console
+      console.error(`[ResendEmailAdapter] sendEmail failed to=${to} subject=${subject.slice(0, 60)}:`, err);
       return { ok: false, emailId: "" };
     }
   }

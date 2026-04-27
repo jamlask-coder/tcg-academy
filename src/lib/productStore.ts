@@ -1,6 +1,7 @@
 import type { LocalProduct } from "@/data/products";
 import { PRODUCTS } from "@/data/products";
 import { DataHub } from "@/lib/dataHub";
+import { getProductCache } from "@/lib/productCache";
 
 const LS_NEW = "tcgacademy_new_products";
 const LS_OVERRIDES = "tcgacademy_product_overrides";
@@ -14,6 +15,18 @@ function safeGet<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+/**
+ * Fuente del catálogo "base":
+ * - Server mode: cache hidratado desde Supabase (vía /api/products). Si aún
+ *   no se ha hidratado en este render, fallback a PRODUCTS estático para no
+ *   pintar vacío. ProductsHydrator dispara la primera fetch al montar.
+ * - Local mode: PRODUCTS estático tal cual.
+ */
+function getBaseCatalog(): LocalProduct[] {
+  const cached = getProductCache();
+  return cached ?? PRODUCTS;
 }
 
 /** Compare products by createdAt descending — newest first.
@@ -37,7 +50,7 @@ export function getMergedProducts(): LocalProduct[] {
   );
   const deleted = new Set(safeGet<number[]>(LS_DELETED, []));
 
-  const base = PRODUCTS.filter((p) => !deleted.has(p.id)).map((p) => {
+  const base = getBaseCatalog().filter((p) => !deleted.has(p.id)).map((p) => {
     const ov = overrides[String(p.id)];
     return ov ? { ...p, ...ov } : p;
   });

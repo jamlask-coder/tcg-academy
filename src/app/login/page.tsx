@@ -190,24 +190,24 @@ function LoginForm() {
               </div>
             </div>
 
-            {/* Remember me */}
+            {/* Remember me — el <input> hace todo el trabajo (estado +
+                accesibilidad + foco + tecla espacio nativa). El <div>
+                visible es PURAMENTE decorativo: aria-hidden y sin onClick
+                propio. Tener antes un onClick en el div + label envolvente
+                provocaba doble toggle (div onClick + label→input.click)
+                que se anulaba a sí mismo en algunos re-renders. */}
             <label className="flex cursor-pointer items-center gap-2.5 select-none">
               <input
                 type="checkbox"
                 checked={remember}
                 onChange={(e) => setRemember(e.target.checked)}
-                className="sr-only"
+                className="peer sr-only"
               />
               <div
-                className={`flex h-5 w-5 items-center justify-center rounded border-2 transition ${
+                aria-hidden="true"
+                className={`flex h-5 w-5 items-center justify-center rounded border-2 transition peer-focus-visible:ring-2 peer-focus-visible:ring-[#2563eb]/40 peer-focus-visible:ring-offset-1 ${
                   remember ? "border-[#2563eb] bg-[#2563eb]" : "border-gray-300"
                 }`}
-                onClick={() => setRemember(!remember)}
-                role="checkbox"
-                aria-checked={remember}
-                aria-label="Recordarme"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === " " && setRemember(!remember)}
               >
                 {remember && (
                   <svg

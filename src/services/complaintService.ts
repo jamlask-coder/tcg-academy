@@ -1,6 +1,7 @@
 // ── Complaint Service ─────────────────────────────────────────────────────────
 // SSOT canónico para reclamaciones formales de cliente (hoja de reclamaciones).
-// Todas las escrituras pasan por aquí y disparan `tcga:complaints:updated`.
+// Modo dual: LS canónico en local; en server, LS es cache + replica fire-and-forget
+// a `/api/complaints`. Eventos: `tcga:complaints:updated`.
 
 import { DataHub } from "@/lib/dataHub";
 
@@ -30,6 +31,18 @@ export interface Complaint {
 
 const KEY = "tcgacademy_complaints";
 const MAX = 1000;
+
+function isServerMode(): boolean {
+  return process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
+}
+
+// Mapping UI ⇄ DB.
+const UI_TO_DB_STATUS: Record<ComplaintStatus, "recibida" | "tramitando" | "resuelta" | "desestimada"> = {
+  recibida: "recibida",
+  en_estudio: "tramitando",
+  resuelta: "resuelta",
+  rechazada: "desestimada",
+};
 
 export function loadComplaints(): Complaint[] {
   if (typeof window === "undefined") return [];
@@ -70,6 +83,22 @@ export function addComplaint(
   const list = loadComplaints();
   list.unshift(complaint);
   persist(list);
+
+  if (isServerMode()) {
+    void fetch("/api/complaints", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        claimantName: complaint.nombre,
+        claimantEmail: complaint.email,
+        orderId: complaint.pedido,
+        // El modelo DB exige `facts` y `claim` separados; en la UI actual solo
+        // hay `descripcion`. Lo replicamos en ambos para no perder info.
+        facts: complaint.descripcion,
+        claim: complaint.descripcion,
+      }),
+    }).catch(() => {});
+  }
   return complaint;
 }
 
@@ -82,6 +111,19 @@ export function updateComplaint(
   if (idx < 0) return null;
   list[idx] = { ...list[idx], ...patch };
   persist(list);
+
+  if (isServerMode()) {
+    const dbPatch: Record<string, unknown> = {};
+    if (patch.status) dbPatch.status = UI_TO_DB_STATUS[patch.status];
+    if (patch.resolution !== undefined) dbPatch.resolution = patch.resolution;
+    if (Object.keys(dbPatch).length > 0) {
+      void fetch("/api/complaints", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...dbPatch }),
+      }).catch(() => {});
+    }
+  }
   return list[idx];
 }
 
