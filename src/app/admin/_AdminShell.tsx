@@ -123,8 +123,9 @@ const NAV_ITEMS: NavItem[] = [
     icon: Wrench,
     sub: [
       { href: "/admin/herramientas", label: "Diagnóstico", icon: Wrench },
+      { href: "/admin/herramientas#backups", label: "Copias servidor (RGPD)", icon: ShieldCheck },
       { href: "/admin/errores", label: "Errores runtime", icon: AlertTriangle },
-      { href: "/admin/copias", label: "Copias de seguridad", icon: ShieldCheck },
+      { href: "/admin/copias", label: "Snapshots locales (admin)", icon: ShieldCheck },
     ],
   },
   { href: "/cuenta/datos", label: "Mis datos", icon: UserCircle },

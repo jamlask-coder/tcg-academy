@@ -637,7 +637,9 @@ export default function AdminHerramientasPage() {
       </div>
 
       {/* Backups producción (RGPD art. 32) */}
-      <BackupServerPanel onToast={showToast} />
+      <div id="backups" className="scroll-mt-24">
+        <BackupServerPanel onToast={showToast} />
+      </div>
 
       {/* Brechas de seguridad (RGPD art. 33 — AEPD 72h) */}
       <BreachIncidentsPanel onToast={showToast} />

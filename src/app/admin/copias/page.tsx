@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import {
   Shield,
   Download,
@@ -333,11 +334,11 @@ export default function AdminCopiasPage() {
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Copias de seguridad
+            Snapshots locales (admin)
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Snapshots de toda la información del negocio — pedidos, facturas,
-            usuarios, puntos, logs.
+            Snapshot del estado del navegador admin (carrito anónimo, cachés UI,
+            preferencias). Útil antes de imports masivos.
           </p>
         </div>
         <button
@@ -349,6 +350,26 @@ export default function AdminCopiasPage() {
           <RefreshCw size={14} /> Actualizar
         </button>
       </div>
+
+      {/* Aviso server-mode: el backup REAL ya no es esto */}
+      {process.env.NEXT_PUBLIC_BACKEND_MODE === "server" && (
+        <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+          <p className="text-sm font-semibold text-blue-900">
+            En modo servidor los datos reales viven en Supabase, no en tu navegador.
+          </p>
+          <p className="mt-1 text-sm text-blue-800">
+            Esta página solo respalda residuos del navegador admin. Para la copia
+            de seguridad de verdad (cifrada, off-site, RGPD) usa{" "}
+            <Link
+              href="/admin/herramientas#backups"
+              className="font-semibold underline hover:text-blue-700"
+            >
+              Herramientas → Backups producción
+            </Link>
+            .
+          </p>
+        </div>
+      )}
 
       {/* Mensaje */}
       {message && (
