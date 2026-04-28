@@ -27,7 +27,10 @@ import {
   type BroadcastChannel,
   type BroadcastTarget,
 } from "@/data/mockData";
-import { saveMessages as persistMessages } from "@/services/messageService";
+import {
+  sendMessage as sendCanonicalMessage,
+  markAsRead as markMessageAsRead,
+} from "@/services/messageService";
 import { DataHub } from "@/lib/dataHub";
 import { clickableProps } from "@/lib/a11y";
 
@@ -76,12 +79,6 @@ function loadMessages(): AppMessage[] {
   } catch {
     return MOCK_MESSAGES;
   }
-}
-
-function saveMessages(msgs: AppMessage[]) {
-  // Delegates to messageService so `tcga:messages:updated` is fired and any
-  // other view (cuenta/mensajes, admin/notificaciones, etc.) stays in sync.
-  persistMessages(msgs);
 }
 
 function loadBroadcasts(): Broadcast[] {
@@ -258,31 +255,22 @@ export default function AdminMensajesPage() {
     setSelected(msg);
     setReplyBody("");
     if (!msg.read && msg.toUserId === "admin") {
-      const updated = messages.map((m) =>
-        m.id === msg.id ? { ...m, read: true } : m,
-      );
-      setMessages(updated);
-      saveMessages(updated);
+      // Replica al servidor en server-mode + emite evento (re-hidrata UI).
+      markMessageAsRead(msg.id);
     }
   };
 
   const handleReply = () => {
     if (!selected || !replyBody.trim()) return;
-    const newMsg: AppMessage = {
-      id: `msg-${Date.now()}`,
+    sendCanonicalMessage({
       fromUserId: "admin",
       toUserId: selected.fromUserId,
       fromName: "TCG Academy",
       toName: selected.fromName,
       subject: `Re: ${selected.subject}`,
       body: replyBody,
-      date: new Date().toISOString(),
-      read: false,
       parentId: selected.id,
-    };
-    const updated = [newMsg, ...messages];
-    setMessages(updated);
-    saveMessages(updated);
+    });
     setReplyBody("");
     showToast(`Respuesta enviada a ${selected.fromName}`);
   };
@@ -291,20 +279,14 @@ export default function AdminMensajesPage() {
     if (!toUser || !subject || !body.trim()) return;
     const recipient = MOCK_USERS.find((u) => u.id === toUser);
     if (!recipient) return;
-    const newMsg: AppMessage = {
-      id: `msg-${Date.now()}`,
+    sendCanonicalMessage({
       fromUserId: "admin",
       toUserId: toUser,
       fromName: "TCG Academy",
       toName: `${recipient.name} ${recipient.lastName}`,
       subject,
       body,
-      date: new Date().toISOString(),
-      read: false,
-    };
-    const updated = [newMsg, ...messages];
-    setMessages(updated);
-    saveMessages(updated);
+    });
     setComposingIndividual(false);
     setToUser("");
     setSubject("");
@@ -332,24 +314,27 @@ export default function AdminMensajesPage() {
     setBroadcasts(newBroadcasts);
     saveBroadcasts(newBroadcasts);
 
-    // Create individual AppMessages for internal/both channel
+    // Create individual AppMessages for internal/both channel.
+    // Cada mensaje pasa por sendCanonicalMessage → escribe LS, emite el
+    // evento `tcga:messages:updated` (la UI se rehidrata via DataHub) y
+    // replica al backend en server-mode. La metadata `isBroadcast`/
+    // `broadcastId` queda en el cache local (la tabla BD no tiene esas
+    // columnas todavía), así que el icono de megáfono aparece en este
+    // dispositivo y en otros admins se verá como mensaje normal.
     if (bcChannel === "interno" || bcChannel === "ambos") {
-      const newMsgs: AppMessage[] = bcRecipients.map((u) => ({
-        id: `msg-${bcId}-${u.id}`,
-        fromUserId: "admin",
-        toUserId: u.id,
-        fromName: "TCG Academy",
-        toName: `${u.name} ${u.lastName}`,
-        subject: bcSubject,
-        body: bcBody,
-        date: new Date().toISOString(),
-        read: false,
-        isBroadcast: true,
-        broadcastId: bcId,
-      }));
-      const updated = [...newMsgs, ...messages];
-      setMessages(updated);
-      saveMessages(updated);
+      for (const u of bcRecipients) {
+        sendCanonicalMessage({
+          id: `msg-${bcId}-${u.id}`,
+          fromUserId: "admin",
+          toUserId: u.id,
+          fromName: "TCG Academy",
+          toName: `${u.name} ${u.lastName}`,
+          subject: bcSubject,
+          body: bcBody,
+          isBroadcast: true,
+          broadcastId: bcId,
+        });
+      }
     }
 
     setBcConfirm(false);

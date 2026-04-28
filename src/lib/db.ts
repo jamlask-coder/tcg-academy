@@ -305,6 +305,10 @@ export interface MessageRecord {
   body: string;
   isRead: boolean;
   parentId?: string;
+  /** True si el mensaje se envió como parte de un broadcast a varios destinatarios. */
+  isBroadcast?: boolean;
+  /** Agrupa todos los mensajes derivados de un mismo broadcast (1 fila por destinatario). */
+  broadcastId?: string;
   createdAt: string;
 }
 
@@ -463,6 +467,12 @@ export interface DbAdapter {
    * identificador fiscal — requisito de integridad legal.
    */
   getUserByNif(nif: string): Promise<UserRecord | null>;
+  /**
+   * Listado completo para vistas administrativas (`/admin/usuarios`).
+   * Solo debe llamarse desde endpoints protegidos por `requireAdmin`.
+   * Devuelve hasta `limit` usuarios ordenados por `createdAt` desc.
+   */
+  listAllUsers(opts?: { limit?: number; role?: UserRecord["role"] }): Promise<UserRecord[]>;
   createUser(user: Omit<UserRecord, "createdAt" | "updatedAt">): Promise<UserRecord>;
   updateUser(userId: string, data: Partial<UserRecord>): Promise<void>;
   /** Cambio de email — separado por validación de colisión y cascada de FKs. */
@@ -504,6 +514,11 @@ export interface DbAdapter {
     performedBy?: string;
     ipAddress?: string;
   }): Promise<void>;
+
+  // Email logs (server-mode auditoría real, no localStorage). `logEmail` ya
+  // está declarado más abajo dentro de "Extended entities" (interfaz original);
+  // aquí sólo añadimos el read.
+  getEmailLogs(opts?: { limit?: number; toEmail?: string }): Promise<EmailLogRecord[]>;
 
   // ── Products + categories ────────────────────────────────────────────────
   getProducts(opts?: { categoryId?: string; includeDeleted?: boolean }): Promise<ProductRecord[]>;
@@ -714,6 +729,36 @@ export class LocalDbAdapter implements DbAdapter {
     return null;
   }
 
+  async listAllUsers(opts?: { limit?: number; role?: UserRecord["role"] }): Promise<UserRecord[]> {
+    // En modo local los usuarios reales viven en `tcgacademy_registered`.
+    // El admin de la página fusiona estos con MOCK_USERS — esa fusión la
+    // hacemos en el caller, no aquí, para mantener este adapter "ciego" a
+    // datos seed.
+    const registered = readStorage<Record<string, RegisteredEntry>>(KEYS.users, {});
+    // RegisteredEntry no almacena `createdAt` en el shape interno — el
+    // local-mode es para dev y no necesita timestamps fiables. Para no
+    // romper el orden, devolvemos `""` y el caller puede decidir.
+    const out: UserRecord[] = Object.entries(registered).map(([email, entry]) => ({
+      id: entry.user.id,
+      email,
+      username: entry.user.username,
+      name: entry.user.name,
+      lastName: entry.user.lastName,
+      phone: entry.user.phone,
+      passwordHash: entry.password,
+      role: (entry.user.role as UserRecord["role"]) ?? "cliente",
+      nif: entry.user.nif,
+      nifType: entry.user.nifType,
+      createdAt: "",
+      updatedAt: "",
+    }));
+    const filtered = opts?.role ? out.filter((u) => u.role === opts.role) : out;
+    const sorted = filtered.sort((a, b) =>
+      (b.createdAt || "").localeCompare(a.createdAt || ""),
+    );
+    return opts?.limit ? sorted.slice(0, opts.limit) : sorted;
+  }
+
   async createUser(user: Omit<UserRecord, "createdAt" | "updatedAt">): Promise<UserRecord> {
     const registered = readStorage<Record<string, RegisteredEntry>>(KEYS.users, {});
     registered[user.email] = {
@@ -891,7 +936,8 @@ export class LocalDbAdapter implements DbAdapter {
     return { ...s, id: `sl-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
   }
   async updateSolicitud(): Promise<void> { /* noop */ }
-  async logEmail(): Promise<void> { /* noop */ }
+  async logEmail(_entry: EmailLogRecord): Promise<void> { /* en local-mode emailService.ts escribe a localStorage */ }
+  async getEmailLogs(): Promise<EmailLogRecord[]> { return []; }
   async logApp(): Promise<void> { /* noop */ }
   async getAddresses(): Promise<AddressRecord[]> { return []; }
   async upsertAddress(a: AddressRecord): Promise<AddressRecord> { return a; }
@@ -1028,6 +1074,18 @@ export class ServerDbAdapter implements DbAdapter {
     const { data, error } = await this.db.from("users").select("*").eq("tax_id", needle).maybeSingle();
     if (error || !data) return null;
     return mapUserRow(data);
+  }
+
+  async listAllUsers(opts?: { limit?: number; role?: UserRecord["role"] }): Promise<UserRecord[]> {
+    // Cap defensivo — `/admin/usuarios` paginará en el front; un admin con
+    // millones de filas no debería tirar todo a memoria de un golpe. 5000 es
+    // suficiente para el horizonte previsto (33 importados WP + crecimiento).
+    const cap = Math.min(opts?.limit ?? 5000, 5000);
+    let q = this.db.from("users").select("*").order("created_at", { ascending: false }).limit(cap);
+    if (opts?.role) q = q.eq("role", opts.role);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []).map(mapUserRow);
   }
 
   async createUser(user: Omit<UserRecord, "createdAt" | "updatedAt">): Promise<UserRecord> {
@@ -1718,6 +1776,8 @@ export class ServerDbAdapter implements DbAdapter {
       subject: m.subject,
       body: m.body,
       parent_id: m.parentId ?? null,
+      is_broadcast: m.isBroadcast ?? false,
+      broadcast_id: m.broadcastId ?? null,
     }).select().single();
     if (error) throw error;
     return mapMessageRow(data);
@@ -1967,6 +2027,42 @@ export class ServerDbAdapter implements DbAdapter {
       user_id: entry.userId ?? null,
     });
     if (error) throw error;
+  }
+
+  async getEmailLogs(opts?: { limit?: number; toEmail?: string }): Promise<EmailLogRecord[]> {
+    const limit = Math.min(Math.max(opts?.limit ?? 200, 1), 1000);
+    let q = this.db
+      .from("email_log")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (opts?.toEmail) q = q.eq("to_email", opts.toEmail.toLowerCase());
+    const { data, error } = await q;
+    if (error) throw error;
+    type Row = {
+      id: string;
+      to_email: string;
+      to_name: string | null;
+      subject: string;
+      template_id: string | null;
+      provider_id: string | null;
+      status: string;
+      error_detail: string | null;
+      user_id: string | null;
+      created_at: string;
+    };
+    return ((data ?? []) as Row[]).map((r) => ({
+      id: r.id,
+      toEmail: r.to_email,
+      toName: r.to_name ?? undefined,
+      subject: r.subject,
+      templateId: r.template_id ?? undefined,
+      providerId: r.provider_id ?? undefined,
+      status: r.status,
+      errorDetail: r.error_detail ?? undefined,
+      userId: r.user_id ?? undefined,
+      createdAt: r.created_at,
+    }));
   }
 
   async logApp(entry: AppLogEntry): Promise<void> {
@@ -2291,6 +2387,8 @@ function mapMessageRow(row: DbRow): MessageRecord {
     body: asStr(row.body),
     isRead: Boolean(row.is_read),
     parentId: asOpt<string>(row.parent_id),
+    isBroadcast: Boolean(row.is_broadcast),
+    broadcastId: asOpt<string>(row.broadcast_id),
     createdAt: asStr(row.created_at),
   };
 }

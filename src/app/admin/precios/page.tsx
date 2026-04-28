@@ -29,6 +29,7 @@ import Link from "next/link";
 import CompetitorPricesModal from "@/components/admin/CompetitorPricesModal";
 import {
   getCachedSnapshot,
+  isFresh,
   refreshCompetitorPrices,
   subscribeCompetitorPrices,
 } from "@/services/competitorPriceService";
@@ -332,6 +333,48 @@ export default function PreciosPage() {
   const [compTick, setCompTick] = useState(0);
   useEffect(() => subscribeCompetitorPrices(() => setCompTick((t) => t + 1)), []);
 
+  // ── Auto-fetch al cargar ───────────────────────────────────────────────────
+  // El usuario abrió "Gestión de Precios" para VER precios — no para clicar 200
+  // botones de refresco. Este efecto recorre las filas y, para las que no
+  // tengan snapshot fresca (24h), encola un refresh con concurrencia 1 (no
+  // saturar la API ni a las tiendas rivales). Se respeta un límite por sesión
+  // para evitar peinadas masivas inintencionadas si el catálogo crece mucho.
+  const [autoFetching, setAutoFetching] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    const MAX_PER_SESSION = 60;
+
+    (async () => {
+      const stale = rows.filter((r) => !isFresh(getCachedSnapshot(r.id)));
+      if (stale.length === 0) return;
+      setAutoFetching(true);
+      const queue = stale.slice(0, MAX_PER_SESSION);
+      for (const row of queue) {
+        if (cancelled) break;
+        try {
+          await refreshCompetitorPrices(row.id, row.name, {
+            productImage: row.image,
+            productGame: row.game,
+            productLanguage: row.language,
+            storeIds: ["pokemillon", "cardmarket"],
+          });
+        } catch {
+          // El servicio ya marca el error en el snapshot — seguimos con el siguiente.
+        }
+      }
+      if (!cancelled) setAutoFetching(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Solo se dispara cuando cambia el set de productos (montaje + DataHub
+    // products:updated). NO depende de `compTick` (eso causaría loop infinito
+    // — cada refresh emite el evento y volvería a pedir).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows.length]);
+
   // Fila expandida para descuentos + refresco rival (ids de PriceRow)
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   // Rows en curso de refresco rival — para mostrar spinner.
@@ -412,7 +455,7 @@ export default function PreciosPage() {
         productImage: row.image,
         productGame: row.game,
         productLanguage: row.language,
-        storeIds: ["cardzone", "pokemillon", "manavortex", "cardmarket"],
+        storeIds: ["pokemillon", "cardmarket"],
       });
     } catch {
       // El servicio ya marca la snapshot; el error se refleja en las celdas.
@@ -630,14 +673,22 @@ export default function PreciosPage() {
           <h1 className="text-xl font-bold text-gray-900">
             Gestión de Precios
           </h1>
-          <p className="mt-0.5 text-xs text-gray-500">
-            {rows.length} productos ·{" "}
-            {dirtyIds.size > 0 ? (
-              <span className="font-semibold text-amber-600">
-                {dirtyIds.size} sin guardar
+          <p className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
+            <span>
+              {rows.length} productos ·{" "}
+              {dirtyIds.size > 0 ? (
+                <span className="font-semibold text-amber-600">
+                  {dirtyIds.size} sin guardar
+                </span>
+              ) : (
+                "Todo guardado"
+              )}
+            </span>
+            {autoFetching && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-700">
+                <RefreshCw size={9} className="animate-spin" />
+                Consultando precios rivales…
               </span>
-            ) : (
-              "Todo guardado"
             )}
           </p>
         </div>
@@ -803,8 +854,6 @@ export default function PreciosPage() {
               <col className="w-[80px]" />
               <col className="w-[74px]" />
               <col className="w-[74px]" />
-              <col className="w-[74px]" />
-              <col className="w-[74px]" />
               <col className="w-[80px]" />
               <col className="w-[80px]" />
               <col className="w-[40px]" />
@@ -859,22 +908,10 @@ export default function PreciosPage() {
                   P Adquisición
                 </th>
                 <th
-                  className="px-1 py-2.5 text-right font-semibold leading-tight text-orange-600"
-                  title="Precio del mismo producto en cardzone.es"
-                >
-                  CardZone
-                </th>
-                <th
                   className="px-1 py-2.5 text-right font-semibold leading-tight text-yellow-700"
                   title="Precio del mismo producto en pokemillon.com"
                 >
                   Pokémillon
-                </th>
-                <th
-                  className="px-1 py-2.5 text-right font-semibold leading-tight text-indigo-600"
-                  title="Precio del mismo producto en manavortex.es"
-                >
-                  Manavortex
                 </th>
                 <th
                   className="px-1 py-2.5 text-right font-semibold leading-tight text-purple-600"
@@ -977,13 +1014,7 @@ export default function PreciosPage() {
                       />
                     </td>
                     <td className="px-1 py-1.5">
-                      <StorePriceCell row={row} storeId="cardzone" tick={compTick} />
-                    </td>
-                    <td className="px-1 py-1.5">
                       <StorePriceCell row={row} storeId="pokemillon" tick={compTick} />
-                    </td>
-                    <td className="px-1 py-1.5">
-                      <StorePriceCell row={row} storeId="manavortex" tick={compTick} />
                     </td>
                     <td className="px-1 py-1.5">
                       <StorePriceCell row={row} storeId="cardmarket" tick={compTick} />
@@ -1020,7 +1051,7 @@ export default function PreciosPage() {
                       key={`${row.id}-expand`}
                       className="border-b border-gray-100 bg-gray-50/80"
                     >
-                      <td colSpan={11} className="px-4 py-4">
+                      <td colSpan={9} className="px-4 py-4">
                         <div className="flex flex-wrap items-end gap-5">
                           <div className="min-w-[120px]">
                             <label className="mb-1 flex items-center gap-1 text-[10px] font-bold tracking-wide text-gray-500 uppercase">
@@ -1098,7 +1129,7 @@ export default function PreciosPage() {
               {pageRows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={10}
+                    colSpan={9}
                     className="px-4 py-12 text-center text-sm text-gray-400"
                   >
                     No se encontraron productos con los filtros aplicados.

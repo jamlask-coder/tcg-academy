@@ -69,35 +69,17 @@ export default function AdminUsuarioDetailPage() {
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- resolución síncrona de datos admin desde varias fuentes */
   useEffect(() => {
-    try {
-      // `id` del param puede ser username (handle) o id legacy.
-      // 1. Buscar en MOCK_USERS por username primero, luego por id, luego por
-      //    slug derivado de name+lastName (backward-compat).
-      let baseUser: AdminUser | null = findUserByHandle(MOCK_USERS, id) ?? null;
+    let cancelled = false;
 
-      // 2. Si no, buscar en tcgacademy_registered (usuarios seeded o reales)
-      if (!baseUser) {
-        const raw = localStorage.getItem("tcgacademy_registered");
-        if (raw) {
-          const registered = JSON.parse(raw) as Record<
-            string,
-            { password: string; user: User }
-          >;
-          const users = Object.values(registered).map((e) => e.user);
-          const match = findUserByHandle(users, id);
-          if (match) baseUser = userToAdminUser(match);
-        }
-      }
-
+    const finalize = (baseUser: AdminUser | null) => {
+      if (cancelled) return;
       if (!baseUser) {
         setResolved(null);
         setLoading(false);
         return;
       }
-
-      // 3. Cruzar con pedidos reales (merged) por userId o email
+      // Cruzar con pedidos reales (merged) por userId o email
       const mergedOrders = readAdminOrdersMerged(ADMIN_ORDERS);
       const emailLower = baseUser.email.toLowerCase();
       const userOrders = mergedOrders.filter(
@@ -105,12 +87,9 @@ export default function AdminUsuarioDetailPage() {
           o.userId === baseUser.id ||
           (o.userEmail && o.userEmail.toLowerCase() === emailLower),
       );
-
-      // 4. Recalcular stats en vivo
       const totalOrders = userOrders.length;
       const totalSpent = userOrders.reduce((s, o) => s + (o.total || 0), 0);
       const livePoints = loadPoints(baseUser.id);
-
       setResolved({
         user: {
           ...baseUser,
@@ -121,12 +100,89 @@ export default function AdminUsuarioDetailPage() {
         orders: userOrders,
       });
       setLoading(false);
-    } catch {
-      setResolved(null);
-      setLoading(false);
-    }
+    };
+
+    const resolve = async () => {
+      try {
+        // 1. MOCK_USERS por handle (siempre disponible en cualquier modo)
+        const fromMock = findUserByHandle(MOCK_USERS, id) ?? null;
+        if (fromMock) {
+          finalize(fromMock);
+          return;
+        }
+
+        const isServerMode =
+          typeof process !== "undefined" &&
+          process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
+
+        if (isServerMode) {
+          // 2. Server-mode: BD vía endpoint admin (no localStorage)
+          const res = await fetch(
+            `/api/admin/users/${encodeURIComponent(id)}`,
+            { credentials: "include" },
+          );
+          if (res.ok) {
+            const data = (await res.json()) as {
+              ok: boolean;
+              user?: {
+                id: string;
+                email: string;
+                username?: string;
+                name: string;
+                lastName: string;
+                phone?: string;
+                role: AdminUser["role"];
+                registeredAt: string;
+              };
+            };
+            if (data.ok && data.user) {
+              const u = data.user;
+              finalize({
+                id: u.id,
+                username: u.username,
+                name: u.name,
+                lastName: u.lastName,
+                email: u.email,
+                role: u.role,
+                registeredAt: u.registeredAt,
+                totalOrders: 0,
+                totalSpent: 0,
+                points: 0,
+                active: true,
+                phone: u.phone,
+              });
+              return;
+            }
+          }
+          finalize(null);
+          return;
+        }
+
+        // 3. Local-mode: tcgacademy_registered (dev)
+        const raw = localStorage.getItem("tcgacademy_registered");
+        if (raw) {
+          const registered = JSON.parse(raw) as Record<
+            string,
+            { password: string; user: User }
+          >;
+          const users = Object.values(registered).map((e) => e.user);
+          const match = findUserByHandle(users, id);
+          if (match) {
+            finalize(userToAdminUser(match));
+            return;
+          }
+        }
+        finalize(null);
+      } catch {
+        finalize(null);
+      }
+    };
+
+    void resolve();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Pre-computed month labels (outside render so it's stable)
   const MONTH_MAP: Record<string, string> = useMemo(

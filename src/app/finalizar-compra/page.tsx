@@ -182,6 +182,11 @@ export default function CheckoutPage() {
     envio: "estandar",
     pago: "tarjeta",
     tiendaRecogida: "",
+    // Recogida en tienda — día y hora preferida del cliente.
+    // Solo aplica cuando envio === "tienda". No genera pedido ni factura;
+    // viaja en el email a la tienda + confirmación al cliente.
+    pickupDate: "",
+    pickupTime: "",
   });
 
   // ── Address selector ────────────────────────────────────────────────────────
@@ -312,8 +317,14 @@ export default function CheckoutPage() {
       }
 
       // ── Guard 5b: Validate NIF (obligatorio para factura — Art. 6.1.d RD 1619/2012) ──
+      // Excepción: recogida en tienda no genera pedido ni factura (es una
+      // reserva/intención). No pedimos NIF para no fricccionar al cliente
+      // cuando aún ni va a comprar online. La factura se emitirá in-situ
+      // desde el PoS si finalmente paga, y allí se le pedirá NIF si la quiere.
       const { validateSpanishNIF } = await import("@/lib/validations/nif");
-      const nifCheck = validateSpanishNIF(form.nif);
+      const nifCheck = isStorePickup
+        ? { valid: true as const, normalized: "", type: "DNI" as const, error: undefined }
+        : validateSpanishNIF(form.nif);
       if (!nifCheck.valid) {
         setOrderError(
           nifCheck.error
@@ -321,6 +332,19 @@ export default function CheckoutPage() {
             : "El NIF / NIE / CIF es obligatorio para emitir la factura.",
         );
         return;
+      }
+      // Validación adicional para pickup: día y hora obligatorios.
+      if (isStorePickup) {
+        if (!form.pickupDate || !form.pickupTime) {
+          setOrderError("Indica el día y la hora a la que pasarás a recoger.");
+          return;
+        }
+        // No permitir fecha pasada.
+        const picked = new Date(`${form.pickupDate}T${form.pickupTime}`);
+        if (Number.isNaN(picked.getTime()) || picked.getTime() < Date.now() - 60_000) {
+          setOrderError("La fecha/hora de recogida debe ser futura.");
+          return;
+        }
       }
 
       // ── Guard 6: Validate prices are sane ──
@@ -488,52 +512,89 @@ export default function CheckoutPage() {
           const productList = items
             .map((i) => `${i.quantity}× ${i.name}`)
             .join(", ");
-          const customerContact = `${form.nombre} ${form.apellidos} · ${form.email} · ${form.telefono}`;
+          // Cita formateada en es-ES para humanos. Solo aplica en pickup.
+          const pickupWhen = isStorePickup && form.pickupDate && form.pickupTime
+            ? new Date(`${form.pickupDate}T${form.pickupTime}`).toLocaleString("es-ES", {
+                weekday: "long",
+                day: "2-digit",
+                month: "long",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "";
+          // Resumen humano del bloque de cita (se inyecta en items_html como
+          // bloque informativo para que aparezca dentro del email sin
+          // necesidad de tocar la plantilla SSOT).
+          const pickupBlockHtml = isStorePickup && tienda
+            ? `<tr><td colspan="3" style="padding:14px 16px;background:#eff6ff;border-radius:10px;font-size:13px;line-height:1.6">
+                  <strong>Recogida en ${tienda.name}</strong><br/>
+                  ${tienda.address}<br/>
+                  ${pickupWhen ? `<strong>Cita del cliente:</strong> ${pickupWhen}<br/>` : ""}
+                  <strong>Contacto cliente:</strong> ${form.nombre}${form.apellidos ? " " + form.apellidos : ""} · Tel: ${form.telefono}${form.email ? " · " + form.email : ""}<br/>
+                  <em>Pago al recoger. Stock se descontará en el momento de la venta desde el PoS.</em>
+                </td></tr>`
+            : "";
+          const customerContact = `${form.nombre}${form.apellidos ? " " + form.apellidos : ""} · ${form.telefono}${form.email ? " · " + form.email : ""}`;
           const intentVars = {
             nombre: form.nombre || "cliente",
             order_id: "intención",
             order_date: new Date().toLocaleDateString("es-ES"),
-            items_html: items
-              .map(
-                (i) =>
-                  `<tr><td>${i.name}</td><td>${i.quantity}</td><td>${(i.price * i.quantity).toFixed(2)}€</td></tr>`,
-              )
-              .join(""),
+            items_html:
+              pickupBlockHtml +
+              items
+                .map(
+                  (i) =>
+                    `<tr><td>${i.name}</td><td>${i.quantity}</td><td>${(i.price * i.quantity).toFixed(2)}€</td></tr>`,
+                )
+                .join(""),
             subtotal: total.toFixed(2),
             shipping: "—",
             total: safeFinalTotal.toFixed(2),
             address: tienda
-              ? `Recogida en: ${tienda.name}`
+              ? `Recogida en: ${tienda.name} — ${tienda.address}${pickupWhen ? ` · Cita: ${pickupWhen}` : ""}`
               : `${form.direccion}, ${form.ciudad} ${form.cp}, ${form.provincia}`,
-            payment_method: form.pago,
+            payment_method: tienda ? "Recogida en tienda — pago al recoger" : form.pago,
             unsubscribe_link: "#",
           };
 
-          // Email a la tienda / admin con la intención
+          // Email a la tienda específica (cada tienda tiene su email).
+          // Si por alguna razón la tienda no tiene email configurado (p.ej.
+          // Barcelona próximamente), copiamos al admin general.
+          const storeEmail = tienda?.email && tienda.email.trim().length > 0
+            ? tienda.email
+            : SITE_CONFIG.email;
           await sendAppEmail({
-            toEmail: tienda ? tienda.email : SITE_CONFIG.email,
+            toEmail: storeEmail,
             toName: tienda ? tienda.name : SITE_CONFIG.name,
             templateId: "confirmacion_pedido",
             vars: intentVars,
-            preview: `${customerContact} · ${productList} · Total aprox: ${safeFinalTotal.toFixed(2)}€ · ${tienda ? "cobrar al recoger" : form.pago}`,
+            preview: tienda
+              ? `Reserva ${tienda.name} · ${customerContact} · ${productList} · Cita: ${pickupWhen || "sin fecha"} · Cobrar al recoger ${safeFinalTotal.toFixed(2)}€`
+              : `${customerContact} · ${productList} · Total aprox: ${safeFinalTotal.toFixed(2)}€ · ${form.pago}`,
           });
 
-          // Email al cliente confirmando la intención (no es un pedido cerrado)
-          await sendAppEmail({
-            toEmail: form.email,
-            toName: `${form.nombre} ${form.apellidos}`.trim(),
-            templateId: "confirmacion_pedido",
-            vars: intentVars,
-            preview: tienda
-              ? `Pasa por ${tienda.name} para abonar y recoger tu pedido (${safeFinalTotal.toFixed(2)}€). Recomendamos confirmar disponibilidad por teléfono antes de desplazarte.`
-              : `Hemos recibido tu solicitud. Te contactaremos para confirmar el pago y los siguientes pasos.`,
-          });
+          // Email al cliente — solo si nos dejó email (en pickup es opcional).
+          if (form.email) {
+            await sendAppEmail({
+              toEmail: form.email,
+              toName: `${form.nombre}${form.apellidos ? " " + form.apellidos : ""}`.trim() || "Cliente",
+              templateId: "confirmacion_pedido",
+              vars: intentVars,
+              preview: tienda
+                ? `Hemos recibido tu reserva en ${tienda.name}${pickupWhen ? ` para el ${pickupWhen}` : ""}. Pago al recoger (${safeFinalTotal.toFixed(2)}€). Si necesitas reprogramar, llámanos.`
+                : `Hemos recibido tu solicitud. Te contactaremos para confirmar el pago y los siguientes pasos.`,
+            });
+          }
         } catch {
           /* email send es non-critical */
         }
 
         clearCart();
         setStep("confirmado");
+        // Forzar scroll al top: la página de confirmación es corta, sin esto
+        // el usuario aterriza donde estaba (pie de form). UX poco profesional.
+        try { window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior }); } catch { window.scrollTo(0, 0); }
         return;
       }
 
@@ -900,6 +961,7 @@ export default function CheckoutPage() {
 
     clearCart();
     setStep("confirmado");
+    try { window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior }); } catch { window.scrollTo(0, 0); }
     } finally {
       releaseCheckoutLock();
       submittingRef.current = false;
@@ -940,17 +1002,22 @@ export default function CheckoutPage() {
           <CheckCircle size={40} className="text-green-500" />
         </div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900">
-          {pickupStore ? "Pedido listo para recoger" : "Pedido confirmado"}
+          {pickupStore ? "Pedido recibido" : "Pedido confirmado"}
         </h1>
         <p className="mb-2 text-gray-600">
           {pickupStore
-            ? "Hemos recibido tu pedido. Te avisaremos cuando esté preparado para recoger."
+            ? "Hemos avisado a la tienda. Te confirmaremos por teléfono o email antes de tu cita."
             : "Gracias por tu compra. Te hemos enviado un email de confirmación."}
         </p>
-        <p className="mb-4 text-sm text-gray-500">
-          Número de pedido:{" "}
-          <span className="font-bold text-gray-800">{orderId}</span>
-        </p>
+        {/* Solo mostramos número de pedido si SE ha creado un pedido real
+            (compra online pagada). En recogida en tienda no hay pedido —
+            es una intención de compra que se cerrará al pasar por la tienda. */}
+        {!pickupStore && (
+          <p className="mb-4 text-sm text-gray-500">
+            Número de pedido:{" "}
+            <span className="font-bold text-gray-800">{orderId}</span>
+          </p>
+        )}
 
         {/* Store pickup info */}
         {pickupStore && (
@@ -959,9 +1026,22 @@ export default function CheckoutPage() {
               Recogida en {pickupStore.name}
             </p>
             <p className="mb-1 text-sm text-gray-600">{pickupStore.address}</p>
+            {form.pickupDate && form.pickupTime && (
+              <p className="mb-1 text-sm text-gray-700">
+                <strong>Tu cita:</strong>{" "}
+                {new Date(`${form.pickupDate}T${form.pickupTime}`).toLocaleString("es-ES", {
+                  weekday: "long",
+                  day: "2-digit",
+                  month: "long",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+            )}
             <p className="mb-2 text-xs text-gray-400">Pago al recoger — {finalTotal.toFixed(2)}€</p>
             <p className="text-xs text-blue-600">
-              Hemos notificado a la tienda. Te enviaremos un email cuando tu pedido esté listo.
+              Hemos notificado a la tienda. Te avisaremos si hay cualquier
+              cambio antes de tu cita.
             </p>
           </div>
         )}
@@ -1209,13 +1289,22 @@ export default function CheckoutPage() {
               </h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 {(
-                  [
-                    ["nombre", "Nombre *", "text", true],
-                    ["apellidos", "Apellidos *", "text", true],
-                    ["nif", "NIF / NIE / CIF *", "text", true],
-                    ["email", "Email *", "email", true],
-                    ["telefono", "Teléfono *", "tel", true],
-                  ] as [keyof typeof form, string, string, boolean][]
+                  isStorePickup
+                    ? // Recogida en tienda: solo lo imprescindible para
+                      // contactar al cliente. Sin NIF (no hay factura
+                      // hasta que pase por la tienda y pague allí).
+                      ([
+                        ["nombre", "Nombre *", "text", true],
+                        ["telefono", "Teléfono *", "tel", true],
+                        ["email", "Email (opcional)", "email", false],
+                      ] as [keyof typeof form, string, string, boolean][])
+                    : ([
+                        ["nombre", "Nombre *", "text", true],
+                        ["apellidos", "Apellidos *", "text", true],
+                        ["nif", "NIF / NIE / CIF *", "text", true],
+                        ["email", "Email *", "email", true],
+                        ["telefono", "Teléfono *", "tel", true],
+                      ] as [keyof typeof form, string, string, boolean][])
                 ).map(([key, label, type, req]) => {
                   const isNif = key === "nif";
                   const isEmail = key === "email";
@@ -1284,6 +1373,53 @@ export default function CheckoutPage() {
                   );
                 })}
               </div>
+
+              {/* ── Día y hora de recogida — SOLO si pickup ── */}
+              {isStorePickup && (
+                <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+                  <h3 className="mb-3 text-sm font-bold text-gray-900">
+                    ¿Cuándo pasarás a recoger? *
+                  </h3>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-gray-700">
+                        Día
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        min={new Date().toISOString().slice(0, 10)}
+                        value={form.pickupDate}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, pickupDate: e.target.value }))
+                        }
+                        aria-invalid={triedSubmitDatos && !form.pickupDate}
+                        className={`h-11 w-full rounded-xl border-2 bg-white px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${triedSubmitDatos && !form.pickupDate ? "border-red-400" : "border-gray-200"}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold text-gray-700">
+                        Hora
+                      </label>
+                      <input
+                        type="time"
+                        required
+                        value={form.pickupTime}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, pickupTime: e.target.value }))
+                        }
+                        aria-invalid={triedSubmitDatos && !form.pickupTime}
+                        className={`h-11 w-full rounded-xl border-2 bg-white px-4 text-sm transition focus:border-[#2563eb] focus:outline-none ${triedSubmitDatos && !form.pickupTime ? "border-red-400" : "border-gray-200"}`}
+                      />
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[11px] text-gray-500">
+                    Confirma horario antes de venir. Si la tienda está cerrada
+                    a esa hora, te contactaremos para reprogramar.
+                  </p>
+                </div>
+              )}
+
               {/* ── Dirección de envío — SÓLO si NO es recogida en tienda ── */}
               {!isStorePickup && (
               <>

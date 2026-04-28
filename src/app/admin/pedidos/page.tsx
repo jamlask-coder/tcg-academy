@@ -13,7 +13,6 @@ import {
   Package,
   Send,
   MessageSquare,
-  Mail,
   StickyNote,
   History,
   Copy,
@@ -32,7 +31,9 @@ import {
 } from "@/data/mockData";
 import {
   readAdminOrdersMerged,
+  readAdminOrdersMergedAsync,
   isAdminVisibleOrder,
+  replicateOrderUpdateToBd,
 } from "@/lib/orderAdapter";
 import { sendMessage as sendCanonicalMessage } from "@/services/messageService";
 import { pushUserNotification } from "@/services/notificationService";
@@ -129,39 +130,6 @@ const INCIDENT_TYPES: Record<string, string> = {
 const STATUS_FLOW: AdminOrderStatus[] = [
   "pendiente_envio",
   "enviado",
-];
-
-const EMAIL_TEMPLATES = [
-  {
-    id: "preparando",
-    label: "Pedido en preparación",
-    subject: "Tu pedido está siendo preparado",
-    body: "Hola,\n\nTu pedido está pendiente de envío y lo estamos preparando. En breve recibirás el número de seguimiento.\n\nGracias por confiar en TCG Academy.",
-  },
-  {
-    id: "enviado",
-    label: "Pedido enviado",
-    subject: "Tu pedido ha sido enviado",
-    body: "Hola,\n\nTu pedido ha sido enviado hoy con GLS. Número de seguimiento: {{tracking}}\n\nPuedes seguirlo en: https://www.gls-spain.es\n\nGracias!",
-  },
-  {
-    id: "incidencia",
-    label: "Respuesta a incidencia",
-    subject: "Actualización sobre tu incidencia",
-    body: "Hola,\n\nHemos revisado tu incidencia y nos ponemos en contacto contigo para resolverla.\n\n",
-  },
-  {
-    id: "stock",
-    label: "Información de stock",
-    subject: "Actualización de stock",
-    body: "Hola,\n\nTe informamos sobre la disponibilidad de los productos de tu pedido.\n\n",
-  },
-  {
-    id: "personalizado",
-    label: "Mensaje personalizado",
-    subject: "",
-    body: "",
-  },
 ];
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
@@ -280,119 +248,6 @@ function Toast({ message, onClose }: { message: string; onClose: () => void }) {
       <button onClick={onClose} className="ml-2 text-white/60 hover:text-white">
         <X size={14} />
       </button>
-    </div>
-  );
-}
-
-// ─── Email modal ──────────────────────────────────────────────────────────────
-
-function EmailModal({
-  order,
-  onClose,
-  onSend,
-}: {
-  order: AdminOrder;
-  onClose: () => void;
-  onSend: (subject: string, body: string) => void;
-}) {
-  const [tplId, setTplId] = useState("preparando");
-  const tpl = EMAIL_TEMPLATES.find((t) => t.id === tplId)!;
-  const [subject, setSubject] = useState(tpl.subject);
-  const [body, setBody] = useState(
-    tpl.body.replace("{{tracking}}", order.trackingNumber ?? ""),
-  );
-
-  const applyTpl = (id: string) => {
-    setTplId(id);
-    const t = EMAIL_TEMPLATES.find((x) => x.id === id)!;
-    setSubject(t.subject);
-    setBody(t.body.replace("{{tracking}}", order.trackingNumber ?? ""));
-  };
-
-  return (
-    <div
-      {...clickableProps(onClose)}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-    >
-      <div
-        {...clickableProps((e) => e?.stopPropagation())}
-        className="w-full max-w-lg rounded-2xl bg-white shadow-2xl"
-      >
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-          <div className="flex items-center gap-2 font-bold text-gray-900">
-            <Mail size={16} className="text-[#2563eb]" /> Enviar email a{" "}
-            {order.userName}
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <div className="space-y-4 px-6 py-4">
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-gray-500">
-              Plantilla
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {EMAIL_TEMPLATES.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => applyTpl(t.id)}
-                  className={`rounded-lg border px-2.5 py-1 text-xs transition ${tplId === t.id ? "border-[#2563eb] bg-[#2563eb] text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-gray-500">
-              Para
-            </label>
-            <div className="rounded-lg bg-gray-50 px-3 py-2 font-mono text-sm text-gray-600">
-              {order.userEmail}
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-gray-500">
-              Asunto
-            </label>
-            <input
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-gray-500">
-              Mensaje
-            </label>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={5}
-              className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-[#2563eb] focus:outline-none"
-            />
-          </div>
-        </div>
-        <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
-          <button
-            onClick={onClose}
-            className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={() => onSend(subject, body)}
-            disabled={!subject || !body}
-            className="flex items-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:bg-[#3b82f6] disabled:opacity-50"
-          >
-            <Mail size={14} /> Enviar email
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -1116,14 +971,22 @@ export default function AdminPedidosPage() {
     return readAdminOrdersMerged(ADMIN_ORDERS).filter(isAdminVisibleOrder);
   });
 
-  // Refresca al volver del background (ej. completar un pedido en otra pestaña).
+  // Refresca al volver del background y al recibir eventos de cambio.
+  // En server-mode tira también de la BD para que pedidos creados desde
+  // otros navegadores/admins lleguen al inbox sin depender de localStorage.
   useEffect(() => {
-    const onFocus = () =>
-      setOrders(readAdminOrdersMerged(ADMIN_ORDERS).filter(isAdminVisibleOrder));
+    let cancelled = false;
+    const refresh = async () => {
+      const merged = await readAdminOrdersMergedAsync(ADMIN_ORDERS);
+      if (!cancelled) setOrders(merged.filter(isAdminVisibleOrder));
+    };
+    void refresh();
+    const onFocus = () => void refresh();
     window.addEventListener("focus", onFocus);
     window.addEventListener("storage", onFocus);
     window.addEventListener("tcga:orders:updated", onFocus);
     return () => {
+      cancelled = true;
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("storage", onFocus);
       window.removeEventListener("tcga:orders:updated", onFocus);
@@ -1141,7 +1004,6 @@ export default function AdminPedidosPage() {
   >("all");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [emailModal, setEmailModal] = useState<AdminOrder | null>(null);
   const [messageModal, setMessageModal] = useState<AdminOrder | null>(null);
   const [shipModal, setShipModal] = useState<AdminOrder | null>(null);
   const [sortField, setSortField] = useState<"date" | "total" | "status">(
@@ -1311,6 +1173,15 @@ export default function AdminPedidosPage() {
       }),
     );
 
+    // Replicar a BD en server-mode (no-op en local). El PATCH no bloquea la
+    // UI ni invalida la escritura local — si el endpoint falla, lo de
+    // localStorage manda hasta el siguiente reload reconciliador.
+    void replicateOrderUpdateToBd(id, {
+      status,
+      ...(tracking ? { tracking } : {}),
+      ...(historyNote ? { note: historyNote } : {}),
+    });
+
     // Audit trail — log status change
     logAudit({
       entityType: "order",
@@ -1476,6 +1347,7 @@ export default function AdminPedidosPage() {
     persistOrders(
       orders.map((o) => (o.id === id ? { ...o, adminNotes: notes } : o)),
     );
+    void replicateOrderUpdateToBd(id, { adminNotes: notes });
     showToast("Notas guardadas");
   };
 
@@ -1507,29 +1379,11 @@ export default function AdminPedidosPage() {
         };
       }),
     );
-    showToast("Incidencia resuelta");
-  };
-
-  const handleSendEmail = (
-    order: AdminOrder,
-    subject: string,
-    _body: string,
-  ) => {
-    const log = JSON.parse(
-      localStorage.getItem("tcgacademy_email_log") ?? "[]",
-    );
-    log.unshift({
-      date: new Date().toISOString(),
-      to: order.userEmail,
-      subject,
+    void replicateOrderUpdateToBd(id, {
       status: "enviado",
+      note: "Incidencia resuelta",
     });
-    localStorage.setItem(
-      "tcgacademy_email_log",
-      JSON.stringify(log.slice(0, 50)),
-    );
-    showToast(`Email enviado a ${order.userEmail}`);
-    setEmailModal(null);
+    showToast("Incidencia resuelta");
   };
 
   const handleSendMessage = (order: AdminOrder, body: string) => {
@@ -1560,13 +1414,6 @@ export default function AdminPedidosPage() {
   return (
     <div>
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
-      {emailModal && (
-        <EmailModal
-          order={emailModal}
-          onClose={() => setEmailModal(null)}
-          onSend={(s, b) => handleSendEmail(emailModal, s, b)}
-        />
-      )}
       {messageModal && (
         <MessageModal
           order={messageModal}

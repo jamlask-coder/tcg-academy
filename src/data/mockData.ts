@@ -1023,6 +1023,8 @@ export interface AdminOrder {
   userRole: "cliente" | "mayorista" | "tienda";
   userName: string;
   userEmail: string;
+  /** Teléfono del comprador — congelado del shippingAddress al crear el pedido. */
+  userPhone?: string;
   date: string;
   adminStatus: AdminOrderStatus;
   items: OrderItem[];
@@ -1051,6 +1053,12 @@ export interface AdminOrder {
   /** NIF/NIE/CIF del comprador — obligatorio para emitir factura (Art. 6.1.d RD 1619/2012). */
   nif?: string;
   nifType?: "DNI" | "NIE" | "CIF";
+  /**
+   * Pedido importado de la SL anterior: SOLO informativo. NUNCA emitir
+   * factura nueva sobre este pedido (la factura pertenece a la sociedad
+   * previa). Bloquea acciones de cobro/factura en /admin/pedidos.
+   */
+  fiscalCarryOver?: boolean;
 }
 
 const _DT = (d: string, t = "10:00") => `${d}T${t}:00`;

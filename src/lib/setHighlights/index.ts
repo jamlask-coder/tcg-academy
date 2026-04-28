@@ -126,6 +126,18 @@ export async function resolveHighlights(
     errors.push(`fetch:${String(e)}`);
   }
 
+  // Re-sort defensivo: garantiza que el orden del carrusel "Cartas más
+  // cotizadas" sea SIEMPRE por priceEur descendente, independientemente del
+  // adapter. Algunos endpoints (Scryfall sort=usd, ygoprodeck con prices a
+  // null, fallback hardcoded sin precio) no garantizaban el orden por valor
+  // EUR — y se veían cartas de céntimos arriba. Aquí las que no tienen precio
+  // van al final, las caras suben.
+  cards = [...cards].sort((a, b) => {
+    const pa = typeof a.priceEur === "number" && a.priceEur > 0 ? a.priceEur : -1;
+    const pb = typeof b.priceEur === "number" && b.priceEur > 0 ? b.priceEur : -1;
+    return pb - pa;
+  });
+
   if (cards.length > 0) {
     highlightCache.set(cacheKey, cards);
   }

@@ -4,6 +4,7 @@ import { persistentRateLimit } from "@/lib/rateLimitStore";
 import { getDb } from "@/lib/db";
 import {
   hashPassword,
+  isLegacyWpHash,
   verifyPassword,
   simulatePasswordVerify,
   enforceMinDuration,
@@ -214,6 +215,20 @@ export async function POST(req: NextRequest) {
         }
 
         const passwordValid = await verifyPassword(password, user.passwordHash);
+        // Migración silenciosa: usuarios importados de la web WordPress tienen
+        // hashes con prefijo `$wp$`. Tras un login válido los re-hashemos al
+        // formato bcrypt nativo y persistimos. El usuario no nota nada.
+        if (passwordValid && isLegacyWpHash(user.passwordHash)) {
+          try {
+            const fresh = await hashPassword(password);
+            await db.updateUser(user.id, { passwordHash: fresh });
+          } catch (e) {
+            // No bloqueamos el login si el upgrade falla — el hash legacy sigue
+            // funcionando hasta el próximo intento.
+            // eslint-disable-next-line no-console
+            console.warn(`[wp-hash-upgrade] failed for user ${user.id}: ${String(e)}`);
+          }
+        }
         if (!passwordValid) {
           await db.logAudit({
             entityType: "user",

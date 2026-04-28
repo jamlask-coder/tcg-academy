@@ -46,3 +46,12 @@ next-env.d.ts
 
 # audit handoff transitorio (memoria de sesiones de auditoría)
 /.claude/audit-handoff.md
+
+# Python price tracker — datos locales, cache y bytecode
+__pycache__/
+*.pyc
+*.pyo
+.python-version
+/scripts/price_tracker/data/
+*.duckdb
+*.duckdb.wal

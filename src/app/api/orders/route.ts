@@ -312,7 +312,7 @@ export async function POST(req: NextRequest) {
       );
 
       // Notify admin
-      const adminEmail = await db.getSetting("notification_email") ?? "admin@tcgacademy.es";
+      const adminEmail = await db.getSetting("notification_email") ?? "tcgacademycalpe@gmail.com";
       const emailService = getEmailService();
       await emailService.sendTemplatedEmail("admin_nuevo_pedido", adminEmail, {
         orderId,

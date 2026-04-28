@@ -377,7 +377,7 @@ const STABLE: EntityRegistryEntry[] = [
 const PARTIAL: EntityRegistryEntry[] = [
   {
     key: "messages",
-    description: "Mensajes entre cliente y vendedor",
+    description: "Mensajes entre cliente y vendedor (incluye broadcasts admin con is_broadcast/broadcast_id)",
     storageKeys: ["tcgacademy_messages"],
     event: DataHubEvents.MESSAGES_UPDATED,
     pii: true,
@@ -386,7 +386,7 @@ const PARTIAL: EntityRegistryEntry[] = [
     maturity: "partial",
     category: "mensajes",
     dependsOn: ["users", "orders"],
-    notes: "Pre-Phase 2 el código vivía disperso; messageService centraliza.",
+    notes: "Server-mode: BD `messages` con columnas is_broadcast/broadcast_id (migración messages_broadcast.sql). El parent `Broadcast` en tcgacademy_broadcasts es la vista outbox del admin — derivable vía GROUP BY broadcast_id; se mantiene LS por simplicidad de UI.",
   },
   {
     key: "notifications",
@@ -473,7 +473,7 @@ const PARTIAL: EntityRegistryEntry[] = [
     adapter: "@/services/emailService",
     maturity: "partial",
     category: "config",
-    notes: "Editables desde /admin/emails. Overrides sobre las plantillas de src/data/emailTemplates.ts.",
+    notes: "Editables desde /admin/emails. Overrides sobre las plantillas de src/data/emailTemplates.ts. NOTA: `tcgacademy_email_sender` es solo local-mode (form decorativo). En server-mode el remitente real (senderName/replyToEmail) vive en BD vía /api/admin/settings y RESEND_FROM_EMAIL fija el FROM.",
   },
   {
     key: "priceOverrides",

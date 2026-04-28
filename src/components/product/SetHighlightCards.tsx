@@ -249,10 +249,14 @@ function CardLightbox({
       >
         <div className="text-center">
           <p className="text-base font-bold text-white sm:text-lg">{card.name}</p>
-          <div className="mt-1 flex items-center justify-center gap-2">
-            {card.isHolo && <Sparkles size={14} className="text-amber-300" />}
-            <p className="text-sm capitalize text-amber-300">{card.rarity}</p>
-          </div>
+          {(card.isHolo || card.rarity) && (
+            <div className="mt-1 flex items-center justify-center gap-2">
+              {card.isHolo && <Sparkles size={14} className="text-amber-300" />}
+              {card.rarity && (
+                <p className="text-sm capitalize text-amber-300">{card.rarity}</p>
+              )}
+            </div>
+          )}
           <p className="mt-1 text-xs text-white/40">
             {index + 1} / {cards.length}
           </p>

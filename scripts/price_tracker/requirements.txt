@@ -1,0 +1,40 @@
+# Price Tracker — TCG Academy
+# Lock de versiones que han sido validadas en local 2026-04-28.
+# Instalar con:
+#   /c/Users/jamla/AppData/Local/Programs/Python/Python312/python.exe -m pip install -r scripts/price_tracker/requirements.txt
+
+# Scraping core
+scrapling[fetchers]>=0.4.7
+beautifulsoup4>=4.14.3
+lxml>=6.1.0
+
+# TCG / Cardmarket
+mkmsdk>=0.6.0
+scrython>=2.0.3
+pokemontcgsdk>=3.4.0
+requests-oauthlib>=2.0.0
+
+# Imagen — match cartas
+imagehash>=4.3.2
+Pillow>=12.2.0
+
+# Datos / análisis
+duckdb>=1.5.2
+polars>=1.40.1
+pandas>=3.0.2
+numpy>=2.4.4
+openpyxl>=3.1.5
+tabulate>=0.10.0
+
+# Persistencia BD prod
+supabase>=2.29.0
+python-dotenv>=1.2.2
+
+# PDF (facturas proveedor)
+pdfplumber>=0.11.9
+
+# Scheduling
+apscheduler>=3.11.2
+schedule>=1.2.2
+arrow>=1.4.0
+rich>=15.0.0

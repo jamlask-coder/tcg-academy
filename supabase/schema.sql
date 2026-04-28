@@ -623,8 +623,8 @@ CREATE TABLE settings (
 );
 
 INSERT INTO settings (key, value) VALUES
-  ('admin_email',             'admin@tcgacademy.es'),
-  ('notification_email',      'admin@tcgacademy.es'),
+  ('admin_email',             'tcgacademycalpe@gmail.com'),
+  ('notification_email',      'tcgacademycalpe@gmail.com'),
   ('store_name',              'TCG Academy'),
   ('default_shipping',        'GLS'),
   ('free_shipping_threshold', '149'),

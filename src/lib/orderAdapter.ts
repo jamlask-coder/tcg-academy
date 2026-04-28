@@ -270,6 +270,7 @@ export function checkoutOrderToAdmin(o: CheckoutOrder): AdminOrder {
     userRole: coerceAdminRole(o.userRole),
     userName: userName || "Cliente sin nombre",
     userEmail: o.shippingAddress.email,
+    userPhone: o.shippingAddress.telefono,
     date: o.date.slice(0, 10),
     adminStatus,
     items,
@@ -562,5 +563,222 @@ export function setAdminOrderStatus(
     return ok;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Replica un cambio sobre un pedido a la BD vía PATCH /api/orders/[id].
+ * Sólo actúa en server-mode; en local-mode es no-op (la persistencia ya
+ * ha ocurrido en localStorage antes de llamar a este helper).
+ *
+ * Pensado para que las páginas admin (/admin/pedidos y /admin/pedidos/[id])
+ * no dupliquen el `fetch(...)` inline. Si la petición falla, se ignora —
+ * localStorage es la SSOT visual; la próxima vez que el admin abra la BD
+ * los datos no coincidirán y un re-save los reconcilia.
+ */
+// ─── BD → AdminOrder ────────────────────────────────────────────────────────
+
+/** Shape mínima de OrderRecord que devuelve GET /api/orders. Lo declaramos
+ *  inline para evitar acoplar el cliente a `@/lib/db` (que es server-only). */
+interface ApiOrderRecord {
+  id: string;
+  userId?: string | null;
+  customerEmail?: string;
+  customerName?: string;
+  customerTaxId?: string;
+  customerPhone?: string;
+  customerRole?: { role?: string } | string | null;
+  items: Array<{
+    productId: number | string;
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    imageUrl?: string;
+  }>;
+  subtotal: number;
+  shippingCost?: number;
+  couponCode?: string;
+  couponDiscount?: number;
+  pointsDiscount?: number;
+  total: number;
+  status: string;
+  shippingMethod?: string;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  trackingNumber?: string;
+  notes?: string;
+  shippingAddress?: {
+    calle?: string;
+    numero?: string;
+    piso?: string;
+    cp?: string;
+    ciudad?: string;
+    provincia?: string;
+    pais?: string;
+  } | null;
+  tiendaRecogida?: string;
+  createdAt?: string;
+}
+
+function coerceUserRoleFromBd(v: ApiOrderRecord["customerRole"]): AdminOrder["userRole"] {
+  const raw =
+    typeof v === "string" ? v : typeof v === "object" && v ? v.role : undefined;
+  return coerceAdminRole(raw ?? null);
+}
+
+function coercePaymentStatusFromBd(v?: string): AdminPaymentStatus | undefined {
+  switch ((v ?? "").toLowerCase()) {
+    case "paid":
+    case "cobrado":
+      return "cobrado";
+    case "refunded":
+    case "reembolsado":
+      return "reembolsado";
+    case "cancelled":
+    case "cancelado":
+      return "cancelado";
+    case "failed":
+    case "fallido":
+      return "fallido";
+    case "pending":
+    case "pendiente":
+      return "pendiente";
+    default:
+      return undefined;
+  }
+}
+
+function formatBdAddress(a: ApiOrderRecord["shippingAddress"]): string {
+  if (!a) return "";
+  const street = [a.calle, a.numero].filter(Boolean).join(" ");
+  const streetWithFloor = a.piso ? `${street}, ${a.piso}` : street;
+  return [
+    streetWithFloor,
+    [a.cp, a.ciudad].filter(Boolean).join(" "),
+    a.provincia,
+    a.pais,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+/**
+ * Convierte un OrderRecord (tal como lo expone /api/orders) en AdminOrder.
+ * Pure: no toca BD ni localStorage. Usado por `fetchAdminOrdersFromBd`.
+ */
+export function orderRecordToAdmin(r: ApiOrderRecord): AdminOrder {
+  const adminStatus = toAdminStatus(r.status);
+  const items: AdminItem[] = (r.items ?? []).map((it) => {
+    const idNum = Number(it.productId);
+    const prod = getMergedById(idNum);
+    return {
+      id: Number.isFinite(idNum) ? idNum : 0,
+      name: it.name,
+      qty: Number(it.quantity) || 0,
+      price: Number(it.unitPrice) || 0,
+      game: prod?.game ?? "otros",
+    };
+  });
+  const isPickup = (r.shippingMethod ?? "") === "tienda" || !!r.tiendaRecogida;
+  const explicitPay = coercePaymentStatusFromBd(r.paymentStatus);
+  return {
+    id: r.id,
+    userId: r.userId ?? `guest-${r.id}`,
+    userRole: coerceUserRoleFromBd(r.customerRole ?? null),
+    userName: r.customerName?.trim() || "Cliente sin nombre",
+    userEmail: r.customerEmail ?? "",
+    userPhone: r.customerPhone,
+    date: (r.createdAt ?? "").slice(0, 10),
+    adminStatus,
+    items,
+    subtotal: Number(r.subtotal) || 0,
+    shipping: Number(r.shippingCost) || 0,
+    total: Number(r.total) || 0,
+    couponCode: r.couponCode,
+    couponDiscount:
+      r.couponDiscount && r.couponDiscount > 0 ? r.couponDiscount : undefined,
+    pointsDiscount:
+      r.pointsDiscount && r.pointsDiscount > 0 ? r.pointsDiscount : undefined,
+    trackingNumber: r.trackingNumber,
+    address: isPickup ? "— Recogida en tienda —" : formatBdAddress(r.shippingAddress),
+    paymentMethod: r.paymentMethod ?? "",
+    paymentStatus:
+      explicitPay ?? derivePaymentStatus(r.paymentMethod ?? "", adminStatus),
+    pickupStore: r.tiendaRecogida ?? undefined,
+    adminNotes: r.notes,
+    statusHistory: [
+      {
+        status: adminStatus,
+        date: r.createdAt ?? new Date().toISOString(),
+        by: "sistema" as const,
+      },
+    ],
+    nif: r.customerTaxId,
+    // Toda orden cargada de la BD pertenece a la SL anterior — sólo
+    // informativa, no se emiten facturas nuevas sobre ella. Bloqueado en
+    // /admin/pedidos y servicios de invoice. Ver memoria fiscal_carry_over.
+    fiscalCarryOver: true,
+  };
+}
+
+/**
+ * Lee pedidos de la BD vía GET /api/orders (server-mode). Mapea a AdminOrder.
+ * En local-mode devuelve [].
+ *
+ * Usado por /admin/pedidos para que pedidos creados desde otros navegadores
+ * (otros admins, otros dispositivos) lleguen al inbox sin depender de
+ * localStorage del navegador admin actual.
+ */
+export async function fetchAdminOrdersFromBd(): Promise<AdminOrder[]> {
+  if (typeof window === "undefined") return [];
+  const isServerMode = process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
+  if (!isServerMode) return [];
+  try {
+    const res = await fetch("/api/orders", { credentials: "include" });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { ok: boolean; orders?: ApiOrderRecord[] };
+    if (!data.ok || !Array.isArray(data.orders)) return [];
+    return data.orders.map(orderRecordToAdmin).map(normalizeLegacyOrder);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Variante async de readAdminOrdersMerged que ADEMÁS hidrata desde BD en
+ * server-mode. Mantiene el orden recientes-primero. Dedup por id.
+ */
+export async function readAdminOrdersMergedAsync(
+  fallback: AdminOrder[] = [],
+): Promise<AdminOrder[]> {
+  const local = readAdminOrdersMerged(fallback);
+  const bd = await fetchAdminOrdersFromBd();
+  if (bd.length === 0) return local;
+  const seen = new Set(local.map((o) => o.id));
+  const extra = bd.filter((o) => !seen.has(o.id));
+  return [...local, ...extra].sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+export async function replicateOrderUpdateToBd(
+  id: string,
+  fields: {
+    status?: AdminOrderStatus;
+    tracking?: string;
+    note?: string;
+    adminNotes?: string;
+  },
+): Promise<void> {
+  if (typeof window === "undefined") return;
+  const isServerMode = process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
+  if (!isServerMode) return;
+  try {
+    await fetch(`/api/orders/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(fields),
+    });
+  } catch {
+    // localStorage ya está actualizado; un futuro reload reconciliará
   }
 }

@@ -152,12 +152,48 @@ function buildFromHardcoded(setId: string, lang: string): HighlightCard[] {
       id: `${setId}-${num}-${lang}`,
       name: c.name,
       imageUrl: tcgdexImageUrl(tcgLang, dexSet, num),
-      rarity: "Ultra Rare",
-      isHolo: true,
+      // No mentir: la rareza y el flag holo se enriquecen luego desde
+      // pokemontcg.io (Cardmarket). Si no hay datos, queda vacío — antes
+      // se hardcodeaba "Ultra Rare" para CUALQUIER carta, lo que pintaba
+      // común-de-0,25€ como ultra rare (incidente Rattata KR 2026-04-28).
+      rarity: "",
+      isHolo: false,
       game: "pokemon",
       externalId: ptcgId,
     };
   });
+}
+
+/**
+ * Enriquece la lista hardcoded (JP/KO) con rareza+precio reales del cartón EN
+ * equivalente. pokemontcg.io devuelve `rarity` (= rareza Cardmarket) y
+ * `cardmarket.prices.trendPrice`. Una sola llamada por set + match por
+ * externalId. Sin esto la rareza queda vacía pero NUNCA se inventa.
+ */
+async function enrichHardcodedFromPtcg(
+  setId: string,
+  hardcoded: HighlightCard[],
+  errors: string[],
+): Promise<HighlightCard[]> {
+  if (hardcoded.length === 0) return hardcoded;
+  try {
+    const real = await fetchFromPtcg(setId);
+    if (real.length === 0) return hardcoded;
+    const byId = new Map(real.map((c) => [c.externalId, c]));
+    return hardcoded.map((c) => {
+      const r = c.externalId ? byId.get(c.externalId) : undefined;
+      if (!r) return c;
+      return {
+        ...c,
+        rarity: r.rarity || "",
+        isHolo: Boolean(r.rarity),
+        priceEur: r.priceEur,
+      };
+    });
+  } catch (e) {
+    errors.push(`pokemontcg:enrich:${String(e)}`);
+    return hardcoded;
+  }
 }
 
 async function fetchTopCards(
@@ -166,9 +202,8 @@ async function fetchTopCards(
   _product: LocalProduct,
   errors: string[],
 ): Promise<HighlightCard[]> {
-  // Intenta pokemontcg.io primero si tenemos API key (en cliente, asumimos que
-  // la proxy puede tenerla — getJson maneja fallback). Sin key la mayoría de
-  // tiempo da 429, así que usamos hardcoded + TCGDex directamente.
+  // Path A — sets con cartón EN-localizado: pokemontcg.io devuelve directamente
+  // imagen + rareza + precio. Es la fuente de verdad (alimentada por Cardmarket).
   if (hasPokemonTcgKey() && (lang === "EN" || lang === "ES" || lang === "FR" || lang === "DE" || lang === "IT" || lang === "PT")) {
     try {
       const r = await fetchFromPtcg(setId);
@@ -177,8 +212,10 @@ async function fetchTopCards(
       errors.push(`pokemontcg:cards:${String(e)}`);
     }
   }
-  // S5 hardcoded-fallback
-  return buildFromHardcoded(setId, lang);
+  // Path B — JP/KO o sin API key: TCGDex provee la imagen del print localizado
+  // y enriquecemos rareza+precio del cartón EN equivalente (mismo SKU Cardmarket).
+  const hardcoded = buildFromHardcoded(setId, lang);
+  return enrichHardcodedFromPtcg(setId, hardcoded, errors);
 }
 
 export const pokemonAdapter: SetAdapter = {

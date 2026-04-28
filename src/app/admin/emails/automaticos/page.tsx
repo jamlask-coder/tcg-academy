@@ -25,6 +25,8 @@ import {
   isCustomized,
   loadSentEmails,
   openHtmlInNewTab,
+  syncCustomTemplatesToDb,
+  hydrateCustomTemplatesFromDb,
   type SentEmailLog,
 } from "@/services/emailService";
 import { EMAIL_TEMPLATES, type EmailTemplate } from "@/data/emailTemplates";
@@ -76,10 +78,30 @@ interface SenderConfig {
   password: string;
   validated: boolean;
   validatedAt?: string;
+  senderName?: string;
 }
 
+function isServerMode(): boolean {
+  return (
+    typeof process !== "undefined" &&
+    process.env.NEXT_PUBLIC_BACKEND_MODE === "server"
+  );
+}
+
+/**
+ * Carga inicial del remitente.
+ *
+ * - **local-mode**: sigue leyendo `tcgacademy_email_sender` (config decorativa
+ *   del usuario; en local-mode no hay envío real).
+ * - **server-mode**: arranca con defaults y la SSOT real (`/api/admin/settings`
+ *   → senderName/replyToEmail) se hidrata en `useEffect` al montar. NO se
+ *   escribe `localStorage` en server-mode — la verdad vive en BD.
+ */
 function loadSender(): SenderConfig {
   if (typeof window === "undefined") return { email: "", password: "", validated: false };
+  if (isServerMode()) {
+    return { email: SITE_CONFIG.email, password: "", validated: false, senderName: SITE_CONFIG.name };
+  }
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) return JSON.parse(raw);
@@ -88,6 +110,10 @@ function loadSender(): SenderConfig {
 }
 
 function saveSender(config: SenderConfig): void {
+  // En server-mode la verdad vive en `/api/admin/settings`; el caller hace el
+  // PUT y no caemos por aquí. Mantener el guard previene un write huérfano si
+  // algún flujo legacy llamase a saveSender() en server-mode.
+  if (isServerMode()) return;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(config));
 }
 
@@ -168,17 +194,123 @@ export default function AdminEmailsAutomaticosPage() {
 
   const previewVars = useMemo(() => DEFAULT_VARS[selected.id] ?? {}, [selected.id]);
 
+  // En server-mode hidrata localStorage con los overrides guardados en BD para
+  // que el admin vea sus customizaciones aunque cambie de navegador o limpie
+  // storage. Sólo corre una vez al montar.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      await hydrateCustomTemplatesFromDb();
+      if (cancelled) return;
+      const fresh = getEffectiveTemplates();
+      setAllTemplates(fresh);
+      // Re-aplica el seleccionado por id por si la versión BD difiere.
+      setSelected((current) => fresh.find((t) => t.id === current.id) ?? fresh[0]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Sender config
   const [sender, setSender] = useState<SenderConfig>(() => loadSender());
   const [senderEmail, setSenderEmail] = useState(sender.email);
   const [senderPassword, setSenderPassword] = useState(sender.password);
+  const [senderName, setSenderName] = useState(sender.senderName ?? SITE_CONFIG.name);
   const [validating, setValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<"ok" | "error" | null>(null);
+  const serverMode = isServerMode();
 
-  // Log
+  // En server-mode, la SSOT real de remitente vive en BD vía /api/admin/settings.
+  // Hidratamos al montar: replyToEmail → email field; senderName → display name.
+  // El password no aplica (Resend usa RESEND_API_KEY env), por eso queda vacío
+  // y la pestaña muestra un banner explicativo.
+  useEffect(() => {
+    if (!serverMode) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/admin/settings", { credentials: "include" });
+        if (!r.ok) return;
+        const data = (await r.json()) as {
+          settings?: {
+            notificationEmail?: string;
+            senderName?: string;
+            replyToEmail?: string;
+          };
+        };
+        if (cancelled || !data.settings) return;
+        const replyTo = data.settings.replyToEmail ?? SITE_CONFIG.email;
+        const name = data.settings.senderName ?? SITE_CONFIG.name;
+        setSenderEmail(replyTo);
+        setSenderName(name);
+        setSender({ email: replyTo, password: "", validated: true, senderName: name });
+      } catch {
+        /* fallback: defaults ya cargados */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [serverMode]);
+
+  // Log: en server-mode tira de /api/admin/email-logs (BD) y mergea con
+  // el cache local (legacy). En local-mode solo localStorage.
   const [sentLog, setSentLog] = useState<SentEmailLog[]>([]);
   useEffect(() => {
-    setSentLog(loadSentEmails());
+    let cancelled = false;
+    const local = loadSentEmails();
+    setSentLog(local);
+    const isServer =
+      typeof process !== "undefined" &&
+      process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
+    if (!isServer) return;
+    (async () => {
+      try {
+        const r = await fetch("/api/admin/email-logs?limit=200", {
+          credentials: "include",
+        });
+        if (!r.ok) return;
+        const data = (await r.json()) as {
+          logs?: Array<{
+            id?: string;
+            toEmail: string;
+            toName?: string;
+            subject: string;
+            templateId?: string;
+            providerId?: string;
+            status: string;
+            createdAt?: string;
+          }>;
+        };
+        if (cancelled || !data.logs) return;
+        // Mapeo BD → SentEmailLog (shape del cliente).
+        // Usamos providerId como id estable (es el emailId que generamos al enviar);
+        // así cuadra con los ids guardados en localStorage por logSentEmail.
+        const fromDb: SentEmailLog[] = data.logs.map((r) => ({
+          id: r.providerId ?? r.id ?? `db-${r.createdAt ?? Date.now()}`,
+          to: r.toEmail,
+          toName: r.toName ?? "",
+          subject: r.subject,
+          templateId: r.templateId ?? "",
+          sentAt: r.createdAt ?? new Date().toISOString(),
+          preview: r.subject,
+        }));
+        // Dedupe por id, BD primero (autoritativa).
+        const seen = new Set<string>();
+        const merged = [...fromDb, ...local].filter((e) => {
+          if (seen.has(e.id)) return false;
+          seen.add(e.id);
+          return true;
+        });
+        if (!cancelled) setSentLog(merged);
+      } catch {
+        // Silent — usamos lo que ya tenemos (local).
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [tab]);
 
   // ── Send-all (test) ────────────────────────────────────────────────────
@@ -250,6 +382,9 @@ export default function AdminEmailsAutomaticosPage() {
     setIsDirty(false);
     setSaveMsg("Plantilla guardada");
     setTimeout(() => setSaveMsg(null), 3000);
+    // Persiste a BD para que los envíos del server (cron/webhook/API) usen
+    // la versión customizada en server-mode. Fire-and-forget.
+    void syncCustomTemplatesToDb();
   };
 
   const handleReset = () => {
@@ -262,6 +397,7 @@ export default function AdminEmailsAutomaticosPage() {
     setEditHtml(original.html);
     setIsDirty(false);
     setEditorResetCount((n) => n + 1);
+    void syncCustomTemplatesToDb();
     setSaveMsg("Plantilla restablecida");
     setTimeout(() => setSaveMsg(null), 3000);
   };
@@ -272,20 +408,66 @@ export default function AdminEmailsAutomaticosPage() {
   };
 
   const handleValidateSender = async () => {
-    if (!senderEmail || !senderPassword) return;
+    if (!senderEmail) return;
     setValidating(true);
     setValidationResult(null);
 
-    // Simulate SMTP validation (in production: POST /api/admin/validate-email)
-    await new Promise((r) => setTimeout(r, 1500));
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(senderEmail) || senderPassword.length < 4) {
+    if (!emailRegex.test(senderEmail)) {
       setValidationResult("error");
       setValidating(false);
       return;
     }
 
+    // Server-mode: persiste a BD vía /api/admin/settings (SSOT real). El email
+    // se guarda como replyToEmail (el FROM lo fija RESEND_FROM_EMAIL en env).
+    if (serverMode) {
+      try {
+        const r = await fetch("/api/admin/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            replyToEmail: senderEmail,
+            senderName: senderName || SITE_CONFIG.name,
+          }),
+        });
+        if (!r.ok) {
+          setValidationResult("error");
+          setValidating(false);
+          return;
+        }
+        const config: SenderConfig = {
+          email: senderEmail,
+          password: "",
+          validated: true,
+          validatedAt: new Date().toISOString(),
+          senderName: senderName || SITE_CONFIG.name,
+        };
+        setSender(config);
+        setValidationResult("ok");
+        setValidating(false);
+        setSaveMsg("Reply-To y nombre guardados en BD");
+        setTimeout(() => setSaveMsg(null), 3000);
+      } catch {
+        setValidationResult("error");
+        setValidating(false);
+      }
+      return;
+    }
+
+    // Local-mode: comportamiento previo (validación local + localStorage).
+    if (!senderPassword) {
+      setValidating(false);
+      return;
+    }
+    // Simulate SMTP validation (local-mode demo)
+    await new Promise((r) => setTimeout(r, 1500));
+    if (senderPassword.length < 4) {
+      setValidationResult("error");
+      setValidating(false);
+      return;
+    }
     const config: SenderConfig = {
       email: senderEmail,
       password: senderPassword,
@@ -603,12 +785,40 @@ export default function AdminEmailsAutomaticosPage() {
                   <Lock size={18} className="text-[#2563eb]" /> Configurar remitente
                 </h3>
                 <p className="mb-5 text-sm text-gray-500">
-                  Introduce el correo y la contraseña de aplicación desde el que se enviarán los emails. Se validará que los datos son correctos.
+                  {serverMode
+                    ? "El FROM lo fija Resend (RESEND_FROM_EMAIL en variables de entorno). Aquí editas el nombre del remitente y el Reply-To que verán los clientes."
+                    : "Introduce el correo y la contraseña de aplicación desde el que se enviarán los emails. Se validará que los datos son correctos."}
                 </p>
 
+                {serverMode && (
+                  <div className="mb-5 flex items-start gap-2 rounded-xl bg-blue-50 px-4 py-3 text-xs text-blue-800">
+                    <AlertTriangle size={14} className="mt-0.5 flex-shrink-0 text-blue-500" />
+                    <span>
+                      Modo servidor activo. Los cambios se guardan en la base de datos (<code className="rounded bg-white px-1 py-0.5 font-mono text-[10px]">/api/admin/settings</code>) y los aplica inmediatamente el envío real vía Resend.
+                    </span>
+                  </div>
+                )}
+
                 <div className="space-y-4">
+                  {serverMode && (
+                    <div>
+                      <label className="mb-1.5 block text-xs font-bold text-gray-600 uppercase tracking-wide">Nombre del remitente</label>
+                      <input
+                        type="text"
+                        value={senderName}
+                        onChange={(e) => { setSenderName(e.target.value); setValidationResult(null); }}
+                        placeholder={SITE_CONFIG.name}
+                        className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
+                      />
+                      <p className="mt-1.5 text-[11px] text-gray-400">
+                        Es el nombre visible del remitente en la bandeja de los clientes.
+                      </p>
+                    </div>
+                  )}
                   <div>
-                    <label className="mb-1.5 block text-xs font-bold text-gray-600 uppercase tracking-wide">Correo electrónico</label>
+                    <label className="mb-1.5 block text-xs font-bold text-gray-600 uppercase tracking-wide">
+                      {serverMode ? "Reply-To (correo de respuesta)" : "Correo electrónico"}
+                    </label>
                     <input
                       type="email"
                       value={senderEmail}
@@ -616,7 +826,13 @@ export default function AdminEmailsAutomaticosPage() {
                       placeholder={SITE_CONFIG.email}
                       className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-[#2563eb] focus:outline-none"
                     />
+                    {serverMode && (
+                      <p className="mt-1.5 text-[11px] text-gray-400">
+                        Cuando un cliente responda al email, llegará a esta dirección.
+                      </p>
+                    )}
                   </div>
+                  {!serverMode && (
                   <div>
                     <label className="mb-1.5 block text-xs font-bold text-gray-600 uppercase tracking-wide">Contraseña o clave de aplicación</label>
                     <input
@@ -630,6 +846,7 @@ export default function AdminEmailsAutomaticosPage() {
                       Para Gmail: usa una &quot;contraseña de aplicación&quot; (no tu contraseña normal). Para otros proveedores: usa la contraseña SMTP.
                     </p>
                   </div>
+                  )}
 
                   {validationResult === "error" && (
                     <div className="flex items-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -647,13 +864,17 @@ export default function AdminEmailsAutomaticosPage() {
 
                   <button
                     onClick={handleValidateSender}
-                    disabled={validating || !senderEmail || !senderPassword}
+                    disabled={
+                      validating ||
+                      !senderEmail ||
+                      (!serverMode && !senderPassword)
+                    }
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-50"
                   >
                     {validating ? (
-                      <><Loader2 size={16} className="animate-spin" /> Validando conexión...</>
+                      <><Loader2 size={16} className="animate-spin" /> {serverMode ? "Guardando..." : "Validando conexión..."}</>
                     ) : (
-                      <><Mail size={16} /> Verificar y guardar</>
+                      <><Mail size={16} /> {serverMode ? "Guardar cambios" : "Verificar y guardar"}</>
                     )}
                   </button>
                 </div>

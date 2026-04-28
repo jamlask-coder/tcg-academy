@@ -11,9 +11,10 @@
  * la entrada genérica.
  */
 
-import { COMPETITOR_STORES, type CompetitorStoreConfig } from "@/config/competitorStores";
+import { COMPETITOR_STORES, getCompetitorStore, type CompetitorStoreConfig } from "@/config/competitorStores";
 import type { StoreAdapter } from "./types";
 import { genericSearch } from "./genericAdapter";
+import { buildCardmarketAdapter } from "./cardmarketAdapter";
 
 function buildAdapterForStore(store: CompetitorStoreConfig): StoreAdapter {
   return {
@@ -22,8 +23,15 @@ function buildAdapterForStore(store: CompetitorStoreConfig): StoreAdapter {
   };
 }
 
-/** Overrides por tienda cuando el adapter genérico no basta. */
-const CUSTOM_ADAPTERS: Record<string, StoreAdapter> = {};
+/** Overrides por tienda cuando el adapter genérico no basta.
+ *  - cardmarket: agregador con SERP propia + precio "From X,XX €" en detalle
+ *    (≈ vendedor profesional para sellados). Requiere parser específico. */
+const cardmarketStore = getCompetitorStore("cardmarket");
+const CUSTOM_ADAPTERS: Record<string, StoreAdapter> = {
+  ...(cardmarketStore
+    ? { cardmarket: buildCardmarketAdapter(cardmarketStore.searchUrl) }
+    : {}),
+};
 
 export const ADAPTERS: Record<string, StoreAdapter> = Object.fromEntries(
   COMPETITOR_STORES.map((s) => [s.id, CUSTOM_ADAPTERS[s.id] ?? buildAdapterForStore(s)]),

@@ -31,32 +31,57 @@ export default function AdminUsuariosPage() {
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
   const [sortByRecent, setSortByRecent] = useState(true);
 
-  const refreshUsers = () => {
+  const refreshUsers = async () => {
     try {
-      // ── Leer usuarios registrados (seed + real) ──
-      const stored = localStorage.getItem("tcgacademy_registered");
-      const registered = stored
-        ? (JSON.parse(stored) as Record<string, { password: string; user: User }>)
-        : {};
-      const mockEmails = new Set(MOCK_USERS.map((u) => u.email.toLowerCase()));
-      const newUsers: AdminUser[] = Object.values(registered)
-        .filter((entry) => !mockEmails.has(entry.user.email.toLowerCase()))
-        .map((entry) => ({
-          id: entry.user.id,
-          username: entry.user.username,
-          name: entry.user.name,
-          lastName: entry.user.lastName,
-          email: entry.user.email,
-          role: entry.user.role as AdminUser["role"],
-          registeredAt: entry.user.createdAt.slice(0, 10),
-          totalOrders: 0,
-          totalSpent: 0,
-          points: 0,
-          active: true,
-          phone: entry.user.phone,
-        }));
+      const isServerMode =
+        typeof process !== "undefined" &&
+        process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
 
-      // ── Cruzar pedidos reales con usuarios para recalcular stats ──
+      let newUsers: AdminUser[] = [];
+
+      if (isServerMode) {
+        // En server-mode el SSOT es Supabase — leemos vía API protegida.
+        // requireAdmin en el endpoint ya garantiza que sólo admins reales
+        // ven la lista, sin importar el navegador desde el que entren.
+        const res = await fetch("/api/admin/users?limit=5000", {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { ok: boolean; users: AdminUser[] };
+          const mockEmails = new Set(MOCK_USERS.map((u) => u.email.toLowerCase()));
+          // Filtramos los seed mock para no duplicar — la BD es la verdad.
+          newUsers = (data.users ?? []).filter(
+            (u) => !mockEmails.has(u.email.toLowerCase()),
+          );
+        }
+      } else {
+        // Modo local — preservamos el comportamiento histórico para dev.
+        const stored = localStorage.getItem("tcgacademy_registered");
+        const registered = stored
+          ? (JSON.parse(stored) as Record<string, { password: string; user: User }>)
+          : {};
+        const mockEmails = new Set(MOCK_USERS.map((u) => u.email.toLowerCase()));
+        newUsers = Object.values(registered)
+          .filter((entry) => !mockEmails.has(entry.user.email.toLowerCase()))
+          .map((entry) => ({
+            id: entry.user.id,
+            username: entry.user.username,
+            name: entry.user.name,
+            lastName: entry.user.lastName,
+            email: entry.user.email,
+            role: entry.user.role as AdminUser["role"],
+            registeredAt: entry.user.createdAt.slice(0, 10),
+            totalOrders: 0,
+            totalSpent: 0,
+            points: 0,
+            active: true,
+            phone: entry.user.phone,
+          }));
+      }
+
+      // ── Cruzar pedidos con usuarios para recalcular stats (idéntico en
+      //    ambos modos — los pedidos siguen viniendo de readAdminOrdersMerged
+      //    que ya hace su propia hidratación) ──
       const merged = readAdminOrdersMerged(ADMIN_ORDERS);
       const statsByKey = new Map<string, { orders: number; spent: number }>();
       for (const o of merged) {
@@ -86,12 +111,14 @@ export default function AdminUsuariosPage() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    refreshUsers();
-    const onUpdate = () => refreshUsers();
+    void refreshUsers();
+    const onUpdate = () => void refreshUsers();
     window.addEventListener("tcga:orders:updated", onUpdate);
+    window.addEventListener("tcga:users:updated", onUpdate);
     window.addEventListener("storage", onUpdate);
     return () => {
       window.removeEventListener("tcga:orders:updated", onUpdate);
+      window.removeEventListener("tcga:users:updated", onUpdate);
       window.removeEventListener("storage", onUpdate);
     };
   }, []);

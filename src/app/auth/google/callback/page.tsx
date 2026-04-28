@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth, type GoogleSignInPayload } from "@/context/AuthContext";
@@ -34,12 +34,29 @@ function decodeJwt(token: string): GoogleIdTokenClaims | null {
 }
 
 export default function GoogleCallbackPage() {
-  const { loginWithGoogle } = useAuth();
+  const { loginWithGoogle, user } = useAuth();
   const router = useRouter();
   const [error, setError] = useState<string>("");
+  // Guard contra doble-ejecución (React StrictMode dev + posible re-render).
+  // Sin esto, el segundo mount no encuentra el nonce (lo borró el primero) y
+  // muestra "Verificación de seguridad fallida" aunque el login fue OK.
+  const ranRef = useRef(false);
 
   useEffect(() => {
+    if (ranRef.current) return;
+    ranRef.current = true;
+
     const run = async () => {
+      // Si ya hay sesión activa y aterrizamos aquí (p.ej. reload de la
+      // callback), no reproceses el hash — solo redirige limpiamente.
+      if (user) {
+        const target = sessionStorage.getItem(REDIRECT_KEY) ?? "/cuenta";
+        sessionStorage.removeItem(REDIRECT_KEY);
+        const finalRedirect = user.role === "admin" ? "/admin" : target;
+        router.replace(finalRedirect);
+        return;
+      }
+
       const hash = window.location.hash.replace(/^#/, "");
       const params = new URLSearchParams(hash);
       const idToken = params.get("id_token");
@@ -61,13 +78,16 @@ export default function GoogleCallbackPage() {
         return;
       }
 
-      // Verify nonce matches the one we stored before redirecting
+      // Verify nonce matches the one we stored before redirecting.
+      // Solo lo borramos si vamos a procesarlo (no antes), para que un
+      // segundo mount accidental encuentre o el nonce intacto o la sesión
+      // ya creada (caso `user` arriba).
       const expectedNonce = sessionStorage.getItem(NONCE_KEY);
-      sessionStorage.removeItem(NONCE_KEY);
       if (!expectedNonce || claims.nonce !== expectedNonce) {
         setError("Verificación de seguridad fallida. Vuelve a intentarlo.");
         return;
       }
+      sessionStorage.removeItem(NONCE_KEY);
 
       // Verify audience = our client ID
       if (claims.aud !== process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
@@ -102,6 +122,14 @@ export default function GoogleCallbackPage() {
         setError(result.error ?? "Error al iniciar sesión con Google");
         return;
       }
+
+      // Limpia el id_token del hash de la URL para que un F5 posterior no
+      // intente reprocesar el token (ya consumido). replaceState evita
+      // navegación adicional. NO se ve en el historial.
+      try {
+        window.history.replaceState(null, "", window.location.pathname);
+      } catch { /* non-critical */ }
+
       // Role-aware redirect: si el usuario recién logueado es admin, lo
       // mandamos a /admin. Si no, al destino guardado antes del OAuth (o a
       // /cuenta por defecto). El gate fiscal (NIF + dirección) se aplica
@@ -120,7 +148,7 @@ export default function GoogleCallbackPage() {
       router.replace(finalRedirect);
     };
     void run();
-  }, [loginWithGoogle, router]);
+  }, [loginWithGoogle, router, user]);
 
   return (
     <div className="flex items-center justify-center bg-gray-50 px-4 py-16 sm:py-24">

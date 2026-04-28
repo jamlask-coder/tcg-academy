@@ -253,9 +253,13 @@ export const orderStatusValues = [
 ] as const;
 
 export const orderPatchSchema = z.object({
-  status: z.enum(orderStatusValues),
+  // status es opcional para soportar updates de "solo notas" sin cambiar estado.
+  // El endpoint exige que al menos uno de los campos esté presente.
+  status: z.enum(orderStatusValues).optional(),
   tracking: z.string().max(120).optional(),
   note: z.string().max(1000).optional(),
+  // Notas internas del admin (no visibles al cliente).
+  adminNotes: z.string().max(2000).optional(),
 });
 
 // ─── Payments ────────────────────────────────────────────────────────────

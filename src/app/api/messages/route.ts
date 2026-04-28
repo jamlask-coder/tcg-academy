@@ -50,6 +50,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "subject y body requeridos" }, { status: 400 });
     }
     // Nunca confiar en fromUserId del cliente — usar auth.id.
+    // Solo admin puede emitir broadcasts (is_broadcast / broadcast_id).
+    const isAdmin = auth.role === "admin";
     const msg = await getDb().sendMessage({
       fromUserId: auth.id,
       toUserId: body.toUserId ?? "admin",
@@ -57,6 +59,8 @@ export async function POST(req: NextRequest) {
       subject: body.subject,
       body: body.body,
       parentId: body.parentId,
+      isBroadcast: isAdmin ? Boolean(body.isBroadcast) : false,
+      broadcastId: isAdmin ? body.broadcastId : undefined,
     });
     return NextResponse.json({ message: msg });
   } catch (err) {

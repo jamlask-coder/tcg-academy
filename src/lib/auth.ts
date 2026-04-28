@@ -42,7 +42,60 @@ export async function verifyPassword(
   password: string,
   hash: string,
 ): Promise<boolean> {
+  // Legacy WordPress 6.8+: hashes con prefijo "$wp$" requieren pre-hash con
+  // HMAC-SHA384 antes del compare bcrypt. Detectamos por prefijo y delegamos.
+  // Tras un login válido el caller debe RE-HASHEAR con `hashPassword(password)`
+  // y persistir el nuevo hash para retirar progresivamente el formato legacy.
+  if (hash.startsWith("$wp$")) {
+    return verifyLegacyWpPassword(password, hash);
+  }
   return bcrypt.compare(password, hash);
+}
+
+/**
+ * Verifica contraseña contra hash legacy WordPress 6.8 (formato `$wp$2y$10$...`).
+ *
+ * Algoritmo según `WP_Password::check()` de WordPress core:
+ *   1. pre = base64(HMAC-SHA384(password, "wp-sha384"))
+ *   2. bcryptCompare(pre, hash.substring(3))   ← strip "$wp"
+ *
+ * Llamado SÓLO desde `verifyPassword` cuando detecta el prefijo.
+ * Necesario para que los 33 usuarios migrados desde la web WP previa puedan
+ * hacer login con su contraseña actual sin tener que solicitarla de nuevo.
+ */
+async function verifyLegacyWpPassword(
+  password: string,
+  wpHash: string,
+): Promise<boolean> {
+  if (!wpHash.startsWith("$wp$")) return false;
+  const bcryptPart = wpHash.substring(3); // queda "$2y$10$..."
+  // Edge runtime no expone `crypto.createHmac` de Node, pero sí Web Crypto
+  // (`crypto.subtle.importKey` + `sign`). Usamos Web Crypto para que sea
+  // isomórfico (Edge / Node).
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode("wp-sha384"),
+    { name: "HMAC", hash: "SHA-384" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(password));
+  // Base64 de los 48 bytes del HMAC-SHA384 → 64 chars (cabe en bcrypt 72-byte).
+  const preHashed = bufferToBase64(new Uint8Array(sig));
+  return bcrypt.compare(preHashed, bcryptPart);
+}
+
+function bufferToBase64(buf: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i]);
+  // Edge + Node 18 ambos exponen `btoa` global.
+  return btoa(binary);
+}
+
+/** True si el hash es del formato legacy WP — el caller debería re-hashear. */
+export function isLegacyWpHash(hash: string): boolean {
+  return hash.startsWith("$wp$");
 }
 
 // Dummy hash precomputado lazy para evitar timing attacks. Cuando el login

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -36,6 +36,7 @@ import {
   getOrderPaymentStatus,
   setOrderPaymentStatus,
   isDeferredPayment,
+  replicateOrderUpdateToBd,
 } from "@/lib/orderAdapter";
 import { regenerateInvoiceForOrder } from "@/lib/invoiceRecovery";
 import { getMessagesForOrder } from "@/services/messageService";
@@ -84,6 +85,13 @@ function loadOrder(id: string): AdminOrder | null {
   }
 }
 
+function isServerMode(): boolean {
+  return (
+    typeof process !== "undefined" &&
+    process.env.NEXT_PUBLIC_BACKEND_MODE === "server"
+  );
+}
+
 function loadEmailLog(orderId: string): EmailLogEntry[] {
   try {
     const raw = localStorage.getItem("tcgacademy_email_log");
@@ -91,6 +99,46 @@ function loadEmailLog(orderId: string): EmailLogEntry[] {
     const all = JSON.parse(raw) as EmailLogEntry[];
     return all
       .filter((e) => e.orderId === orderId)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * En server-mode, los envíos reales se registran en BD vía `logSentEmail`
+ * (tabla `email_log`). Filtramos por destinatario y por subject que contenga
+ * el id del pedido — el schema de `email_log` no tiene columna `order_id`,
+ * pero todos los emails de pedido incluyen el id en el asunto.
+ *
+ * Devuelve [] si la fetch falla; el caller cae al cache de localStorage.
+ */
+async function loadEmailLogFromBd(
+  orderId: string,
+  userEmail: string,
+): Promise<EmailLogEntry[]> {
+  try {
+    const url = `/api/admin/email-logs?toEmail=${encodeURIComponent(userEmail)}&limit=200`;
+    const r = await fetch(url, { credentials: "include" });
+    if (!r.ok) return [];
+    const data = (await r.json()) as {
+      logs?: Array<{
+        toEmail: string;
+        subject: string;
+        status: string;
+        createdAt?: string;
+      }>;
+    };
+    if (!data.logs) return [];
+    return data.logs
+      .filter((row) => row.subject?.includes(orderId))
+      .map<EmailLogEntry>((row) => ({
+        date: row.createdAt ?? new Date().toISOString(),
+        to: row.toEmail,
+        subject: row.subject,
+        status: row.status ?? "enviado",
+        orderId,
+      }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   } catch {
     return [];
@@ -374,12 +422,40 @@ export default function PedidoDetailClient() {
     if (!o) { router.replace("/admin/pedidos"); return; }
     setOrder(o);
     setNotes(o.adminNotes ?? "");
-    ensureOrderEmails(o);
+    // En server-mode el cache localStorage es secundario: la SSOT son los
+    // logs reales de `logSentEmail` en BD. Evitamos fabricar entradas
+    // sintéticas (lo que hacía `ensureOrderEmails`) porque sobreescribirían
+    // visualmente lo que viene de Resend.
+    if (!isServerMode()) ensureOrderEmails(o);
     const ps = getOrderPaymentStatus(o.id);
     setPaymentStatus(ps === "cobrado" ? "cobrado" : "pendiente");
   }, [orderId, router]);
 
-  const emailLog = useMemo(() => order ? loadEmailLog(order.id) : [], [order]);
+  // emailLog: en server-mode tiramos de /api/admin/email-logs (BD) y
+  // mergeamos con el cache local. En local-mode solo localStorage.
+  const [emailLog, setEmailLog] = useState<EmailLogEntry[]>([]);
+  useEffect(() => {
+    if (!order) { setEmailLog([]); return; }
+    const local = loadEmailLog(order.id);
+    setEmailLog(local);
+    if (!isServerMode()) return;
+    let cancelled = false;
+    (async () => {
+      const fromBd = await loadEmailLogFromBd(order.id, order.userEmail);
+      if (cancelled || fromBd.length === 0) return;
+      // Dedupe por (date+subject) — el cache local puede tener entradas
+      // antiguas sintéticas; las de BD son autoritativas.
+      const seen = new Set(fromBd.map((e) => `${e.date}|${e.subject}`));
+      const merged = [
+        ...fromBd,
+        ...local.filter((e) => !seen.has(`${e.date}|${e.subject}`)),
+      ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      setEmailLog(merged);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [order]);
   const [messages, setMessages] = useState<AppMessage[]>([]);
   useEffect(() => {
     if (!order) { setMessages([]); return; }
@@ -395,6 +471,15 @@ export default function PedidoDetailClient() {
 
   const handleMarkPaid = useCallback(async () => {
     if (!order) return;
+    // Pedidos importados de la SL anterior: solo informativos. Bloqueamos
+    // confirmar cobro porque arrastraría una emisión de factura indebida
+    // (la factura de ese pedido pertenece a la sociedad previa).
+    if (order.fiscalCarryOver) {
+      showToast(
+        "Pedido histórico (SL anterior) — no se confirman cobros ni se emiten facturas desde aquí.",
+      );
+      return;
+    }
     const next = paymentStatus === "cobrado" ? "pendiente" : "cobrado";
     setPaymentStatus(next);
     setOrderPaymentStatus(order.id, next);
@@ -450,6 +535,15 @@ export default function PedidoDetailClient() {
       setOrder(updatedOrder);
       DataHub.emit("orders");
 
+      // Server-mode: replicar cambio a la BD vía PATCH /api/orders/[id].
+      // Helper centralizado en orderAdapter — evita duplicar el fetch+headers
+      // en cada call site.
+      await replicateOrderUpdateToBd(order.id, {
+        status: next,
+        ...(next === "enviado" && tracking ? { tracking } : {}),
+        ...(historyNote ? { note: historyNote } : {}),
+      });
+
       // Email "Pedido enviado" al comprador con tracking + carrier
       if (next === "enviado" && tracking) {
         const effectiveTracking = tracking;
@@ -499,6 +593,9 @@ export default function PedidoDetailClient() {
       setNotesSaved(true);
       setTimeout(() => setNotesSaved(false), 2000);
     } catch { /* ignore */ }
+
+    // Server-mode: replicar adminNotes a BD vía helper centralizado.
+    void replicateOrderUpdateToBd(order.id, { adminNotes: notes });
   }, [order, notes]);
 
   const isPaid = !isManualPayment(order?.paymentMethod ?? "") || paymentStatus === "cobrado";
@@ -622,7 +719,7 @@ export default function PedidoDetailClient() {
             <Truck size={14} /> Seguimiento GLS
           </a>
         )}
-        {isManualPayment(order.paymentMethod) && (
+        {isManualPayment(order.paymentMethod) && !order.fiscalCarryOver && (
           <button
             onClick={handleMarkPaid}
             className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition ${
@@ -634,6 +731,14 @@ export default function PedidoDetailClient() {
             {paymentStatus === "cobrado" ? <CheckCircle2 size={14} /> : <Clock size={14} />}
             {paymentStatus === "cobrado" ? "Pago cobrado" : "Marcar como cobrado"}
           </button>
+        )}
+        {order.fiscalCarryOver && (
+          <span
+            className="flex items-center gap-1.5 rounded-xl bg-gray-100 px-3 py-2 text-xs font-bold text-gray-600"
+            title="Pedido importado de la SL anterior — solo informativo. La factura pertenece a la sociedad previa; no se emite nueva factura desde aquí."
+          >
+            <FileText size={14} /> Histórico SL anterior · solo informativo
+          </span>
         )}
       </div>
 
@@ -988,16 +1093,7 @@ export default function PedidoDetailClient() {
               <div className="mt-3 border-t border-gray-100 pt-3">
                 <div className="space-y-0">
                   <InfoRow label="Dirección" value={order.address} />
-                  <InfoRow label="Teléfono" value={
-                    // Phone from shipping address if available, otherwise placeholder from order data
-                    (() => {
-                      try {
-                        const orders = JSON.parse(localStorage.getItem("tcgacademy_orders") ?? "[]");
-                        const clientOrder = orders.find((o: { id: string }) => o.id === order.id);
-                        return clientOrder?.shippingAddress?.telefono ?? "No disponible";
-                      } catch { return "No disponible"; }
-                    })()
-                  } />
+                  <InfoRow label="Teléfono" value={order.userPhone ?? "No disponible"} />
                   {order.pickupStore && <InfoRow label="Recogida" value={order.pickupStore} />}
                   {order.trackingNumber && (
                     <InfoRow label="Tracking" value={

@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { requireAdmin, assertSameOrigin } from "@/lib/apiAuth";
 import { logger } from "@/lib/logger";
-import { renderEmailTemplate } from "@/services/emailService";
+import { renderEmailTemplateAsync } from "@/services/emailService";
 import { EMAIL_TEMPLATES } from "@/data/emailTemplates";
 import { getPreviewVarsFor } from "@/data/emailPreviewVars";
 
@@ -188,13 +188,15 @@ export async function POST(req: NextRequest) {
   // Códigos que indican error de configuración (no transitorio): si el
   // primer intento falla con uno de éstos, abortamos. No tiene sentido
   // hacer 23 envíos más con la misma key/dominio mal configurados.
-  const ABORT_STATUSES = new Set([401, 403, 404]);
+  // 400 incluido porque Resend lo usa para "validation_error: API key is invalid"
+  // y para dominios From sin verificar — son fallos persistentes, no transitorios.
+  const ABORT_STATUSES = new Set([400, 401, 403, 404]);
   let aborted = false;
 
   for (let i = 0; i < EMAIL_TEMPLATES.length; i++) {
     const tpl = EMAIL_TEMPLATES[i];
     const vars = getPreviewVarsFor(tpl.id, tpl.variables);
-    const rendered = renderEmailTemplate(tpl.id, vars);
+    const rendered = await renderEmailTemplateAsync(tpl.id, vars);
     if (!rendered) {
       results.push({
         templateId: tpl.id,

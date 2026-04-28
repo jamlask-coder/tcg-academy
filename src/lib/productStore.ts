@@ -108,6 +108,11 @@ export function isLocalProduct(id: number): boolean {
  * Soft-delete canónico de un producto (cualquier origen: estático o admin).
  * Marca el id como borrado y emite el evento DataHub correspondiente para
  * que el catálogo, carrito y wishlists se actualicen.
+ *
+ * En server-mode replica el borrado a BD vía DELETE /api/admin/products/[id]
+ * (fire-and-forget) para que otros admins/dispositivos también lo vean. La
+ * lista local sigue actualizándose como cache optimista para que la UI no
+ * parpadee.
  */
 export function softDeleteProduct(id: number): void {
   if (typeof window === "undefined") return;
@@ -120,6 +125,18 @@ export function softDeleteProduct(id: number): void {
     }
   } catch {
     /* ignore */
+  }
+
+  const isServerMode =
+    typeof process !== "undefined" &&
+    process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
+  if (isServerMode) {
+    void fetch(`/api/admin/products/${encodeURIComponent(String(id))}`, {
+      method: "DELETE",
+      credentials: "include",
+    }).catch(() => {
+      // optimista: la lista local ya está actualizada, un reload reconciliará
+    });
   }
 }
 

@@ -32,8 +32,10 @@ import type { NormalizedName } from "@/lib/competitors/nameNormalize";
 
 /** Umbral mínimo del score combinado para aceptar el match. */
 const MATCH_THRESHOLD = 0.5;
-/** Límite de imágenes remotas a descargar por búsqueda (protección). */
-const MAX_IMAGES_PER_SEARCH = 8;
+/** Límite de imágenes remotas a descargar por búsqueda (protección).
+ *  Subido de 8 → 10 porque el scoring ahora prioriza imagen y un dHash
+ *  de más candidatos compensa cuando el primero no es el correcto. */
+const MAX_IMAGES_PER_SEARCH = 10;
 
 export async function genericSearch(
   store: CompetitorStoreConfig,

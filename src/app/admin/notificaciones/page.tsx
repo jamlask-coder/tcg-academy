@@ -127,7 +127,53 @@ interface RegisteredUser {
 
 // ─── Build notifications from live data ───────────────────────────────────────
 
-function buildAdminNotifications(): AdminNotification[] {
+async function fetchRecentRegisteredUsers(): Promise<
+  { id: string; name: string; lastName: string; email: string; createdAt: string }[]
+> {
+  const isServerMode =
+    typeof process !== "undefined" &&
+    process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
+
+  if (isServerMode) {
+    try {
+      const res = await fetch("/api/admin/users?limit=200", {
+        credentials: "include",
+      });
+      if (!res.ok) return [];
+      const data = (await res.json()) as {
+        ok: boolean;
+        users: { id: string; name: string; lastName: string; email: string; registeredAt: string }[];
+      };
+      return (data.users ?? []).map((u) => ({
+        id: u.id,
+        name: u.name,
+        lastName: u.lastName,
+        email: u.email,
+        createdAt: u.registeredAt,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  // Local-mode dev fallback
+  try {
+    const raw = localStorage.getItem("tcgacademy_registered");
+    if (!raw) return [];
+    const registered: Record<string, RegisteredUser> = JSON.parse(raw);
+    return Object.values(registered).map((e) => ({
+      id: e.user.id,
+      name: e.user.name,
+      lastName: e.user.lastName,
+      email: e.user.email,
+      createdAt: e.user.createdAt,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function buildAdminNotifications(): Promise<AdminNotification[]> {
   const notifs: AdminNotification[] = [];
 
   // 1. Pedidos pendientes de envío (acción del cliente, no del admin)
@@ -235,25 +281,22 @@ function buildAdminNotifications(): AdminNotification[] {
 
   // 5. Registros recientes (últimos 7 días)
   try {
-    const raw = localStorage.getItem("tcgacademy_registered");
-    if (raw) {
-      const registered: Record<string, RegisteredUser> = JSON.parse(raw);
-      const sevenDaysAgo = Date.now() - 7 * 86400000;
-      Object.values(registered).forEach((entry) => {
-        const created = new Date(entry.user.createdAt).getTime();
-        if (created > sevenDaysAgo) {
-          notifs.push({
-            id: `registro-${entry.user.id}`,
-            type: "registro_nuevo",
-            title: "Nuevo registro de usuario",
-            message: `${entry.user.name} ${entry.user.lastName} (${entry.user.email})`,
-            date: entry.user.createdAt,
-            link: "/admin/usuarios",
-            sourceId: entry.user.id,
-          });
-        }
-      });
-    }
+    const recentUsers = await fetchRecentRegisteredUsers();
+    const sevenDaysAgo = Date.now() - 7 * 86400000;
+    recentUsers.forEach((u) => {
+      const created = new Date(u.createdAt).getTime();
+      if (Number.isFinite(created) && created > sevenDaysAgo) {
+        notifs.push({
+          id: `registro-${u.id}`,
+          type: "registro_nuevo",
+          title: "Nuevo registro de usuario",
+          message: `${u.name} ${u.lastName} (${u.email})`,
+          date: u.createdAt,
+          link: "/admin/usuarios",
+          sourceId: u.id,
+        });
+      }
+    });
   } catch {
     /* ignore */
   }
@@ -272,17 +315,18 @@ export default function AdminNotificacionesPage() {
   const [notifications, setNotifications] = useState<AdminNotification[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
 
-  const refresh = useCallback(() => {
-    setNotifications(buildAdminNotifications());
+  const refresh = useCallback(async () => {
+    const next = await buildAdminNotifications();
+    setNotifications(next);
     setReadIds(loadReadIds());
   }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    refresh();
-    const id = setInterval(refresh, 5000);
-    const onStorage = () => refresh();
-    const onIncidents = () => refresh();
+    void refresh();
+    const id = setInterval(() => void refresh(), 5000);
+    const onStorage = () => void refresh();
+    const onIncidents = () => void refresh();
     window.addEventListener("storage", onStorage);
     window.addEventListener("tcga:incidents:updated", onIncidents);
     return () => {

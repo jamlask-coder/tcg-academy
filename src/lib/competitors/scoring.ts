@@ -84,8 +84,15 @@ export interface CombinedBreakdown {
 
 /**
  * Score combinado 0..1 aproximado. Veto por idioma devuelve 0.
- *  - Con imagen:    0.35*name + 0.25*langPos + 0.40*image
+ *  - Con imagen:    0.20*name + 0.20*langPos + 0.60*image
  *  - Sin imagen:    0.60*name + 0.40*langPos
+ *  - Bypass:        si image ≥ 0.85 (dHash casi idéntico) y no hay veto de
+ *                   idioma → devolvemos image directamente. Razón:
+ *                   nombres de productos varían mucho entre tiendas
+ *                   ("Booster Box" vs "Caja de sobres" vs "Display"), pero
+ *                   la foto del fabricante es prácticamente la misma. Si dos
+ *                   imágenes coinciden a nivel perceptual, es el mismo SKU.
+ *
  * langPos mapea [-1,1] → [0,1].
  */
 export function combinedScore(input: CombinedInput): CombinedBreakdown {
@@ -97,8 +104,11 @@ export function combinedScore(input: CombinedInput): CombinedBreakdown {
   let score: number;
   if (input.image === undefined) {
     score = 0.6 * input.name + 0.4 * langPos;
+  } else if (input.image >= 0.85) {
+    // Bypass: dos imágenes casi idénticas son el mismo producto.
+    score = input.image;
   } else {
-    score = 0.35 * input.name + 0.25 * langPos + 0.4 * input.image;
+    score = 0.2 * input.name + 0.2 * langPos + 0.6 * input.image;
   }
   return {
     score: Math.max(0, Math.min(1, score)),

@@ -126,7 +126,11 @@ async function resolveMagic(
 }
 
 async function scryfallSearch(query: string): Promise<ScryfallCard[]> {
-  const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&order=usd&dir=desc&page=1`;
+  // order=eur — Scryfall acepta orden por EUR directamente, igual que mostramos
+  // en la UI (priceEur). Antes ordenábamos por USD y la lista se desincronizaba
+  // con los precios mostrados (carta cara en USD pero barata en EUR aparecía
+  // arriba). Ahora la posición coincide con el valor que ve el usuario.
+  const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&order=eur&dir=desc&page=1`;
   const data = await getJson<{ data?: ScryfallCard[] }>(url, {
     headers: { Accept: "application/json" },
   });

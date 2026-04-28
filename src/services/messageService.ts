@@ -94,6 +94,8 @@ export async function hydrateMessagesForUser(userId: string): Promise<void> {
       read: Boolean(m.isRead ?? false),
       orderId: typeof m.orderId === "string" ? m.orderId : undefined,
       parentId: typeof m.parentId === "string" ? m.parentId : undefined,
+      isBroadcast: typeof m.isBroadcast === "boolean" ? m.isBroadcast : undefined,
+      broadcastId: typeof m.broadcastId === "string" ? m.broadcastId : undefined,
     }));
     // Merge: server mensajes ganan sobre LS por id; preservamos los que LS
     // tiene pero server no (broadcast local, mocks).
@@ -137,7 +139,11 @@ export function sendMessage(
   saveMessages([msg, ...all]);
 
   // Server mode: replica al backend (fire-and-forget). El LS ya tiene el msg.
-  if (isServerMode() && !msg.isBroadcast) {
+  // La metadata broadcast (`isBroadcast`, `broadcastId`) viaja al servidor
+  // tras la migración `messages_broadcast.sql`: el destinatario ve el icono
+  // de megáfono en cualquier dispositivo. Solo admin puede emitirla
+  // (la API rechaza estos campos si auth.role !== "admin").
+  if (isServerMode()) {
     void fetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -147,6 +153,8 @@ export function sendMessage(
         body: msg.body,
         orderId: msg.orderId,
         parentId: msg.parentId,
+        isBroadcast: msg.isBroadcast,
+        broadcastId: msg.broadcastId,
       }),
     }).catch(() => {});
   }

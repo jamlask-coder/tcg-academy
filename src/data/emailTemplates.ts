@@ -18,103 +18,115 @@ export interface EmailTemplate {
 }
 
 // URL absoluta del escudo (los emails se abren fuera del dominio).
-const SHIELD_URL = "https://tcgacademy.es/images/logo-tcg-shield.png";
+// `-trimmed` es la versión sin padding transparente alrededor — evita que
+// algunos clientes (Outlook, Gmail-app) lo recorten al ajustarlo a 72px.
+const SHIELD_URL = "https://tcgacademy.es/images/logo-tcg-shield-trimmed.png";
 const SITE_URL = "https://tcgacademy.es";
 
-// ─── PALETA OFICIAL ───────────────────────────────────────────────────────────
-//  --navy-900: #0a1530   (fondo base, header/footer)
-//  --navy-700: #15306b   (gradiente medio)
-//  --blue-600: #2549a8   (acento, CTAs, links)
-//  --blue-300: #93b4ff   (subtítulos sobre fondo oscuro)
-//  --bg-soft : #f5f7fb   (fondo del email fuera del wrapper)
-//  --ink-900 : #0f172a   (texto principal)
-//  --ink-600 : #475569   (texto secundario)
-//  --ink-400 : #94a3b8   (texto terciario)
-//  --line    : #e2e8f0   (bordes suaves)
+// ─── PALETA OFICIAL (la misma de la web) ─────────────────────────────────────
+//  Navy header  : #132B5F   (Header.tsx — color sólido, sin gradiente)
+//  Navy footer  : #0a1530   (Footer.tsx — fondo navy oscuro)
+//  Mid blue     : #15306b   (gradiente medio del site)
+//  Accent blue  : #2549a8   (links, focus)
+//  Amber CTA    : #fbbf24   (botones primarios, igual a "Crear cuenta" del site)
+//  Amber dark   : #0a1628   (texto sobre amber, alto contraste)
+//  Bg soft      : #f5f7fb   (fondo fuera del wrapper)
+//  Ink-900      : #0f172a   (texto principal sobre blanco)
+//  Ink-600      : #475569   (texto secundario)
+//  Ink-400      : #94a3b8   (terciario)
+//  Line         : #e2e8f0   (bordes suaves)
 
 const BASE_STYLES = `
   <style>
     body { margin: 0; padding: 0; font-family: 'Helvetica Neue', Arial, sans-serif; background: #f5f7fb; -webkit-font-smoothing: antialiased; }
     .wrapper { max-width: 600px; margin: 0 auto; background: #ffffff; }
 
-    /* ── Header (escudo + marca) ─────────────────────────────────────────── */
+    /* ── Header (escudo + marca) — sólido #132B5F, igual a la web ────────── */
     .header {
-      background: #0a1530;
-      background-image: radial-gradient(circle at 20% 0%, rgba(37, 73, 168, 0.45) 0%, transparent 50%),
-                        radial-gradient(circle at 80% 100%, rgba(21, 48, 107, 0.55) 0%, transparent 55%);
-      padding: 36px 40px 28px;
+      background: #132B5F;
+      padding: 16px 40px 14px;
       text-align: center;
     }
-    .header-shield { display: block; margin: 0 auto 14px; height: 72px; width: auto; }
-    .header-logo { color: #ffffff; font-size: 18px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; }
-    .header-sub { color: #93b4ff; font-size: 12px; margin-top: 6px; letter-spacing: 0.5px; }
+    .header-shield { display: block; margin: 0 auto 6px; width: 52px; height: 52px; border: 0; outline: none; }
+    .header-logo { color: #ffffff; font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; }
+    .header-sub { display: none; }
 
-    /* ── Top buttons (acceso rápido) ─────────────────────────────────────── */
-    .top-btns { background: #15306b; padding: 14px 40px; text-align: center; }
+    /* ── Top buttons (acceso rápido) — barra ámbar fina ─────────────────── */
+    .top-btns { background: #fbbf24; padding: 10px 40px; text-align: center; }
     .top-btns a {
       display: inline-block;
-      background: rgba(255, 255, 255, 0.12);
-      color: #ffffff !important;
+      color: #0a1628 !important;
       font-size: 12px;
       font-weight: 700;
-      padding: 8px 16px;
-      border-radius: 8px;
+      padding: 4px 10px;
       text-decoration: none;
-      margin: 3px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      margin: 0 6px;
     }
+    .top-btns a + a { border-left: 1px solid rgba(10, 22, 40, 0.25); padding-left: 16px; }
 
-    /* ── Progreso del pedido ─────────────────────────────────────────────── */
-    .progress { padding: 24px 40px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
-    .progress-track { display: flex; align-items: center; justify-content: center; gap: 0; }
-    .prog-step { text-align: center; width: 80px; }
-    .prog-dot { width: 16px; height: 16px; border-radius: 50%; margin: 0 auto 6px; }
-    .prog-dot.done { background: #2549a8; box-shadow: 0 0 0 3px rgba(37, 73, 168, 0.18); }
-    .prog-dot.pending { background: #e2e8f0; border: 2px solid #cbd5e1; }
-    .prog-label { font-size: 11px; font-weight: 600; color: #94a3b8; }
+    /* ── Progreso del pedido (table-based para compat. Outlook/Gmail-app) ── */
+    .progress { padding: 26px 24px 22px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+    .progress-table { width: 100%; max-width: 520px; margin: 0 auto; border-collapse: collapse; }
+    .progress-table td { padding: 0; vertical-align: middle; }
+    .prog-cell { width: 68px; text-align: center; }
+    .prog-icon {
+      width: 44px; height: 44px; line-height: 44px;
+      border-radius: 50%; margin: 0 auto;
+      font-size: 20px; text-align: center;
+      mso-line-height-rule: exactly;
+    }
+    .prog-icon.done { background: #2549a8; color: #ffffff; box-shadow: 0 0 0 4px rgba(37, 73, 168, 0.14); }
+    .prog-icon.pending { background: #e2e8f0; color: #94a3b8; border: 2px solid #cbd5e1; line-height: 40px; }
+    .prog-label { font-size: 11px; font-weight: 700; color: #94a3b8; padding-top: 8px; letter-spacing: 0.02em; }
     .prog-label.done { color: #2549a8; }
-    .prog-line { flex: 1; height: 3px; margin-bottom: 22px; }
+    .prog-line-cell { padding: 0 4px; }
+    .prog-line { height: 3px; border-radius: 2px; font-size: 0; line-height: 3px; }
     .prog-line.done { background: #2549a8; }
     .prog-line.pending { background: #e2e8f0; }
 
-    /* ── Hero (cabecera del mensaje) ─────────────────────────────────────── */
+    /* ── Hero (cabecera del mensaje) — blanco, título oscuro, sin bloque ─ */
     .hero {
-      background: linear-gradient(135deg, #0a1530 0%, #15306b 60%, #2549a8 100%);
-      padding: 36px 40px;
+      background: #ffffff;
+      padding: 32px 40px 8px;
       text-align: center;
+      border-bottom: 1px solid #e2e8f0;
     }
-    .hero h1 { color: #ffffff; font-size: 26px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.3px; }
-    .hero p { color: #c7d4ef; font-size: 14px; margin: 0; }
+    .hero h1 { color: #0f172a; font-size: 24px; font-weight: 800; margin: 0 0 6px; letter-spacing: -0.3px; }
+    .hero p { color: #64748b; font-size: 14px; margin: 0 0 18px; }
+    /* Variante: barra superior de color para tipo de email (success / error / info) */
+    .hero-accent { display: inline-block; height: 3px; width: 48px; border-radius: 2px; background: #fbbf24; margin: 0 0 14px; }
+    .hero-accent.ok { background: #16a34a; }
+    .hero-accent.err { background: #dc2626; }
+    .hero-accent.info { background: #2549a8; }
+    .hero-accent.muted { background: #94a3b8; }
 
     /* ── Contenido ───────────────────────────────────────────────────────── */
-    .content { padding: 36px 40px; }
+    .content { padding: 32px 40px; }
     .content p { color: #334155; font-size: 15px; line-height: 1.7; margin: 0 0 16px; }
     .content a { color: #2549a8; }
 
-    /* ── Botones ─────────────────────────────────────────────────────────── */
+    /* ── Botones — ámbar igual al CTA "Crear cuenta" de la web ──────────── */
     .btn {
       display: inline-block;
-      background: #2549a8;
-      background-image: linear-gradient(180deg, #2e58c4 0%, #2549a8 100%);
-      color: #ffffff !important;
-      font-weight: 700;
+      background: #fbbf24;
+      color: #0a1628 !important;
+      font-weight: 800;
       font-size: 15px;
-      padding: 14px 32px;
-      border-radius: 12px;
+      padding: 13px 32px;
+      border-radius: 999px;
       text-decoration: none;
       margin: 8px 0;
-      box-shadow: 0 4px 14px rgba(37, 73, 168, 0.28);
     }
     .btn-secondary {
       display: inline-block;
       background: #ffffff;
-      color: #2549a8 !important;
+      color: #132B5F !important;
       font-weight: 700;
       font-size: 14px;
-      padding: 12px 28px;
-      border-radius: 10px;
+      padding: 11px 26px;
+      border-radius: 999px;
       text-decoration: none;
-      border: 2px solid #2549a8;
+      border: 1.5px solid #132B5F;
       margin: 8px 0;
     }
 
@@ -173,7 +185,7 @@ const BASE_STYLES = `
 
     /* ── Puntos ──────────────────────────────────────────────────────────── */
     .points-box {
-      background: linear-gradient(135deg, #15306b 0%, #2549a8 100%);
+      background: #132B5F;
       border-radius: 16px;
       padding: 26px;
       text-align: center;
@@ -204,65 +216,45 @@ const BASE_STYLES = `
     .legal-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin: 24px 0 0; }
     .legal-box p { color: #94a3b8 !important; font-size: 10px !important; line-height: 1.55; margin: 0 0 6px !important; }
 
-    /* ── Footer ──────────────────────────────────────────────────────────── */
+    /* ── Footer — sólido #0a1530 (igual a la web), sin radial gradients ── */
     .footer {
       background: #0a1530;
-      background-image: radial-gradient(circle at 80% 0%, rgba(37, 73, 168, 0.35) 0%, transparent 55%);
-      padding: 30px 40px 26px;
+      padding: 22px 40px 20px;
       text-align: center;
       color: #c7d4ef;
     }
-    .footer p { color: #c7d4ef; font-size: 12px; line-height: 1.65; margin: 0 0 8px; }
-    .footer a { color: #ffffff; text-decoration: none; }
+    .footer p { color: #c7d4ef; font-size: 12px; line-height: 1.6; margin: 0 0 6px; }
+    .footer a { color: #ffffff; text-decoration: underline; }
     .footer .legal { color: #93a3c2 !important; font-size: 11px !important; }
-    .social-links { margin: 0 0 16px; }
-    .social-links a {
-      display: inline-block;
-      background: #2549a8;
-      color: #ffffff;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      text-align: center;
-      line-height: 32px;
-      font-size: 11px;
-      margin: 0 4px;
-      text-decoration: none;
-      font-weight: 700;
-    }
-    .footer-divider { height: 1px; background: rgba(255, 255, 255, 0.12); margin: 18px 0; }
+    .footer-divider { height: 1px; background: rgba(255, 255, 255, 0.12); margin: 14px 0; }
 
     @media (max-width: 600px) {
-      .content, .progress { padding: 24px 22px; }
-      .header, .top-btns, .footer { padding: 24px 22px; }
-      .hero { padding: 28px 22px; }
-      .hero h1 { font-size: 22px; }
-      .header-shield { height: 60px; }
-      .header-logo { font-size: 16px; letter-spacing: 3px; }
+      .content { padding: 24px 22px; }
+      .header { padding: 14px 22px 12px; }
+      .top-btns { padding: 8px 22px; }
+      .footer { padding: 20px 22px; }
+      .hero { padding: 24px 22px 6px; }
+      .hero h1 { font-size: 20px; }
+      .header-shield { width: 48px !important; height: 48px !important; }
+      .header-logo { font-size: 12px; letter-spacing: 2.5px; }
+      .progress { padding: 22px 12px 18px; }
+      .prog-cell { width: 56px; }
+      .prog-icon { width: 38px; height: 38px; line-height: 38px; font-size: 16px; }
+      .prog-icon.pending { line-height: 34px; }
+      .prog-label { font-size: 10px; }
     }
   </style>
 `;
 
 const FOOTER_HTML = `
   <div class="footer">
-    <div class="social-links">
-      <a href="https://instagram.com/tcgacademy" aria-label="Instagram">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
-      </a>
-      <a href="https://tiktok.com/@tcgacademy" aria-label="TikTok">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.88a8.2 8.2 0 004.84 1.56V7a4.85 4.85 0 01-1.07-.31z"/></svg>
-      </a>
-      <a href="https://x.com/tcgacademy" aria-label="X">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.747l7.73-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-      </a>
-    </div>
     <p><strong style="color:#ffffff;">${SITE_CONFIG.name}</strong> · <a href="mailto:${SITE_CONFIG.email}">${SITE_CONFIG.email}</a> · <a href="tel:${SITE_CONFIG.phone.replace(/\s+/g, "")}">${SITE_CONFIG.phone}</a></p>
     <p>${SITE_CONFIG.address}</p>
     <div class="footer-divider"></div>
     <p class="legal">
       Has recibido este email porque tienes una cuenta en ${SITE_CONFIG.name}.<br/>
       <a href="{{unsubscribe_link}}">Cancelar suscripción</a> ·
-      <a href="${SITE_URL}/politica-privacidad">Política de privacidad</a>
+      <a href="${SITE_URL}/privacidad">Política de privacidad</a>
     </p>
     <p class="legal">
       ${SITE_CONFIG.name} es una marca de ${SITE_CONFIG.legalName}. CIF: ${SITE_CONFIG.cif}. ©${new Date().getFullYear()} ${SITE_CONFIG.legalName}. Todos los derechos reservados.
@@ -282,7 +274,7 @@ function wrapEmail(content: string): string {
 <body>
   <div class="wrapper">
     <div class="header">
-      <img src="${SHIELD_URL}" alt="TCG Academy" class="header-shield" />
+      <img src="${SHIELD_URL}" alt="TCG Academy" class="header-shield" width="84" height="84" style="display:block;margin:0 auto 14px;width:84px;height:84px;border:0;outline:none;" />
       <div class="header-logo">TCG Academy</div>
       <div class="header-sub">Tu tienda de cartas coleccionables</div>
     </div>
@@ -302,6 +294,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     variables: ["nombre", "email", "unsubscribe_link"],
     html: wrapEmail(`
       <div class="hero">
+        <span class="hero-accent"></span>
         <h1>¡Bienvenido/a, {{nombre}}!</h1>
         <p>Tu cuenta en TCG Academy está lista</p>
       </div>
@@ -346,31 +339,31 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
         <a href="${SITE_URL}/catalogo">Volver a comprar</a>
       </div>
       <div class="hero">
+        <span class="hero-accent"></span>
         <h1>¡Pedido confirmado!</h1>
         <p>Estamos preparando tu pedido con todo el cariño</p>
       </div>
       <div class="progress">
-        <div class="progress-track">
-          <div class="prog-step">
-            <div class="prog-dot done"></div>
-            <div class="prog-label done">Pedido</div>
-          </div>
-          <div class="prog-line done"></div>
-          <div class="prog-step">
-            <div class="prog-dot done"></div>
-            <div class="prog-label done">Pagado</div>
-          </div>
-          <div class="prog-line pending"></div>
-          <div class="prog-step">
-            <div class="prog-dot pending"></div>
-            <div class="prog-label">Pendiente de envío</div>
-          </div>
-          <div class="prog-line pending"></div>
-          <div class="prog-step">
-            <div class="prog-dot pending"></div>
-            <div class="prog-label">Enviado</div>
-          </div>
-        </div>
+        <table role="presentation" class="progress-table" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td class="prog-cell"><div class="prog-icon done">🛒</div></td>
+            <td class="prog-line-cell"><div class="prog-line done">&nbsp;</div></td>
+            <td class="prog-cell"><div class="prog-icon done">💳</div></td>
+            <td class="prog-line-cell"><div class="prog-line pending">&nbsp;</div></td>
+            <td class="prog-cell"><div class="prog-icon pending">📦</div></td>
+            <td class="prog-line-cell"><div class="prog-line pending">&nbsp;</div></td>
+            <td class="prog-cell"><div class="prog-icon pending">🚚</div></td>
+          </tr>
+          <tr>
+            <td class="prog-cell"><div class="prog-label done">Pedido</div></td>
+            <td></td>
+            <td class="prog-cell"><div class="prog-label done">Pagado</div></td>
+            <td></td>
+            <td class="prog-cell"><div class="prog-label">Preparando</div></td>
+            <td></td>
+            <td class="prog-cell"><div class="prog-label">Enviado</div></td>
+          </tr>
+        </table>
       </div>
       <div class="content">
         <p>Hola {{nombre}},</p>
@@ -425,32 +418,32 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
         <a href="${SITE_URL}/cuenta">Mi cuenta</a>
         <a href="${SITE_URL}/catalogo">Volver a comprar</a>
       </div>
-      <div class="hero" style="background: linear-gradient(135deg, #0a1530 0%, #15306b 50%, #047857 100%);">
+      <div class="hero">
+        <span class="hero-accent ok"></span>
         <h1>¡Tu pedido está en camino!</h1>
         <p>Lo recibirás en las próximas 48 horas</p>
       </div>
       <div class="progress">
-        <div class="progress-track">
-          <div class="prog-step">
-            <div class="prog-dot done"></div>
-            <div class="prog-label done">Pedido</div>
-          </div>
-          <div class="prog-line done"></div>
-          <div class="prog-step">
-            <div class="prog-dot done"></div>
-            <div class="prog-label done">Pagado</div>
-          </div>
-          <div class="prog-line done"></div>
-          <div class="prog-step">
-            <div class="prog-dot done"></div>
-            <div class="prog-label done">Pendiente de envío</div>
-          </div>
-          <div class="prog-line done"></div>
-          <div class="prog-step">
-            <div class="prog-dot done"></div>
-            <div class="prog-label done">Enviado</div>
-          </div>
-        </div>
+        <table role="presentation" class="progress-table" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td class="prog-cell"><div class="prog-icon done">🛒</div></td>
+            <td class="prog-line-cell"><div class="prog-line done">&nbsp;</div></td>
+            <td class="prog-cell"><div class="prog-icon done">💳</div></td>
+            <td class="prog-line-cell"><div class="prog-line done">&nbsp;</div></td>
+            <td class="prog-cell"><div class="prog-icon done">📦</div></td>
+            <td class="prog-line-cell"><div class="prog-line done">&nbsp;</div></td>
+            <td class="prog-cell"><div class="prog-icon done">🚚</div></td>
+          </tr>
+          <tr>
+            <td class="prog-cell"><div class="prog-label done">Pedido</div></td>
+            <td></td>
+            <td class="prog-cell"><div class="prog-label done">Pagado</div></td>
+            <td></td>
+            <td class="prog-cell"><div class="prog-label done">Preparando</div></td>
+            <td></td>
+            <td class="prog-cell"><div class="prog-label done">Enviado</div></td>
+          </tr>
+        </table>
       </div>
       <div class="content">
         <p>Hola {{nombre}},</p>
@@ -488,6 +481,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     ],
     html: wrapEmail(`
       <div class="hero">
+        <span class="hero-accent"></span>
         <h1>Tu factura está disponible</h1>
         <p>Pedido #{{order_id}}</p>
       </div>
@@ -523,6 +517,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     ],
     html: wrapEmail(`
       <div class="hero">
+        <span class="hero-accent"></span>
         <h1>Albarán de entrega</h1>
         <p>Documento {{albaran_id}}</p>
       </div>
@@ -556,6 +551,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     ],
     html: wrapEmail(`
       <div class="hero">
+        <span class="hero-accent"></span>
         <h1>Un regalo para ti</h1>
         <p>Hemos preparado un descuento exclusivo</p>
       </div>
@@ -591,6 +587,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     ],
     html: wrapEmail(`
       <div class="hero">
+        <span class="hero-accent"></span>
         <h1>¡Puntos añadidos!</h1>
         <p>Sigue acumulando y canjéalos por descuentos</p>
       </div>
@@ -625,7 +622,8 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       "unsubscribe_link",
     ],
     html: wrapEmail(`
-      <div class="hero" style="background: linear-gradient(135deg, #0a1530 0%, #15306b 50%, #047857 100%);">
+      <div class="hero">
+        <span class="hero-accent ok"></span>
         <h1>Devolución aceptada</h1>
         <p>Tu reembolso está en camino</p>
       </div>
@@ -650,7 +648,8 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       "Se envía cuando una devolución es rechazada tras revisión. Indica el motivo.",
     variables: ["nombre", "return_id", "order_id", "motivo", "unsubscribe_link"],
     html: wrapEmail(`
-      <div class="hero" style="background: linear-gradient(135deg, #0a1530 0%, #7f1d1d 60%, #b91c1c 100%);">
+      <div class="hero">
+        <span class="hero-accent err"></span>
         <h1>Devolución no aceptada</h1>
         <p>Tu solicitud ha sido revisada</p>
       </div>
@@ -682,7 +681,8 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       "unsubscribe_link",
     ],
     html: wrapEmail(`
-      <div class="hero" style="background: linear-gradient(135deg, #0a1530 0%, #15306b 50%, #047857 100%);">
+      <div class="hero">
+        <span class="hero-accent ok"></span>
         <h1>Reembolso emitido</h1>
         <p>Tu dinero está de camino</p>
       </div>
@@ -707,7 +707,8 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       "Se envía cuando se cancela una devolución (por el cliente o el admin).",
     variables: ["nombre", "return_id", "order_id", "motivo", "unsubscribe_link"],
     html: wrapEmail(`
-      <div class="hero" style="background: linear-gradient(135deg, #0a1530 0%, #334155 100%);">
+      <div class="hero">
+        <span class="hero-accent muted"></span>
         <h1>Devolución cancelada</h1>
         <p>La solicitud ya no está activa</p>
       </div>
@@ -732,6 +733,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     variables: ["nombre", "verify_url", "expires_in", "unsubscribe_link"],
     html: wrapEmail(`
       <div class="hero">
+        <span class="hero-accent"></span>
         <h1>Confirma tu email</h1>
         <p>Un paso más para activar tu cuenta</p>
       </div>
@@ -758,6 +760,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     variables: ["nombre", "reset_url", "expires_in", "unsubscribe_link"],
     html: wrapEmail(`
       <div class="hero">
+        <span class="hero-accent"></span>
         <h1>Recupera tu contraseña</h1>
         <p>Has solicitado restablecer tu contraseña</p>
       </div>
@@ -790,7 +793,8 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       "unsubscribe_link",
     ],
     html: wrapEmail(`
-      <div class="hero" style="background: linear-gradient(135deg, #0a1530 0%, #2e1065 60%, #4c1d95 100%);">
+      <div class="hero">
+        <span class="hero-accent info"></span>
         <h1>¡Olvidaste algo!</h1>
         <p>Tus cartas están esperando en el carrito</p>
       </div>
@@ -826,9 +830,9 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     variables: ["toName", "fromName", "fromInitial"],
     html: wrapEmail(`
       <div class="hero">
-        <span class="badge" style="background:rgba(255,255,255,0.15); color:#ffffff; margin-bottom:14px;">Invitación al grupo</span>
-        <h1 style="margin-top:8px;">¡Hola, {{toName}}!</h1>
-        <p>Has recibido una solicitud de asociación</p>
+        <span class="hero-accent info"></span>
+        <h1>¡Hola, {{toName}}!</h1>
+        <p>Has recibido una invitación a un grupo</p>
       </div>
       <div class="content">
         <p>Has recibido una <strong>solicitud de asociación</strong> en TCG Academy. Si la aceptas, ambos ganaréis puntos automáticamente cada vez que cualquiera de vosotros realice una compra.</p>
@@ -869,6 +873,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     variables: ["nombre", "producto", "producto_url", "producto_imagen"],
     html: wrapEmail(`
       <div class="hero">
+        <span class="hero-accent"></span>
         <h1>¡Ya está disponible!</h1>
         <p>El producto que esperabas ha vuelto</p>
       </div>
@@ -896,6 +901,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     variables: ["nombre", "producto", "producto_url", "producto_imagen", "idioma"],
     html: wrapEmail(`
       <div class="hero">
+        <span class="hero-accent"></span>
         <h1>Alerta activada</h1>
         <p>Te avisaremos en cuanto llegue</p>
       </div>
@@ -939,7 +945,8 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       "panel_url",
     ],
     html: wrapEmail(`
-      <div class="hero" style="background: linear-gradient(135deg, #0a1530 0%, #7f1d1d 60%, #b45309 100%);">
+      <div class="hero">
+        <span class="hero-accent err"></span>
         <h1>{{severidad_label}}</h1>
         <p>Modelo {{modelo}} — {{period}}</p>
       </div>
@@ -972,6 +979,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     variables: ["nombre", "numeroFactura", "urlActivacion", "expiraEn"],
     html: wrapEmail(`
       <div class="hero">
+        <span class="hero-accent"></span>
         <h1>Bienvenido a TCG Academy</h1>
         <p>Completa tu cuenta para gestionar tus pedidos y facturas</p>
       </div>
@@ -1006,19 +1014,31 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
         <a href="${SITE_URL}/catalogo">Volver a comprar</a>
       </div>
       <div class="hero">
+        <span class="hero-accent"></span>
         <h1>¡Pedido confirmado!</h1>
         <p>Hemos recibido tu pedido y lo estamos preparando</p>
       </div>
       <div class="progress">
-        <div class="progress-track">
-          <div class="prog-step"><div class="prog-dot done"></div><div class="prog-label done">Pedido</div></div>
-          <div class="prog-line done"></div>
-          <div class="prog-step"><div class="prog-dot done"></div><div class="prog-label done">Pagado</div></div>
-          <div class="prog-line pending"></div>
-          <div class="prog-step"><div class="prog-dot pending"></div><div class="prog-label">Pendiente envío</div></div>
-          <div class="prog-line pending"></div>
-          <div class="prog-step"><div class="prog-dot pending"></div><div class="prog-label">Enviado</div></div>
-        </div>
+        <table role="presentation" class="progress-table" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td class="prog-cell"><div class="prog-icon done">🛒</div></td>
+            <td class="prog-line-cell"><div class="prog-line done">&nbsp;</div></td>
+            <td class="prog-cell"><div class="prog-icon done">💳</div></td>
+            <td class="prog-line-cell"><div class="prog-line pending">&nbsp;</div></td>
+            <td class="prog-cell"><div class="prog-icon pending">📦</div></td>
+            <td class="prog-line-cell"><div class="prog-line pending">&nbsp;</div></td>
+            <td class="prog-cell"><div class="prog-icon pending">🚚</div></td>
+          </tr>
+          <tr>
+            <td class="prog-cell"><div class="prog-label done">Pedido</div></td>
+            <td></td>
+            <td class="prog-cell"><div class="prog-label done">Pagado</div></td>
+            <td></td>
+            <td class="prog-cell"><div class="prog-label">Preparando</div></td>
+            <td></td>
+            <td class="prog-cell"><div class="prog-label">Enviado</div></td>
+          </tr>
+        </table>
       </div>
       <div class="content">
         <p>Hola {{nombre}},</p>
@@ -1051,6 +1071,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
         <a href="${SITE_URL}/tiendas">Nuestras tiendas</a>
       </div>
       <div class="hero">
+        <span class="hero-accent"></span>
         <h1>¡Pedido reservado!</h1>
         <p>Te avisaremos cuando esté listo para recoger</p>
       </div>
@@ -1085,7 +1106,8 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
       "appUrl",
     ],
     html: wrapEmail(`
-      <div class="hero" style="background: linear-gradient(135deg, #0a1530 0%, #15306b 50%, #047857 100%);">
+      <div class="hero">
+        <span class="hero-accent ok"></span>
         <h1>¡Listo para recoger!</h1>
         <p>Tu pedido te está esperando en la tienda</p>
       </div>
@@ -1112,7 +1134,8 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     description: "Confirmación de cancelación del pedido. Reemplaza al legacy.",
     variables: ["nombre", "orderId", "appUrl"],
     html: wrapEmail(`
-      <div class="hero" style="background: linear-gradient(135deg, #0a1530 0%, #1e293b 50%, #b91c1c 100%);">
+      <div class="hero">
+        <span class="hero-accent err"></span>
         <h1>Pedido cancelado</h1>
         <p>Tu pedido ha sido cancelado correctamente</p>
       </div>
@@ -1137,6 +1160,7 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
     variables: ["orderId", "customerName", "customerEmail", "total", "appUrl"],
     html: wrapEmail(`
       <div class="hero">
+        <span class="hero-accent"></span>
         <h1>Nuevo pedido recibido</h1>
         <p>Pedido #{{orderId}}</p>
       </div>
