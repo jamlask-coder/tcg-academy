@@ -17,7 +17,6 @@ import {
   AlertCircle,
   Copy,
   ExternalLink,
-  Info,
   X,
   RefreshCw,
 } from "lucide-react";
@@ -358,20 +357,9 @@ function IncidentModal({ orderId, onClose, onSubmit }: IncidentModalProps) {
   );
 }
 
-const DEMO_BANNER_KEY = "tcgacademy_demo_pedidos_dismissed";
-
 export default function PedidosPage() {
   const { user } = useAuth();
   const isDemoUser = !!user?.id?.startsWith("demo-");
-  const [showDemoBanner, setShowDemoBanner] = useState(() => {
-    try {
-      return typeof window !== "undefined"
-        ? !localStorage.getItem(DEMO_BANNER_KEY)
-        : false;
-    } catch {
-      return true;
-    }
-  });
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
       const raw =
@@ -515,29 +503,7 @@ export default function PedidosPage() {
         />
       )}
 
-      {showDemoBanner && (
-        <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <Info size={16} className="mt-0.5 flex-shrink-0 text-amber-500" />
-          <p className="flex-1 text-sm text-amber-800">
-            <strong>Modo demo:</strong> estos pedidos son datos de ejemplo para
-            demostración. En producción se conectarán con el sistema real de
-            pedidos.
-          </p>
-          <button
-            onClick={() => {
-              try {
-                localStorage.setItem(DEMO_BANNER_KEY, "1");
-              } catch {}
-              setShowDemoBanner(false);
-            }}
-            className="flex-shrink-0 text-amber-400 transition hover:text-amber-600"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
-      <div className="mb-6">
+<div className="mb-6">
         <p className="text-sm text-gray-500">
           {orders.length} pedidos realizados
         </p>

@@ -18,7 +18,6 @@ import {
   Copy,
   ExternalLink,
   Printer,
-  Info,
   Ban,
   RotateCcw,
 } from "lucide-react";
@@ -933,26 +932,7 @@ function SortIcon({
   );
 }
 
-const DEMO_BANNER_KEY = "tcgacademy_demo_pedidos_dismissed";
-
 export default function AdminPedidosPage() {
-  const [showDemoBanner, setShowDemoBanner] = useState(() => {
-    try {
-      return typeof window !== "undefined"
-        ? !localStorage.getItem(DEMO_BANNER_KEY)
-        : false;
-    } catch {
-      return true;
-    }
-  });
-
-  const dismissDemoBanner = () => {
-    try {
-      localStorage.setItem(DEMO_BANNER_KEY, "1");
-    } catch {}
-    setShowDemoBanner(false);
-  };
-
   // Merge robusto: lee `tcgacademy_admin_orders` + recupera cualquier pedido
   // huérfano que el checkout escribió sólo en `tcgacademy_orders`. Así NINGÚN
   // pedido real puede quedar invisible para el admin, ni aunque falle el
@@ -1442,24 +1422,7 @@ export default function AdminPedidosPage() {
         />
       )}
 
-      {showDemoBanner && (
-        <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <Info size={16} className="mt-0.5 flex-shrink-0 text-amber-500" />
-          <p className="flex-1 text-sm text-amber-800">
-            <strong>Modo demo:</strong> estos pedidos son datos de ejemplo para
-            demostración. En producción se conectarán con el sistema real de
-            pedidos.
-          </p>
-          <button
-            onClick={dismissDemoBanner}
-            className="flex-shrink-0 text-amber-400 transition hover:text-amber-600"
-          >
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+<div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Gestión de pedidos</h1>
           <p className="mt-1 text-sm text-gray-500">
