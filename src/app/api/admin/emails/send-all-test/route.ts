@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { requireAdmin, assertSameOrigin } from "@/lib/apiAuth";
 import { logger } from "@/lib/logger";
 import { renderEmailTemplate } from "@/services/emailService";
-import { getEmailService } from "@/lib/email";
 import { EMAIL_TEMPLATES } from "@/data/emailTemplates";
 import { getPreviewVarsFor } from "@/data/emailPreviewVars";
 
@@ -11,6 +10,73 @@ import { getPreviewVarsFor } from "@/data/emailPreviewVars";
 // suficiente para no rebotar. Si subimos al plan de pago, podríamos bajarlo.
 const RESEND_THROTTLE_MS = 600;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+interface SendOutcome {
+  ok: boolean;
+  emailId?: string;
+  status?: number;
+  error?: string;
+}
+
+/**
+ * Llamada directa a Resend (sin pasar por el adapter) para poder capturar
+ * el status HTTP y el cuerpo del error. El adapter es voluntariamente opaco
+ * (devuelve solo `ok: boolean`), lo que dificulta el diagnóstico desde el
+ * panel admin. Aquí queremos ver el motivo exacto.
+ */
+async function sendViaResend(opts: {
+  apiKey: string;
+  fromEmail: string;
+  replyTo: string;
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<SendOutcome> {
+  try {
+    const payload: Record<string, unknown> = {
+      from: `TCG Academy <${opts.fromEmail}>`,
+      to: [opts.to],
+      subject: opts.subject,
+      html: opts.html,
+    };
+    if (opts.replyTo) payload.reply_to = opts.replyTo;
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${opts.apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      let bodyText = await res.text();
+      // Resend devuelve JSON en errores; intentamos extraer `message`.
+      try {
+        const parsed = JSON.parse(bodyText) as { message?: string; name?: string };
+        if (parsed.message) bodyText = parsed.message;
+        if (parsed.name && !bodyText.includes(parsed.name))
+          bodyText = `${parsed.name}: ${bodyText}`;
+      } catch {
+        /* texto plano */
+      }
+      return {
+        ok: false,
+        status: res.status,
+        error: `Resend ${res.status}: ${bodyText.slice(0, 280)}`,
+      };
+    }
+
+    const data = (await res.json()) as { id: string };
+    return { ok: true, emailId: data.id, status: res.status };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Error de red contactando Resend",
+    };
+  }
+}
 
 /**
  * POST /api/admin/emails/send-all-test
@@ -22,11 +88,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * Restricciones:
  *   - Solo rol admin (vía `requireAdmin`).
  *   - Solo origen propio (`assertSameOrigin`) — sin CSRF cross-site.
- *   - Si el backend no está en server-mode, devuelve 412 (Precondition Failed)
- *     porque sin Resend configurado no llegaría ningún correo real.
+ *   - Si el backend no está en server-mode, devuelve 412.
+ *   - Si la primera plantilla falla por config (401/403/422), aborta el
+ *     bucle para no quemar 24 intentos con el mismo error.
  *
  * Body: `{ targetEmail: string }`
- * Respuesta: `{ ok, total, sent, failed, results: [{templateId, ok, error?}] }`
+ * Respuesta: `{ ok, total, sent, failed, firstError?, aborted?, results }`
  */
 export async function POST(req: NextRequest) {
   // CSRF dura: rechazar cualquier request cuyo origen no sea el dominio propio.
@@ -78,11 +145,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Pre-checks de configuración Resend para devolver un mensaje útil en
-  // vez de 24 fallos opacos. `sendAppEmail` se traga el error y solo expone
-  // un boolean — aquí miramos directamente las env vars antes de empezar.
-  const hasResendKey = Boolean(process.env.RESEND_API_KEY);
+  // vez de 24 fallos opacos.
+  const apiKey = process.env.RESEND_API_KEY ?? "";
   const fromEmail = process.env.RESEND_FROM_EMAIL ?? "";
-  if (!hasResendKey) {
+  const replyTo = process.env.RESEND_REPLY_TO ?? "";
+
+  if (!apiKey) {
     return NextResponse.json(
       {
         ok: false,
@@ -109,51 +177,63 @@ export async function POST(req: NextRequest) {
     total: EMAIL_TEMPLATES.length,
   });
 
-  const emailService = getEmailService();
-  const results: { templateId: string; name: string; ok: boolean; error?: string }[] = [];
+  const results: {
+    templateId: string;
+    name: string;
+    ok: boolean;
+    status?: number;
+    error?: string;
+  }[] = [];
+
+  // Códigos que indican error de configuración (no transitorio): si el
+  // primer intento falla con uno de éstos, abortamos. No tiene sentido
+  // hacer 23 envíos más con la misma key/dominio mal configurados.
+  const ABORT_STATUSES = new Set([401, 403, 404]);
+  let aborted = false;
 
   for (let i = 0; i < EMAIL_TEMPLATES.length; i++) {
     const tpl = EMAIL_TEMPLATES[i];
-    try {
-      const vars = getPreviewVarsFor(tpl.id, tpl.variables);
-      const rendered = renderEmailTemplate(tpl.id, vars);
-      if (!rendered) {
-        results.push({
-          templateId: tpl.id,
-          name: tpl.name,
-          ok: false,
-          error: "Plantilla no encontrada",
-        });
-        continue;
-      }
-      // Llamamos al adapter directamente (no `sendAppEmail`) para poder
-      // capturar el mensaje exacto del fallo cuando ocurre.
-      const res = await emailService.sendEmail(
-        targetEmail,
-        `[TEST] ${rendered.subject}`,
-        rendered.html,
-      );
-      if (res.ok) {
-        results.push({ templateId: tpl.id, name: tpl.name, ok: true });
-      } else {
-        // El adapter logea el detalle a stderr; aquí no tenemos el mensaje
-        // pero podemos diferenciarlo del catch.
-        results.push({
-          templateId: tpl.id,
-          name: tpl.name,
-          ok: false,
-          error: "Resend devolvió ok=false (revisa logs Vercel)",
-        });
-      }
-    } catch (err) {
+    const vars = getPreviewVarsFor(tpl.id, tpl.variables);
+    const rendered = renderEmailTemplate(tpl.id, vars);
+    if (!rendered) {
       results.push({
         templateId: tpl.id,
         name: tpl.name,
         ok: false,
-        error: err instanceof Error ? err.message : "error desconocido",
+        error: "Plantilla no encontrada",
       });
+      continue;
     }
-    // Throttle entre envíos (excepto tras el último).
+
+    const outcome = await sendViaResend({
+      apiKey,
+      fromEmail,
+      replyTo,
+      to: targetEmail,
+      subject: `[TEST] ${rendered.subject}`,
+      html: rendered.html,
+    });
+
+    results.push({
+      templateId: tpl.id,
+      name: tpl.name,
+      ok: outcome.ok,
+      status: outcome.status,
+      error: outcome.error,
+    });
+
+    // Si el primer envío revela un error de configuración (key/dominio),
+    // aborta — todos los demás van a fallar con lo mismo.
+    if (i === 0 && !outcome.ok && outcome.status && ABORT_STATUSES.has(outcome.status)) {
+      aborted = true;
+      logger.warn("Send-all abortado: error de configuración Resend", "admin/emails", {
+        status: outcome.status,
+        error: outcome.error,
+      });
+      break;
+    }
+
+    // Throttle entre envíos (excepto tras el último o si ya hemos abortado).
     if (i < EMAIL_TEMPLATES.length - 1) await sleep(RESEND_THROTTLE_MS);
   }
 
@@ -163,9 +243,11 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: failed === 0,
-    total: results.length,
+    total: EMAIL_TEMPLATES.length,
+    attempted: results.length,
     sent,
     failed,
+    aborted,
     firstError,
     results,
   });

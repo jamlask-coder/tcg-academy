@@ -193,8 +193,10 @@ export default function AdminEmailsAutomaticosPage() {
     | {
         ok: boolean;
         total?: number;
+        attempted?: number;
         sent?: number;
         failed?: number;
+        aborted?: boolean;
         error?: string;
         firstError?: string;
       }
@@ -213,8 +215,10 @@ export default function AdminEmailsAutomaticosPage() {
       const data = (await res.json()) as {
         ok: boolean;
         total?: number;
+        attempted?: number;
         sent?: number;
         failed?: number;
+        aborted?: boolean;
         error?: string;
         firstError?: string;
       };
@@ -396,10 +400,16 @@ export default function AdminEmailsAutomaticosPage() {
               <div className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
                 <div className="flex items-start gap-2">
                   <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
-                  <span>{sendAllResult.error ?? `Fallaron ${sendAllResult.failed}/${sendAllResult.total} envíos.`}</span>
+                  <span>
+                    {sendAllResult.error
+                      ? sendAllResult.error
+                      : sendAllResult.aborted
+                        ? `Abortado tras el primer intento (error de configuración).`
+                        : `Fallaron ${sendAllResult.failed}/${sendAllResult.attempted ?? sendAllResult.total} envíos.`}
+                  </span>
                 </div>
                 {sendAllResult.firstError && (
-                  <p className="mt-2 ml-6 text-[12px] text-red-600">
+                  <p className="mt-2 ml-6 break-all text-[12px] text-red-600">
                     <strong>Causa:</strong> {sendAllResult.firstError}
                   </p>
                 )}
