@@ -353,7 +353,23 @@ function normalizeLegacyOrder(o: AdminOrder): AdminOrder {
   };
 }
 
+/**
+ * En server-mode (BACKEND_MODE=server) la BD es la ÚNICA fuente de verdad.
+ * Los mocks (ADMIN_ORDERS) y los pedidos de demo en localStorage NO se mezclan
+ * — sólo se hidratan vía `readAdminOrdersMergedAsync` desde /api/orders.
+ *
+ * Razón: en producción los pedidos reales de la web actual pertenecen a la SL
+ * anterior (ver `fiscalCarryOver`) y NO podemos contaminar la lista con cuentas
+ * mock o intentos de checkout local. Ver memoria `feedback_fiscal_carry_over`.
+ */
+const SERVER_MODE = process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
+
 export function readAdminOrdersMerged(fallback: AdminOrder[] = []): AdminOrder[] {
+  if (SERVER_MODE) {
+    // Server-mode: ignoramos mocks y localStorage de demo. La rama síncrona
+    // devuelve [] hasta que `readAdminOrdersMergedAsync` hidrate desde BD.
+    return [];
+  }
   if (typeof window === "undefined") return fallback.map(normalizeLegacyOrder);
   const admin = safeRead<AdminOrder[]>(ADMIN_KEY, []).map(normalizeLegacyOrder);
   const checkout = safeRead<CheckoutOrder[]>("tcgacademy_orders", []);
@@ -751,6 +767,11 @@ export async function fetchAdminOrdersFromBd(): Promise<AdminOrder[]> {
 export async function readAdminOrdersMergedAsync(
   fallback: AdminOrder[] = [],
 ): Promise<AdminOrder[]> {
+  if (SERVER_MODE) {
+    // Server-mode: SOLO BD. Sin mocks, sin localStorage de demo.
+    const bd = await fetchAdminOrdersFromBd();
+    return bd.sort((a, b) => (a.date < b.date ? 1 : -1));
+  }
   const local = readAdminOrdersMerged(fallback);
   const bd = await fetchAdminOrdersFromBd();
   if (bd.length === 0) return local;

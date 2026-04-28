@@ -396,8 +396,17 @@ function HeaderInlineAuth() {
 
   // ── Logged in: greeting + account dropdown ────────────────────────────────
   if (user) {
+    // Badge de rol. Para admin lo sacamos como Link a /admin (atajo directo
+    // al panel resumen — no se puede anidar <Link> dentro de <button>).
+    // Para mayorista/tienda sigue siendo decorativo, dentro del botón.
+    const isAdmin = user.role === "admin";
+    const showRoleBadge = user.role === "mayorista" || user.role === "tienda" || isAdmin;
+    const roleBadgeLabel = user.role === "mayorista" ? "Mayorista" : user.role === "tienda" ? "Tienda" : "Admin";
+    const roleBadgeClass =
+      "inline-flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-amber-400 px-1.5 text-[10px] font-bold leading-none text-gray-900";
+
     return (
-      <div className="relative hidden lg:block" ref={menuRef}>
+      <div className="relative hidden lg:flex items-center gap-1.5" ref={menuRef}>
         <button
           onClick={() => setMenuOpen((o) => !o)}
           aria-label="Mi cuenta"
@@ -406,12 +415,9 @@ function HeaderInlineAuth() {
         >
           <span className="text-xs text-blue-200">Bienvenido,&nbsp;</span>
           <span className="text-xs font-bold text-white">{firstName}</span>
-          {(user.role === "mayorista" || user.role === "tienda" || user.role === "admin") && (
-            <span
-              className="ml-1.5 inline-flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-amber-400 px-1.5 text-[10px] font-bold leading-none text-gray-900"
-              aria-label={`Rol: ${user.role}`}
-            >
-              {user.role === "mayorista" ? "Mayorista" : user.role === "tienda" ? "Tienda" : "Admin"}
+          {showRoleBadge && !isAdmin && (
+            <span className={`ml-1.5 ${roleBadgeClass}`} aria-label={`Rol: ${user.role}`}>
+              {roleBadgeLabel}
             </span>
           )}
           <ChevronDown
@@ -419,6 +425,17 @@ function HeaderInlineAuth() {
             className={`ml-0.5 text-white/50 transition-transform ${menuOpen ? "rotate-180" : ""}`}
           />
         </button>
+        {/* Atajo directo al panel admin: clic en el badge Admin = ir a /admin */}
+        {isAdmin && (
+          <Link
+            href="/admin"
+            aria-label="Ir al panel de administración"
+            title="Ir al panel admin"
+            className={`${roleBadgeClass} transition hover:brightness-110 hover:ring-2 hover:ring-amber-300/60`}
+          >
+            Admin
+          </Link>
+        )}
 
         {/* Account dropdown */}
         {menuOpen && (

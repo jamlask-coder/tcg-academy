@@ -1135,6 +1135,16 @@ export default function AdminPedidosPage() {
     const previousOrder = orders.find((o) => o.id === id);
     const previousStatus = previousOrder?.adminStatus ?? "unknown";
 
+    // Pedidos importados de la SL anterior: solo lectura. Bloqueamos cualquier
+    // mutación de estado (enviado/cancelado/devolución) — pertenecen a la
+    // sociedad previa, no se gestionan desde la web nueva.
+    if (previousOrder?.fiscalCarryOver) {
+      showToast(
+        "Pedido histórico (SL anterior) — sólo lectura. No se puede modificar.",
+      );
+      return;
+    }
+
     // Skip if status hasn't changed
     if (previousStatus === status) return;
 

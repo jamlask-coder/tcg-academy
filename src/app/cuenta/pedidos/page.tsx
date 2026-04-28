@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -398,6 +398,72 @@ export default function PedidosPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [incidentModal, setIncidentModal] = useState<string | null>(null);
   const { showToast } = useToast();
+
+  // Hidratación server-mode: en producción los pedidos del usuario viven en la
+  // BD, no en localStorage. Tras login (incluyendo los 33 usuarios migrados de
+  // la web anterior) consultamos /api/orders para mostrarlos. GET /api/orders
+  // ya filtra por user.id en el server (no admin) — no necesitamos pasarlo.
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_BACKEND_MODE !== "server") return;
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/orders", { credentials: "include" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { ok: boolean; orders?: Array<{
+          id: string; userId?: string; createdAt?: string; status?: string;
+          total?: number; trackingNumber?: string; paymentMethod?: string;
+          paymentStatus?: string; shippingMethod?: string; tiendaRecogida?: string;
+          shippingAddress?: { calle?: string; numero?: string; piso?: string;
+            cp?: string; ciudad?: string; provincia?: string; pais?: string };
+          items?: Array<{ name: string; quantity: number; unitPrice: number;
+            imageUrl?: string; game?: string }>;
+        }> };
+        if (!data.ok || !Array.isArray(data.orders) || cancelled) return;
+        const fromBd: Order[] = data.orders.map((r) => ({
+          id: r.id,
+          userId: r.userId,
+          date: (r.createdAt ?? "").slice(0, 10),
+          dateFormatted: formatDate((r.createdAt ?? "").slice(0, 10)),
+          status: normalizeStatus(r.status ?? "pagado"),
+          total: Number(r.total) || 0,
+          items: (r.items ?? []).map((it) => ({
+            name: it.name,
+            qty: it.quantity,
+            price: it.unitPrice,
+            image: it.imageUrl,
+            game: it.game,
+          })),
+          shippingAddress: r.shippingAddress
+            ? {
+                direccion: [r.shippingAddress.calle, r.shippingAddress.numero]
+                  .filter(Boolean).join(" "),
+                ciudad: r.shippingAddress.ciudad,
+                cp: r.shippingAddress.cp,
+                provincia: r.shippingAddress.provincia,
+              }
+            : undefined,
+          paymentMethod: r.paymentMethod,
+          paymentStatus: r.paymentStatus as PaymentStatus | undefined,
+          trackingNumber: r.trackingNumber,
+          envio: r.shippingMethod,
+          tiendaRecogida: r.tiendaRecogida,
+        }));
+        // Mergeamos: BD primero (auténticos), local-only después (en demo/dev).
+        setOrders((prev) => {
+          const seen = new Set(fromBd.map((o) => o.id));
+          const localOnly = prev.filter((o) => !seen.has(o.id));
+          return [...fromBd, ...localOnly].sort((a, b) =>
+            a.date < b.date ? 1 : -1,
+          );
+        });
+      } catch {
+        /* fallback silente: localStorage ya cubrió la primera render */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   const handleIncidentSubmit = (
     orderId: string,

@@ -507,6 +507,15 @@ export default function PedidoDetailClient() {
   const handleStatusChange = useCallback(
     async (next: AdminOrderStatus, tracking?: string, carrier: Carrier = "GLS") => {
       if (!order) return;
+      // Pedidos importados de la SL anterior: solo informativos, sólo lectura.
+      // Bloqueamos cualquier mutación de estado (enviado, cancelado, devolución…)
+      // porque pertenecen fiscal y operativamente a la sociedad previa.
+      if (order.fiscalCarryOver) {
+        showToast(
+          "Pedido histórico (SL anterior) — sólo lectura. No se puede modificar el estado.",
+        );
+        return;
+      }
       if (next === order.adminStatus && !tracking) return;
       const now = new Date().toISOString();
       const historyNote = next === "enviado" && tracking
@@ -641,9 +650,15 @@ export default function PedidoDetailClient() {
               onChange={(e) =>
                 requestStatusChange(e.target.value as AdminOrderStatus)
               }
-              className="cursor-pointer appearance-none rounded-full pr-8 pl-7 py-1 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-offset-1"
+              disabled={order.fiscalCarryOver}
+              className="cursor-pointer appearance-none rounded-full pr-8 pl-7 py-1 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-70"
               style={{ backgroundColor: status.bg, color: status.color }}
               aria-label={`Estado del pedido: ${status.label}`}
+              title={
+                order.fiscalCarryOver
+                  ? "Pedido histórico (SL anterior) — sólo lectura"
+                  : undefined
+              }
             >
               {(Object.keys(STATUS_CFG) as AdminOrderStatus[]).map((s) => (
                 <option key={s} value={s}>
@@ -694,12 +709,24 @@ export default function PedidoDetailClient() {
         </button>
         <button
           onClick={() => {
+            if (order.fiscalCarryOver) {
+              showToast(
+                "Pedido histórico (SL anterior) — la factura pertenece a la sociedad previa.",
+              );
+              return;
+            }
             if (!isPaid) { showToast("El pago debe estar confirmado para generar factura"); return; }
             showToast("Factura generada — disponible en Facturas");
           }}
-          disabled={!isPaid}
+          disabled={!isPaid || Boolean(order.fiscalCarryOver)}
           className="flex items-center gap-1.5 rounded-xl bg-gray-100 px-3 py-2 text-xs font-bold text-gray-700 transition hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
-          title={!isPaid ? "El pago debe estar confirmado para generar factura" : ""}
+          title={
+            order.fiscalCarryOver
+              ? "Pedido histórico (SL anterior) — no se emiten facturas desde aquí"
+              : !isPaid
+              ? "El pago debe estar confirmado para generar factura"
+              : ""
+          }
         >
           <Receipt size={14} /> Generar factura
         </button>
