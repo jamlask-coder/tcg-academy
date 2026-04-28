@@ -28,6 +28,11 @@ export const dynamic = "force-dynamic";
 
 /** UserRecord (BD) → AdminUser (UI). Nunca filtramos `passwordHash`. */
 function toAdminUser(u: UserRecord): AdminUser {
+  // Para B2B (mayorista/tienda) el NIF es realmente CIF de empresa: lo
+  // proyectamos también a `cif` para que la página detalle muestre los datos
+  // fiscales B2B sin lookups adicionales. `company` queda undefined hasta que
+  // exista la columna `company` en BD (TODO Fase 4).
+  const isB2B = u.role === "mayorista" || u.role === "tienda";
   return {
     id: u.id,
     username: u.username ?? u.email.split("@")[0] ?? u.id,
@@ -36,11 +41,13 @@ function toAdminUser(u: UserRecord): AdminUser {
     email: u.email,
     role: u.role,
     registeredAt: (u.createdAt ?? "").slice(0, 10),
-    totalOrders: 0, // se cruza en el front con readAdminOrdersMerged
+    totalOrders: 0, // se cruza en el front con readAdminOrdersMergedAsync
     totalSpent: 0,
     points: 0, // se cruza en el front con loadPoints()
     active: true,
     phone: u.phone,
+    birthDate: u.birthDate,
+    cif: isB2B ? u.nif : undefined,
   };
 }
 

@@ -22,7 +22,7 @@ import {
   type AdminOrder,
 } from "@/data/mockData";
 import type { User } from "@/types/user";
-import { readAdminOrdersMerged } from "@/lib/orderAdapter";
+import { readAdminOrdersMerged, readAdminOrdersMergedAsync } from "@/lib/orderAdapter";
 import { loadPoints } from "@/services/pointsService";
 import { findUserByHandle } from "@/lib/userHandle";
 import { B2BCharts } from "@/components/account/B2BCharts";
@@ -72,15 +72,24 @@ export default function AdminUsuarioDetailPage() {
   useEffect(() => {
     let cancelled = false;
 
-    const finalize = (baseUser: AdminUser | null) => {
+    const isServerMode =
+      typeof process !== "undefined" &&
+      process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
+
+    const finalize = async (baseUser: AdminUser | null) => {
       if (cancelled) return;
       if (!baseUser) {
         setResolved(null);
         setLoading(false);
         return;
       }
-      // Cruzar con pedidos reales (merged) por userId o email
-      const mergedOrders = readAdminOrdersMerged(ADMIN_ORDERS);
+      // Cruzar con pedidos reales por userId o email. En server-mode tiramos
+      // de la BD vía readAdminOrdersMergedAsync — el sync no ve nada si los
+      // pedidos están en Supabase y no en localStorage del navegador admin.
+      const mergedOrders = isServerMode
+        ? await readAdminOrdersMergedAsync(ADMIN_ORDERS)
+        : readAdminOrdersMerged(ADMIN_ORDERS);
+      if (cancelled) return;
       const emailLower = baseUser.email.toLowerCase();
       const userOrders = mergedOrders.filter(
         (o) =>
@@ -104,16 +113,16 @@ export default function AdminUsuarioDetailPage() {
 
     const resolve = async () => {
       try {
-        // 1. MOCK_USERS por handle (siempre disponible en cualquier modo)
-        const fromMock = findUserByHandle(MOCK_USERS, id) ?? null;
-        if (fromMock) {
-          finalize(fromMock);
-          return;
+        // En server-mode los MOCK_USERS son demos heredados — saltamos directo
+        // a la BD. En local-mode mantenemos el comportamiento histórico para
+        // que /demo siga funcionando sin Supabase.
+        if (!isServerMode) {
+          const fromMock = findUserByHandle(MOCK_USERS, id) ?? null;
+          if (fromMock) {
+            await finalize(fromMock);
+            return;
+          }
         }
-
-        const isServerMode =
-          typeof process !== "undefined" &&
-          process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
 
         if (isServerMode) {
           // 2. Server-mode: BD vía endpoint admin (no localStorage)
@@ -133,11 +142,15 @@ export default function AdminUsuarioDetailPage() {
                 phone?: string;
                 role: AdminUser["role"];
                 registeredAt: string;
+                nif?: string;
+                nifType?: "DNI" | "NIE" | "CIF";
+                birthDate?: string;
               };
             };
             if (data.ok && data.user) {
               const u = data.user;
-              finalize({
+              const isB2B = u.role === "mayorista" || u.role === "tienda";
+              await finalize({
                 id: u.id,
                 username: u.username,
                 name: u.name,
@@ -150,11 +163,13 @@ export default function AdminUsuarioDetailPage() {
                 points: 0,
                 active: true,
                 phone: u.phone,
+                birthDate: u.birthDate,
+                cif: isB2B ? u.nif : undefined,
               });
               return;
             }
           }
-          finalize(null);
+          await finalize(null);
           return;
         }
 
@@ -168,13 +183,13 @@ export default function AdminUsuarioDetailPage() {
           const users = Object.values(registered).map((e) => e.user);
           const match = findUserByHandle(users, id);
           if (match) {
-            finalize(userToAdminUser(match));
+            await finalize(userToAdminUser(match));
             return;
           }
         }
-        finalize(null);
+        await finalize(null);
       } catch {
-        finalize(null);
+        await finalize(null);
       }
     };
 

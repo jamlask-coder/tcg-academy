@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Search, ChevronDown, Users, X, ChevronRight, Clock } from "lucide-react";
 import { MOCK_USERS, ADMIN_ORDERS, type AdminUser } from "@/data/mockData";
 import type { User } from "@/types/user";
-import { readAdminOrdersMerged } from "@/lib/orderAdapter";
+import { readAdminOrdersMerged, readAdminOrdersMergedAsync } from "@/lib/orderAdapter";
 import { loadPoints } from "@/services/pointsService";
 import { getUserHandle } from "@/lib/userHandle";
 
@@ -78,10 +78,13 @@ export default function AdminUsuariosPage() {
           }));
       }
 
-      // ── Cruzar pedidos con usuarios para recalcular stats (idéntico en
-      //    ambos modos — los pedidos siguen viniendo de readAdminOrdersMerged
-      //    que ya hace su propia hidratación) ──
-      const merged = readAdminOrdersMerged(ADMIN_ORDERS);
+      // ── Cruzar pedidos con usuarios para recalcular stats ──
+      // En server-mode `readAdminOrdersMerged` (sync) no ve la BD: devolvía
+      // [] y los totales por usuario quedaban a 0. Usamos la versión async
+      // que tira de /api/orders y mantiene compatibilidad con local-mode.
+      const merged = IS_SERVER_MODE
+        ? await readAdminOrdersMergedAsync(ADMIN_ORDERS)
+        : readAdminOrdersMerged(ADMIN_ORDERS);
       const statsByKey = new Map<string, { orders: number; spent: number }>();
       for (const o of merged) {
         const keys = [o.userId, o.userEmail?.toLowerCase()].filter(Boolean) as string[];
