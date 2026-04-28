@@ -12,7 +12,7 @@
 import { NextResponse } from "next/server";
 import { verifyBackupAdmin } from "@/lib/backup/adminAuth";
 import { restoreBackup } from "@/lib/backup/backupJob";
-import { isBackupS3Configured } from "@/lib/backup/s3Client";
+import { isBackupConfigured } from "@/lib/backup/storage";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -29,9 +29,9 @@ export async function POST(req: Request) {
   if (!auth.ok) {
     return NextResponse.json({ ok: false, error: auth.reason }, { status: 401 });
   }
-  if (!isBackupS3Configured()) {
+  if (!isBackupConfigured()) {
     return NextResponse.json(
-      { ok: false, error: "s3_not_configured" },
+      { ok: false, error: "storage_not_configured" },
       { status: 501 },
     );
   }

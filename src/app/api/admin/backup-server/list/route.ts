@@ -1,14 +1,15 @@
 /**
  * GET /api/admin/backup-server/list
  *
- * Lista los backups cifrados almacenados en S3 (o S3-compat). Cada entrada
- * incluye hash encadenado para detección de manipulación.
+ * Lista los backups cifrados almacenados en el backend activo (Drive o
+ * S3-compat). Cada entrada incluye hash encadenado para detección de
+ * manipulación.
  */
 
 import { NextResponse } from "next/server";
 import { verifyBackupAdmin } from "@/lib/backup/adminAuth";
-import { listBackups } from "@/lib/backup/backupJob";
-import { isBackupS3Configured } from "@/lib/backup/s3Client";
+import { activeBackupBackend, listBackups } from "@/lib/backup/backupJob";
+import { isBackupConfigured } from "@/lib/backup/storage";
 
 export const runtime = "nodejs";
 
@@ -17,14 +18,21 @@ export async function GET(req: Request) {
   if (!auth.ok) {
     return NextResponse.json({ ok: false, error: auth.reason }, { status: 401 });
   }
-  if (!isBackupS3Configured()) {
+  if (!isBackupConfigured()) {
     return NextResponse.json({
       ok: false,
       configured: false,
+      backend: "none",
       backups: [],
-      message: "S3 no configurado — rellena BACKUP_S3_* en .env",
+      message:
+        "Almacenamiento no configurado — define GOOGLE_DRIVE_SA_KEY+GOOGLE_DRIVE_BACKUP_FOLDER_ID o BACKUP_S3_*",
     });
   }
   const backups = await listBackups();
-  return NextResponse.json({ ok: true, configured: true, backups });
+  return NextResponse.json({
+    ok: true,
+    configured: true,
+    backend: activeBackupBackend(),
+    backups,
+  });
 }

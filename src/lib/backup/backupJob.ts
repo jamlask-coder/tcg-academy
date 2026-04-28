@@ -4,10 +4,14 @@
  * Se ejecuta desde /api/cron/backup-supabase (diario) o desde /admin/herramientas
  * (manual). Siempre cifrado y siempre con manifest encadenado.
  *
+ * Backend de almacenamiento (`src/lib/backup/storage.ts`):
+ *  - Drive (preferente si GOOGLE_DRIVE_SA_KEY + folder ID) — RGPD off-site free
+ *  - S3-compat (R2/B2/AWS) si BACKUP_S3_* — fallback empresarial
+ *
  * Contrato:
- *   - Sin credenciales S3 configuradas → devuelve { ok: false, error: "s3_not_configured" }.
- *   - Sin clave de cifrado → devuelve { ok: false, error: "encryption_not_configured" }.
- *   - Sin Supabase admin → devuelve { ok: false, error: "supabase_not_configured" }.
+ *   - Sin backend configurado → { ok: false, error: "storage_not_configured" }.
+ *   - Sin clave de cifrado → { ok: false, error: "encryption_not_configured" }.
+ *   - Sin Supabase admin → { ok: false, error: "supabase_not_configured" }.
  *   - Error en una tabla → se incluye en el manifest como "error" pero no aborta el resto.
  */
 
@@ -24,14 +28,14 @@ import {
   sha256Hex,
 } from "./integrity";
 import {
-  getBackupCredentials,
-  getBackupLocation,
-  isBackupS3Configured,
-  s3Delete,
-  s3Get,
-  s3List,
-  s3Put,
-} from "./s3Client";
+  backupKeyPrefix,
+  getBackupBackend,
+  isBackupConfigured,
+  storageDelete,
+  storageGet,
+  storageList,
+  storagePut,
+} from "./storage";
 import { BACKUP_TABLES, dumpTable, restoreTable } from "./supabaseDump";
 import type {
   BackupJobResult,
@@ -66,17 +70,9 @@ function manifestKey(prefix: string, id: string): string {
 }
 
 async function loadPreviousChainHash(): Promise<string | null> {
-  const location = getBackupLocation();
-  const credentials = getBackupCredentials();
-  if (!location || !credentials) return null;
-
-  const list = await s3List({
-    endpoint: location.endpoint,
-    bucket: location.bucket,
-    prefix: `${location.keyPrefix}/`,
-    credentials,
-    maxKeys: 1000,
-  });
+  if (!isBackupConfigured()) return null;
+  const prefix = backupKeyPrefix();
+  const list = await storageList(`${prefix}/`, 1000);
   // Filtramos solo manifiestos y ordenamos por clave descendente (la clave
   // incluye el timestamp, así que basta con el orden lexicográfico).
   const manifests = list
@@ -86,12 +82,7 @@ async function loadPreviousChainHash(): Promise<string | null> {
 
   const latest = manifests[0];
   try {
-    const body = await s3Get({
-      endpoint: location.endpoint,
-      bucket: location.bucket,
-      key: latest.key,
-      credentials,
-    });
+    const body = await storageGet(latest.key);
     const parsed = JSON.parse(body.toString("utf8")) as BackupManifest;
     return parsed.chainSha256;
   } catch {
@@ -107,13 +98,11 @@ export async function runBackup(): Promise<BackupJobResult> {
   if (!hasEncryptionKey()) {
     return { ok: false, error: "encryption_not_configured", durationMs: 0 };
   }
-  if (!isBackupS3Configured()) {
-    return { ok: false, error: "s3_not_configured", durationMs: 0 };
+  if (!isBackupConfigured()) {
+    return { ok: false, error: "storage_not_configured", durationMs: 0 };
   }
 
-  const location = getBackupLocation()!;
-  const credentials = getBackupCredentials()!;
-
+  const prefix = backupKeyPrefix();
   const startedAt = new Date().toISOString();
   const id = backupId(new Date(startedAt));
 
@@ -127,14 +116,8 @@ export async function runBackup(): Promise<BackupJobResult> {
       if (dump.rowCount === 0) continue; // no subir tablas vacías
       const encrypted = encryptBuffer(dump.ndjson);
       const blob = serializeEncrypted(encrypted);
-      const key = tableKey(location.keyPrefix, id, table);
-      await s3Put({
-        endpoint: location.endpoint,
-        bucket: location.bucket,
-        key,
-        body: blob,
-        credentials,
-      });
+      const key = tableKey(prefix, id, table);
+      await storagePut(key, blob);
       tables.push({
         table,
         rowCount: dump.rowCount,
@@ -182,14 +165,11 @@ export async function runBackup(): Promise<BackupJobResult> {
     chainSha256,
   };
 
-  await s3Put({
-    endpoint: location.endpoint,
-    bucket: location.bucket,
-    key: manifestKey(location.keyPrefix, id),
-    body: Buffer.from(JSON.stringify(manifest, null, 2), "utf8"),
-    contentType: "application/json",
-    credentials,
-  });
+  await storagePut(
+    manifestKey(prefix, id),
+    Buffer.from(JSON.stringify(manifest, null, 2), "utf8"),
+    "application/json",
+  );
 
   // Purge de backups antiguos (RGPD: minimización de datos).
   await pruneOldBackups();
@@ -202,17 +182,10 @@ export async function runBackup(): Promise<BackupJobResult> {
 }
 
 export async function listBackups(): Promise<BackupListEntry[]> {
-  if (!isBackupS3Configured()) return [];
-  const location = getBackupLocation()!;
-  const credentials = getBackupCredentials()!;
+  if (!isBackupConfigured()) return [];
+  const prefix = backupKeyPrefix();
 
-  const list = await s3List({
-    endpoint: location.endpoint,
-    bucket: location.bucket,
-    prefix: `${location.keyPrefix}/`,
-    credentials,
-    maxKeys: 1000,
-  });
+  const list = await storageList(`${prefix}/`, 1000);
   const manifestKeys = list
     .filter((e) => e.key.endsWith("/manifest.json"))
     .sort((a, b) => b.key.localeCompare(a.key));
@@ -220,12 +193,7 @@ export async function listBackups(): Promise<BackupListEntry[]> {
   const out: BackupListEntry[] = [];
   for (const m of manifestKeys.slice(0, 90)) {
     try {
-      const body = await s3Get({
-        endpoint: location.endpoint,
-        bucket: location.bucket,
-        key: m.key,
-        credentials,
-      });
+      const body = await storageGet(m.key);
       const parsed = JSON.parse(body.toString("utf8")) as BackupManifest;
       out.push({
         id: parsed.id,
@@ -245,7 +213,7 @@ export async function listBackups(): Promise<BackupListEntry[]> {
 }
 
 export async function verifyBackup(backupId: string): Promise<BackupVerifyResult> {
-  if (!isBackupS3Configured()) {
+  if (!isBackupConfigured()) {
     return {
       id: backupId,
       ok: false,
@@ -253,18 +221,12 @@ export async function verifyBackup(backupId: string): Promise<BackupVerifyResult
       manifestHashOk: false,
       chainHashOk: false,
       tableHashMismatches: [],
-      message: "S3 no configurado",
+      message: "Almacenamiento de backup no configurado",
     };
   }
-  const location = getBackupLocation()!;
-  const credentials = getBackupCredentials()!;
+  const prefix = backupKeyPrefix();
 
-  const manifestBody = await s3Get({
-    endpoint: location.endpoint,
-    bucket: location.bucket,
-    key: manifestKey(location.keyPrefix, backupId),
-    credentials,
-  });
+  const manifestBody = await storageGet(manifestKey(prefix, backupId));
   const manifest = JSON.parse(manifestBody.toString("utf8")) as BackupManifest;
 
   const recomputedManifestHash = computeManifestHash(manifest);
@@ -279,12 +241,7 @@ export async function verifyBackup(backupId: string): Promise<BackupVerifyResult
   for (const t of manifest.tables) {
     if (!t.objectKey) continue; // skip error rows
     try {
-      const blob = await s3Get({
-        endpoint: location.endpoint,
-        bucket: location.bucket,
-        key: t.objectKey,
-        credentials,
-      });
+      const blob = await storageGet(t.objectKey);
       const plaintext = decryptBuffer(deserializeEncrypted(blob));
       if (sha256Hex(plaintext) !== t.sha256) mismatches.push(t.table);
     } catch (err) {
@@ -311,21 +268,15 @@ export async function restoreBackup(
   tableFilter?: string[],
   opts: { truncateFirst?: boolean } = {},
 ): Promise<{ restoredTables: string[]; totalRows: number }> {
-  if (!isBackupS3Configured()) {
-    throw new Error("S3 no configurado");
+  if (!isBackupConfigured()) {
+    throw new Error("Almacenamiento de backup no configurado");
   }
   if (!hasEncryptionKey()) {
     throw new Error("Clave de cifrado no disponible");
   }
-  const location = getBackupLocation()!;
-  const credentials = getBackupCredentials()!;
+  const prefix = backupKeyPrefix();
 
-  const manifestBody = await s3Get({
-    endpoint: location.endpoint,
-    bucket: location.bucket,
-    key: manifestKey(location.keyPrefix, backupId),
-    credentials,
-  });
+  const manifestBody = await storageGet(manifestKey(prefix, backupId));
   const manifest = JSON.parse(manifestBody.toString("utf8")) as BackupManifest;
 
   const tables = manifest.tables.filter(
@@ -335,12 +286,7 @@ export async function restoreBackup(
   const restoredTables: string[] = [];
   let totalRows = 0;
   for (const t of tables) {
-    const blob = await s3Get({
-      endpoint: location.endpoint,
-      bucket: location.bucket,
-      key: t.objectKey,
-      credentials,
-    });
+    const blob = await storageGet(t.objectKey);
     const plaintext = decryptBuffer(deserializeEncrypted(blob));
     if (sha256Hex(plaintext) !== t.sha256) {
       throw new Error(`Hash mismatch en ${t.table} — backup corrupto`);
@@ -356,8 +302,7 @@ export async function restoreBackup(
 }
 
 /**
- * Elimina backups cuyo `startedAt` supere BACKUP_RETENTION_DAYS.
- * Preserva los manifiestos de los últimos N días (ventana de retención).
+ * Elimina backups cuyo `lastModified` supere BACKUP_RETENTION_DAYS.
  *
  * AVISO RGPD: facturas deben conservarse 72 meses. Como las facturas están
  * dentro del backup (tabla `invoices`) y el backup completo es la unidad, si
@@ -365,32 +310,25 @@ export async function restoreBackup(
  * separados para fiscal (ver BACKUP_RECOVERY.md).
  */
 export async function pruneOldBackups(): Promise<{ deleted: string[] }> {
-  if (!isBackupS3Configured()) return { deleted: [] };
-  const location = getBackupLocation()!;
-  const credentials = getBackupCredentials()!;
+  if (!isBackupConfigured()) return { deleted: [] };
+  const prefix = backupKeyPrefix();
   const keepDays = retentionDays();
 
-  const list = await s3List({
-    endpoint: location.endpoint,
-    bucket: location.bucket,
-    prefix: `${location.keyPrefix}/`,
-    credentials,
-    maxKeys: 1000,
-  });
+  const list = await storageList(`${prefix}/`, 1000);
   const cutoff = Date.now() - keepDays * 86400_000;
   const deleted: string[] = [];
 
   for (const entry of list) {
     const d = new Date(entry.lastModified).getTime();
     if (Number.isFinite(d) && d < cutoff) {
-      await s3Delete({
-        endpoint: location.endpoint,
-        bucket: location.bucket,
-        key: entry.key,
-        credentials,
-      });
+      await storageDelete(entry.key);
       deleted.push(entry.key);
     }
   }
   return { deleted };
+}
+
+/** Backend activo (para diagnóstico en /admin/herramientas). */
+export function activeBackupBackend(): string {
+  return getBackupBackend();
 }
