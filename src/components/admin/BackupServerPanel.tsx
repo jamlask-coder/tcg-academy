@@ -3,12 +3,13 @@
 /**
  * Panel de backups producción (RGPD art. 32).
  *
- * Muestra los backups cifrados almacenados en S3, permite ejecutar uno manual,
- * verificar integridad (hash encadenado + SHA-256 por tabla) y restaurar.
+ * Muestra los backups cifrados almacenados en el backend activo (Drive o
+ * S3-compat), permite ejecutar uno manual, verificar integridad (hash
+ * encadenado + SHA-256 por tabla) y restaurar.
  *
  * SOLO opera contra los endpoints /api/admin/backup-server/* — que requieren
- * `x-admin-token`. Si no hay token ni S3 configurado, el panel muestra modo
- * degradado con instrucciones.
+ * `x-admin-token`. Si no hay token ni backend configurado, el panel muestra
+ * modo degradado con instrucciones específicas para cada backend.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -31,8 +32,11 @@ function getAdminToken(): string {
   return localStorage.getItem("tcgacademy_admin_token") ?? "";
 }
 
+type BackendKind = "drive" | "s3" | "none";
+
 export function BackupServerPanel({ onToast }: Props) {
   const [configured, setConfigured] = useState<boolean | null>(null);
+  const [backend, setBackend] = useState<BackendKind>("none");
   const [backups, setBackups] = useState<BackupListEntry[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [verifying, setVerifying] = useState<Record<string, BackupVerifyResult | null>>({});
@@ -50,9 +54,11 @@ export function BackupServerPanel({ onToast }: Props) {
       const json = (await res.json()) as {
         ok: boolean;
         configured?: boolean;
+        backend?: BackendKind;
         backups?: BackupListEntry[];
       };
       setConfigured(Boolean(json.configured));
+      setBackend(json.backend ?? "none");
       setBackups(json.backups ?? []);
     } catch {
       setConfigured(false);
@@ -171,10 +177,17 @@ export function BackupServerPanel({ onToast }: Props) {
 
       {configured === false && token && (
         <div className="mb-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-          S3 no configurado. Rellena en <code>.env</code>: <code>BACKUP_S3_ENDPOINT</code>,{" "}
-          <code>BACKUP_S3_BUCKET</code>, <code>BACKUP_S3_ACCESS_KEY</code>,{" "}
-          <code>BACKUP_S3_SECRET_KEY</code>, <code>BACKUP_ENCRYPTION_KEY</code>.
+          Almacenamiento off-site no configurado. Define en Vercel{" "}
+          <code>GOOGLE_DRIVE_SA_KEY</code> + <code>GOOGLE_DRIVE_BACKUP_FOLDER_ID</code>{" "}
+          (Drive, gratis), o bien <code>BACKUP_S3_*</code> (S3-compat). Y{" "}
+          <code>BACKUP_ENCRYPTION_KEY</code> en cualquier caso. Después redeploy.
         </div>
+      )}
+
+      {configured && (
+        <p className="mb-3 text-xs text-gray-500">
+          Backend activo: <strong className="font-semibold text-gray-700">{backend === "drive" ? "Google Drive" : backend === "s3" ? "S3-compat" : "—"}</strong>
+        </p>
       )}
 
       {backups.length === 0 && configured && (
