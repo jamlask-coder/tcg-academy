@@ -24,22 +24,25 @@ const ROLE_LABELS: Record<string, string> = {
 
 type UserRole = AdminUser["role"];
 
+const IS_SERVER_MODE =
+  typeof process !== "undefined" &&
+  process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
+
 export default function AdminUsuariosPage() {
   const router = useRouter();
-  const [users, setUsers] = useState<AdminUser[]>(MOCK_USERS);
+  // En server-mode la BD es la SSOT — arrancamos vacío y dejamos que el
+  // fetch a /api/admin/users rellene. Nunca mostramos MOCK_USERS porque son
+  // demos heredados de cuando todo vivía en localStorage.
+  const [users, setUsers] = useState<AdminUser[]>(IS_SERVER_MODE ? [] : MOCK_USERS);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
   const [sortByRecent, setSortByRecent] = useState(true);
 
   const refreshUsers = async () => {
     try {
-      const isServerMode =
-        typeof process !== "undefined" &&
-        process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
-
       let newUsers: AdminUser[] = [];
 
-      if (isServerMode) {
+      if (IS_SERVER_MODE) {
         // En server-mode el SSOT es Supabase — leemos vía API protegida.
         // requireAdmin en el endpoint ya garantiza que sólo admins reales
         // ven la lista, sin importar el navegador desde el que entren.
@@ -48,11 +51,7 @@ export default function AdminUsuariosPage() {
         });
         if (res.ok) {
           const data = (await res.json()) as { ok: boolean; users: AdminUser[] };
-          const mockEmails = new Set(MOCK_USERS.map((u) => u.email.toLowerCase()));
-          // Filtramos los seed mock para no duplicar — la BD es la verdad.
-          newUsers = (data.users ?? []).filter(
-            (u) => !mockEmails.has(u.email.toLowerCase()),
-          );
+          newUsers = data.users ?? [];
         }
       } else {
         // Modo local — preservamos el comportamiento histórico para dev.
@@ -104,7 +103,11 @@ export default function AdminUsuariosPage() {
         };
       };
 
-      const combined = [...MOCK_USERS, ...newUsers].map(recomputeUser);
+      // Server-mode: SOLO usuarios reales de BD (los WP migrados).
+      // Local-mode: MOCK_USERS (demos) + registrados en localStorage.
+      const combined = IS_SERVER_MODE
+        ? newUsers.map(recomputeUser)
+        : [...MOCK_USERS, ...newUsers].map(recomputeUser);
       setUsers(combined);
     } catch { /* ignore */ }
   };
