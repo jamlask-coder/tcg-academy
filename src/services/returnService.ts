@@ -460,6 +460,62 @@ export function getReturnsByUser(userId: string): ReturnRequest[] {
 }
 
 /**
+ * SSOT — total reembolsado por usuario. Devuelve un mapa
+ * { userId | emailLower } → euros reembolsados (sumando todas las RMAs en
+ * estado "reembolsada"). Lo consume `/admin/usuarios`, `/admin/usuarios/[id]`,
+ * `analyticsService.getTopCustomers` y `getRevenueSummary` para que el "Gasto
+ * total" del cliente y los KPIs reflejen los reembolsos como negativo —
+ * un cliente que devolvió todo no debe seguir computando como gasto.
+ *
+ * Solo cuentan RMAs cerradas con `status === "reembolsada"` (transferencia
+ * emitida). Las solicitudes en revisión / aprobadas / enviadas todavía no
+ * descuentan.
+ */
+export function getRefundedAmountByUser(): Map<string, number> {
+  const result = new Map<string, number>();
+  const all = loadReturns();
+  for (const r of all) {
+    if (r.status !== "reembolsada" && !r.refundedAt) continue;
+    const amount = Number(r.totalRefundAmount) || 0;
+    if (amount <= 0) continue;
+    const keys = [r.customerId, r.customerEmail?.toLowerCase()].filter(
+      Boolean,
+    ) as string[];
+    for (const k of keys) {
+      result.set(k, (result.get(k) ?? 0) + amount);
+    }
+  }
+  return result;
+}
+
+/**
+ * Total reembolsado a un usuario (suma de todas sus RMAs en estado
+ * "reembolsada"). Wrapper sobre `getRefundedAmountByUser()` para callers que
+ * solo necesitan el dato de un usuario concreto.
+ */
+export function getRefundedAmountForUser(
+  userId: string,
+  email?: string,
+): number {
+  const map = getRefundedAmountByUser();
+  return map.get(userId) ?? (email ? map.get(email.toLowerCase()) ?? 0 : 0);
+}
+
+/**
+ * Suma global de reembolsos cerrados — para descontar del revenue del
+ * dashboard. Misma fuente que getRefundedAmountByUser.
+ */
+export function getTotalRefundedAmount(): number {
+  const all = loadReturns();
+  let total = 0;
+  for (const r of all) {
+    if (r.status !== "reembolsada" && !r.refundedAt) continue;
+    total += Number(r.totalRefundAmount) || 0;
+  }
+  return total;
+}
+
+/**
  * Restore stock for returned items.
  */
 export function restoreStockForReturn(items: ReturnItem[]): void {

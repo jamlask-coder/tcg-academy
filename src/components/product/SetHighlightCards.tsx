@@ -7,36 +7,10 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight, X, Sparkles } from "lucide-react";
-import { CATEGORY_LABELS, GAME_CONFIG, type LocalProduct } from "@/data/products";
-import { PriceHistoryChart } from "@/components/product/PriceHistoryChart";
+import { type LocalProduct } from "@/data/products";
 import { resolveHighlights, type HighlightCard } from "@/lib/setHighlights";
 import { TCGDEX_EN_SET, TCGDEX_JP_SET, TCGDEX_LANG, tcgdexSeriesPath } from "@/lib/setHighlights/setMaps";
 import { clickableProps } from "@/lib/a11y";
-
-// ─── Helpers de nombre (para título "Colección completa de ...") ─────────────
-
-function cleanSetName(product: LocalProduct): string {
-  let name = product.name
-    .replace(/^\[DEMO\]\s*/i, "")
-    .replace(/\s*\(\d+\s*(?:cartas|sobres)\)/gi, "")
-    .trim();
-  const gameName = GAME_CONFIG[product.game]?.name;
-  if (gameName) {
-    const escaped = gameName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    name = name.replace(new RegExp(`^${escaped}\\s*[:\\-]?\\s*`, "i"), "");
-  }
-  const categoryLabel = CATEGORY_LABELS[product.category];
-  if (categoryLabel) {
-    const escapedCat = categoryLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    name = name.replace(new RegExp(`\\s*${escapedCat}\\s*$`, "i"), "");
-    const singular = categoryLabel.replace(/s\b/, "");
-    if (singular !== categoryLabel) {
-      const escapedSingular = singular.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      name = name.replace(new RegExp(`\\s*${escapedSingular}\\s*$`, "i"), "");
-    }
-  }
-  return name.trim();
-}
 
 // ─── Holo shimmer overlay ────────────────────────────────────────────────────
 
@@ -131,7 +105,8 @@ function CardLightbox({
     if (i >= 0 && i < cards.length) slots.push({ offset: off, card: cards[i], idx: i });
   }
 
-  const hasChart = Boolean(card.externalId && card.game);
+  // Histórico de precios retirado: el lightbox solo muestra la carta y su info.
+  const hasChart = false;
 
   return (
     <div
@@ -238,14 +213,10 @@ function CardLightbox({
         })}
       </div>
 
-      {/* Info + chart for center card */}
+      {/* Info de la carta */}
       <div
         {...clickableProps((e) => e?.stopPropagation())}
-        className={
-          hasChart
-            ? "flex w-full flex-col items-center gap-3 px-4 pt-4 pb-6"
-            : "absolute bottom-4 left-0 right-0 flex flex-col items-center gap-3 px-4 sm:bottom-6"
-        }
+        className="absolute bottom-4 left-0 right-0 flex flex-col items-center gap-3 px-4 sm:bottom-6"
       >
         <div className="text-center">
           <p className="text-base font-bold text-white sm:text-lg">{card.name}</p>
@@ -261,16 +232,6 @@ function CardLightbox({
             {index + 1} / {cards.length}
           </p>
         </div>
-        {card.game && card.externalId && (
-          <div className="w-full max-w-[600px]">
-            <PriceHistoryChart
-              key={`${card.game}:${card.externalId}`}
-              game={card.game}
-              externalId={card.externalId}
-              cardName={card.name}
-            />
-          </div>
-        )}
       </div>
     </div>
   );
@@ -805,7 +766,7 @@ export function SetHighlightCards({ product }: Props) {
                 className="group/col flex items-center gap-2 text-left"
               >
                 <h3 className="text-xl font-bold text-gray-900 transition group-hover/col:text-[#2563eb]">
-                  Ver la colección completa de {cleanSetName(product)} ({collection.length})
+                  Ver colección
                 </h3>
                 <ChevronRight
                   size={18}

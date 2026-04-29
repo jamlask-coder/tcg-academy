@@ -6,6 +6,10 @@
 
 import { getMergedProducts } from "@/lib/productStore";
 import { readAdminOrdersMerged } from "@/lib/orderAdapter";
+import {
+  getRefundedAmountByUser,
+  getTotalRefundedAmount,
+} from "@/services/returnService";
 
 // ─── Storage keys ───────────────────────────────────────────────────────────
 
@@ -186,8 +190,15 @@ export function getRevenueSummary(
     }
   }
 
+  // Restamos los reembolsos cerrados (RMAs reembolsadas) del revenue total.
+  // No los reasignamos por juego/categoría/rol porque el desglose por
+  // dimensión sigue mostrando importe bruto vendido — el neto tras
+  // devoluciones solo aplica al total agregado del KPI principal.
+  const refundedTotal = getTotalRefundedAmount();
+  const netTotal = Math.max(0, total - refundedTotal);
+
   return {
-    total: Math.round(total * 100) / 100,
+    total: Math.round(netTotal * 100) / 100,
     byGame,
     byCategory,
     byRole,
@@ -297,6 +308,16 @@ export function getTopCustomers(limit = 10): TopCustomer[] {
         orderCount: 1,
       });
     }
+  }
+
+  // Restar reembolsos cerrados — sin esto, el ranking incluía clientes
+  // que devolvieron todo y seguían figurando en el top.
+  const refundsByKey = getRefundedAmountByUser();
+  for (const c of customerMap.values()) {
+    const refunded =
+      refundsByKey.get(c.userId) ??
+      (c.userId.includes("@") ? refundsByKey.get(c.userId.toLowerCase()) ?? 0 : 0);
+    if (refunded > 0) c.totalSpent = Math.max(0, c.totalSpent - refunded);
   }
 
   return Array.from(customerMap.values())

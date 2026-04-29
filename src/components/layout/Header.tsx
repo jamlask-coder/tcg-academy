@@ -16,7 +16,6 @@ import {
   ShieldCheck,
   CheckCircle2,
   LogOut,
-  LayoutDashboard,
   Inbox,
   Menu,
   ChevronDown,
@@ -481,25 +480,7 @@ function ProfileIconMenu() {
         />
       </button>
       {open && (
-        <div className="absolute top-full right-0 z-50 mt-2 w-52 overflow-hidden rounded-2xl border border-gray-200 bg-white py-1.5 shadow-2xl">
-          <div className="border-b border-gray-100 px-4 pt-2.5 pb-2.5">
-            <p className="text-sm font-bold text-gray-900">
-              {user.name} {user.lastName}
-            </p>
-            {user.role !== "admin" && user.email && (
-              <p className="mt-0.5 truncate text-[11px] text-gray-400">
-                {user.email}
-              </p>
-            )}
-          </div>
-          <Link
-            href={user.role === "admin" ? "/admin" : "/cuenta"}
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50"
-          >
-            <LayoutDashboard size={15} className="text-gray-400" /> Resumen
-          </Link>
-          <div className="my-1 border-t border-gray-100" />
+        <div className="absolute top-full right-0 z-50 mt-2 w-44 overflow-hidden rounded-2xl border border-gray-200 bg-white py-1.5 shadow-2xl">
           <button
             type="button"
             onClick={() => {

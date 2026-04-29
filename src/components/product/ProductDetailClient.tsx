@@ -31,6 +31,7 @@ import { persistProductPatch } from "@/lib/productPersist";
 import { SetHighlightCards } from "@/components/product/SetHighlightCards";
 import { LanguageFlag } from "@/components/ui/LanguageFlag";
 import { DiscountBadgeEdit } from "@/components/ui/DiscountBadgeEdit";
+import { InCartBadge } from "@/components/ui/InCartBadge";
 import { usePrice } from "@/hooks/usePrice";
 import { LocalProductCard } from "@/components/product/LocalProductCard";
 import { InlineEdit } from "@/components/admin/InlineEdit";
@@ -1389,7 +1390,13 @@ export function ProductDetailClient({ product: initialProduct, config, catLabel 
                       <Plus size={15} />
                     </button>
                   </div>
-                ) : (
+                ) : null}
+                {cartQty > 0 && !isOutOfStock && (
+                  <div className="mt-1.5 flex justify-center">
+                    <InCartBadge variant="detail" />
+                  </div>
+                )}
+                {cartQty === 0 && !isOutOfStock && (
                   <button
                     onClick={handleAddToCart}
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] py-3 text-sm font-bold text-white shadow-lg transition-all duration-200 hover:bg-[#1d4ed8] hover:shadow-xl active:scale-[0.97]"

@@ -28,6 +28,7 @@ import {
   readAdminOrdersMergedAsync,
 } from "@/lib/orderAdapter";
 import { loadPoints } from "@/services/pointsService";
+import { getRefundedAmountForUser } from "@/services/returnService";
 import { findUserByHandle } from "@/lib/userHandle";
 import { B2BCharts } from "@/components/account/B2BCharts";
 import { SendCouponButton } from "@/components/admin/SendCouponModal";
@@ -112,7 +113,11 @@ export default function AdminUsuarioDetailPage() {
       // ellos. La exclusión de carry-over vive únicamente en el módulo
       // fiscal (303/390/libro de facturas), nunca en stats de usuario.
       const totalOrders = userOrders.length;
-      const totalSpent = userOrders.reduce((s, o) => s + (o.total || 0), 0);
+      const grossSpent = userOrders.reduce((s, o) => s + (o.total || 0), 0);
+      // Restamos las RMAs reembolsadas — un cliente que devolvió no debe
+      // seguir contabilizando ese importe en su gasto total.
+      const refunded = getRefundedAmountForUser(baseUser.id, baseUser.email);
+      const totalSpent = Math.max(0, grossSpent - refunded);
       const livePoints = loadPoints(baseUser.id);
       setResolved({
         user: {

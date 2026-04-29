@@ -9,6 +9,7 @@ import {
   readAdminOrdersMergedAsync,
 } from "@/lib/orderAdapter";
 import { loadPoints } from "@/services/pointsService";
+import { getRefundedAmountByUser } from "@/services/returnService";
 import { getUserHandle } from "@/lib/userHandle";
 
 const ROLE_COLORS = {
@@ -81,10 +82,19 @@ export default function AdminUsuariosPage() {
           }));
       }
 
-      // ── Cruzar pedidos con usuarios para recalcular stats ──
-      // En server-mode `readAdminOrdersMerged` (sync) no ve la BD: devolvía
-      // [] y los totales por usuario quedaban a 0. Usamos la versión async
-      // que tira de /api/orders y mantiene compatibilidad con local-mode.
+      // ── PASE 1: pintar usuarios YA, sin esperar a /api/orders ──
+      // Antes esperábamos a `readAdminOrdersMergedAsync` antes de llamar a
+      // `setUsers`, lo que dejaba la tabla en "0 usuarios" durante segundos
+      // mientras /api/orders devolvía TODOS los pedidos. Ahora pintamos
+      // primero la lista (con totales 0/0) y enriquecemos en pase 2. Mejora
+      // notable de TTI sin sacrificar exactitud: cuando llegan los pedidos,
+      // re-renderizamos con los totales correctos.
+      const initialUsers = IS_SERVER_MODE
+        ? newUsers
+        : [...MOCK_USERS, ...newUsers];
+      setUsers(initialUsers);
+
+      // ── PASE 2: cruzar pedidos con usuarios para recalcular stats ──
       // Importante: contabilizamos TODOS los pedidos (incluidos los heredados
       // fiscalCarryOver). El admin necesita ver el histórico real del cliente
       // — son pedidos de verdad, sólo que no facturamos sobre ellos. La
@@ -102,23 +112,28 @@ export default function AdminUsuariosPage() {
           statsByKey.set(k, prev);
         }
       }
+      // Reembolsos cerrados (RMAs reembolsadas) — restan del totalSpent
+      // del cliente. Sin esto, un cliente que devolvió todo seguía
+      // apareciendo con el gasto íntegro y desvirtuaba el ranking.
+      const refundsByKey = getRefundedAmountByUser();
       const recomputeUser = (u: AdminUser): AdminUser => {
         const s = statsByKey.get(u.id) ?? statsByKey.get(u.email.toLowerCase());
         const livePoints = loadPoints(u.id);
+        const refunded =
+          refundsByKey.get(u.id) ??
+          refundsByKey.get(u.email.toLowerCase()) ??
+          0;
+        const grossSpent = s ? s.spent : u.totalSpent;
+        const netSpent = Math.max(0, grossSpent - refunded);
         return {
           ...u,
           totalOrders: s ? s.orders : u.totalOrders,
-          totalSpent: s ? s.spent : u.totalSpent,
+          totalSpent: netSpent,
           points: livePoints > 0 ? livePoints : u.points,
         };
       };
 
-      // Server-mode: SOLO usuarios reales de BD (los WP migrados).
-      // Local-mode: MOCK_USERS (demos) + registrados en localStorage.
-      const combined = IS_SERVER_MODE
-        ? newUsers.map(recomputeUser)
-        : [...MOCK_USERS, ...newUsers].map(recomputeUser);
-      setUsers(combined);
+      setUsers(initialUsers.map(recomputeUser));
     } catch { /* ignore */ }
   };
 

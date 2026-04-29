@@ -54,6 +54,47 @@ function now(): number {
 }
 
 /**
+ * Tabla de rarezas → tier numérico (más alto = más cotizada). Cubre Pokemon
+ * (Cardmarket), Magic (Scryfall), Yu-Gi-Oh, One Piece y Lorcana. Las rarezas
+ * desconocidas devuelven 0 — quedan al final del fallback.
+ *
+ * Solo se usa como TIE-BREAKER cuando no hay priceEur. No reemplaza el precio
+ * real cuando existe.
+ */
+function rarityTier(rarity: string | undefined): number {
+  if (!rarity) return 0;
+  const r = rarity.toLowerCase();
+  // Pokemon (Cardmarket / pokemontcg.io)
+  if (r.includes("special illustration")) return 100;
+  if (r.includes("hyper rare")) return 95;
+  if (r.includes("illustration rare")) return 90;
+  if (r.includes("ultra rare") || r.includes("ultrarare")) return 85;
+  if (r.includes("secret")) return 88;
+  if (r.includes("double rare")) return 70;
+  // Magic
+  if (r === "mythic" || r.includes("mythic")) return 95;
+  // Yu-Gi-Oh
+  if (r.includes("starlight")) return 100;
+  if (r.includes("ghost rare") || r.includes("collector")) return 95;
+  if (r.includes("prismatic secret")) return 92;
+  if (r.includes("ultimate")) return 80;
+  if (r.includes("super rare")) return 65;
+  // One Piece / Dragon Ball
+  if (r.includes("sec")) return 95;
+  if (r.includes("scr")) return 95;
+  if (r.includes("sp ")) return 88;
+  if (r.includes("sr") || r === "sr") return 80;
+  // Lorcana
+  if (r.includes("enchanted")) return 95;
+  if (r.includes("legendary")) return 75;
+  // Generic fallback
+  if (r === "rare" || r.includes("rare holo") || r.includes("rare")) return 50;
+  if (r.includes("uncommon")) return 20;
+  if (r.includes("common")) return 10;
+  return 0;
+}
+
+/**
  * Indica si el adaptador de un juego está soportado (tiene fuente de cartas).
  * Juegos como `topps`, `panini`, `cyberpunk` son cromos sin cotización, por lo
  * que devuelven siempre `[]` y no deben contabilizarse como "fallos".
@@ -132,10 +173,17 @@ export async function resolveHighlights(
   // null, fallback hardcoded sin precio) no garantizaban el orden por valor
   // EUR — y se veían cartas de céntimos arriba. Aquí las que no tienen precio
   // van al final, las caras suben.
+  //
+  // Fallback de rareza: cuando priceEur falta (sets JP-only sin Cardmarket
+  // como SV11W White Flare), ordenar por número de carta dejaba arriba
+  // Trainers/Stadiums/Energy. Con `rarityTier` priorizamos rarezas altas
+  // (Special Illustration Rare, Hyper Rare, Ultra Rare, Mythic, Secret…)
+  // sobre Common/Uncommon/Trainer.
   cards = [...cards].sort((a, b) => {
     const pa = typeof a.priceEur === "number" && a.priceEur > 0 ? a.priceEur : -1;
     const pb = typeof b.priceEur === "number" && b.priceEur > 0 ? b.priceEur : -1;
-    return pb - pa;
+    if (pa !== pb) return pb - pa;
+    return rarityTier(b.rarity) - rarityTier(a.rarity);
   });
 
   if (cards.length > 0) {

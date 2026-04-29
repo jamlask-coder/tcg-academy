@@ -13,7 +13,7 @@ import {
   Package2,
 } from "lucide-react";
 import { ADMIN_ORDERS } from "@/data/mockData";
-import { readAdminOrdersMerged, isCountableOrder } from "@/lib/orderAdapter";
+import { readAdminOrdersMerged, isStatsCountableOrder } from "@/lib/orderAdapter";
 import { loadIncidents } from "@/services/incidentService";
 import { loadMessages as loadAllMessages } from "@/services/messageService";
 import { loadSolicitudes } from "@/services/solicitudService";
@@ -179,8 +179,9 @@ async function buildAdminNotifications(): Promise<AdminNotification[]> {
   // 1. Pedidos pendientes de envío (acción del cliente, no del admin)
   try {
     // Merge: incluye pedidos del checkout aunque el mirror al inbox fallara.
-    // Carry-over (SL anterior) no genera notificaciones de operativa nueva.
-    const orders = readAdminOrdersMerged(ADMIN_ORDERS).filter(isCountableOrder);
+    // Incluimos heredados (carry-over) — son envíos reales que el admin
+    // tiene que gestionar aunque la factura sea de la SL anterior.
+    const orders = readAdminOrdersMerged(ADMIN_ORDERS).filter(isStatsCountableOrder);
     orders
       .filter((o) => o.adminStatus === "pendiente_envio")
       .forEach((o) => {

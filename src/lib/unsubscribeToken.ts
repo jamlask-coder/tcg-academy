@@ -57,10 +57,31 @@ export async function verifyUnsubscribeToken(
 
 /**
  * Construye la URL absoluta que se inyecta en `{{unsubscribe_link}}` de cada
- * plantilla. Usa `NEXT_PUBLIC_APP_URL` (mismo patrón que el resto del código).
+ * plantilla. Resuelve el dominio en este orden:
+ *   1. `NEXT_PUBLIC_APP_URL` (configurado por el operador, p.ej. dominio
+ *      personalizado tcgacademy.com).
+ *   2. `VERCEL_PROJECT_PRODUCTION_URL` (Vercel inyecta el dominio prod
+ *      automáticamente — robust fallback si el operador olvida la env var).
+ *   3. `VERCEL_URL` (deployment-specific, p.ej. preview/branch).
+ *   4. `http://localhost:3000` (último recurso, dev local).
+ *
+ * Antes solo miraba (1) y caía a localhost. Si `NEXT_PUBLIC_APP_URL` no
+ * estaba configurado en Vercel, los emails enviados desde producción
+ * apuntaban a `http://localhost:3000/unsubscribe?...` → 404 / connection
+ * refused al hacer click desde la bandeja de entrada del usuario.
  */
 export async function getUnsubscribeUrl(email: string): Promise<string> {
   const token = await createUnsubscribeToken(email);
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = resolveAppBaseUrl();
   return `${appUrl}/unsubscribe?token=${encodeURIComponent(token)}`;
+}
+
+function resolveAppBaseUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL;
+  if (explicit && /^https?:\/\//.test(explicit)) return explicit.replace(/\/$/, "");
+  const prodUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (prodUrl) return `https://${prodUrl.replace(/\/$/, "")}`;
+  const vercelUrl = process.env.VERCEL_URL;
+  if (vercelUrl) return `https://${vercelUrl.replace(/\/$/, "")}`;
+  return "http://localhost:3000";
 }

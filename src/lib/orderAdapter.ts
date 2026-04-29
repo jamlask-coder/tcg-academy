@@ -417,23 +417,33 @@ export function isAdminVisibleOrder(o: AdminOrder): boolean {
 }
 
 /**
- * SSOT para "¿este pedido contabiliza en KPIs/totales/stats?".
+ * SSOT FISCAL — "¿este pedido contabiliza en cálculos de impuestos?".
  *
  * Los pedidos heredados (`fiscalCarryOver: true`) pertenecen a la SL
- * anterior y se muestran en /admin/pedidos solo como observación. NO deben
- * sumar en:
- *   - Ingresos/revenue del dashboard
- *   - Pedidos por usuario en /admin/usuarios
- *   - Estadísticas operativas
- *   - Modelo 303 / 390 / cualquier cálculo fiscal (la SL nueva no tributa
- *     ingresos de la SL anterior)
- *   - Badges de pendientes en sidebar/header
+ * anterior. La SL nueva NO tributa sobre ingresos de la SL anterior, así que
+ * quedan FUERA de:
+ *   - Modelo 303 / 390
+ *   - Auto-emisión de facturas
+ *   - Conciliación bancaria fiscal
  *
- * Sí siguen apareciendo en listados (tabla de /admin/pedidos, tabla de
- * pedidos del usuario en su detalle) marcados visualmente como heredados.
+ * Para badges operativos, KPIs del dashboard, totales por usuario y
+ * estadísticas usar `isStatsCountableOrder` — esos contextos SÍ incluyen
+ * heredados porque el admin necesita ver el histórico real del cliente.
  */
 export function isCountableOrder(o: AdminOrder): boolean {
   return !o.fiscalCarryOver && isAdminVisibleOrder(o);
+}
+
+/**
+ * SSOT OPERATIVO — "¿este pedido cuenta en KPIs/badges/estadísticas?".
+ *
+ * Igual que `isCountableOrder` pero SIN excluir carry-over. Los heredados
+ * son pedidos reales del negocio (mismo cliente, mismo producto), solo que
+ * no los facturamos nosotros. Para todo lo que NO sea cálculo fiscal deben
+ * sumar.
+ */
+export function isStatsCountableOrder(o: AdminOrder): boolean {
+  return isAdminVisibleOrder(o);
 }
 
 /**
@@ -441,16 +451,17 @@ export function isCountableOrder(o: AdminOrder): boolean {
  * (`readAdminOrdersMerged`) para incluir también los que sólo existen todavía
  * en el checkout (`tcgacademy_orders`) y aún no se propagaron al inbox admin.
  *
- * Criterio: `adminStatus === "pendiente_envio"` Y `isAdminVisibleOrder` (i.e.
- * NO son pagos diferidos pendientes de cobro). Así el badge de la cabecera,
- * el del sidebar admin y la tarjeta "Pendientes" de /admin/pedidos muestran
- * exactamente el mismo número — no puede haber desfase.
+ * Criterio: `adminStatus === "pendiente_envio"` Y `isStatsCountableOrder`
+ * (i.e. NO son pagos diferidos pendientes de cobro, pero SÍ incluye
+ * heredados — un envío pendiente sigue siéndolo aunque la factura sea de
+ * la SL anterior). Así el badge de la cabecera, el del sidebar admin y la
+ * tarjeta "Pendientes" de /admin/pedidos muestran el mismo número.
  */
 export function countPendingOrdersToShip(): number {
   if (typeof window === "undefined") return 0;
   const orders = readAdminOrdersMerged();
   return orders
-    .filter(isCountableOrder)
+    .filter(isStatsCountableOrder)
     .filter((o) => o.adminStatus === "pendiente_envio").length;
 }
 

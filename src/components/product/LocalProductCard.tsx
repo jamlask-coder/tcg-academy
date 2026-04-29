@@ -17,6 +17,7 @@ import {
 } from "@/data/products";
 import { LanguageFlag } from "@/components/ui/LanguageFlag";
 import { DiscountBadgeEdit } from "@/components/ui/DiscountBadgeEdit";
+import { InCartBadge } from "@/components/ui/InCartBadge";
 import { usePrice } from "@/hooks/usePrice";
 import { HoloCard } from "@/components/product/HoloCard";
 import { isLocalProduct, getProductUrl } from "@/lib/productStore";
@@ -461,6 +462,11 @@ function LocalProductCardInner({ product }: Props) {
             <span className="text-[10px] font-semibold text-red-500">
               {limitMsg}
             </span>
+          )}
+          {cartQty > 0 && (
+            <div className="pt-0.5">
+              <InCartBadge variant="card" />
+            </div>
           )}
         </div>
       </div>
