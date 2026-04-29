@@ -172,7 +172,7 @@ function SendMessageModal({
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="Ej: Información sobre tu pedido"
                 maxLength={140}
-                className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-blue-600 focus:outline-none"
+                className="h-11 w-full rounded-xl border-2 border-gray-200 bg-white px-4 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-blue-600 focus:outline-none"
               />
               <p className="mt-1 text-xs text-gray-400">
                 {subject.length}/140 caracteres
@@ -189,7 +189,7 @@ function SendMessageModal({
                 placeholder="Escribe aquí el mensaje íntegro que recibirá el usuario tanto en su bandeja como en su email..."
                 rows={10}
                 maxLength={4000}
-                className="w-full resize-none rounded-xl border-2 border-gray-200 px-4 py-3 text-sm leading-relaxed transition focus:border-blue-600 focus:outline-none"
+                className="w-full resize-none rounded-xl border-2 border-gray-200 bg-white px-4 py-3 text-sm leading-relaxed text-gray-900 placeholder:text-gray-400 transition focus:border-blue-600 focus:outline-none"
               />
               <p className="mt-1 text-xs text-gray-400">
                 {body.length}/4000 caracteres · Los saltos de línea se respetan.
