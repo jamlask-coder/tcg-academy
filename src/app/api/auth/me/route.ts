@@ -2,8 +2,18 @@
  * GET /api/auth/me
  *
  * Hidrata la sesión del usuario actual desde la cookie JWT (`tcga_session`).
- * Returns 401 si no hay cookie válida; 200 con `{ user }` si la sesión es
- * válida.
+ *
+ *   - 200 `{ ok: true, user }`   → sesión válida.
+ *   - 200 `{ ok: false }`        → no hay sesión (visitante anónimo). NO es
+ *                                   un error: el endpoint reporta estado.
+ *                                   Devolverlo como 401 ensucia la consola
+ *                                   del navegador en cada visita anónima
+ *                                   (Refused to load… 401) y rompe los
+ *                                   tests de "no console errors".
+ *   - 401 `{ ok: false, error }` → cookie presente pero el usuario que
+ *                                   referencia ya no existe en BD: forzamos
+ *                                   logout en el cliente.
+ *   - 500                         → error interno hidratando.
  *
  * Lo usa `AuthContext` al montar la app en server mode, en lugar de leer el
  * usuario desde localStorage. La cookie httpOnly es la fuente de verdad —
@@ -32,7 +42,11 @@ export async function GET(req: NextRequest) {
 
   const session = await getSessionFromRequest(req);
   if (!session?.sub) {
-    return NextResponse.json({ ok: false }, { status: 401 });
+    // Sin sesión = estado válido para un visitante anónimo. Devolvemos 200
+    // con `ok:false` para que el navegador no registre un error en consola
+    // (el AuthContext sólo mira `res.ok && data.ok`, su comportamiento no
+    // cambia: si `ok:false` no setea user).
+    return NextResponse.json({ ok: false });
   }
 
   try {

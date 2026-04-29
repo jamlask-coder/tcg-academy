@@ -56,10 +56,14 @@ for (const route of MAIN_ROUTES) {
 }
 
 // ─── Navbar logos are fully visible (not clipped) ─────────────────────────────
+//
+// En `/` la Navbar está oculta a propósito (el hero de home ya muestra la
+// navegación por juegos). Vamos a una página interna para que la Navbar
+// renderice y podamos auditar sus logos.
 
 test("navbar logos are visible and not clipped at 1024px", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 })
-  await page.goto("/")
+  await page.goto("/magic")
   await page.waitForSelector("nav img")
 
   const logos = await page.$$("nav img")
@@ -80,10 +84,13 @@ test("navbar logos are visible and not clipped at 1024px", async ({ page }) => {
 
 test("mega-menu stays at fixed Y position when switching games", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto("/")
+  // El hero de `/` tiene su propio sistema de navegación; la Navbar
+  // (donde vive el mega-menú) sólo aparece fuera de home.
+  await page.goto("/magic")
+  await page.waitForSelector("nav a[href='/magic']")
 
   // Hover first game logo
-  const firstLogo = page.locator("nav a[href='/magic']")
+  const firstLogo = page.locator("nav a[href='/magic']").first()
   await firstLogo.hover()
   await page.waitForTimeout(200)
 
@@ -91,8 +98,11 @@ test("mega-menu stays at fixed Y position when switching games", async ({ page }
   const menuBefore = await page.locator("[data-testid='mega-menu']").first().boundingBox()
   expect(menuBefore).not.toBeNull()
 
-  // Move to second game logo without leaving the nav
-  const secondLogo = page.locator("nav a[href='/pokemon']")
+  // Move to second game logo without leaving the nav.
+  // OJO: el mega-menú sólo se abre para los juegos en
+  // COLLECTION_PRIMARY_SLUGS (magic, one-piece, riftbound). Pokemon
+  // no tiene mega-menú, así que probamos contra `one-piece`.
+  const secondLogo = page.locator("nav a[href='/one-piece']").first()
   await secondLogo.hover()
   await page.waitForTimeout(250) // wait for content fade
 

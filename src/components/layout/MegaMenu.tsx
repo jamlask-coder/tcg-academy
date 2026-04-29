@@ -83,6 +83,7 @@ export function MegaMenu({ game, onClose, logoCenterX }: Props) {
 
   return (
     <motion.div
+      data-testid="mega-menu"
       initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: positioned ? 1 : 0, y: positioned ? 0 : -6 }}
       exit={{ opacity: 0, y: -6 }}

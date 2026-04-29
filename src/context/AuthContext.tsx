@@ -459,7 +459,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
             if (res.ok) {
               const data = (await res.json()) as { ok: boolean; user?: User };
-              if (data.ok && data.user) {
+              // Sin sesión = `ok:false`. Limpiar caché legacy y salir,
+              // mismo efecto que recibir 401 (ver bloque más abajo).
+              if (!data.ok) {
+                try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+                return;
+              }
+              if (data.user) {
                 // /api/auth/me ahora devuelve addresses/empresa/favorites
                 // hidratados desde BD (Promise.all en el endpoint). El caché
                 // localStorage solo se usa como fallback para campos no

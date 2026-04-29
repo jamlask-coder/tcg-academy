@@ -45,18 +45,25 @@ for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await goto(page);
 
-    // We compare the inner Container divs (max-w-[1400px] mx-auto px-6).
+    // We compare the inner Container divs (max-w-[1400px] mx-auto px-4|6).
     // They should all have identical left and right boundaries.
+    //
+    // OJO: ignoramos contenedores ocultos a este viewport (display:none /
+    // hidden lg:block, drawers cerrados, etc.). `getBoundingClientRect()`
+    // devuelve {0,0,0,0} para esos elementos y romperían la comparación
+    // sin reflejar un bug real (ej. la Navbar es `hidden lg:block` así que
+    // a 768px su Container existe en el DOM pero con rect zero).
     const rects = await page.evaluate(() => {
-      // All Container divs: they have class max-w-\[1400px\] and mx-auto
       const containers = Array.from(document.querySelectorAll('[class*="max-w-\\[1400px\\]"]'));
-      return containers.map((el) => {
-        const r = el.getBoundingClientRect();
-        return { left: Math.round(r.left), right: Math.round(r.right), tag: el.tagName, id: el.id };
-      });
+      return containers
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          return { left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width) };
+        })
+        .filter((r) => r.width > 0);
     });
 
-    // At desktop widths, all containers should align (±4px tolerance)
+    // At desktop widths, all visible containers should align (±4px tolerance)
     if (vp.width >= 1024 && rects.length >= 2) {
       const firstLeft = rects[0].left;
       const firstRight = rects[0].right;
