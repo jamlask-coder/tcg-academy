@@ -5,6 +5,15 @@ import Link from "next/link";
 import { useAuth, type GoogleSignInPayload } from "@/context/AuthContext";
 import type { User } from "@/types/user";
 
+// Evita cualquier intento de prerender estático: el callback solo tiene
+// sentido en runtime con `window`, `sessionStorage` y un fragmento de URL
+// presente. En producción Next.js intentaba pre-procesar la página y eso
+// dejaba el bundle en un estado donde la hidratación crasheaba con un
+// "Cannot read properties of undefined (reading 'length')" sin contexto,
+// que el navegador mostraba como "This page couldn't load".
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const NONCE_KEY = "google_oauth_nonce";
 const REDIRECT_KEY = "google_oauth_redirect";
 
@@ -54,8 +63,23 @@ export default function GoogleCallbackPage() {
       // Lee el id_token de fragment (#) o, como fallback, de query (?).
       // Google a veces devuelve `error` en query string aunque el flow sea
       // implicit; cubrimos ambos para mostrar el mensaje real al usuario.
-      const hash = window.location.hash.replace(/^#/, "");
-      const search = window.location.search.replace(/^\?/, "");
+      // Defensivo: si por cualquier motivo `window` o sus propiedades no
+      // están disponibles (extensión que stub'ea globals, hidratación rota),
+      // capturamos y mostramos un error claro en vez de propagar y romper el
+      // árbol React entero (que es lo que provoca "This page couldn't load").
+      let hash = "";
+      let search = "";
+      try {
+        hash = (window?.location?.hash ?? "").replace(/^#/, "");
+        search = (window?.location?.search ?? "").replace(/^\?/, "");
+      } catch {
+        setError(
+          "El navegador no permite leer la URL. Si usas Brave Shields en " +
+            "modo estricto o una extensión web3 (MetaMask), prueba a " +
+            "desactivar Shields para este sitio o usar otra ventana.",
+        );
+        return;
+      }
       const fragParams = new URLSearchParams(hash);
       const queryParams = new URLSearchParams(search);
       const idToken = fragParams.get("id_token") ?? queryParams.get("id_token");

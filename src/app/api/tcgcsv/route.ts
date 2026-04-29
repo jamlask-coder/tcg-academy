@@ -19,7 +19,10 @@ import { NextResponse } from "next/server";
 import { normalizeForMatch } from "@/lib/setHighlights/matching";
 import type { CatalogHit } from "@/lib/productIdentifier/types";
 
-export const runtime = "edge";
+// runtime: nodejs (default). El edge runtime desactivaría la generación
+// estática (`revalidate`) y haría que cada request re-pegara a tcgcsv.com.
+// Como solo proxeamos JSON con fetch + filtrado in-memory, nodejs vale.
+export const runtime = "nodejs";
 export const revalidate = 3600;
 
 // ─── Game → TCGCSV categoryId ──────────────────────────────────────────────
