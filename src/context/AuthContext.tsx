@@ -578,6 +578,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     backfillNifIndex();
   }, []);
 
+  // Heartbeat de presencia "online" (server mode only) — cada 60s mientras el
+  // usuario esté logueado el cliente pinguea /api/auth con action=heartbeat.
+  // El backend escribe last_seen_at; el admin renderiza punto verde/rojo según
+  // el delta. Si el usuario cierra la pestaña, el ping deja de llegar y el
+  // estado pasa a "rojo" tras ~3 min sin actividad.
+  useEffect(() => {
+    if (!IS_SERVER_MODE) return;
+    if (!user) return;
+    let cancelled = false;
+    const ping = () => {
+      if (cancelled) return;
+      // fetch sin await — no necesitamos el resultado para nada client-side.
+      fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "heartbeat" }),
+        keepalive: true,
+      }).catch(() => { /* errores de red no rompen UX */ });
+    };
+    ping(); // primer ping inmediato al montar / al login
+    const id = window.setInterval(ping, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [user]);
+
   const persist = useCallback((u: User | null, expiresIn?: number) => {
     setUser(u);
     if (u) {

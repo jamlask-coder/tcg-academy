@@ -5,7 +5,7 @@
  */
 
 import { getMergedProducts } from "@/lib/productStore";
-import { readAdminOrdersMerged, isCountableOrder } from "@/lib/orderAdapter";
+import { readAdminOrdersMerged } from "@/lib/orderAdapter";
 
 // ─── Storage keys ───────────────────────────────────────────────────────────
 
@@ -91,8 +91,10 @@ function loadOrders(): OrderRecord[] {
   try {
     // Fuente unificada: merge admin + orphan recovery desde checkout.
     // Así todos los paneles leen lo mismo — no hay contadores aislados.
-    // Excluye carry-over (SL anterior) — solo informativo, no contabiliza KPIs.
-    const merged = readAdminOrdersMerged([]).filter(isCountableOrder);
+    // Incluimos TODOS los pedidos (también los heredados fiscalCarryOver):
+    // los KPIs/dash deben reflejar el histórico real del negocio. La
+    // exclusión de carry-over vive sólo en el módulo fiscal (303/390/libro).
+    const merged = readAdminOrdersMerged([]);
     if (merged.length > 0) return merged as unknown as OrderRecord[];
     // Fallback adicional (ambos vacíos)
     const raw = localStorage.getItem(ORDERS_KEY);

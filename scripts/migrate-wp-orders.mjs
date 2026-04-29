@@ -422,6 +422,23 @@ ON CONFLICT (id) DO UPDATE SET
   imported++;
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Rebind defensivo: el INSERT ... ON CONFLICT DO UPDATE de cada pedido
+// NO actualiza user_id (intencionado: nunca pisamos un user_id ya
+// enlazado). Pero los pedidos importados ANTES que su dueño quedaron
+// con user_id = NULL para siempre. Este bloque rebindea por email
+// dentro de la misma transacción del import → el SQL es 100% self-healing.
+// Idempotente: solo toca user_id NULL.
+// ─────────────────────────────────────────────────────────────────────
+lines.push("");
+lines.push("-- Rebind defensivo de huérfanos (user_id NULL ↔ users.email)");
+lines.push(`UPDATE orders o
+   SET user_id    = u.id,
+       updated_at = NOW()
+  FROM users u
+ WHERE o.user_id IS NULL
+   AND LOWER(TRIM(u.email)) = LOWER(TRIM(o.customer_snapshot->>'email'))
+   AND COALESCE(TRIM(o.customer_snapshot->>'email'), '') <> '';`);
 lines.push("");
 lines.push("COMMIT;");
 lines.push("");

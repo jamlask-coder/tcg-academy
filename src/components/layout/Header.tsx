@@ -15,7 +15,6 @@ import {
   Zap,
   ShieldCheck,
   CheckCircle2,
-  ChevronDown,
   LogOut,
   LayoutDashboard,
   Inbox,
@@ -28,6 +27,7 @@ import { GAME_CONFIG } from "@/data/products";
 import { getMergedProducts, getProductUrl } from "@/lib/productStore";
 import { useNotifications } from "@/context/NotificationContext";
 import { useDebounce } from "@/hooks/useDebounce";
+import { normalizeForSearch } from "@/utils/searchNormalize";
 import { MobileDrawer } from "./MobileDrawer";
 import { countPendingOrdersToShip } from "@/lib/orderAdapter";
 import { DataHub } from "@/lib/dataHub";
@@ -81,14 +81,14 @@ function SearchDropdown({
   }, [query]);
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizeForSearch(query);
     if (q.length < 2) return [];
     const all = getMergedProducts();
     return all
       .filter(
         (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.tags.some((t) => t.toLowerCase().includes(q)),
+          normalizeForSearch(p.name).includes(q) ||
+          p.tags.some((t) => normalizeForSearch(t).includes(q)),
       )
       .slice(0, 6);
   }, [query]);
@@ -375,100 +375,42 @@ function HeaderTagline() {
 // Cuando SÍ está logado mantenemos el saludo + dropdown idénticos.
 
 function HeaderInlineAuth() {
-  const { user, logout } = useAuth();
-  const router = useRouter();
-
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // Click outside closes account dropdown
-  useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
+  const { user } = useAuth();
 
   const firstName = user?.name.split(" ")[0] ?? "";
 
-  // ── Logged in: greeting + account dropdown ────────────────────────────────
+  // ── Logged in: greeting pill + role badge (NO dropdown — ahora vive en el icono persona) ──
   if (user) {
-    // Badge de rol. Para admin lo sacamos como Link a /admin (atajo directo
-    // al panel resumen — no se puede anidar <Link> dentro de <button>).
-    // Para mayorista/tienda sigue siendo decorativo, dentro del botón.
     const isAdmin = user.role === "admin";
     const showRoleBadge = user.role === "mayorista" || user.role === "tienda" || isAdmin;
     const roleBadgeLabel = user.role === "mayorista" ? "Mayorista" : user.role === "tienda" ? "Tienda" : "Admin";
-    const roleBadgeClass =
-      "inline-flex h-4 min-w-[16px] badge-ping-wrap items-center justify-center rounded-full bg-amber-400 px-1.5 text-[10px] font-bold leading-none text-gray-900";
+    // Pills h-9 a juego (saludo + rol). Misma altura, mismo radio, ambos sólidos.
+    const rolePillClass =
+      "inline-flex h-9 items-center justify-center rounded-full bg-amber-400 px-4 text-xs font-extrabold uppercase tracking-wider text-[#0a1628]";
 
     return (
-      <div className="relative hidden lg:flex items-center gap-1.5" ref={menuRef}>
-        <button
-          onClick={() => setMenuOpen((o) => !o)}
-          aria-label="Mi cuenta"
-          aria-expanded={menuOpen}
-          className="flex h-9 items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-4 transition hover:bg-white/15"
-        >
-          <span className="text-xs text-blue-200">Bienvenido,&nbsp;</span>
+      <div className="hidden lg:flex items-center gap-1.5">
+        {/* Pill de saludo — solid, sin dropdown. El dropdown ahora vive en el icono persona. */}
+        <div className="flex h-9 items-center gap-1.5 rounded-full bg-blue-600 px-4">
+          <span className="text-xs text-blue-100">Bienvenido,&nbsp;</span>
           <span className="text-xs font-bold text-white">{firstName}</span>
-          {showRoleBadge && !isAdmin && (
-            <span className={`ml-1.5 ${roleBadgeClass}`} aria-label={`Rol: ${user.role}`}>
-              {roleBadgeLabel}
-            </span>
-          )}
-          <ChevronDown
-            size={10}
-            className={`ml-0.5 text-white/50 transition-transform ${menuOpen ? "rotate-180" : ""}`}
-          />
-        </button>
-        {/* Atajo directo al panel admin: clic en el badge Admin = ir a /admin */}
+        </div>
+        {/* Badge Admin: link directo a /admin */}
         {isAdmin && (
           <Link
             href="/admin"
             aria-label="Ir al panel de administración"
             title="Ir al panel admin"
-            className={`${roleBadgeClass} transition hover:brightness-110 hover:ring-2 hover:ring-amber-300/60`}
+            className={`${rolePillClass} transition hover:bg-amber-300 hover:ring-2 hover:ring-amber-300/60`}
           >
             Admin
           </Link>
         )}
-
-        {/* Account dropdown */}
-        {menuOpen && (
-          <div className="absolute top-full right-0 z-50 mt-2 w-52 overflow-hidden rounded-2xl border border-gray-200 bg-white py-1.5 shadow-2xl">
-            <div className="border-b border-gray-100 px-4 pt-2.5 pb-2.5">
-              <p className="text-sm font-bold text-gray-900">
-                {user.name} {user.lastName}
-              </p>
-              {user.role !== "admin" && user.email && (
-                <p className="mt-0.5 truncate text-[11px] text-gray-400">
-                  {user.email}
-                </p>
-              )}
-            </div>
-            <Link
-              href={user.role === "admin" ? "/admin" : "/cuenta"}
-              onClick={() => setMenuOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50"
-            >
-              <LayoutDashboard size={15} className="text-gray-400" /> Resumen
-            </Link>
-            <div className="my-1 border-t border-gray-100" />
-            <button
-              onClick={() => {
-                setMenuOpen(false);
-                logout();
-                router.push("/");
-              }}
-              className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 transition hover:bg-red-50"
-            >
-              <LogOut size={15} className="text-red-400" /> Cerrar sesión
-            </button>
-          </div>
+        {/* Badge mayorista/tienda: decorativo, mismo tamaño */}
+        {showRoleBadge && !isAdmin && (
+          <span className={rolePillClass} aria-label={`Rol: ${user.role}`}>
+            {roleBadgeLabel}
+          </span>
         )}
       </div>
     );
@@ -483,6 +425,85 @@ function HeaderInlineAuth() {
     >
       Entrar
     </Link>
+  );
+}
+
+// ─── Profile icon dropdown (desktop) ──────────────────────────────────────────
+//
+// Sustituye al antiguo dropdown que vivía en el pill del saludo. Ahora cliquear
+// el icono persona abre un menú con Resumen + Cerrar sesión. El logout llama a
+// `logout()` del AuthContext y redirige a la home.
+function ProfileIconMenu() {
+  const { user, logout } = useAuth();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  if (!user) {
+    return (
+      <Link
+        href="/login"
+        className="hidden items-center justify-center gap-1.5 rounded-lg p-2 transition hover:bg-white/10 lg:flex lg:min-h-9"
+        aria-label="Iniciar sesión"
+      >
+        <User size={22} className="text-white" />
+      </Link>
+    );
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-label="Mi cuenta"
+        aria-expanded={open}
+        className="hidden items-center justify-center gap-1.5 rounded-lg p-2 transition hover:bg-white/10 lg:flex lg:min-h-9"
+      >
+        <User size={22} className="text-white" />
+      </button>
+      {open && (
+        <div className="absolute top-full right-0 z-50 mt-2 w-52 overflow-hidden rounded-2xl border border-gray-200 bg-white py-1.5 shadow-2xl">
+          <div className="border-b border-gray-100 px-4 pt-2.5 pb-2.5">
+            <p className="text-sm font-bold text-gray-900">
+              {user.name} {user.lastName}
+            </p>
+            {user.role !== "admin" && user.email && (
+              <p className="mt-0.5 truncate text-[11px] text-gray-400">
+                {user.email}
+              </p>
+            )}
+          </div>
+          <Link
+            href={user.role === "admin" ? "/admin" : "/cuenta"}
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 transition hover:bg-gray-50"
+          >
+            <LayoutDashboard size={15} className="text-gray-400" /> Resumen
+          </Link>
+          <div className="my-1 border-t border-gray-100" />
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              logout();
+              router.push("/");
+            }}
+            className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 transition hover:bg-red-50"
+          >
+            <LogOut size={15} className="text-red-400" /> Cerrar sesión
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -643,7 +664,7 @@ export function Header() {
           (no con el centro del bloque logo+tagline). pt y pb simétricos para
           que el tagline tenga el mismo aire arriba (hacia TCG Academy) que
           abajo (hacia la imagen). */}
-      <Container className="flex h-14 items-start justify-between gap-3 py-[6px] lg:grid lg:h-14 lg:grid-cols-[1fr_auto_1fr] lg:items-start lg:gap-3 lg:py-0">
+      <Container className="flex h-14 items-start justify-center gap-6 py-[6px] lg:grid lg:h-14 lg:grid-cols-[1fr_auto_1fr] lg:items-start lg:justify-stretch lg:gap-3 lg:py-0">
         {/* Hamburger + Logo */}
         <div className="flex shrink-0 items-start gap-2 lg:items-center lg:justify-self-end">
           <button
@@ -770,14 +791,10 @@ export function Header() {
           <HeaderInlineAuth />
           {/* 1. User icon — SIEMPRE el primero (izquierda del todo).
               Desktop only: en móvil el login/cuenta vive en la píldora estilo
-              YouTube del centro (middle zone). */}
-          <Link
-            href={user ? (user.role === "admin" ? "/admin" : "/cuenta") : "/login"}
-            className="hidden items-center justify-center gap-1.5 rounded-lg p-2 transition hover:bg-white/10 lg:flex lg:min-h-9"
-            aria-label={user?.role === "admin" ? "Panel de administración" : "Mi cuenta"}
-          >
-            <User size={22} className="text-white" />
-          </Link>
+              YouTube del centro (middle zone).
+              Cliquear abre dropdown con Resumen + Cerrar sesión (antes vivía
+              en el pill del saludo, se movió aquí). */}
+          <ProfileIconMenu />
 
           {/* Admin shortcut (sm, not desktop where panel admin is in greeting menu) */}
           {user?.role === "admin" && (

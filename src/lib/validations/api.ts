@@ -179,6 +179,12 @@ export const authUpdateFavoritesSchema = z.object({
   favorites: z.array(z.number().int().positive()).max(2000),
 });
 
+// ── Heartbeat de presencia online (cliente lo dispara cada ~60s).
+//    El user se identifica vía cookie de sesión, no payload.
+export const authHeartbeatSchema = z.object({
+  action: z.literal("heartbeat"),
+});
+
 export const authBodySchema = z.discriminatedUnion("action", [
   authLoginSchema,
   authRegisterSchema,
@@ -195,6 +201,7 @@ export const authBodySchema = z.discriminatedUnion("action", [
   authUpdateAddressesSchema,
   authUpdateEmpresaSchema,
   authUpdateFavoritesSchema,
+  authHeartbeatSchema,
 ]);
 
 // ─── Orders ──────────────────────────────────────────────────────────────

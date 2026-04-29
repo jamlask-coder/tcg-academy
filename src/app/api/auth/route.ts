@@ -1241,6 +1241,27 @@ export async function POST(req: NextRequest) {
         return response;
       }
 
+      // ── HEARTBEAT ──────────────────────────────────────────────────────
+      // Cliente logueado pinguea cada ~60s. Sólo escribimos last_seen_at en
+      // server mode; en local mode es no-op porque el admin no consulta una
+      // sesión distinta a la suya.
+      case "heartbeat": {
+        if (!isServerMode()) return NextResponse.json({ ok: true });
+        const session = await getSessionFromRequest(req);
+        if (!session?.sub) {
+          // 200 silencioso: no queremos que el cliente vea fallar el ping si
+          // la cookie ha caducado — el AuthContext ya gestiona el logout.
+          return NextResponse.json({ ok: true });
+        }
+        try {
+          const db = await getDb();
+          await db.updateLastSeen(session.sub, new Date().toISOString());
+        } catch {
+          // Errores de heartbeat no deben romper la sesión del cliente.
+        }
+        return NextResponse.json({ ok: true });
+      }
+
       default:
         return NextResponse.json({ error: "Acción no válida" }, { status: 400 });
     }

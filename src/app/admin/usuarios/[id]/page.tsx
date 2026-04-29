@@ -13,6 +13,7 @@ import {
   Phone,
   MapPin,
   Star,
+  KeyRound,
 } from "lucide-react";
 import {
   MOCK_USERS,
@@ -25,12 +26,12 @@ import type { User } from "@/types/user";
 import {
   readAdminOrdersMerged,
   readAdminOrdersMergedAsync,
-  isCountableOrder,
 } from "@/lib/orderAdapter";
 import { loadPoints } from "@/services/pointsService";
 import { findUserByHandle } from "@/lib/userHandle";
 import { B2BCharts } from "@/components/account/B2BCharts";
 import { SendCouponButton } from "@/components/admin/SendCouponModal";
+import { SendMessageButton } from "@/components/admin/SendMessageModal";
 import { UserRoleManager } from "@/components/admin/UserRoleManager";
 import { VisitChart } from "@/components/account/VisitChart";
 import { UserPersonalDataPanel } from "@/components/admin/UserPersonalDataPanel";
@@ -72,6 +73,11 @@ export default function AdminUsuarioDetailPage() {
     orders: AdminOrder[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  // Presencia "online" — separada de `resolved.user` para no contaminar el
+  // tipo AdminUser (que se reusa en otras vistas) con un campo dinámico.
+  // Refresca cada 30s en server-mode para que el punto verde/rojo refleje
+  // el último heartbeat del usuario sin tener que recargar la página.
+  const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,11 +106,13 @@ export default function AdminUsuarioDetailPage() {
           o.userId === baseUser.id ||
           (o.userEmail && o.userEmail.toLowerCase() === emailLower),
       );
-      // Los pedidos heredados (carry-over) se MUESTRAN en la lista pero NO
-      // contabilizan en totalOrders/totalSpent: son histórico SL anterior.
-      const countable = userOrders.filter(isCountableOrder);
-      const totalOrders = countable.length;
-      const totalSpent = countable.reduce((s, o) => s + (o.total || 0), 0);
+      // Contamos TODOS los pedidos del usuario (incluidos los heredados
+      // fiscalCarryOver). El admin necesita ver el histórico real del
+      // cliente — son pedidos de verdad, sólo que no facturamos sobre
+      // ellos. La exclusión de carry-over vive únicamente en el módulo
+      // fiscal (303/390/libro de facturas), nunca en stats de usuario.
+      const totalOrders = userOrders.length;
+      const totalSpent = userOrders.reduce((s, o) => s + (o.total || 0), 0);
       const livePoints = loadPoints(baseUser.id);
       setResolved({
         user: {
@@ -152,11 +160,13 @@ export default function AdminUsuarioDetailPage() {
                 nif?: string;
                 nifType?: "DNI" | "NIE" | "CIF";
                 birthDate?: string;
+                lastSeenAt?: string;
               };
             };
             if (data.ok && data.user) {
               const u = data.user;
               const isB2B = u.role === "mayorista" || u.role === "tienda";
+              if (!cancelled) setLastSeenAt(u.lastSeenAt ?? null);
               await finalize({
                 id: u.id,
                 username: u.username,
@@ -203,6 +213,39 @@ export default function AdminUsuarioDetailPage() {
     void resolve();
     return () => {
       cancelled = true;
+    };
+  }, [id]);
+
+  // Refresca lastSeenAt cada 30s en server-mode mientras la pestaña está
+  // visible, para que el punto verde/rojo no se quede congelado en el
+  // momento de la carga inicial. El admin sólo ve cambios al recargar de
+  // otro modo, y queremos que vea "se desconectó" sin pulsar F5.
+  useEffect(() => {
+    const isServerMode =
+      typeof process !== "undefined" &&
+      process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
+    if (!isServerMode) return;
+    if (!id) return;
+    let cancelled = false;
+    const tick = async () => {
+      if (document.hidden) return;
+      try {
+        const res = await fetch(
+          `/api/admin/users/${encodeURIComponent(id)}`,
+          { credentials: "include", cache: "no-store" },
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as { ok: boolean; user?: { lastSeenAt?: string } };
+        if (cancelled) return;
+        if (data.ok && data.user) {
+          setLastSeenAt(data.user.lastSeenAt ?? null);
+        }
+      } catch { /* ignore — el dot simplemente no actualizará este tick */ }
+    };
+    const intervalId = window.setInterval(tick, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
     };
   }, [id]);
 
@@ -360,9 +403,12 @@ export default function AdminUsuarioDetailPage() {
             {user.lastName[0]}
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-bold">
-              {user.name} {user.lastName}
-            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold">
+                {user.name} {user.lastName}
+              </h1>
+              <UserPresenceDot lastSeenAt={lastSeenAt} />
+            </div>
             <p className="text-blue-200">{user.email}</p>
             <span
               className={`mt-1 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${ROLE_COLORS[user.role]}`}
@@ -379,10 +425,17 @@ export default function AdminUsuarioDetailPage() {
             />
             <Link
               href="/admin/bonos"
-              className="flex items-center gap-1.5 rounded-xl bg-white/15 px-4 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/25"
+              className="flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-amber-400 active:scale-95"
             >
-              <Star size={14} /> Enviar puntos
+              <Star size={16} /> Enviar puntos
             </Link>
+            <SendMessageButton
+              userId={user.id}
+              userName={user.name}
+              userLastName={user.lastName}
+              userEmail={user.email}
+            />
+            <SendResetPasswordButton email={user.email} />
           </div>
         </div>
       </div>
@@ -525,5 +578,109 @@ export default function AdminUsuarioDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Botón admin: dispara el flujo /api/auth reset-password para el email indicado.
+ * Anti-enumeración: el endpoint siempre responde 200, así que aquí sólo
+ * mostramos "Email enviado" si la respuesta es ok. El correo real lo envía
+ * el adapter Resend en background (after()).
+ */
+function SendResetPasswordButton({ email }: { email: string }) {
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+  async function handleClick() {
+    if (state === "sending" || state === "sent") return;
+    setState("sending");
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset-password", email }),
+      });
+      if (res.ok) {
+        setState("sent");
+        setTimeout(() => setState("idle"), 4000);
+      } else {
+        setState("error");
+        setTimeout(() => setState("idle"), 4000);
+      }
+    } catch {
+      setState("error");
+      setTimeout(() => setState("idle"), 4000);
+    }
+  }
+
+  const label =
+    state === "sending"
+      ? "Enviando…"
+      : state === "sent"
+        ? "Email enviado ✓"
+        : state === "error"
+          ? "Error — reintentar"
+          : "Restablecer contraseña";
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={state === "sending" || state === "sent"}
+      className="flex items-center gap-1.5 rounded-xl bg-white/15 px-4 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-70"
+      aria-label="Enviar email de restablecer contraseña al usuario"
+    >
+      <KeyRound size={14} /> {label}
+    </button>
+  );
+}
+
+/**
+ * Punto de presencia del usuario, similar a indicadores de chat.
+ *   - Verde con animación pulse → último heartbeat hace < 3 min (online).
+ *   - Rojo estático → sin heartbeat reciente (offline).
+ *   - Gris si nunca ha hecho heartbeat (cuenta nueva o BD sin migrar).
+ *
+ * Umbral 3 min = 3× el periodo del heartbeat (60s) para tolerar fallos de red
+ * sin marcar a alguien como offline al primer ping perdido.
+ *
+ * `now` vive en estado y se refresca cada 30s — leer `Date.now()` durante
+ * render rompe react-hooks/purity (resultado no determinista entre renders).
+ */
+function UserPresenceDot({ lastSeenAt }: { lastSeenAt: string | null }) {
+  const [now, setNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  if (!lastSeenAt) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-bold text-white/80" title="Sin actividad registrada">
+        <span className="inline-block h-2 w-2 rounded-full bg-gray-300" />
+        Sin actividad
+      </span>
+    );
+  }
+  const ts = Date.parse(lastSeenAt);
+  const isOnline = Number.isFinite(ts) && now - ts < 3 * 60 * 1000;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+        isOnline ? "bg-green-500/25 text-green-100" : "bg-red-500/25 text-red-100"
+      }`}
+      title={isOnline ? "En línea ahora" : `Última vez: ${new Date(ts).toLocaleString("es-ES")}`}
+    >
+      <span className="relative inline-flex h-2.5 w-2.5">
+        {isOnline && (
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+        )}
+        <span
+          className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
+            isOnline ? "bg-green-400" : "bg-red-500"
+          }`}
+        />
+      </span>
+      {isOnline ? "En línea" : "Desconectado"}
+    </span>
   );
 }

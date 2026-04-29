@@ -11,12 +11,16 @@ import {
   SidebarFilters,
   MobileFilterButton,
 } from "@/components/filters/SidebarFilters";
+import { normalizeForSearch } from "@/utils/searchNormalize";
 
 const LANG_ORDER = ["ES", "EN", "JP", "KO", "FR", "DE", "IT", "PT", "ZH"];
 
 function SearchPageContent() {
   const params = useSearchParams();
-  const q = (params.get("q") ?? "").trim().toLowerCase();
+  const rawQ = (params.get("q") ?? "").trim();
+  // `q` se usa para filtrar (accent-insensitive). `rawQ` para mostrar al
+  // usuario el término exacto que tecleó.
+  const q = normalizeForSearch(rawQ);
   const [allProducts, setAllProducts] = useState<LocalProduct[]>([]);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
@@ -46,10 +50,10 @@ function SearchPageContent() {
     if (!q) return [];
     return allProducts.filter(
       (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q) ||
-        p.tags.some((t) => t.toLowerCase().includes(q)) ||
-        (GAME_CONFIG[p.game]?.name ?? p.game).toLowerCase().includes(q),
+        normalizeForSearch(p.name).includes(q) ||
+        normalizeForSearch(p.description).includes(q) ||
+        p.tags.some((t) => normalizeForSearch(t).includes(q)) ||
+        normalizeForSearch(GAME_CONFIG[p.game]?.name ?? p.game).includes(q),
     );
   }, [q, allProducts]);
 
@@ -95,7 +99,7 @@ function SearchPageContent() {
         {q ? (
           <>
             Resultados para{" "}
-            <span className="text-[#2563eb]">&quot;{q}&quot;</span>
+            <span className="text-[#2563eb]">&quot;{rawQ}&quot;</span>
           </>
         ) : (
           "Búsqueda"
@@ -135,7 +139,7 @@ function SearchPageContent() {
                   Sin resultados
                 </h2>
                 <p className="mb-6 text-gray-500">
-                  No encontramos nada para &quot;{q}&quot;
+                  No encontramos nada para &quot;{rawQ}&quot;
                 </p>
                 <Link
                   href="/catalogo"
@@ -157,7 +161,7 @@ function SearchPageContent() {
               <>
                 <p className="mb-6 text-sm text-gray-500">
                   {results.length} resultado{results.length !== 1 ? "s" : ""}{" "}
-                  para &quot;{q}&quot;
+                  para &quot;{rawQ}&quot;
                 </p>
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                   {results.map((p) => (

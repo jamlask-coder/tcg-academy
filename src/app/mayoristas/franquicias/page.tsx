@@ -1,247 +1,163 @@
-"use client";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { Store, CheckCircle2, AlertCircle, Mail, Phone } from "lucide-react";
-import { checkRateLimit } from "@/utils/sanitize";
+import {
+  Store,
+  ArrowRight,
+  MapPin,
+  Megaphone,
+  GraduationCap,
+  Boxes,
+  ShieldCheck,
+  TrendingUp,
+} from "lucide-react";
 import { SITE_CONFIG } from "@/config/siteConfig";
-import { addSolicitud } from "@/services/solicitudService";
 
-const schema = z.object({
-  nombre: z.string().min(2, "Mínimo 2 caracteres").max(200),
-  email: z.string().email("Email no válido"),
-  telefono: z.string().regex(/^[+]?[\d\s\-()]{9,15}$/, "Teléfono no válido"),
-  ciudad: z.string().min(2, "Introduce la ciudad").max(100),
-  mensaje: z.string().max(2000).optional(),
-  aceptaPrivacidad: z
-    .boolean()
-    .refine((v) => v === true, "Debes aceptar la política de privacidad"),
-});
+export const metadata: Metadata = {
+  title: "Abre tu tienda TCG en franquicia | TCG Academy",
+  description:
+    "Abre una tienda física TCG Academy en tu ciudad: marca consolidada, formación, suministro garantizado, software de tienda y campañas locales. Modelo de franquicia para emprendedores del sector cartas coleccionables.",
+  alternates: { canonical: "/mayoristas/franquicias" },
+};
 
-type FormData = z.infer<typeof schema>;
+const BENEFITS = [
+  {
+    icon: Store,
+    title: "Marca consolidada",
+    desc: "Aprovecha el reconocimiento de TCG Academy desde el día 1: identidad visual, manual de marca, escaparate físico estandarizado y comunidad activa online.",
+  },
+  {
+    icon: Boxes,
+    title: "Suministro prioritario",
+    desc: "Acceso al catálogo completo (Magic, Pokémon, Yu-Gi-Oh, One Piece, Lorcana, Riftbound) con tarifas mejores que B2B y reservas anticipadas de novedades.",
+  },
+  {
+    icon: GraduationCap,
+    title: "Formación incluida",
+    desc: "Onboarding de 2 semanas: gestión de stock, organización de torneos sancionados, atención experta al jugador y peritaje de cartas singles.",
+  },
+  {
+    icon: Megaphone,
+    title: "Marketing local",
+    desc: "Campañas de captación geolocalizada, presencia en buscador de tiendas oficial, soporte en redes sociales y kit de eventos para lanzamientos.",
+  },
+  {
+    icon: TrendingUp,
+    title: "Software de tienda",
+    desc: "TPV, inventario sincronizado con web, libro de torneos, peritaje de singles y conexión directa con la central. Cero papel, todo trazable.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Exclusividad por zona",
+    desc: "Asignamos área de protección territorial. No abrimos otra franquicia en tu radio mientras la tuya esté activa y cumpla los estándares.",
+  },
+];
 
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null;
-  return (
-    <p className="mt-1 flex items-center gap-1 text-xs text-red-500">
-      <AlertCircle size={11} />
-      {message}
-    </p>
-  );
-}
+const PERFIL = [
+  "Emprendedor con conocimiento del sector TCG (jugador activo, organizador de torneos, ex-empleado de tienda, coleccionista avanzado…)",
+  "Capacidad de inversión inicial entre 35.000 € y 60.000 € (local, mobiliario, stock inicial, canon de entrada)",
+  "Local comercial a pie de calle de 60-150 m² en ciudad de más de 30.000 habitantes (o área metropolitana)",
+  "Disponibilidad para abrir torneos semanales y eventos de lanzamiento de producto",
+];
 
-function inputCls(hasError: boolean) {
-  return `h-11 w-full rounded-xl border-2 px-4 text-sm transition focus:outline-none ${
-    hasError
-      ? "border-red-300 focus:border-red-400"
-      : "border-gray-200 focus:border-[#0f766e]"
-  }`;
-}
-
-export default function FranquiciasPage() {
-  const [submitted, setSubmitted] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: { aceptaPrivacidad: false },
-  });
-
-  const onSubmit = async (data: FormData) => {
-    if (!checkRateLimit("franquicia-form", 3, 60_000)) {
-      alert("Demasiados intentos. Espera un momento.");
-      return;
-    }
-    await new Promise((r) => setTimeout(r, 600));
-
-    try {
-      addSolicitud({
-        id: crypto.randomUUID(),
-        tipo: "franquicia",
-        datos: data,
-      });
-    } catch {
-      // localStorage may be unavailable
-    }
-
-    setSubmitted(true);
-  };
-
-  if (submitted) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center bg-white px-6 py-20">
-        <div className="mx-auto max-w-lg text-center">
-          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-teal-100">
-            <CheckCircle2 size={40} className="text-teal-600" />
-          </div>
-          <h1 className="mb-4 text-3xl font-bold text-gray-900">
-            Gracias por tu interés
-          </h1>
-          <p className="mb-8 text-gray-500">
-            Hemos recibido tu consulta. Te contestaremos al email que nos has
-            dejado.
-          </p>
-          <Link
-            href="/mayoristas"
-            className="inline-flex items-center gap-2 rounded-xl bg-[#0f766e] px-6 py-3 font-semibold text-white transition hover:bg-[#0d6b62]"
-          >
-            Volver a Profesionales
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
+export default function FranquiciasLandingPage() {
   return (
     <div className="bg-white">
       {/* Hero */}
-      <section className="border-b border-gray-100 bg-white py-12 sm:py-14">
-        <div className="mx-auto max-w-[1400px] px-6">
+      <section className="border-b border-gray-100 bg-gradient-to-br from-[#ecfdf5] to-white py-14 sm:py-20">
+        <div className="mx-auto max-w-[1100px] px-6 text-center">
+          <span className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-teal-100 px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#0f766e]">
+            <Store size={12} /> Franquicia TCG
+          </span>
+          <h1 className="mb-4 text-3xl font-bold text-gray-900 md:text-5xl">
+            Abre tu tienda TCG con la marca de referencia
+          </h1>
+          <p className="mx-auto mb-8 max-w-2xl text-base text-gray-600 sm:text-lg">
+            {SITE_CONFIG.legalName} licencia su modelo de tienda física a
+            emprendedores del sector cartas coleccionables. Marca, suministro,
+            formación, software y exclusividad territorial — para que abrir
+            tienda no sea empezar de cero.
+          </p>
           <Link
-            href="/mayoristas"
-            className="mb-4 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900"
+            href="/mayoristas/franquicias/solicitar"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#0f766e] px-6 py-3 font-bold text-white transition hover:bg-[#115e59]"
           >
-            ← Profesionales
+            Solicitar información <ArrowRight size={18} />
           </Link>
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-teal-50 text-[#0f766e]">
-              <Store size={22} />
-            </div>
-            <div>
-              <h1 className="mb-2 text-3xl font-bold text-gray-900 md:text-4xl">
-                Abre tu tienda TCG
-              </h1>
-              <p className="max-w-2xl text-base text-gray-600">
-                Tenemos 4 tiendas físicas propias ({SITE_CONFIG.legalName}) y
-                podemos compartir nuestra experiencia si te planteas abrir la
-                tuya. Escríbenos sin compromiso y hablamos.
-              </p>
-            </div>
-          </div>
+          <p className="mt-3 text-xs text-gray-500">
+            Te respondemos por email y, si encajamos, agendamos una visita
+            comercial sin compromiso.
+          </p>
         </div>
       </section>
 
-      {/* Simple form */}
-      <section className="bg-white py-14">
-        <div className="mx-auto max-w-[680px] px-6">
-          <div className="mb-6 text-center">
-            <h2 className="mb-2 text-2xl font-bold text-gray-900">
-              Cuéntanos brevemente
-            </h2>
-            <p className="text-sm text-gray-500">
-              Sin compromiso. Solo respondemos a tu consulta.
-            </p>
-          </div>
-
-          <form
-            onSubmit={handleSubmit(onSubmit)}
-            className="space-y-4 rounded-2xl border border-gray-200 bg-white p-6 sm:p-8"
-            noValidate
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">
-                  Nombre <span className="text-red-500">*</span>
-                </label>
-                <input
-                  {...register("nombre")}
-                  placeholder="Tu nombre"
-                  className={inputCls(!!errors.nombre)}
-                />
-                <FieldError message={errors.nombre?.message} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">
-                  Teléfono <span className="text-red-500">*</span>
-                </label>
-                <input
-                  {...register("telefono")}
-                  type="tel"
-                  placeholder="+34 600 000 000"
-                  className={inputCls(!!errors.telefono)}
-                />
-                <FieldError message={errors.telefono?.message} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">
-                  Email <span className="text-red-500">*</span>
-                </label>
-                <input
-                  {...register("email")}
-                  type="email"
-                  placeholder="tu@email.com"
-                  className={inputCls(!!errors.email)}
-                />
-                <FieldError message={errors.email?.message} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">
-                  Ciudad <span className="text-red-500">*</span>
-                </label>
-                <input
-                  {...register("ciudad")}
-                  placeholder="Madrid, Valencia..."
-                  className={inputCls(!!errors.ciudad)}
-                />
-                <FieldError message={errors.ciudad?.message} />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="mb-1 block text-sm font-semibold text-gray-700">
-                  Mensaje
-                </label>
-                <textarea
-                  {...register("mensaje")}
-                  rows={4}
-                  placeholder="¿Qué te gustaría preguntarnos?"
-                  className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-sm transition focus:border-[#0f766e] focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <label className="flex cursor-pointer items-start gap-3 border-t border-gray-100 pt-4">
-              <input
-                type="checkbox"
-                {...register("aceptaPrivacidad")}
-                className="mt-0.5 h-4 w-4 rounded accent-[#0f766e]"
-              />
-              <span className="text-sm text-gray-700">
-                Acepto la política de privacidad{" "}
-                <span className="text-red-500">*</span>
-              </span>
-            </label>
-            <FieldError message={errors.aceptaPrivacidad?.message} />
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-2xl bg-[#0f766e] py-3.5 text-base font-bold text-white transition hover:bg-[#0d6b62] disabled:opacity-60"
-            >
-              {isSubmitting ? "Enviando..." : "Enviar consulta"}
-            </button>
-          </form>
-
-          {/* Contacto directo */}
-          <div className="mt-8 flex flex-wrap justify-center gap-3 text-sm text-gray-500">
-            <a
-              href={`mailto:${SITE_CONFIG.email}`}
-              className="inline-flex items-center gap-2 hover:text-gray-900"
-            >
-              <Mail size={14} /> {SITE_CONFIG.email}
-            </a>
-            <span className="text-gray-300">·</span>
-            <a
-              href={`tel:${SITE_CONFIG.phone.replace(/\s/g, "")}`}
-              className="inline-flex items-center gap-2 hover:text-gray-900"
-            >
-              <Phone size={14} /> {SITE_CONFIG.phone}
-            </a>
-          </div>
+      {/* Beneficios */}
+      <section className="mx-auto max-w-[1200px] px-6 py-16">
+        <div className="mb-10 text-center">
+          <h2 className="mb-2 text-2xl font-bold text-gray-900 md:text-3xl">
+            Qué te aporta ser franquicia TCG Academy
+          </h2>
+          <p className="text-gray-500">
+            Todo lo que tardarías años en construir solo, ya hecho.
+          </p>
         </div>
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {BENEFITS.map(({ icon: Icon, title, desc }) => (
+            <div
+              key={title}
+              className="rounded-2xl border border-gray-200 bg-white p-6"
+            >
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-teal-100 text-[#0f766e]">
+                <Icon size={20} />
+              </div>
+              <h3 className="mb-1.5 font-bold text-gray-900">{title}</h3>
+              <p className="text-sm text-gray-600">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Perfil candidato */}
+      <section className="border-y border-gray-100 bg-gray-50 py-14">
+        <div className="mx-auto max-w-[800px] px-6">
+          <h2 className="mb-4 text-center text-2xl font-bold text-gray-900">
+            Perfil del franquiciado
+          </h2>
+          <p className="mb-6 text-center text-sm text-gray-500">
+            Buscamos personas que conozcan el sector y quieran convertir su
+            pasión en una tienda profesional.
+          </p>
+          <ul className="space-y-3">
+            {PERFIL.map((r) => (
+              <li
+                key={r}
+                className="flex items-start gap-3 rounded-xl bg-white p-4"
+              >
+                <span className="mt-0.5 inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-[#0f766e]">
+                  <MapPin size={12} />
+                </span>
+                <span className="text-sm text-gray-700">{r}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* CTA final */}
+      <section className="mx-auto max-w-[800px] px-6 py-16 text-center">
+        <h2 className="mb-3 text-2xl font-bold text-gray-900 md:text-3xl">
+          ¿Te encaja el modelo?
+        </h2>
+        <p className="mx-auto mb-6 max-w-xl text-gray-600">
+          Cuéntanos quién eres, en qué ciudad piensas abrir y por qué crees que
+          tu zona necesita una tienda TCG. Si encajamos, te enviamos el dossier
+          completo con cifras, royalties y plan de apertura.
+        </p>
+        <Link
+          href="/mayoristas/franquicias/solicitar"
+          className="inline-flex items-center gap-2 rounded-xl bg-[#0f766e] px-6 py-3 font-bold text-white transition hover:bg-[#115e59]"
+        >
+          Ir al formulario <ArrowRight size={18} />
+        </Link>
       </section>
     </div>
   );

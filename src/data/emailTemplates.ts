@@ -7,6 +7,7 @@
 // relativas al dominio).
 
 import { SITE_CONFIG } from "@/config/siteConfig";
+import { SHIELD_DATA_URI } from "@/data/emailAssets";
 
 export interface EmailTemplate {
   id: string;
@@ -17,10 +18,12 @@ export interface EmailTemplate {
   html: string;
 }
 
-// URL absoluta del escudo (los emails se abren fuera del dominio).
-// `-trimmed` es la versión sin padding transparente alrededor — evita que
-// algunos clientes (Outlook, Gmail-app) lo recorten al ajustarlo a 72px.
-const SHIELD_URL = "https://tcgacademy.es/images/logo-tcg-shield-trimmed.png";
+// Escudo embebido como data URI — el logo viaja DENTRO del email, así no
+// depende de que el deploy sirva /images/* (en su día apuntábamos a
+// https://tcgacademy.es/images/logo-tcg-shield-trimmed.png pero el host
+// devolvía 404 y el <img> aparecía roto en Gmail).
+// Para cambiar el logo: sustituye el PNG y ejecuta `node scripts/regen-email-logo.mjs`.
+const SHIELD_URL = SHIELD_DATA_URI;
 const SITE_URL = "https://tcgacademy.es";
 
 // ─── PALETA OFICIAL (la misma de la web) ─────────────────────────────────────
@@ -1176,6 +1179,34 @@ export const EMAIL_TEMPLATES: EmailTemplate[] = [
           <a href="{{appUrl}}/admin/pedidos" class="btn">Abrir panel de pedidos</a>
         </p>
         <p style="color:#475569; font-size:13px">Notificación interna del sistema TCG Academy.</p>
+      </div>
+    `),
+  },
+  {
+    id: "mensaje_admin",
+    name: "Mensaje del equipo TCG Academy",
+    subject: "{{subject}}",
+    description:
+      "Mensaje directo enviado por el admin a un usuario desde su perfil. " +
+      "El mismo contenido se duplica como AppMessage en su bandeja interna. " +
+      "El cuerpo viene en {{message_html}} ya escapado y con saltos de línea convertidos a <br>.",
+    variables: ["nombre", "subject", "message_html", "appUrl", "unsubscribe_link"],
+    html: wrapEmail(`
+      <div class="hero">
+        <span class="hero-accent"></span>
+        <h1>Tienes un mensaje</h1>
+        <p>Del equipo de TCG Academy</p>
+      </div>
+      <div class="content">
+        <p>Hola {{nombre}},</p>
+        <div class="info-box" style="line-height:1.7;">{{message_html}}</div>
+        <p style="text-align:center; margin: 28px 0;">
+          <a href="{{appUrl}}/cuenta/mensajes" class="btn">Ver mis mensajes</a>
+        </p>
+        <p style="color:#475569; font-size:13px">
+          Este mensaje también está disponible en tu bandeja de entrada dentro de tu cuenta de TCG Academy.
+        </p>
+        <p><strong>El equipo de TCG Academy</strong></p>
       </div>
     `),
   },

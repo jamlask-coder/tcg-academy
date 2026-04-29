@@ -498,3 +498,53 @@ export async function sendCouponEmail(
     preview: `Cupón ${params.couponCode}: ${params.couponValue}`,
   });
 }
+
+// ── Admin → Usuario (mensaje directo) ─────────────────────────────────────
+
+interface AdminMessageEmailParams {
+  toEmail: string;
+  toName: string;
+  subject: string;
+  /** Texto del mensaje en plano. Aquí se escapa HTML y se convierten saltos
+   *  de línea a <br> antes de inyectarlo en la plantilla `mensaje_admin`. */
+  bodyText: string;
+  appUrl?: string;
+}
+
+/**
+ * Escapa HTML mínimo para evitar inyección: el admin escribe texto plano
+ * en el textarea del modal, no esperamos que escriba `<script>` adrede,
+ * pero tampoco queremos que un `&` o un `<` rompan el render del email.
+ */
+function escapeHtmlForEmail(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export async function sendAdminMessageEmail(
+  params: AdminMessageEmailParams,
+): Promise<{ ok: boolean; emailId: string }> {
+  const appUrl =
+    params.appUrl ??
+    (typeof window !== "undefined" ? window.location.origin : "https://tcgacademy.es");
+
+  // Texto plano → HTML seguro con saltos de línea preservados.
+  const bodyHtml = escapeHtmlForEmail(params.bodyText).replace(/\r?\n/g, "<br>");
+
+  return sendAppEmail({
+    toEmail: params.toEmail,
+    toName: params.toName,
+    templateId: "mensaje_admin",
+    vars: {
+      nombre: params.toName,
+      subject: params.subject,
+      message_html: bodyHtml,
+      appUrl,
+    },
+    preview: params.subject,
+  });
+}

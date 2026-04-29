@@ -118,6 +118,9 @@ export interface UserRecord {
   emailVerified?: boolean;
   /** Timestamp ISO de verificación — columna `email_verified_at`. */
   emailVerifiedAt?: string;
+  /** Heartbeat del cliente (cada 60s mientras está logueado). Se usa para
+   * mostrar punto verde/rojo en /admin/usuarios/[id]. */
+  lastSeenAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -477,6 +480,8 @@ export interface DbAdapter {
   updateUser(userId: string, data: Partial<UserRecord>): Promise<void>;
   /** Cambio de email — separado por validación de colisión y cascada de FKs. */
   updateUserEmail(userId: string, newEmail: string): Promise<void>;
+  /** Heartbeat — actualiza last_seen_at sin tocar updated_at. */
+  updateLastSeen(userId: string, isoTimestamp: string): Promise<void>;
   deleteUser(userId: string): Promise<void>;
 
   // Invoices
@@ -821,6 +826,11 @@ export class LocalDbAdapter implements DbAdapter {
     }
   }
 
+  async updateLastSeen(): Promise<void> {
+    // Local mode: no-op. La presencia "online" sólo tiene sentido en server
+    // mode donde el admin consulta otra sesión distinta a la suya.
+  }
+
   async getInvoices(userId?: string): Promise<InvoiceRecord[]> {
     const invoices = readStorage<InvoiceRecord[]>(KEYS.invoices, []);
     if (userId) return invoices.filter((i) => i.userId === userId);
@@ -1142,6 +1152,19 @@ export class ServerDbAdapter implements DbAdapter {
       .update({ email: lower, updated_at: new Date().toISOString() })
       .eq("id", userId);
     if (error) throw error;
+  }
+
+  async updateLastSeen(userId: string, isoTimestamp: string): Promise<void> {
+    // Heartbeat — actualiza last_seen_at SIN tocar updated_at, para que la
+    // columna updated_at siga reflejando cambios reales del perfil del
+    // usuario y no la mera presencia. Si la columna aún no existe (la
+    // migración users_last_seen_at.sql no se aplicó), suprimimos el error
+    // para no romper el heartbeat client-side.
+    const { error } = await this.db
+      .from("users")
+      .update({ last_seen_at: isoTimestamp })
+      .eq("id", userId);
+    if (error && !/last_seen_at/i.test(error.message)) throw error;
   }
 
   // ── Invoices ────────────────────────────────────────────────────────────
@@ -2245,6 +2268,7 @@ function mapUserRow(row: DbRow): UserRecord {
         ? false
         : undefined,
     emailVerifiedAt: asOpt<string>(row.email_verified_at),
+    lastSeenAt: asOpt<string>(row.last_seen_at),
     createdAt: asStr(row.created_at),
     updatedAt: asStr(row.updated_at),
   };

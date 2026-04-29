@@ -37,6 +37,8 @@ interface AdminUserDetail {
   emailVerifiedAt?: string;
   referralCode?: string;
   referredBy?: string;
+  /** Último heartbeat del cliente — el admin lo usa para el indicador online. */
+  lastSeenAt?: string;
 }
 
 function toDetail(u: UserRecord): AdminUserDetail {
@@ -55,6 +57,7 @@ function toDetail(u: UserRecord): AdminUserDetail {
     emailVerifiedAt: u.emailVerifiedAt,
     referralCode: u.referralCode,
     referredBy: u.referredBy,
+    lastSeenAt: u.lastSeenAt,
   };
 }
 

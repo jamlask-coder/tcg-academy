@@ -7,7 +7,6 @@ import type { User } from "@/types/user";
 import {
   readAdminOrdersMerged,
   readAdminOrdersMergedAsync,
-  isCountableOrder,
 } from "@/lib/orderAdapter";
 import { loadPoints } from "@/services/pointsService";
 import { getUserHandle } from "@/lib/userHandle";
@@ -86,12 +85,13 @@ export default function AdminUsuariosPage() {
       // En server-mode `readAdminOrdersMerged` (sync) no ve la BD: devolvía
       // [] y los totales por usuario quedaban a 0. Usamos la versión async
       // que tira de /api/orders y mantiene compatibilidad con local-mode.
-      // Los pedidos heredados (fiscalCarryOver) NO contabilizan: se filtran
-      // con isCountableOrder antes de agregar.
-      const mergedAll = IS_SERVER_MODE
+      // Importante: contabilizamos TODOS los pedidos (incluidos los heredados
+      // fiscalCarryOver). El admin necesita ver el histórico real del cliente
+      // — son pedidos de verdad, sólo que no facturamos sobre ellos. La
+      // exclusión de carry-over vive únicamente en el módulo fiscal.
+      const merged = IS_SERVER_MODE
         ? await readAdminOrdersMergedAsync(ADMIN_ORDERS)
         : readAdminOrdersMerged(ADMIN_ORDERS);
-      const merged = mergedAll.filter(isCountableOrder);
       const statsByKey = new Map<string, { orders: number; spent: number }>();
       for (const o of merged) {
         const keys = [o.userId, o.userEmail?.toLowerCase()].filter(Boolean) as string[];
