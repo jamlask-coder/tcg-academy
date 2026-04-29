@@ -19,7 +19,7 @@ import {
   generateAnnualReport,
 } from "@/services/taxService";
 import { generateModelo347 } from "@/accounting/advancedAccounting";
-import { readAdminOrdersMerged } from "@/lib/orderAdapter";
+import { readAdminOrdersMerged, isCountableOrder } from "@/lib/orderAdapter";
 import type { Quarter } from "@/types/tax";
 import { isIntraCommunityOperation } from "@/services/taxService";
 import {
@@ -705,7 +705,8 @@ export function draft369(year: number, quarter: Quarter): FiscalDraft {
   }
 
   const { start, end } = getQuarterRange(year, quarter);
-  const orders = readAdminOrdersMerged([]);
+  // Excluye pedidos heredados (SL anterior) — no contabilizan en modelos AEAT.
+  const orders = readAdminOrdersMerged([]).filter(isCountableOrder);
   const ueOrders = orders.filter((o) => {
     const d = new Date(o.date ?? "");
     if (d < start || d > end) return false;
@@ -994,7 +995,8 @@ export function draftIntrastat(year: number, month: number): FiscalDraft {
   }
 
   const { start, end } = getMonthRange(year, month);
-  const orders = readAdminOrdersMerged([]);
+  // Excluye pedidos heredados (SL anterior) de Intrastat.
+  const orders = readAdminOrdersMerged([]).filter(isCountableOrder);
   const expediciones = orders.filter((o) => {
     const d = new Date(o.date ?? "");
     if (d < start || d > end) return false;

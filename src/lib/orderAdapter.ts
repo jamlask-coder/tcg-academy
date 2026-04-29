@@ -417,6 +417,26 @@ export function isAdminVisibleOrder(o: AdminOrder): boolean {
 }
 
 /**
+ * SSOT para "¿este pedido contabiliza en KPIs/totales/stats?".
+ *
+ * Los pedidos heredados (`fiscalCarryOver: true`) pertenecen a la SL
+ * anterior y se muestran en /admin/pedidos solo como observación. NO deben
+ * sumar en:
+ *   - Ingresos/revenue del dashboard
+ *   - Pedidos por usuario en /admin/usuarios
+ *   - Estadísticas operativas
+ *   - Modelo 303 / 390 / cualquier cálculo fiscal (la SL nueva no tributa
+ *     ingresos de la SL anterior)
+ *   - Badges de pendientes en sidebar/header
+ *
+ * Sí siguen apareciendo en listados (tabla de /admin/pedidos, tabla de
+ * pedidos del usuario en su detalle) marcados visualmente como heredados.
+ */
+export function isCountableOrder(o: AdminOrder): boolean {
+  return !o.fiscalCarryOver && isAdminVisibleOrder(o);
+}
+
+/**
  * Cuenta los pedidos pendientes por enviar, tirando del SSOT unificado
  * (`readAdminOrdersMerged`) para incluir también los que sólo existen todavía
  * en el checkout (`tcgacademy_orders`) y aún no se propagaron al inbox admin.
@@ -430,7 +450,7 @@ export function countPendingOrdersToShip(): number {
   if (typeof window === "undefined") return 0;
   const orders = readAdminOrdersMerged();
   return orders
-    .filter(isAdminVisibleOrder)
+    .filter(isCountableOrder)
     .filter((o) => o.adminStatus === "pendiente_envio").length;
 }
 

@@ -42,7 +42,7 @@ import {
   pointsToEuros,
   type HistoryEntryType,
 } from "@/services/pointsService";
-import { readAdminOrdersMerged } from "@/lib/orderAdapter";
+import { readAdminOrdersMerged, isCountableOrder } from "@/lib/orderAdapter";
 
 const BarChart = dynamic(() => import("recharts").then((m) => m.BarChart), { ssr: false });
 const Bar = dynamic(() => import("recharts").then((m) => m.Bar), { ssr: false });
@@ -93,12 +93,14 @@ export default function EstadisticasPage() {
   const [showAllLocations, setShowAllLocations] = useState(false);
   const [trafficChannel, setTrafficChannel] = useState<TrafficChannel>("all");
   const [allProducts, setAllProducts] = useState<LocalProduct[]>(() => getMergedProducts());
-  const [liveOrders, setLiveOrders] = useState(() => readAdminOrdersMerged(ADMIN_ORDERS));
+  const [liveOrders, setLiveOrders] = useState(() =>
+    readAdminOrdersMerged(ADMIN_ORDERS).filter(isCountableOrder),
+  );
 
   useEffect(() => {
     const reload = () => {
       setAllProducts(getMergedProducts());
-      setLiveOrders(readAdminOrdersMerged(ADMIN_ORDERS));
+      setLiveOrders(readAdminOrdersMerged(ADMIN_ORDERS).filter(isCountableOrder));
     };
     window.addEventListener("tcga:products:updated", reload);
     window.addEventListener("tcga:orders:updated", reload);

@@ -48,6 +48,7 @@ import type {
 import {
   readAdminOrdersMerged,
   getOrderPaymentStatus,
+  isCountableOrder,
 } from "@/lib/orderAdapter";
 import { loadSupplierInvoices } from "@/services/supplierInvoiceService";
 import { SupplierInvoiceStatus } from "@/types/fiscal";
@@ -608,7 +609,9 @@ function ManualPicker({
   const [q, setQ] = useState("");
   const candidates = useMemo(() => {
     if (type === "income") {
+      // Carry-over (SL anterior) no entra en conciliación bancaria nueva.
       return readAdminOrdersMerged()
+        .filter(isCountableOrder)
         .filter((o) => getOrderPaymentStatus(o.id) === "pendiente")
         .map((o) => ({
           id: o.id,

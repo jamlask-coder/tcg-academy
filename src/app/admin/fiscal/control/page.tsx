@@ -22,7 +22,7 @@ import {
 import { exportReconciliationCSV } from "@/lib/fiscalAudit";
 import { exportIssuesCSV } from "@/lib/invoiceRecovery";
 import { loadInvoices } from "@/services/invoiceService";
-import { readAdminOrdersMerged } from "@/lib/orderAdapter";
+import { readAdminOrdersMerged, isCountableOrder } from "@/lib/orderAdapter";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -125,7 +125,7 @@ export default function ControlFiscalPage() {
           </button>
           <button
             onClick={() => {
-              const orders = readAdminOrdersMerged();
+              const orders = readAdminOrdersMerged().filter(isCountableOrder);
               const invoices = loadInvoices();
               const csv = exportReconciliationCSV(orders, invoices);
               downloadCSV(csv, `reconciliacion_pedidos_facturas_${new Date().toISOString().slice(0, 10)}.csv`);

@@ -43,6 +43,7 @@ import {
   readAdminOrdersMerged,
   setOrderPaymentStatus,
   getOrderPaymentStatus,
+  isCountableOrder,
 } from "@/lib/orderAdapter";
 
 const KEY_MOVEMENTS = "tcgacademy_bank_movements";
@@ -332,9 +333,10 @@ export function findMatch(mov: BankMovement): MatchResult {
   const concept = normalize(`${mov.concept} ${mov.reference} ${mov.counterparty}`);
 
   if (mov.type === "income") {
-    const orders = readAdminOrdersMerged().filter(
-      (o) => getOrderPaymentStatus(o.id) === "pendiente",
-    );
+    // Excluye carry-over: ya fue conciliado por la SL anterior.
+    const orders = readAdminOrdersMerged()
+      .filter(isCountableOrder)
+      .filter((o) => getOrderPaymentStatus(o.id) === "pendiente");
     const candidates = orders.filter((o) => amountsMatch(o.total, mov.amount));
     if (candidates.length === 0) return { target: null };
 

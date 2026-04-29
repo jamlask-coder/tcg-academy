@@ -22,6 +22,12 @@ function buildGoogleAuthUrl(redirectTo: string): string {
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: redirectUri,
     response_type: "id_token",
+    // `response_mode=fragment` evita que algunos navegadores/proxies traten
+    // mal el id_token (URL fragments no se loguean ni se reenvían). Implícito
+    // por OIDC pero Google requiere que sea explícito en algunos clientes
+    // recientes — sin esto la respuesta puede llegar en query y romper el
+    // callback (la página "This page couldn't load" del usuario).
+    response_mode: "fragment",
     scope: "openid email profile",
     nonce,
     prompt: "select_account",

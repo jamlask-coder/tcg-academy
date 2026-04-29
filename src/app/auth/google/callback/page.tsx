@@ -34,12 +34,16 @@ function decodeJwt(token: string): GoogleIdTokenClaims | null {
 }
 
 export default function GoogleCallbackPage() {
-  const { loginWithGoogle, user } = useAuth();
+  const { loginWithGoogle } = useAuth();
   const router = useRouter();
   const [error, setError] = useState<string>("");
   // Guard contra doble-ejecución (React StrictMode dev + posible re-render).
   // Sin esto, el segundo mount no encuentra el nonce (lo borró el primero) y
   // muestra "Verificación de seguridad fallida" aunque el login fue OK.
+  // No dependemos de `user` del AuthContext aquí: hidratar AuthContext puede
+  // tardar (fetch a /api/auth/me) y crear una race en la que el callback
+  // redirige antes de procesar el id_token. Procesamos siempre el fragmento
+  // si está presente; si la sesión ya estaba activa, persist() lo refresca.
   const ranRef = useRef(false);
 
   useEffect(() => {
@@ -47,28 +51,33 @@ export default function GoogleCallbackPage() {
     ranRef.current = true;
 
     const run = async () => {
-      // Si ya hay sesión activa y aterrizamos aquí (p.ej. reload de la
-      // callback), no reproceses el hash — solo redirige limpiamente.
-      if (user) {
-        const target = sessionStorage.getItem(REDIRECT_KEY) ?? "/cuenta";
-        sessionStorage.removeItem(REDIRECT_KEY);
-        const finalRedirect = user.role === "admin" ? "/admin" : target;
-        router.replace(finalRedirect);
-        return;
-      }
-
+      // Lee el id_token de fragment (#) o, como fallback, de query (?).
+      // Google a veces devuelve `error` en query string aunque el flow sea
+      // implicit; cubrimos ambos para mostrar el mensaje real al usuario.
       const hash = window.location.hash.replace(/^#/, "");
-      const params = new URLSearchParams(hash);
-      const idToken = params.get("id_token");
-      const oauthError = params.get("error");
+      const search = window.location.search.replace(/^\?/, "");
+      const fragParams = new URLSearchParams(hash);
+      const queryParams = new URLSearchParams(search);
+      const idToken = fragParams.get("id_token") ?? queryParams.get("id_token");
+      const oauthError =
+        fragParams.get("error") ?? queryParams.get("error");
+      const oauthErrorDescription =
+        fragParams.get("error_description") ??
+        queryParams.get("error_description");
 
       if (oauthError) {
-        setError(`Google rechazó el login: ${oauthError}`);
+        const detail = oauthErrorDescription
+          ? `${oauthError}: ${oauthErrorDescription}`
+          : oauthError;
+        setError(`Google rechazó el login: ${detail}`);
         return;
       }
 
       if (!idToken) {
-        setError("No se recibió token de Google");
+        setError(
+          "No se recibió token de Google. Comprueba que la URL de redirección " +
+            "está autorizada en Google Cloud Console.",
+        );
         return;
       }
 
@@ -147,8 +156,14 @@ export default function GoogleCallbackPage() {
 
       router.replace(finalRedirect);
     };
-    void run();
-  }, [loginWithGoogle, router, user]);
+    // Wrap defensivo: si algo lanza (parseo, fetch, decoding), mostramos
+    // nuestra UI de error en vez de dejar que React/Next muestren la
+    // pantalla genérica "This page couldn't load. Reload to try again".
+    run().catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Error inesperado al procesar el login con Google: ${msg}`);
+    });
+  }, [loginWithGoogle, router]);
 
   return (
     <div className="flex items-center justify-center bg-gray-50 px-4 py-16 sm:py-24">

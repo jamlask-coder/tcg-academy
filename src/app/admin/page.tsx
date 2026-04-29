@@ -26,7 +26,7 @@ import {
   buildProductsSeries,
 } from "@/services/analyticsService";
 import type { OrderMetrics, TopProduct } from "@/services/analyticsService";
-import { readAdminOrdersMerged } from "@/lib/orderAdapter";
+import { readAdminOrdersMerged, isCountableOrder } from "@/lib/orderAdapter";
 import { ADMIN_ORDERS } from "@/data/mockData";
 import { loadAdminCoupons } from "@/services/couponService";
 import type { AdminCoupon } from "@/data/mockData";
@@ -84,7 +84,9 @@ export default function AdminDashboard() {
   const [topProductsByQty, setTopProductsByQty] = useState<TopProduct[]>(() => getTopProducts(5, "qty"));
   const [userStats, setUserStats] = useState(() => getLiveUserStats());
   const [pendingOrdersCount, setPendingOrdersCount] = useState(() => countPendingAdminOrders());
-  const [allOrders, setAllOrders] = useState(() => readAdminOrdersMerged(ADMIN_ORDERS));
+  const [allOrders, setAllOrders] = useState(() =>
+    readAdminOrdersMerged(ADMIN_ORDERS).filter(isCountableOrder),
+  );
   const [coupons, setCoupons] = useState<AdminCoupon[]>([]);
   const [salesSeries, setSalesSeries] = useState(() => ({
     "7d": buildSalesSeries("7d"),
@@ -116,7 +118,7 @@ export default function AdminDashboard() {
       setTopProductsByQty(getTopProducts(5, "qty"));
       setUserStats(getLiveUserStats());
       setPendingOrdersCount(countPendingAdminOrders());
-      setAllOrders(readAdminOrdersMerged(ADMIN_ORDERS));
+      setAllOrders(readAdminOrdersMerged(ADMIN_ORDERS).filter(isCountableOrder));
       setSalesSeries({
         "7d": buildSalesSeries("7d"),
         "30d": buildSalesSeries("30d"),

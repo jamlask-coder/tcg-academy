@@ -22,7 +22,11 @@ import {
   type AdminOrder,
 } from "@/data/mockData";
 import type { User } from "@/types/user";
-import { readAdminOrdersMerged, readAdminOrdersMergedAsync } from "@/lib/orderAdapter";
+import {
+  readAdminOrdersMerged,
+  readAdminOrdersMergedAsync,
+  isCountableOrder,
+} from "@/lib/orderAdapter";
 import { loadPoints } from "@/services/pointsService";
 import { findUserByHandle } from "@/lib/userHandle";
 import { B2BCharts } from "@/components/account/B2BCharts";
@@ -96,8 +100,11 @@ export default function AdminUsuarioDetailPage() {
           o.userId === baseUser.id ||
           (o.userEmail && o.userEmail.toLowerCase() === emailLower),
       );
-      const totalOrders = userOrders.length;
-      const totalSpent = userOrders.reduce((s, o) => s + (o.total || 0), 0);
+      // Los pedidos heredados (carry-over) se MUESTRAN en la lista pero NO
+      // contabilizan en totalOrders/totalSpent: son histórico SL anterior.
+      const countable = userOrders.filter(isCountableOrder);
+      const totalOrders = countable.length;
+      const totalSpent = countable.reduce((s, o) => s + (o.total || 0), 0);
       const livePoints = loadPoints(baseUser.id);
       setResolved({
         user: {
