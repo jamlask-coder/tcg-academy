@@ -27,15 +27,44 @@ export interface Store {
   color: string;
 }
 
+export interface EventSession {
+  /** Etiqueta del día — p.ej. "Sábado" / "Domingo" */
+  label: string;
+  /** ISO date — "2026-05-09" */
+  date: string;
+  /** "10:30" */
+  time: string;
+}
+
 export interface Event {
   id: number;
+  slug: string;
   title: string;
-  date: string;
-  store: string;
+  subtitle?: string;
+  /** Slug del juego ("riftbound", "magic", "pokemon"…) — ver GAME_CONFIG */
   game: string;
-  price: number;
-  image: string;
-  description: string;
+  /** ID de la tienda en STORES */
+  storeId: string;
+  /** Dirección donde se celebra el evento (puede diferir de la tienda) */
+  address: string;
+  city: string;
+  postalCode?: string;
+  /** Una o varias sesiones (sábado, domingo…) */
+  sessions: EventSession[];
+  /** Inscripción en € (incluye IVA) */
+  entryFee: number;
+  /** Texto del premio — "Sobre por victoria", "Sobre + booster"… */
+  prizeText: string;
+  /** Ruta pública al cartel (relativa a /public) */
+  posterImage: string;
+  /** Color HEX de acento — gradientes y bordes */
+  accentColor: string;
+  /** Resumen corto — 1 frase, lo que ve el usuario en la card cerrada */
+  shortDescription: string;
+  /** Descripción larga — markdown ligero permitido (\n para párrafos) */
+  longDescription: string;
+  /** Bullets destacados — qué se entrega, qué se juega */
+  highlights: string[];
 }
 
 export interface B2BApplication {

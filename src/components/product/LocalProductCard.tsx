@@ -273,6 +273,13 @@ function LocalProductCardInner({ product }: Props) {
                   <ShoppingCart size={14} /> Añadir
                 </button>
               )}
+              {cartQty > 0 && (
+                <div className="mt-1 flex justify-center">
+                  <span className="rounded-full bg-white/95 px-2 py-0.5 shadow-sm backdrop-blur-sm">
+                    <InCartBadge variant="card" />
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -349,6 +356,9 @@ function LocalProductCardInner({ product }: Props) {
                 >
                   +
                 </button>
+              </div>
+              <div className="mt-0.5 flex justify-center">
+                <InCartBadge variant="card" />
               </div>
             </div>
           ) : (
@@ -462,11 +472,6 @@ function LocalProductCardInner({ product }: Props) {
             <span className="text-[10px] font-semibold text-red-500">
               {limitMsg}
             </span>
-          )}
-          {cartQty > 0 && (
-            <div className="pt-0.5">
-              <InCartBadge variant="card" />
-            </div>
           )}
         </div>
       </div>

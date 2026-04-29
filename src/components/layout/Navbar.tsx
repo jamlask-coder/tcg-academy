@@ -5,8 +5,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { MegaMenu } from "./MegaMenu";
-import { TiendasMenu } from "./TiendasMenu";
-import { MayoristasMenu } from "./MayoristasMenu";
+import { EventosMenu } from "./EventosMenu";
 import { OtrosMenu } from "./OtrosMenu";
 import { MEGA_MENU_DATA } from "@/data/megaMenuData";
 import { getMergedMegaMenu } from "@/lib/megaMenuOverrides";
@@ -154,6 +153,7 @@ function GameLogo({
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
+const EVENTOS_KEY = "eventos";
 const TIENDAS_KEY = "tiendas";
 const MAYORISTAS_KEY = "mayoristas";
 const OTROS_KEY = "otros";
@@ -257,6 +257,7 @@ export function Navbar() {
 
   const activeGameData =
     activeItem &&
+    activeItem !== EVENTOS_KEY &&
     activeItem !== TIENDAS_KEY &&
     activeItem !== MAYORISTAS_KEY &&
     activeItem !== OTROS_KEY &&
@@ -308,7 +309,7 @@ export function Navbar() {
                       className="group/logo flex items-stretch"
                       onMouseEnter={() => openItem(slug)}
                       style={(() => {
-                        const anyGameInNavHovered = activeItem !== null && activeItem !== TIENDAS_KEY && activeItem !== MAYORISTAS_KEY && activeItem !== OTROS_KEY;
+                        const anyGameInNavHovered = activeItem !== null && activeItem !== EVENTOS_KEY && activeItem !== TIENDAS_KEY && activeItem !== MAYORISTAS_KEY && activeItem !== OTROS_KEY;
                         const onAGamePage = NAVBAR_GAMES.some(g => pathname === `/${g.slug}` || pathname.startsWith(`/${g.slug}/`));
 
                         // Hover takes priority
@@ -401,70 +402,62 @@ export function Navbar() {
               {/* ── Eventos ──────────────────────────────────────────────────── */}
               <div
                 role="presentation"
-                onMouseEnter={() => setActiveItem(null)}
+                onMouseEnter={() => openItem(EVENTOS_KEY)}
                 className="flex items-stretch"
               >
-                <Link
-                  href="/eventos"
-                  className={`relative z-10 -mb-px flex items-center border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition ${
-                    pathname.startsWith("/eventos")
+                <button
+                  aria-label="Ver próximos eventos"
+                  aria-expanded={activeItem === EVENTOS_KEY}
+                  className={`relative z-10 -mb-px flex items-center gap-1 border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition ${
+                    activeItem === EVENTOS_KEY || pathname.startsWith("/eventos")
                       ? "border-amber-400 text-amber-300"
                       : "border-transparent text-white/80 hover:text-white"
                   }`}
                 >
                   Eventos
-                </Link>
-              </div>
-
-              {/* ── Tiendas ──────────────────────────────────────────────────── */}
-              <div
-                role="presentation"
-                onMouseEnter={() => openItem(TIENDAS_KEY)}
-                className="flex items-stretch"
-              >
-                <button
-                  aria-label="Ver nuestras tiendas"
-                  aria-expanded={activeItem === TIENDAS_KEY}
-                  className={`relative z-10 -mb-px flex items-center gap-1 border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition ${
-                    activeItem === TIENDAS_KEY || pathname.startsWith("/tiendas")
-                      ? "border-amber-400 text-amber-300"
-                      : "border-transparent text-white/80 hover:text-white"
-                  }`}
-                >
-                  Tiendas
                   <ChevronDown
                     size={11}
                     className={`ml-0.5 transition-transform duration-200 ${
-                      activeItem === TIENDAS_KEY ? "rotate-180" : ""
+                      activeItem === EVENTOS_KEY ? "rotate-180" : ""
                     }`}
                   />
                 </button>
               </div>
 
+              {/* ── Tiendas ──────────────────────────────────────────────────── */}
+              <div
+                role="presentation"
+                onMouseEnter={() => setActiveItem(null)}
+                className="flex items-stretch"
+              >
+                <Link
+                  href="/tiendas"
+                  className={`relative z-10 -mb-px flex items-center border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition ${
+                    pathname.startsWith("/tiendas")
+                      ? "border-amber-400 text-amber-300"
+                      : "border-transparent text-white/80 hover:text-white"
+                  }`}
+                >
+                  Tiendas
+                </Link>
+              </div>
+
               {/* ── Profesionales ────────────────────────────────────────────── */}
               <div
                 role="presentation"
-                onMouseEnter={() => openItem(MAYORISTAS_KEY)}
+                onMouseEnter={() => setActiveItem(null)}
                 className="flex items-stretch"
               >
-                <button
-                  aria-label="Ver soluciones para profesionales"
-                  aria-expanded={activeItem === MAYORISTAS_KEY}
-                  className={`relative z-10 -mb-px flex items-center gap-1 border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition ${
-                    activeItem === MAYORISTAS_KEY ||
+                <Link
+                  href="/mayoristas"
+                  className={`relative z-10 -mb-px flex items-center border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition ${
                     pathname.startsWith("/mayoristas")
                       ? "border-amber-400 text-amber-300"
                       : "border-transparent text-white/80 hover:text-white"
                   }`}
                 >
                   Profesionales
-                  <ChevronDown
-                    size={11}
-                    className={`ml-0.5 transition-transform duration-200 ${
-                      activeItem === MAYORISTAS_KEY ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
+                </Link>
               </div>
             </div>
           </div>
@@ -477,11 +470,8 @@ export function Navbar() {
           {activeGameData && (
             <MegaMenu game={activeGameData} onClose={closeNow} logoCenterX={activeLogoLeft ?? undefined} />
           )}
-          {activeItem === TIENDAS_KEY && (
-            <TiendasMenu key="tiendas" onClose={closeNow} />
-          )}
-          {activeItem === MAYORISTAS_KEY && (
-            <MayoristasMenu key="mayoristas" onClose={closeNow} />
+          {activeItem === EVENTOS_KEY && (
+            <EventosMenu key="eventos" onClose={closeNow} />
           )}
           {activeItem === OTROS_KEY && (
             <OtrosMenu key="otros" onClose={closeNow} />
