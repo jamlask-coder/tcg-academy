@@ -126,7 +126,6 @@ export function EventFloatingPromo() {
       return;
     }
     const t = setTimeout(() => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisible(true);
     }, SHOW_AFTER_MS);
     return () => clearTimeout(t);

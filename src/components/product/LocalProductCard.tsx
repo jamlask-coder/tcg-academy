@@ -17,7 +17,6 @@ import {
 } from "@/data/products";
 import { LanguageFlag } from "@/components/ui/LanguageFlag";
 import { DiscountBadgeEdit } from "@/components/ui/DiscountBadgeEdit";
-import { InCartBadge } from "@/components/ui/InCartBadge";
 import { usePrice } from "@/hooks/usePrice";
 import { HoloCard } from "@/components/product/HoloCard";
 import { isLocalProduct, getProductUrl } from "@/lib/productStore";
@@ -106,7 +105,10 @@ function LocalProductCardInner({ product }: Props) {
     CARD_CATEGORIES.has(product.category) &&
     (product.game === "pokemon" || product.game === "riftbound");
 
-  const imageAspect = "aspect-square";
+  // 2026-04-29: aspect-square → 5/6 para que el producto respire un poco más
+  // bajo el botón flotante (queja del usuario: "se ve poco porque sale este
+  // mismo botón"). Subida moderada — no más para no romper la grid.
+  const imageAspect = "aspect-[5/6]";
   const imageObjectFit = "object-contain !px-2 !pt-8 !pb-0";
   // Show second image on hover if available
   const displayImage = hovered && product.images[1] ? product.images[1] : image;
@@ -241,7 +243,11 @@ function LocalProductCardInner({ product }: Props) {
             ))}
             <div style={{ animation: cartQty === 1 && added ? "scaleIn 0.3s ease-out" : "none" }}>
               {cartQty > 0 ? (
-                <div className="flex w-full items-center justify-center overflow-visible rounded-lg border border-white/40 bg-white shadow-lg">
+                // 2026-04-29: pill unificado "− X en la cesta +" — sustituye al
+                // stepper blanco + pastilla "Añadido" debajo (eran 2 piezas).
+                // Mantiene los colores amber del botón "Añadir" para que la
+                // continuidad visual sea total.
+                <div className="flex w-full items-stretch overflow-hidden rounded-lg border border-amber-200 bg-gradient-to-r from-white to-amber-50 shadow-[0_2px_12px_rgba(245,158,11,0.25)]">
                   <button
                     onClick={(e) => {
                       e.preventDefault();
@@ -249,20 +255,25 @@ function LocalProductCardInner({ product }: Props) {
                       if (cartQty <= 1) removeItem(cartKey);
                       else updateQty(cartKey, cartQty - 1);
                     }}
-                    className="flex h-8 flex-1 items-center justify-center rounded-l-lg text-gray-700 transition-all duration-150 hover:bg-red-50 hover:text-red-500 active:scale-90"
+                    className="flex h-9 w-9 flex-shrink-0 items-center justify-center text-amber-800 transition-colors duration-150 hover:bg-amber-100/60 active:scale-90"
                     aria-label={cartQty <= 1 ? "Eliminar del carrito" : "Quitar uno"}
                   >
-                    {cartQty <= 1 ? <Trash2 size={13} /> : "−"}
+                    {cartQty <= 1 ? (
+                      <Trash2 size={13} />
+                    ) : (
+                      <span className="text-lg leading-none font-bold">−</span>
+                    )}
                   </button>
-                  <span className="flex h-8 min-w-[28px] items-center justify-center border-x border-gray-100 px-1.5 text-sm font-bold text-gray-900">
-                    {cartQty}
+                  <span className="flex flex-1 items-center justify-center gap-1.5 px-1 text-sm font-bold text-amber-800">
+                    <ShoppingCart size={13} strokeWidth={2.5} />
+                    {cartQty} en la cesta
                   </span>
                   <button
                     onClick={(e) => { handleAddToCart(e); }}
-                    className="flex h-8 flex-1 items-center justify-center rounded-r-lg text-gray-700 transition-all duration-150 hover:bg-green-50 hover:text-green-600 active:scale-90"
+                    className="flex h-9 w-9 flex-shrink-0 items-center justify-center text-amber-800 transition-colors duration-150 hover:bg-amber-100/60 active:scale-90"
                     aria-label="Añadir uno más"
                   >
-                    +
+                    <span className="text-lg leading-none font-bold">+</span>
                   </button>
                 </div>
               ) : (
@@ -272,13 +283,6 @@ function LocalProductCardInner({ product }: Props) {
                 >
                   <ShoppingCart size={14} /> Añadir
                 </button>
-              )}
-              {cartQty > 0 && (
-                <div className="mt-1 flex justify-center">
-                  <span className="rounded-full bg-white/95 px-2 py-0.5 shadow-sm backdrop-blur-sm">
-                    <InCartBadge variant="card" />
-                  </span>
-                </div>
               )}
             </div>
           </div>
@@ -335,7 +339,8 @@ function LocalProductCardInner({ product }: Props) {
                   {anim.type === "plus" ? "+1" : "−1"}
                 </span>
               ))}
-              <div className="flex items-center overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+              {/* Mobile pill — mismo lenguaje que desktop, dimensiones reducidas */}
+              <div className="flex items-stretch overflow-hidden rounded-md border border-amber-200 bg-gradient-to-r from-white to-amber-50 shadow-[0_2px_8px_rgba(245,158,11,0.2)]">
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -343,22 +348,26 @@ function LocalProductCardInner({ product }: Props) {
                     if (cartQty <= 1) removeItem(cartKey);
                     else updateQty(cartKey, cartQty - 1);
                   }}
-                  className="flex h-7 flex-1 items-center justify-center text-[11px] font-bold text-gray-700 transition-colors hover:bg-red-50 active:text-red-500"
+                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-amber-800 transition-colors active:scale-90"
                   aria-label={cartQty <= 1 ? "Eliminar del carrito" : "Quitar uno"}
                 >
-                  {cartQty <= 1 ? <Trash2 size={10} /> : "−"}
+                  {cartQty <= 1 ? (
+                    <Trash2 size={10} />
+                  ) : (
+                    <span className="text-sm leading-none font-bold">−</span>
+                  )}
                 </button>
-                <span className="flex h-7 min-w-[26px] items-center justify-center border-x border-gray-100 text-[11px] font-bold text-gray-900">{cartQty}</span>
+                <span className="flex flex-1 items-center justify-center gap-1 text-[11px] font-bold text-amber-800">
+                  <ShoppingCart size={10} strokeWidth={2.5} />
+                  {cartQty} en la cesta
+                </span>
                 <button
                   onClick={handleAddToCart}
-                  className="flex h-7 flex-1 items-center justify-center text-[11px] font-bold text-gray-700 transition-colors hover:bg-green-50 active:text-green-500"
+                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center text-amber-800 transition-colors active:scale-90"
                   aria-label="Añadir uno más"
                 >
-                  +
+                  <span className="text-sm leading-none font-bold">+</span>
                 </button>
-              </div>
-              <div className="mt-0.5 flex justify-center">
-                <InCartBadge variant="card" />
               </div>
             </div>
           ) : (
