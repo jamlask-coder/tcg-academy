@@ -109,7 +109,13 @@ function LocalProductCardInner({ product }: Props) {
   // bajo el botón flotante (queja del usuario: "se ve poco porque sale este
   // mismo botón"). Subida moderada — no más para no romper la grid.
   const imageAspect = "aspect-[5/6]";
-  const imageObjectFit = "object-contain !px-2 !pt-8 !pb-0";
+  // 2026-04-29: object-top → la imagen se ancla arriba en lugar de centrarse.
+  // Para productos landscape (displays, sobres anchos) object-contain dejaba
+  // mucho aire arriba Y abajo. Ahora ese aire se concentra abajo (donde la
+  // card respira hacia el footer/precio) y la imagen queda pegada bajo los
+  // badges. Padding mínimo arriba para no chocar con el badge NUEVO.
+  const imageObjectFit =
+    "object-contain object-top !px-2 !pt-1 !pb-0";
   // Show second image on hover if available
   const displayImage = hovered && product.images[1] ? product.images[1] : image;
 
@@ -211,7 +217,7 @@ function LocalProductCardInner({ product }: Props) {
           Ver memory: feedback_cart_button_always_visible.md */}
       {!isOutOfStock && (
         <div className="absolute right-0 bottom-0 left-0 hidden sm:block">
-          <div className="relative bg-gradient-to-t from-black/60 via-black/25 to-transparent px-2 pt-8 pb-2">
+          <div className="relative bg-gradient-to-t from-black/60 via-black/25 to-transparent px-2 pt-3 pb-1.5">
             <style>{`
               @keyframes floatUp {
                 0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
@@ -247,7 +253,7 @@ function LocalProductCardInner({ product }: Props) {
                 // stepper blanco + pastilla "Añadido" debajo (eran 2 piezas).
                 // Mantiene los colores amber del botón "Añadir" para que la
                 // continuidad visual sea total.
-                <div className="flex w-full items-stretch overflow-hidden rounded-lg border border-amber-200 bg-gradient-to-r from-white to-amber-50 shadow-[0_2px_12px_rgba(245,158,11,0.25)]">
+                <div className="flex w-full items-stretch overflow-hidden rounded-lg border-[1.5px] border-amber-500 bg-gradient-to-r from-white to-amber-50 shadow-[0_2px_12px_rgba(217,119,6,0.28)]">
                   <button
                     onClick={(e) => {
                       e.preventDefault();
@@ -279,7 +285,7 @@ function LocalProductCardInner({ product }: Props) {
               ) : (
                 <button
                   onClick={handleAddToCart}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-200 bg-gradient-to-r from-white to-amber-50 py-2 text-sm font-bold text-amber-800 shadow-[0_2px_12px_rgba(245,158,11,0.25)] transition-all duration-200 hover:from-amber-50 hover:to-amber-100 hover:shadow-[0_4px_20px_rgba(245,158,11,0.4)] hover:scale-[1.03] active:scale-[0.97]"
+                  className="gold-sweep flex w-full items-center justify-center gap-1.5 rounded-lg border-[1.5px] border-amber-500 bg-gradient-to-r from-white to-amber-50 py-2 text-sm font-bold text-amber-800 shadow-[0_2px_12px_rgba(217,119,6,0.28)] transition-all duration-200 hover:from-amber-50 hover:to-amber-100 hover:shadow-[0_6px_24px_rgba(217,119,6,0.45)] hover:scale-[1.03] active:scale-[0.97]"
                 >
                   <ShoppingCart size={14} /> Añadir
                 </button>
@@ -292,7 +298,7 @@ function LocalProductCardInner({ product }: Props) {
       {/* ── Restock alert (desktop, SIEMPRE visible) ── */}
       {isOutOfStock && (
         <div className="absolute right-0 bottom-0 left-0 hidden sm:block">
-          <div className="bg-gradient-to-t from-black/60 via-black/25 to-transparent px-2 pt-8 pb-2">
+          <div className="bg-gradient-to-t from-black/60 via-black/25 to-transparent px-2 pt-3 pb-1.5">
             {restockSub ? (
               <div className="flex items-center justify-center gap-1.5 rounded-lg bg-green-50 py-2 text-xs font-bold text-green-600">
                 <Check size={13} /> Te avisaremos
@@ -340,7 +346,7 @@ function LocalProductCardInner({ product }: Props) {
                 </span>
               ))}
               {/* Mobile pill — mismo lenguaje que desktop, dimensiones reducidas */}
-              <div className="flex items-stretch overflow-hidden rounded-md border border-amber-200 bg-gradient-to-r from-white to-amber-50 shadow-[0_2px_8px_rgba(245,158,11,0.2)]">
+              <div className="flex items-stretch overflow-hidden rounded-md border-[1.5px] border-amber-500 bg-gradient-to-r from-white to-amber-50 shadow-[0_2px_8px_rgba(217,119,6,0.22)]">
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -373,7 +379,7 @@ function LocalProductCardInner({ product }: Props) {
           ) : (
             <button
               onClick={handleAddToCart}
-              className="flex w-full items-center justify-center gap-1.5 rounded-md border border-amber-200 bg-gradient-to-r from-white to-amber-50 py-1.5 text-[11px] font-bold text-amber-800 shadow-[0_2px_8px_rgba(245,158,11,0.2)] transition-all duration-200 active:scale-[0.97]"
+              className="gold-sweep flex w-full items-center justify-center gap-1.5 rounded-md border-[1.5px] border-amber-500 bg-gradient-to-r from-white to-amber-50 py-1.5 text-[11px] font-bold text-amber-800 shadow-[0_2px_8px_rgba(217,119,6,0.22)] transition-all duration-200 active:scale-[0.97]"
             >
               <ShoppingCart size={13} /> Añadir
             </button>

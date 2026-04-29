@@ -30,13 +30,17 @@ import {
   Sparkles,
   ChevronUp,
 } from "lucide-react";
-import { EVENTS } from "@/data/events";
+import { getUpcomingEvents } from "@/data/events";
 import { STORES } from "@/data/stores";
 import type { Event } from "@/types";
 
 const STORAGE_PREFIX = "tcga_event_promo_dismissed:";
 const DISMISSAL_TTL_DAYS = 7;
 const SHOW_AFTER_MS = 3000;
+
+// Navy de la marca — pinta el header del widget para que case con el resto
+// del site. El color del juego sigue presente como acento (stripe + halo).
+const BRAND_NAVY = "#132B5F";
 
 const MONTHS = [
   "ene",
@@ -93,18 +97,8 @@ function markDismissed(eventId: number): void {
 }
 
 function pickFeaturedEvent(): Event | null {
-  // Devuelve el primer evento futuro (por primera sesión). Si todos están
-  // pasados, no muestra nada — evita spamear con eventos caducados.
-  const today = new Date().toISOString().slice(0, 10);
-  const upcoming = EVENTS.filter((e) => {
-    const last = e.sessions[e.sessions.length - 1]?.date;
-    return last && last >= today;
-  }).sort((a, b) => {
-    const da = a.sessions[0]?.date ?? "";
-    const db = b.sessions[0]?.date ?? "";
-    return da.localeCompare(db);
-  });
-  return upcoming[0] ?? null;
+  // Helper canónico filtra y ordena. Si todos están pasados, no muestra nada.
+  return getUpcomingEvents()[0] ?? null;
 }
 
 export function EventFloatingPromo() {
@@ -198,33 +192,42 @@ function ExpandedCard({
     <div
       className="pointer-events-auto relative w-[320px] overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 sm:w-[360px]"
       style={{
-        boxShadow: `0 20px 50px -12px ${accent}40, 0 8px 24px rgba(0,0,0,0.12)`,
+        boxShadow: `0 20px 50px -12px ${accent}30, 0 8px 24px rgba(10,22,40,0.18)`,
       }}
     >
-      {/* Cabecera con gradiente del juego */}
+      {/* Cabecera navy de marca — el color del juego entra como stripe + halo
+          para no romper la identidad del site al cambiar de evento. */}
       <div
         className="relative px-4 pt-4 pb-3"
         style={{
-          background: `linear-gradient(135deg, ${accent} 0%, ${accent}dd 100%)`,
+          background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, #0a1628 100%)`,
         }}
       >
-        {/* Patrón de brillo decorativo */}
+        {/* Stripe vertical con el color del juego — sutil pero presente */}
+        <span
+          aria-hidden="true"
+          className="absolute top-0 left-0 h-full w-1"
+          style={{ background: accent }}
+        />
+        {/* Halo del color del juego difuminado en la esquina */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-40"
+          className="pointer-events-none absolute inset-0"
           style={{
-            background:
-              "radial-gradient(circle at 80% 0%, rgba(255,255,255,0.4), transparent 50%)",
+            background: `radial-gradient(circle at 85% 0%, ${accent}55, transparent 55%)`,
           }}
         />
 
         <div className="relative flex items-start justify-between gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/25 backdrop-blur-sm">
-              <Sparkles size={14} className="text-white" />
+            <span
+              className="flex h-7 w-7 items-center justify-center rounded-full backdrop-blur-sm"
+              style={{ background: `${accent}40` }}
+            >
+              <Sparkles size={14} style={{ color: accent }} />
             </span>
             <div>
-              <p className="text-[10px] font-bold tracking-widest text-white/80 uppercase">
+              <p className="text-[10px] font-bold tracking-widest text-white/70 uppercase">
                 Evento destacado
               </p>
               <p className="text-[11px] font-semibold text-white">
@@ -295,22 +298,36 @@ function ExpandedCard({
         </div>
       </Link>
 
-      {/* CTA */}
-      <Link
-        href={`/eventos/${event.slug}`}
-        className="block px-3 pb-3"
-      >
-        <span
-          className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold text-white shadow-md transition hover:shadow-lg active:scale-[0.98]"
-          style={{
-            background: `linear-gradient(135deg, ${accent}, ${accent}dd)`,
-          }}
-        >
-          <Ticket size={13} />
-          Reservar plaza
-        </span>
-      </Link>
+      {/* CTA — va directo al locator externo si está definido (no obliga
+          al usuario a aterrizar en /eventos/[slug] y bajar a buscar el
+          botón). Fallback mailto a la tienda si el evento no tiene URL. */}
+      <ReservationCTA event={event} />
     </div>
+  );
+}
+
+function ReservationCTA({ event }: { event: Event }) {
+  const isExternal = !!event.registrationUrl;
+  const href =
+    event.registrationUrl ??
+    `mailto:hola@tcgacademy.es?subject=${encodeURIComponent(
+      `Inscripción: ${event.title}`,
+    )}`;
+
+  // Mismo lenguaje que el botón "Añadir al carrito" (LocalProductCard) — el
+  // CTA principal del site y el de eventos hablan el mismo idioma dorado.
+  return (
+    <a
+      href={href}
+      target={isExternal ? "_blank" : undefined}
+      rel={isExternal ? "noopener noreferrer" : undefined}
+      className="block px-3 pb-3"
+    >
+      <span className="gold-sweep flex items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-amber-500 bg-gradient-to-r from-white to-amber-50 py-2.5 text-xs font-bold text-amber-800 shadow-[0_2px_12px_rgba(217,119,6,0.28)] transition hover:from-amber-50 hover:to-amber-100 hover:shadow-[0_6px_22px_rgba(217,119,6,0.4)] active:scale-[0.98]">
+        <Ticket size={13} />
+        Reservar plaza · {event.entryFee}€
+      </span>
+    </a>
   );
 }
 

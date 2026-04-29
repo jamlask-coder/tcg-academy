@@ -1,10 +1,20 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE_CONFIG } from "@/config/siteConfig";
 
-export const metadata = {
-  title: "Política de privacidad | TCG Academy",
+export const metadata: Metadata = {
+  title: "Política de privacidad",
   description:
     "Información sobre el tratamiento de datos personales en TCG Academy conforme al RGPD.",
+  alternates: { canonical: "/privacidad" },
+  openGraph: {
+    title: "Política de privacidad | TCG Academy",
+    description:
+      "Cómo tratamos tus datos personales conforme al RGPD y la LOPDGDD.",
+    url: "/privacidad",
+    type: "article",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function PrivacidadPage() {

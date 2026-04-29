@@ -269,6 +269,50 @@ html {
   100% { background-position:  200% center; }
 }
 
+/* Barrido dorado para CTAs amber — sweep sutil cada 4s + acelerado en hover.
+   Da vida al botón "Añadir al carrito" y al CTA "Reservar plaza" sin gritar. */
+@keyframes goldSweep {
+  0%, 70%, 100% {
+    transform: translateX(-150%) skewX(-20deg);
+    opacity: 0;
+  }
+  78% { opacity: 1; }
+  95% {
+    transform: translateX(260%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+.gold-sweep {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.gold-sweep::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(251, 191, 36, 0.55) 50%,
+    transparent 100%
+  );
+  transform: translateX(-150%) skewX(-20deg);
+  animation: goldSweep 4.5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+.gold-sweep:hover::before {
+  animation-duration: 1.4s;
+}
+.gold-sweep > * {
+  position: relative;
+  z-index: 1;
+}
+
 @keyframes badgePulse {
   0%, 100% { transform: scale(1); }
   50%       { transform: scale(1.12); }

@@ -1,9 +1,18 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE_CONFIG } from "@/config/siteConfig";
 
-export const metadata = {
-  title: "Términos y condiciones | TCG Academy",
+export const metadata: Metadata = {
+  title: "Términos y condiciones",
   description: "Condiciones generales de contratación y uso de TCG Academy.",
+  alternates: { canonical: "/terminos" },
+  openGraph: {
+    title: "Términos y condiciones | TCG Academy",
+    description: "Condiciones generales de contratación y uso de TCG Academy.",
+    url: "/terminos",
+    type: "article",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function TerminosPage() {

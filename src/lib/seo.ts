@@ -9,6 +9,7 @@
 import { SITE_CONFIG } from "@/config/siteConfig";
 import type { Store } from "@/data/stores";
 import type { LocalProduct } from "@/data/products";
+import type { Event } from "@/types";
 
 export const SITE_URL = "https://tcgacademy.es";
 
@@ -262,7 +263,9 @@ export function breadcrumbJsonLd(items: BreadcrumbItem[]) {
   };
 }
 
-/** Article — guías y posts de blog. Da elegibilidad a rich results. */
+/** Article — guías y posts de blog. Da elegibilidad a rich results.
+ *  `type: "BlogPosting"` cuando es un post editorial (las guías lo son).
+ */
 export interface ArticleLdInput {
   title: string;
   description: string;
@@ -270,12 +273,13 @@ export interface ArticleLdInput {
   image?: string;
   datePublished: string;
   dateModified?: string;
+  type?: "Article" | "BlogPosting" | "NewsArticle";
 }
 
 export function articleJsonLd(input: ArticleLdInput) {
   return {
     "@context": "https://schema.org",
-    "@type": "Article",
+    "@type": input.type ?? "Article",
     headline: input.title,
     description: input.description,
     image: abs(input.image ?? "/og-default.png"),
@@ -286,6 +290,67 @@ export function articleJsonLd(input: ArticleLdInput) {
     mainEntityOfPage: {
       "@type": "WebPage",
       "@id": abs(input.url),
+    },
+  };
+}
+
+/**
+ * Event — esquema schema.org/Event con location + offers de inscripción.
+ * Da elegibilidad a "Eventos" en Google (carruseles + Lens). El campo
+ * `eventStatus` permanece scheduled hasta que el evento expira por fecha.
+ *
+ * Si el evento tiene varias sesiones, exponemos la primera como
+ * `startDate` y la última como `endDate` (Google admite el rango).
+ */
+export function eventJsonLd(event: Event, store: Store | undefined) {
+  const first = event.sessions[0];
+  const last = event.sessions[event.sessions.length - 1];
+  const startDate = first ? `${first.date}T${first.time ?? "10:00"}:00+02:00` : undefined;
+  const endDate = last ? `${last.date}T${last.time ?? "20:00"}:00+02:00` : undefined;
+
+  const location = store
+    ? {
+        "@type": "Place",
+        name: store.name,
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: event.address,
+          addressLocality: event.city,
+          postalCode: event.postalCode,
+          addressCountry: "ES",
+        },
+      }
+    : {
+        "@type": "Place",
+        name: event.city,
+        address: {
+          "@type": "PostalAddress",
+          streetAddress: event.address,
+          addressLocality: event.city,
+          postalCode: event.postalCode,
+          addressCountry: "ES",
+        },
+      };
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: event.title,
+    description: event.shortDescription,
+    image: abs(event.posterImage),
+    startDate,
+    endDate,
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    eventStatus: "https://schema.org/EventScheduled",
+    location,
+    organizer: { "@id": `${SITE_URL}/#organization` },
+    offers: {
+      "@type": "Offer",
+      url: event.registrationUrl ?? `${SITE_URL}/eventos/${event.slug}`,
+      price: event.entryFee.toFixed(2),
+      priceCurrency: "EUR",
+      availability: "https://schema.org/InStock",
+      validFrom: new Date().toISOString().slice(0, 10),
     },
   };
 }

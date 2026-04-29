@@ -1,11 +1,21 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { faqJsonLd, jsonLdProps } from "@/lib/seo";
 
-export const metadata = {
-  title: "Devoluciones y desistimiento | TCG Academy",
+export const metadata: Metadata = {
+  title: "Devoluciones y desistimiento",
   description:
-    "Información sobre el derecho de desistimiento, devoluciones y reembolsos en TCG Academy.",
+    "Información sobre el derecho de desistimiento, devoluciones y reembolsos en TCG Academy. Plazo 14 días, reembolso por transferencia.",
+  alternates: { canonical: "/devoluciones" },
+  openGraph: {
+    title: "Devoluciones y desistimiento | TCG Academy",
+    description:
+      "14 días para desistir. Reembolso siempre por transferencia bancaria.",
+    url: "/devoluciones",
+    type: "article",
+  },
+  robots: { index: true, follow: true },
 };
 
 // FAQPage para SEO — NO añade UI visible, solo JSON-LD en el <head>-equivalent.

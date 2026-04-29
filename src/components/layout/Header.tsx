@@ -377,25 +377,22 @@ function HeaderTagline() {
 function HeaderInlineAuth() {
   const { user } = useAuth();
 
-  const firstName = user?.name.split(" ")[0] ?? "";
-
-  // ── Logged in: greeting pill + role badge (NO dropdown — ahora vive en el icono persona) ──
+  // ── Logged in: SOLO la pill de rol (Admin/Mayorista/Tienda). El saludo
+  //    "Bienvenido, X" vive ahora en `HeaderGreeting`, que se renderiza
+  //    DESPUÉS del icono persona para que el orden visual sea:
+  //    [ADMIN] [icono persona] [Bienvenido, Ricardo]   (aprobado 2026-04-29)
   if (user) {
     const isAdmin = user.role === "admin";
     const showRoleBadge = user.role === "mayorista" || user.role === "tienda" || isAdmin;
     const roleBadgeLabel = user.role === "mayorista" ? "Mayorista" : user.role === "tienda" ? "Tienda" : "Admin";
-    // Pills h-9 a juego (saludo + rol). Misma altura, mismo radio, ambos sólidos.
     const rolePillClass =
       "inline-flex h-9 items-center justify-center rounded-full bg-amber-400 px-4 text-xs font-extrabold uppercase tracking-wider text-[#0a1628]";
 
+    if (!showRoleBadge) return null;
+
     return (
-      <div className="hidden lg:flex items-center gap-2">
-        {/* Orden 2026-04-29 (aprobado): ADMIN pill PRIMERO (pegado al buscador
-            por el lado izquierdo de la zona derecha), luego saludo en texto
-            plano sin fondo, y el icono persona viene a continuación en el
-            contenedor padre. */}
-        {/* Badge Admin: link directo a /admin */}
-        {isAdmin && (
+      <div className="hidden lg:flex items-center">
+        {isAdmin ? (
           <Link
             href="/admin"
             aria-label="Ir al panel de administración"
@@ -404,18 +401,11 @@ function HeaderInlineAuth() {
           >
             Admin
           </Link>
-        )}
-        {/* Badge mayorista/tienda: decorativo, mismo tamaño */}
-        {showRoleBadge && !isAdmin && (
+        ) : (
           <span className={rolePillClass} aria-label={`Rol: ${user.role}`}>
             {roleBadgeLabel}
           </span>
         )}
-        {/* Saludo: texto plano, mismo tamaño que la pill ADMIN (text-xs).
-            Sin fondo azul ni padding — vive directamente sobre la cabecera. */}
-        <span className="text-xs text-white">
-          Bienvenido, <span className="font-bold">{firstName}</span>
-        </span>
       </div>
     );
   }
@@ -429,6 +419,19 @@ function HeaderInlineAuth() {
     >
       Entrar
     </Link>
+  );
+}
+
+// Saludo "Bienvenido, X" — vive separado del HeaderInlineAuth para poder
+// renderizarlo a la DERECHA del icono persona. Solo se muestra si hay sesión.
+function HeaderGreeting() {
+  const { user } = useAuth();
+  if (!user) return null;
+  const firstName = user.name.split(" ")[0] ?? "";
+  return (
+    <span className="hidden text-xs text-white lg:inline">
+      Bienvenido, <span className="font-bold">{firstName}</span>
+    </span>
   );
 }
 
@@ -780,12 +783,12 @@ export function Header() {
               estados logueado / no logueado. Su ancho variable NO afecta al
               centrado del buscador porque está en la columna derecha del grid. */}
           <HeaderInlineAuth />
-          {/* 1. User icon — SIEMPRE el primero (izquierda del todo).
-              Desktop only: en móvil el login/cuenta vive en la píldora estilo
-              YouTube del centro (middle zone).
-              Cliquear abre dropdown con Resumen + Cerrar sesión (antes vivía
-              en el pill del saludo, se movió aquí). */}
+          {/* Orden aprobado 2026-04-29: ADMIN pill → icono persona → saludo.
+              El icono va ANTES del saludo (no después como estaba), siguiendo
+              petición explícita del usuario para que el icono quede a la
+              izquierda de "Bienvenido, X". */}
           <ProfileIconMenu />
+          <HeaderGreeting />
 
           {/* Admin shortcut (sm, not desktop where panel admin is in greeting menu) */}
           {user?.role === "admin" && (

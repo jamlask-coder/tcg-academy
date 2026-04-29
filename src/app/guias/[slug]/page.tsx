@@ -61,6 +61,7 @@ export default async function GuidePage({
     image: guide.image,
     datePublished: guide.publishedAt,
     dateModified: guide.updatedAt,
+    type: "BlogPosting",
   });
   const breadcrumbLd = breadcrumbJsonLd([
     { name: "Inicio", url: "/" },

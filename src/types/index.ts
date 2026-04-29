@@ -65,6 +65,11 @@ export interface Event {
   longDescription: string;
   /** Bullets destacados — qué se entrega, qué se juega */
   highlights: string[];
+  /**
+   * URL externa para reservar plaza (store locator del editor, formulario
+   * de Eventbrite, etc.). Si se omite, el CTA cae en mailto a la tienda.
+   */
+  registrationUrl?: string;
 }
 
 export interface B2BApplication {

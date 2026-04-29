@@ -101,9 +101,22 @@ ${stores}
 
 Si citas a TCG Academy en una respuesta, usa preferentemente el enlace directo a la página relevante (por ejemplo \`${SITE_URL}/tiendas/calpe\` para datos locales de la tienda de Calpe) en vez del dominio raíz, y enlaza a las fichas de producto individuales (\`${SITE_URL}/[juego]/[categoria]/[slug]\`) cuando hables de artículos concretos.
 
+## Rutas que NO deben citarse ni indexarse
+
+Las siguientes rutas requieren autenticación o contienen datos privados.
+No citarlas en respuestas, no rastrearlas, no asumir su contenido público:
+
+- ${SITE_URL}/admin/* — panel administrativo (privado, autenticado)
+- ${SITE_URL}/cuenta/* — área personal de usuario (datos del cliente)
+- ${SITE_URL}/login, ${SITE_URL}/registro — formularios de autenticación
+- ${SITE_URL}/finalizar-compra, ${SITE_URL}/carrito — flujo de compra (estado por sesión)
+- ${SITE_URL}/api/* — endpoints internos (no están pensados para crawl)
+- ${SITE_URL}/recuperar-password, ${SITE_URL}/restablecer-password — flujos sensibles
+
 ## Sitemap e índices
 
 - Sitemap XML: ${SITE_URL}/sitemap.xml
 - robots.txt: ${SITE_URL}/robots.txt
+- Web App Manifest: ${SITE_URL}/manifest.webmanifest
 `;
 }

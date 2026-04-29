@@ -1,9 +1,20 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Star, Users, ShoppingCart, Gift, ArrowRight } from "lucide-react";
 
-export const metadata = {
-  title: "Programa de puntos — TCG Academy",
-  description: "Acumula puntos con cada compra y canjéalos por descuentos exclusivos en TCG Academy.",
+export const metadata: Metadata = {
+  title: "Programa de puntos",
+  description:
+    "Acumula puntos con cada compra y canjéalos por descuentos exclusivos en TCG Academy.",
+  alternates: { canonical: "/puntos" },
+  openGraph: {
+    title: "Programa de puntos | TCG Academy",
+    description:
+      "100 puntos por cada euro gastado. Canjea en pago. Multiplicadores con tu grupo.",
+    url: "/puntos",
+    type: "article",
+  },
+  robots: { index: true, follow: true },
 };
 
 const STEPS = [

@@ -49,10 +49,20 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
+    site: "@tcgacademy",
+    creator: "@tcgacademy",
     title: "TCG Academy — La mejor tienda TCG de España",
     description:
       "Pokémon, Magic, Yu-Gi-Oh!, Naruto, Lorcana y Dragon Ball. 4 tiendas físicas, envío en 24h.",
     images: ["/og-default.png"],
+  },
+  applicationName: "TCG Academy",
+  authors: [{ name: "TCG Academy", url: SITE_URL }],
+  category: "shopping",
+  formatDetection: {
+    telephone: true,
+    address: true,
+    email: true,
   },
   robots: {
     index: true,
@@ -83,6 +93,27 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
+        {/* Performance hints — preconnect a orígenes que el navegador
+            usará en el primer paint. Reduce TTFB en assets críticos y
+            mejora Core Web Vitals (LCP/FID), señales SEO de Google. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+        <link rel="dns-prefetch" href="https://images.unsplash.com" />
+        <link rel="dns-prefetch" href="https://product-images.tcgplayer.com" />
+        <link rel="dns-prefetch" href="https://images.pokemontcg.io" />
+        <link rel="dns-prefetch" href="https://cards.scryfall.io" />
+        {/* Color esquemas (Safari iOS pinta el chrome del browser) */}
+        <meta name="theme-color" content="#132B5F" />
+        {/* Geo signals para SEO local — coordenadas Calpe (flagship) */}
+        <meta name="geo.region" content="ES-VC" />
+        <meta name="geo.placename" content="Calpe, Alicante" />
+        <meta name="geo.position" content="38.6448;0.0588" />
+        <meta name="ICBM" content="38.6448, 0.0588" />
         <script {...jsonLdProps(organizationJsonLd())} />
         <script {...jsonLdProps(websiteJsonLd())} />
       </head>

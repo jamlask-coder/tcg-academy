@@ -3,6 +3,7 @@ import type { MetadataRoute } from "next";
 import { PRODUCTS, GAME_CONFIG, getAllCategories } from "@/data/products";
 import { STORES } from "@/data/stores";
 import { GUIDES } from "@/data/guides";
+import { EVENTS } from "@/data/events";
 import { SITE_URL } from "@/lib/seo";
 
 const BASE = SITE_URL;
@@ -15,6 +16,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${BASE}/catalogo`, priority: 0.9, changeFrequency: "daily", lastModified: now },
     { url: `${BASE}/tiendas`, priority: 0.8, changeFrequency: "monthly", lastModified: now },
     { url: `${BASE}/eventos`, priority: 0.7, changeFrequency: "weekly", lastModified: now },
+    { url: `${BASE}/eventos/historial`, priority: 0.4, changeFrequency: "monthly", lastModified: now },
     { url: `${BASE}/contacto`, priority: 0.6, changeFrequency: "yearly" },
     { url: `${BASE}/mayoristas`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/mayoristas/b2b`, priority: 0.55, changeFrequency: "monthly" },
@@ -77,12 +79,32 @@ export default function sitemap(): MetadataRoute.Sitemap {
     lastModified: new Date(g.updatedAt ?? g.publishedAt),
   }));
 
+  // Eventos individuales — incluimos también pasados porque el historial
+  // los enlaza y ayuda al SEO de marca a largo plazo.
+  const eventRoutes: MetadataRoute.Sitemap = EVENTS.map((e) => {
+    const last = e.sessions[e.sessions.length - 1]?.date;
+    return {
+      url: `${BASE}/eventos/${e.slug}`,
+      priority: 0.6,
+      changeFrequency: "weekly" as const,
+      lastModified: last ? new Date(last) : now,
+      images: e.posterImage
+        ? [
+            e.posterImage.startsWith("http")
+              ? e.posterImage
+              : `${BASE}${e.posterImage.startsWith("/") ? "" : "/"}${e.posterImage}`,
+          ]
+        : undefined,
+    };
+  });
+
   return [
     ...staticRoutes,
     ...storeRoutes,
     ...gameRoutes,
     ...categoryRoutes,
     ...guideRoutes,
+    ...eventRoutes,
     ...productRoutes,
   ];
 }

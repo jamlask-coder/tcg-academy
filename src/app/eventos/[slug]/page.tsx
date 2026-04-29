@@ -1,38 +1,41 @@
 /**
  * Página de detalle de evento — `/eventos/<slug>`.
  *
- * Composición por capas, tipográfica y editorial — sin póster horneado.
- * El antiguo PNG mezclaba arte+texto+logos en baja resolución (cutre).
- * Esta página rinde todo desde React → crisp en cualquier resolución.
+ * Composición por capas, tipográfica y editorial. El cartel oficial del
+ * evento (`posterImage`) se integra como apoyo visual en el hero (no como
+ * fondo gigante pixelado: framed, contenido a su tamaño natural).
  *
- * Estructura:
- *   1. Hero (gradiente acento + display Fraunces + 3 stats grandes + CTA)
- *   2. Sobre el evento (longDescription)
- *   3. Qué te llevas (highlights)
- *   4. Sesiones (cards grandes con fecha+hora)
- *   5. Cómo llegar (dirección + Google Maps)
- *   6. Otros próximos eventos (si los hay)
+ * Renderiza tanto eventos próximos como pasados:
+ *  - Próximo  → eyebrow "Inscripciones abiertas" + CTA reservar
+ *  - Pasado   → eyebrow "Evento finalizado" + nota cerrada (sin CTA)
  *
- * SSG → `generateStaticParams` lista todos los slugs. `generateMetadata`
- * personaliza title/description/OG por evento.
+ * SSG → `generateStaticParams` lista todos los slugs (incluidos pasados,
+ * porque el historial enlaza a sus fichas).
  */
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
   Calendar,
+  CheckCircle2,
   Clock,
   MapPin,
   Sparkles,
   Ticket,
   Trophy,
 } from "lucide-react";
-import { EVENTS } from "@/data/events";
+import { EVENTS, getUpcomingEvents, isEventPast } from "@/data/events";
 import { STORES } from "@/data/stores";
 import type { Event } from "@/types";
+import {
+  breadcrumbJsonLd,
+  eventJsonLd,
+  jsonLdProps,
+} from "@/lib/seo";
 
 interface RouteParams {
   params: Promise<{ slug: string }>;
@@ -53,10 +56,19 @@ export async function generateMetadata({
   return {
     title: event.title,
     description: event.shortDescription,
+    alternates: { canonical: `/eventos/${event.slug}` },
     openGraph: {
       title: event.title,
       description: event.shortDescription,
       type: "article",
+      url: `/eventos/${event.slug}`,
+      images: event.posterImage ? [{ url: event.posterImage }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: event.title,
+      description: event.shortDescription,
+      images: event.posterImage ? [event.posterImage] : undefined,
     },
   };
 }
@@ -69,28 +81,41 @@ export default async function EventDetailPage({ params }: RouteParams) {
   const store = STORES[event.storeId];
   const storeName = store?.name ?? event.storeId;
   const accent = event.accentColor;
+  const past = isEventPast(event);
 
-  const otherEvents = EVENTS.filter(
-    (e) => e.slug !== event.slug && lastSessionDate(e) >= todayIso(),
-  ).slice(0, 3);
+  // Otros próximos eventos (excluyendo el actual). Solo se sugieren
+  // próximos, nunca pasados — pasados están en /eventos/historial.
+  const otherEvents = getUpcomingEvents()
+    .filter((e) => e.slug !== event.slug)
+    .slice(0, 3);
+
+  // JSON-LD: Event + BreadcrumbList — invisibles para el usuario, oro para
+  // los carruseles de eventos de Google y los crawlers de IA.
+  const eventLd = eventJsonLd(event, store);
+  const breadcrumbLd = breadcrumbJsonLd([
+    { name: "Inicio", url: "/" },
+    { name: "Eventos", url: "/eventos" },
+    { name: event.title, url: `/eventos/${event.slug}` },
+  ]);
 
   return (
     <article className="bg-white">
+      <script {...jsonLdProps(eventLd)} />
+      <script {...jsonLdProps(breadcrumbLd)} />
       {/* ── Breadcrumb / volver ─────────────────────────────────────── */}
       <div className="mx-auto max-w-5xl px-4 pt-8">
         <Link
-          href="/eventos"
+          href={past ? "/eventos/historial" : "/eventos"}
           className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-gray-500 transition hover:text-gray-900"
         >
           <ArrowLeft size={13} />
-          Todos los eventos
+          {past ? "Volver al historial" : "Todos los eventos"}
         </Link>
       </div>
 
       {/* ── HERO ───────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden">
-        {/* Capa de fondo — gradiente del juego, muy sutil para no competir
-            con la tipografía. El "wow" lo da el contenido, no el adorno. */}
+        {/* Capa de fondo — gradiente del juego, muy sutil */}
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0"
@@ -98,80 +123,100 @@ export default async function EventDetailPage({ params }: RouteParams) {
             background: `radial-gradient(ellipse 70% 60% at 50% 0%, ${accent}14 0%, transparent 60%)`,
           }}
         />
-        {/* Línea de acento superior — fina, editorial */}
+        {/* Línea de acento superior */}
         <div
           aria-hidden="true"
           className="absolute inset-x-0 top-0 h-[3px]"
-          style={{ background: accent }}
+          style={{ background: past ? "#9ca3af" : accent }}
         />
 
         <div className="relative mx-auto max-w-5xl px-4 pt-12 pb-16 sm:pt-16 sm:pb-20">
-          {/* Eyebrow: tipo de evento + tienda */}
-          <div className="mb-8 flex flex-wrap items-center gap-2 text-[11px] font-bold tracking-[0.16em] uppercase">
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1"
-              style={{ background: `${accent}18`, color: accent }}
-            >
-              <Sparkles size={11} /> Inscripciones abiertas
-            </span>
-            <span className="text-gray-300">·</span>
-            <span className="text-gray-500">
-              {event.subtitle ?? "Evento presencial"}
-            </span>
-            <span className="text-gray-300">·</span>
-            <span className="text-gray-500">{storeName}</span>
-          </div>
+          <div className="grid gap-10 lg:grid-cols-[1fr,300px] lg:gap-14">
+            {/* Columna izquierda — texto + stats + CTA */}
+            <div>
+              {/* Eyebrow: estado + tienda */}
+              <div className="mb-8 flex flex-wrap items-center gap-2 text-[11px] font-bold tracking-[0.16em] uppercase">
+                {past ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-gray-500">
+                    <CheckCircle2 size={11} /> Evento finalizado
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1"
+                    style={{ background: `${accent}18`, color: accent }}
+                  >
+                    <Sparkles size={11} /> Inscripciones abiertas
+                  </span>
+                )}
+                <span className="text-gray-300">·</span>
+                <span className="text-gray-500">
+                  {event.subtitle ?? "Evento presencial"}
+                </span>
+                <span className="text-gray-300">·</span>
+                <span className="text-gray-500">{storeName}</span>
+              </div>
 
-          {/* Título display — Fraunces, grande, editorial */}
-          <h1
-            className="mb-5 max-w-3xl text-[44px] leading-[1.05] font-bold tracking-tight text-gray-900 sm:text-[60px]"
-            style={{ fontFamily: "var(--font-fraunces), serif" }}
-          >
-            {event.title}
-          </h1>
+              {/* Título display */}
+              <h1
+                className="mb-5 text-[40px] leading-[1.05] font-bold tracking-tight text-gray-900 sm:text-[56px]"
+                style={{ fontFamily: "var(--font-fraunces), serif" }}
+              >
+                {event.title}
+              </h1>
 
-          <p className="mb-10 max-w-2xl text-[17px] leading-relaxed text-gray-600 sm:text-[18px]">
-            {event.shortDescription}
-          </p>
+              <p className="mb-10 max-w-2xl text-[17px] leading-relaxed text-gray-600 sm:text-[18px]">
+                {event.shortDescription}
+              </p>
 
-          {/* 3 stats clave — grandes y profesionales */}
-          <div className="grid gap-4 sm:grid-cols-3">
-            <BigStat
-              icon={<Calendar size={16} />}
-              label="Fechas"
-              value={formatRange(event.sessions)}
-              accent={accent}
-            />
-            <BigStat
-              icon={<Ticket size={16} />}
-              label="Inscripción"
-              value={`${event.entryFee}€`}
-              accent={accent}
-            />
-            <BigStat
-              icon={<Trophy size={16} />}
-              label="Premio"
-              value={event.prizeText}
-              accent={accent}
-            />
-          </div>
+              {/* 3 stats clave */}
+              <div className="grid gap-3 sm:grid-cols-3">
+                <BigStat
+                  icon={<Calendar size={16} />}
+                  label="Fechas"
+                  value={formatRange(event.sessions)}
+                  accent={accent}
+                />
+                <BigStat
+                  icon={<Ticket size={16} />}
+                  label="Inscripción"
+                  value={`${event.entryFee}€`}
+                  accent={accent}
+                />
+                <BigStat
+                  icon={<Trophy size={16} />}
+                  label="Premio"
+                  value={event.prizeText}
+                  accent={accent}
+                />
+              </div>
 
-          {/* CTA principal */}
-          <div className="mt-10 flex flex-wrap items-center gap-3">
-            <a
-              href={`mailto:hola@tcgacademy.es?subject=${encodeURIComponent(`Inscripción: ${event.title}`)}`}
-              className="inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-sm font-bold text-white shadow-lg transition-all hover:scale-[1.02] hover:shadow-xl active:scale-[0.98]"
-              style={{
-                background: `linear-gradient(135deg, ${accent}, ${accent}dd)`,
-                boxShadow: `0 10px 28px ${accent}40`,
-              }}
-            >
-              <Ticket size={15} />
-              Reservar plaza · {event.entryFee}€
-            </a>
-            <span className="text-[12px] text-gray-400">
-              Plazas limitadas
-            </span>
+              {/* CTA principal — solo si el evento es futuro */}
+              {past ? (
+                <p className="mt-10 text-[13px] text-gray-400">
+                  Este evento ya finalizó.{" "}
+                  <Link
+                    href="/eventos"
+                    className="font-semibold text-[#2563eb] hover:underline"
+                  >
+                    Ver próximos eventos →
+                  </Link>
+                </p>
+              ) : (
+                <div className="mt-10 flex flex-wrap items-center gap-3">
+                  <ReservationCTA event={event} />
+                  <span className="text-[12px] text-gray-400">
+                    Plazas limitadas
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Columna derecha — el cartel oficial del evento como apoyo
+                visual. Framed, ratio 2/3 (cartel real), sombra suave.
+                No domina la página — la tipografía manda. */}
+            <aside className="order-first lg:order-none">
+              <PosterFrame event={event} accent={accent} past={past} />
+            </aside>
           </div>
         </div>
       </section>
@@ -206,7 +251,7 @@ export default async function EventDetailPage({ params }: RouteParams) {
             </ul>
           </div>
 
-          {/* Derecha: sesiones + ubicación, sticky en desktop */}
+          {/* Derecha: sesiones + ubicación */}
           <aside className="space-y-5 lg:sticky lg:top-24 lg:self-start">
             <SidePanel accent={accent} icon={<Clock size={13} />} title="Sesiones">
               <div className="space-y-2.5">
@@ -283,6 +328,70 @@ export default async function EventDetailPage({ params }: RouteParams) {
 
 // ─── Subcomponentes ────────────────────────────────────────────────────────
 
+function PosterFrame({
+  event,
+  accent,
+  past,
+}: {
+  event: Event;
+  accent: string;
+  past: boolean;
+}) {
+  return (
+    <div className="mx-auto max-w-[300px] lg:mx-0">
+      <div
+        className="relative aspect-[2/3] overflow-hidden rounded-2xl ring-1 ring-black/5"
+        style={{
+          // Halo del color del juego — sutil, NO compite con el cartel
+          boxShadow: `0 24px 60px -20px ${accent}55, 0 4px 16px rgba(0,0,0,0.12)`,
+        }}
+      >
+        <Image
+          src={event.posterImage}
+          alt={`Cartel oficial: ${event.title}`}
+          fill
+          sizes="(max-width: 1024px) 280px, 300px"
+          className={`object-cover ${past ? "opacity-70 saturate-50" : ""}`}
+          priority
+        />
+        {past && (
+          <div className="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/60 to-transparent p-4">
+            <span className="rounded-full bg-white/95 px-3 py-1 text-[10px] font-bold tracking-[0.14em] text-gray-700 uppercase backdrop-blur-sm">
+              Finalizado
+            </span>
+          </div>
+        )}
+      </div>
+      <p className="mt-3 text-center text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase">
+        Cartel oficial
+      </p>
+    </div>
+  );
+}
+
+function ReservationCTA({ event }: { event: Event }) {
+  const isExternal = !!event.registrationUrl;
+  const href =
+    event.registrationUrl ??
+    `mailto:hola@tcgacademy.es?subject=${encodeURIComponent(`Inscripción: ${event.title}`)}`;
+
+  // Mismo lenguaje visual que el botón "Añadir al carrito" (LocalProductCard):
+  // borde dorado amber-500, fondo blanco→amber-50, texto amber-800. Coherencia
+  // total — el CTA principal del site (carrito) y el de eventos hablan igual.
+  return (
+    <a
+      href={href}
+      target={isExternal ? "_blank" : undefined}
+      rel={isExternal ? "noopener noreferrer" : undefined}
+      className="gold-sweep inline-flex items-center gap-2 rounded-xl border-[1.5px] border-amber-500 bg-gradient-to-r from-white to-amber-50 px-6 py-3.5 text-sm font-bold text-amber-800 shadow-[0_2px_12px_rgba(217,119,6,0.28)] transition-all hover:scale-[1.02] hover:from-amber-50 hover:to-amber-100 hover:shadow-[0_6px_24px_rgba(217,119,6,0.4)] active:scale-[0.98]"
+    >
+      <Ticket size={15} />
+      Reservar plaza · {event.entryFee}€
+      {isExternal && <ArrowRight size={13} />}
+    </a>
+  );
+}
+
 function BigStat({
   icon,
   label,
@@ -344,9 +453,7 @@ function SidePanel({
       className="rounded-2xl border bg-white p-4"
       style={{ borderColor: `${accent}26` }}
     >
-      <h3
-        className="mb-3 flex items-center gap-1.5 text-[10px] font-bold tracking-[0.14em] text-gray-500 uppercase"
-      >
+      <h3 className="mb-3 flex items-center gap-1.5 text-[10px] font-bold tracking-[0.14em] text-gray-500 uppercase">
         <span style={{ color: accent }}>{icon}</span>
         {title}
       </h3>
@@ -438,12 +545,4 @@ function formatRange(sessions: { date: string }[]): string {
   return `${formatShort(sessions[0].date)} – ${formatShort(
     sessions[sessions.length - 1].date,
   )}`;
-}
-
-function lastSessionDate(e: Event): string {
-  return e.sessions[e.sessions.length - 1]?.date ?? "";
-}
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
 }

@@ -42,7 +42,10 @@ import {
   pointsToEuros,
   type HistoryEntryType,
 } from "@/services/pointsService";
-import { readAdminOrdersMerged } from "@/lib/orderAdapter";
+import {
+  readAdminOrdersMerged,
+  readAdminOrdersMergedAsync,
+} from "@/lib/orderAdapter";
 
 const BarChart = dynamic(() => import("recharts").then((m) => m.BarChart), { ssr: false });
 const Bar = dynamic(() => import("recharts").then((m) => m.Bar), { ssr: false });
@@ -98,14 +101,29 @@ export default function EstadisticasPage() {
   );
 
   useEffect(() => {
+    let cancelled = false;
+    // En server-mode `readAdminOrdersMerged` devuelve [] hasta que pasamos
+    // por la versión async (que sí pega a /api/orders y trae la BD). Sin
+    // este hidratado las gráficas y los KPIs se quedaban a cero aunque
+    // hubiera ventas en Supabase. Ver memoria fiscalCarryOver: estos pedidos
+    // son de la SL anterior — los mostramos sólo informativos, no facturable.
     const reload = () => {
       setAllProducts(getMergedProducts());
       setLiveOrders(readAdminOrdersMerged(ADMIN_ORDERS));
+      readAdminOrdersMergedAsync(ADMIN_ORDERS)
+        .then((orders) => {
+          if (!cancelled) setLiveOrders(orders);
+        })
+        .catch(() => {
+          /* fallback al síncrono ya colocado */
+        });
     };
+    reload();
     window.addEventListener("tcga:products:updated", reload);
     window.addEventListener("tcga:orders:updated", reload);
     window.addEventListener("storage", reload);
     return () => {
+      cancelled = true;
       window.removeEventListener("tcga:products:updated", reload);
       window.removeEventListener("tcga:orders:updated", reload);
       window.removeEventListener("storage", reload);

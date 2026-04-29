@@ -1,10 +1,20 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE_CONFIG } from "@/config/siteConfig";
 
-export const metadata = {
-  title: "Condiciones del Programa de Puntos y Grupos | TCG Academy",
+export const metadata: Metadata = {
+  title: "Condiciones del Programa de Puntos y Grupos",
   description:
     "Bases legales, condiciones de uso y limitaciones del programa de puntos y grupos de fidelización de TCG Academy.",
+  alternates: { canonical: "/condiciones-puntos" },
+  openGraph: {
+    title: "Condiciones del Programa de Puntos | TCG Academy",
+    description:
+      "Bases legales del programa de puntos y grupos.",
+    url: "/condiciones-puntos",
+    type: "article",
+  },
+  robots: { index: true, follow: true },
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

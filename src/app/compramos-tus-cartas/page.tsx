@@ -17,9 +17,26 @@ import { SITE_CONFIG } from "@/config/siteConfig";
 // llamadas a la acción hacia /contacto. Pendiente de que el usuario revise
 // copys, cifras y condiciones antes de publicar.
 export const metadata: Metadata = {
-  title: "Compramos tus cartas — TCG Academy",
+  title: "Compramos tus cartas",
   description:
     "Vendemos y compramos cartas y colecciones TCG. Tasación gratuita, pago rápido y transparente. Magic, Pokémon, Yu-Gi-Oh, One Piece y más.",
+  alternates: { canonical: "/compramos-tus-cartas" },
+  keywords: [
+    "vender cartas TCG",
+    "comprar colección Magic",
+    "tasación cartas Pokémon",
+    "vender cartas Yu-Gi-Oh",
+    "tienda compra colecciones",
+    "tasación gratuita TCG",
+  ],
+  openGraph: {
+    title: "Compramos tus cartas | TCG Academy",
+    description:
+      "Tasación gratuita y pago rápido. Magic, Pokémon, Yu-Gi-Oh, One Piece y más.",
+    url: "/compramos-tus-cartas",
+    type: "article",
+  },
+  robots: { index: true, follow: true },
 };
 
 const STEPS = [

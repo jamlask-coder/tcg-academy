@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import { EVENTS } from "@/data/events";
+import Link from "next/link";
+import { ArrowRight, History } from "lucide-react";
+import { getUpcomingEvents, getPastEvents } from "@/data/events";
 import { STORES } from "@/data/stores";
 import { EventsClient } from "./EventsClient";
 
@@ -9,27 +11,15 @@ export const metadata: Metadata = {
     "Presentaciones, prereleases y torneos en las tiendas físicas de TCG Academy. Inscríbete y juega con la comunidad.",
 };
 
-/**
- * Ordena por la primera sesión de cada evento (asc). Eventos pasados se
- * relegan al final pero no se ocultan — útil para que el equipo recuerde
- * qué se ha hecho. Si quisiéramos archivarlos, basta con un filtro `>= now`.
- */
-function sortedEvents() {
-  return [...EVENTS].sort((a, b) => {
-    const da = a.sessions[0]?.date ?? "";
-    const db = b.sessions[0]?.date ?? "";
-    return da.localeCompare(db);
-  });
-}
-
 export default function EventosPage() {
-  const events = sortedEvents().map((e) => {
+  const upcoming = getUpcomingEvents().map((e) => {
     const store = STORES[e.storeId];
     return {
       event: e,
       storeName: store?.name ?? e.storeId,
     };
   });
+  const pastCount = getPastEvents().length;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:py-16">
@@ -46,14 +36,32 @@ export default function EventosPage() {
         </p>
       </header>
 
-      {events.length === 0 ? (
+      {upcoming.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-20 text-center">
           <p className="text-sm text-gray-400">
-            No hay eventos programados. ¡Vuelve pronto!
+            No hay eventos programados ahora mismo. ¡Vuelve pronto!
           </p>
         </div>
       ) : (
-        <EventsClient events={events} />
+        <EventsClient events={upcoming} />
+      )}
+
+      {/* Enlace al historial — solo si hay eventos pasados */}
+      {pastCount > 0 && (
+        <div className="mt-12 flex justify-center sm:mt-16">
+          <Link
+            href="/eventos/historial"
+            className="group inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-5 py-2.5 text-[13px] font-semibold text-gray-700 transition-all hover:border-gray-300 hover:shadow-sm"
+          >
+            <History size={14} className="text-gray-400" />
+            Ver historial de eventos
+            <span className="text-gray-400">({pastCount})</span>
+            <ArrowRight
+              size={13}
+              className="text-gray-400 transition-transform group-hover:translate-x-0.5"
+            />
+          </Link>
+        </div>
       )}
     </div>
   );

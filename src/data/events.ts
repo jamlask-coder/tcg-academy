@@ -40,5 +40,45 @@ export const EVENTS: Event[] = [
       "Tutorial de reglas para principiantes",
       "Mesas, fundas y dados a tu disposición",
     ],
+    registrationUrl:
+      "https://locator.riftbound.uvsgames.com/stores/0b1693d0-d803-4824-a1a9-bca5a75349fd",
   },
 ];
+
+// ─── Helpers de filtrado por fecha ─────────────────────────────────────────
+//
+// Usados por todas las superficies (listado, detalle, widget, dropdown)
+// para que la regla "los eventos pasados desaparecen" sea consistente.
+// El ISO `YYYY-MM-DD` se compara como string — funciona perfectamente.
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function lastSessionDate(e: Event): string {
+  return e.sessions[e.sessions.length - 1]?.date ?? "";
+}
+
+/** True si todas las sesiones del evento ya han ocurrido. */
+export function isEventPast(e: Event): boolean {
+  const last = lastSessionDate(e);
+  return last !== "" && last < todayIso();
+}
+
+/** Eventos cuya última sesión es hoy o futura. Ordenados por primera sesión. */
+export function getUpcomingEvents(): Event[] {
+  return EVENTS.filter((e) => !isEventPast(e)).sort((a, b) => {
+    const da = a.sessions[0]?.date ?? "";
+    const db = b.sessions[0]?.date ?? "";
+    return da.localeCompare(db);
+  });
+}
+
+/** Eventos ya finalizados. Más recientes primero (historial cronológico inverso). */
+export function getPastEvents(): Event[] {
+  return EVENTS.filter(isEventPast).sort((a, b) => {
+    const da = lastSessionDate(a);
+    const db = lastSessionDate(b);
+    return db.localeCompare(da);
+  });
+}

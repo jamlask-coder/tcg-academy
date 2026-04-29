@@ -1,10 +1,20 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE_CONFIG } from "@/config/siteConfig";
 
-export const metadata = {
-  title: "Política de cookies | TCG Academy",
+export const metadata: Metadata = {
+  title: "Política de cookies",
   description:
     "Información sobre el uso de cookies en TCG Academy conforme al RGPD y la LSSI-CE.",
+  alternates: { canonical: "/cookies" },
+  openGraph: {
+    title: "Política de cookies | TCG Academy",
+    description:
+      "Cookies usadas, finalidad y cómo gestionar tu consentimiento.",
+    url: "/cookies",
+    type: "article",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function CookiesPage() {

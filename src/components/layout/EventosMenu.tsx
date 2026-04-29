@@ -12,7 +12,7 @@ import {
   Ticket,
 } from "lucide-react";
 import { Container } from "@/components/ui/Container";
-import { EVENTS } from "@/data/events";
+import { getUpcomingEvents } from "@/data/events";
 import { STORES } from "@/data/stores";
 import type { Event } from "@/types";
 
@@ -58,7 +58,7 @@ function formatRange(sessions: Event["sessions"]): string {
  * CTA directo a la página de eventos para inscribirse.
  */
 export function EventosMenu({ onClose }: Props) {
-  const events = EVENTS;
+  const events = getUpcomingEvents();
   const featured = events[0];
 
   return (

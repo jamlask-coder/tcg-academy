@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE_CONFIG } from "@/config/siteConfig";
 
@@ -15,10 +16,19 @@ function formatInscripcionRegistral(): string {
   return `Registro Mercantil de ${r.provincia}, Tomo ${r.tomo}, Folio ${r.folio}, Hoja ${r.hoja}`;
 }
 
-export const metadata = {
-  title: "Aviso legal | TCG Academy",
+export const metadata: Metadata = {
+  title: "Aviso legal",
   description:
     "Aviso legal e información sobre el titular del sitio web TCG Academy conforme a la LSSI-CE.",
+  alternates: { canonical: "/aviso-legal" },
+  openGraph: {
+    title: "Aviso legal | TCG Academy",
+    description:
+      "Información sobre el titular del sitio (LSSI-CE) y datos de contacto.",
+    url: "/aviso-legal",
+    type: "article",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function AvisoLegalPage() {

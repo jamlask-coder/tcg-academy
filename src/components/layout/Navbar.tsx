@@ -5,7 +5,6 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { MegaMenu } from "./MegaMenu";
-import { EventosMenu } from "./EventosMenu";
 import { OtrosMenu } from "./OtrosMenu";
 import { MEGA_MENU_DATA } from "@/data/megaMenuData";
 import { getMergedMegaMenu } from "@/lib/megaMenuOverrides";
@@ -402,26 +401,19 @@ export function Navbar() {
               {/* ── Eventos ──────────────────────────────────────────────────── */}
               <div
                 role="presentation"
-                onMouseEnter={() => openItem(EVENTOS_KEY)}
+                onMouseEnter={() => setActiveItem(null)}
                 className="flex items-stretch"
               >
-                <button
-                  aria-label="Ver próximos eventos"
-                  aria-expanded={activeItem === EVENTOS_KEY}
-                  className={`relative z-10 -mb-px flex items-center gap-1 border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition ${
-                    activeItem === EVENTOS_KEY || pathname.startsWith("/eventos")
+                <Link
+                  href="/eventos"
+                  className={`relative z-10 -mb-px flex items-center border-b-2 px-3.5 text-sm font-semibold whitespace-nowrap transition ${
+                    pathname.startsWith("/eventos")
                       ? "border-amber-400 text-amber-300"
                       : "border-transparent text-white/80 hover:text-white"
                   }`}
                 >
                   Eventos
-                  <ChevronDown
-                    size={11}
-                    className={`ml-0.5 transition-transform duration-200 ${
-                      activeItem === EVENTOS_KEY ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
+                </Link>
               </div>
 
               {/* ── Tiendas ──────────────────────────────────────────────────── */}
@@ -469,9 +461,6 @@ export function Navbar() {
         <AnimatePresence>
           {activeGameData && (
             <MegaMenu game={activeGameData} onClose={closeNow} logoCenterX={activeLogoLeft ?? undefined} />
-          )}
-          {activeItem === EVENTOS_KEY && (
-            <EventosMenu key="eventos" onClose={closeNow} />
           )}
           {activeItem === OTROS_KEY && (
             <OtrosMenu key="otros" onClose={closeNow} />
