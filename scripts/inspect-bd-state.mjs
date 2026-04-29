@@ -20,11 +20,35 @@ for (const line of fs.readFileSync(envPath, "utf8").split(/\r?\n/)) {
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
 }
 
-const sb = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { persistSession: false } },
-);
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const srk = process.env.SUPABASE_SERVICE_ROLE_KEY;
+console.log("Supabase URL:", url);
+console.log("Service role key (head):", srk ? srk.slice(0, 20) + "…" : "MISSING");
+console.log("");
+
+const sb = createClient(url, srk, { auth: { persistSession: false } });
+
+// auth.users (Supabase Auth) puede contener los 33 si el import los puso allí
+// y no en public.users. Sólo accesible vía Admin API.
+try {
+  const { data: authData, error: authErr } = await sb.auth.admin.listUsers({
+    page: 1,
+    perPage: 200,
+  });
+  if (authErr) console.log("auth.users → ERR:", authErr.message);
+  else console.log(`auth.users: ${authData?.users?.length ?? 0} filas`);
+  if ((authData?.users?.length ?? 0) > 0) {
+    console.log("  Muestra (3):");
+    for (const u of authData.users.slice(0, 3)) {
+      console.log(
+        `   - ${u.id} · ${u.email} · created=${u.created_at?.slice(0, 10)} · meta=${JSON.stringify(u.user_metadata ?? {}).slice(0, 80)}`,
+      );
+    }
+  }
+} catch (e) {
+  console.log("auth.users → exception:", e.message);
+}
+console.log("");
 
 const TABLES = [
   "users",
