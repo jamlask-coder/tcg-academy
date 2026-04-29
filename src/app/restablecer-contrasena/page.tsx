@@ -7,6 +7,17 @@ import { hashPassword } from "@/context/AuthContext";
 import type { User } from "@/types/user";
 import { validatePasswordForRole } from "@/lib/passwordPolicy";
 
+/**
+ * Modo backend del cliente. En server mode el token de reset está en
+ * Supabase (lo emite /api/auth reset-password en after()) — esta página
+ * NO puede verificar el token localmente; sólo lo valida en el submit
+ * llamando a /api/auth reset-confirm. En local mode mantenemos la
+ * lógica antigua contra localStorage para que dev/preview siga
+ * funcionando sin BD.
+ */
+const SERVER_MODE =
+  (process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local") === "server";
+
 const REGISTERED_KEY = "tcgacademy_registered";
 const TOKENS_KEY = "tcgacademy_reset_tokens";
 
@@ -61,6 +72,14 @@ function ResetForm() {
       setTokenValid(false);
       return;
     }
+    // En server mode el token se valida server-side al enviar el form.
+    // Sólo bloqueamos aquí los enlaces obviamente malformados (sin token o
+    // sin email). El servidor responderá 400 si el token está expirado o no
+    // coincide con el hash almacenado.
+    if (SERVER_MODE) {
+      setTokenValid(true);
+      return;
+    }
     try {
       const tokens = JSON.parse(
         localStorage.getItem(TOKENS_KEY) ?? "{}",
@@ -86,24 +105,72 @@ function ResetForm() {
     }
 
     // Detectar el rol del email para aplicar la política correspondiente.
-    // Admin → ≥12 chars Aa1*. Resto → ≥6 chars cualquier cosa. En modo
-    // server este flujo no se ejecuta (server valida con la misma función),
-    // pero en local mode es la única defensa.
-    let targetRole = "cliente";
-    try {
-      const registeredPeek = JSON.parse(
-        localStorage.getItem(REGISTERED_KEY) ?? "{}",
-      ) as Record<string, { password: string; user: User }>;
-      targetRole =
-        registeredPeek[email]?.user.role ?? DEMO_USERS[email]?.role ?? "cliente";
-    } catch { /* ignore */ }
-    const pwdCheck = validatePasswordForRole(password, targetRole);
-    if (!pwdCheck.ok) {
-      setError(pwdCheck.error ?? "Contraseña no válida");
-      return;
+    // Admin → ≥12 chars Aa1*. Resto → ≥6 chars cualquier cosa.
+    //
+    // En SERVER_MODE saltamos esta comprobación porque el rol real no está
+    // en localStorage (vive en BD): aplicar "cliente" por defecto sería
+    // demasiado laxo para admins. El servidor reaplica la política correcta
+    // con el rol auténtico de BD en /api/auth reset-confirm y devuelve un
+    // mensaje claro si la contraseña no cumple.
+    if (!SERVER_MODE) {
+      let targetRole = "cliente";
+      try {
+        const registeredPeek = JSON.parse(
+          localStorage.getItem(REGISTERED_KEY) ?? "{}",
+        ) as Record<string, { password: string; user: User }>;
+        targetRole =
+          registeredPeek[email]?.user.role ?? DEMO_USERS[email]?.role ?? "cliente";
+      } catch { /* ignore */ }
+      const pwdCheck = validatePasswordForRole(password, targetRole);
+      if (!pwdCheck.ok) {
+        setError(pwdCheck.error ?? "Contraseña no válida");
+        return;
+      }
     }
 
     setLoading(true);
+
+    // ── Server mode ───────────────────────────────────────────────
+    // Delegamos en /api/auth reset-confirm. El servidor:
+    //   - hace SHA-256 del token y lo compara con el hash almacenado
+    //   - valida la expiración (1 h)
+    //   - aplica `validatePasswordForRole(user.role)` (admin ≥12 Aa1*)
+    //   - hashea con bcrypt y persiste en BD
+    //   - invalida el token tras consumo (single-use)
+    //   - envía email de confirmación
+    if (SERVER_MODE) {
+      try {
+        const res = await fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "reset-confirm",
+            email,
+            token,
+            newPassword: password,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          // Mensajes posibles: "Enlace no válido o expirado",
+          // "Enlace expirado. Solicita uno nuevo.", o errores de
+          // política de contraseña.
+          setError(data?.error ?? "No se ha podido restablecer la contraseña.");
+          setLoading(false);
+          return;
+        }
+        setSuccess(true);
+        setTimeout(() => {
+          router.push("/login?reset=ok");
+        }, 2000);
+      } catch {
+        setError("Error de red. Inténtalo de nuevo.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     try {
       const registered = JSON.parse(
         localStorage.getItem(REGISTERED_KEY) ?? "{}",

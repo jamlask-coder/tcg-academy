@@ -425,7 +425,7 @@ export default function AdminUsuarioDetailPage() {
             />
             <Link
               href="/admin/bonos"
-              className="flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-amber-400 active:scale-95"
+              className="flex items-center gap-2 rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-[#0a1628] shadow-md transition hover:bg-amber-300 active:scale-95"
             >
               <Star size={16} /> Enviar puntos
             </Link>
@@ -626,7 +626,7 @@ function SendResetPasswordButton({ email }: { email: string }) {
       type="button"
       onClick={handleClick}
       disabled={state === "sending" || state === "sent"}
-      className="flex items-center gap-1.5 rounded-xl bg-white/15 px-4 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-70"
+      className="flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-[#0a1628] shadow-md transition hover:bg-gray-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
       aria-label="Enviar email de restablecer contraseña al usuario"
     >
       <KeyRound size={14} /> {label}

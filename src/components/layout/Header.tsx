@@ -19,6 +19,7 @@ import {
   LayoutDashboard,
   Inbox,
   Menu,
+  ChevronDown,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
@@ -466,9 +467,14 @@ function ProfileIconMenu() {
         onClick={() => setOpen((o) => !o)}
         aria-label="Mi cuenta"
         aria-expanded={open}
-        className="hidden items-center justify-center gap-1.5 rounded-lg p-2 transition hover:bg-white/10 lg:flex lg:min-h-9"
+        className="hidden items-center justify-center gap-1 rounded-lg p-2 transition hover:bg-white/10 lg:flex lg:min-h-9"
       >
         <User size={22} className="text-white" />
+        <ChevronDown
+          size={14}
+          className={`text-white/70 transition-transform ${open ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        />
       </button>
       {open && (
         <div className="absolute top-full right-0 z-50 mt-2 w-52 overflow-hidden rounded-2xl border border-gray-200 bg-white py-1.5 shadow-2xl">

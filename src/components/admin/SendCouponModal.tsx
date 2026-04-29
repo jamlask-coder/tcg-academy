@@ -37,7 +37,7 @@ export function SendCouponButton(props: SendCouponProps) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-amber-400 active:scale-95"
+        className="flex items-center gap-2 rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-[#0a1628] shadow-md transition hover:bg-amber-300 active:scale-95"
       >
         <Ticket size={16} />
         Enviar cupón
