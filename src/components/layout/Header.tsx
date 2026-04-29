@@ -390,12 +390,11 @@ function HeaderInlineAuth() {
       "inline-flex h-9 items-center justify-center rounded-full bg-amber-400 px-4 text-xs font-extrabold uppercase tracking-wider text-[#0a1628]";
 
     return (
-      <div className="hidden lg:flex items-center gap-1.5">
-        {/* Pill de saludo — solid, sin dropdown. El dropdown ahora vive en el icono persona. */}
-        <div className="flex h-9 items-center gap-1.5 rounded-full bg-blue-600 px-4">
-          <span className="text-xs text-blue-100">Bienvenido,&nbsp;</span>
-          <span className="text-xs font-bold text-white">{firstName}</span>
-        </div>
+      <div className="hidden lg:flex items-center gap-2">
+        {/* Orden 2026-04-29 (aprobado): ADMIN pill PRIMERO (pegado al buscador
+            por el lado izquierdo de la zona derecha), luego saludo en texto
+            plano sin fondo, y el icono persona viene a continuación en el
+            contenedor padre. */}
         {/* Badge Admin: link directo a /admin */}
         {isAdmin && (
           <Link
@@ -413,6 +412,11 @@ function HeaderInlineAuth() {
             {roleBadgeLabel}
           </span>
         )}
+        {/* Saludo: texto plano, mismo tamaño que la pill ADMIN (text-xs).
+            Sin fondo azul ni padding — vive directamente sobre la cabecera. */}
+        <span className="text-xs text-white">
+          Bienvenido, <span className="font-bold">{firstName}</span>
+        </span>
       </div>
     );
   }
