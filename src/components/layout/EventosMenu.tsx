@@ -122,7 +122,7 @@ function FeaturedEventHero({
 
   return (
     <Link
-      href="/eventos"
+      href={`/eventos/${event.slug}`}
       onClick={onClose}
       className="group grid overflow-hidden rounded-2xl border transition-all hover:shadow-xl sm:grid-cols-[200px,1fr]"
       style={{
@@ -250,7 +250,7 @@ function SecondaryEventCard({
   const accent = event.accentColor;
   return (
     <Link
-      href="/eventos"
+      href={`/eventos/${event.slug}`}
       onClick={onClose}
       className="group flex items-start gap-3 rounded-xl border border-gray-100 p-3 transition-all hover:border-gray-200 hover:shadow-sm"
     >

@@ -7,6 +7,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { ScrollToTop } from "@/components/layout/ScrollToTop";
 import { CookieConsent } from "@/components/legal/CookieConsent";
+import { EventFloatingPromo } from "@/components/layout/EventFloatingPromo";
 import { FiscalDataGuard } from "@/components/auth/FiscalDataGuard";
 import {
   SITE_URL,
@@ -97,6 +98,7 @@ export default function RootLayout({
               <main className="flex-1 bg-gray-50">{children}</main>
               <Footer />
               <CookieConsent />
+              <EventFloatingPromo />
             </div>
           </FiscalDataGuard>
         </Providers>
