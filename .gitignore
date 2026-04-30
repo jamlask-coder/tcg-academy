@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+# Screenshots generados por tests visuales (artefactos locales, no commitear).
+/tests/visual/out/
 
 # next.js
 /.next/

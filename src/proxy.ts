@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySessionToken } from "@/lib/auth";
 import { isIpAllowedForAdmin } from "@/lib/adminIpAllowlist";
+import { timingSafeEqualStr } from "@/lib/timingSafe";
 
 const SESSION_COOKIE = "tcga_session";
 const ADMIN_LOCAL_COOKIE = "tcga_admin_panel"; // local-mode panel gate cookie
@@ -26,21 +27,6 @@ function getIp(request: NextRequest): string {
     request.headers.get("x-real-ip") ??
     "unknown"
   );
-}
-
-/**
- * Comparación de strings en tiempo constante (audit P0 A-01).
- * `===` en JS abrevia al primer byte distinto → time leak permite
- * adivinar `ADMIN_PANEL_TOKEN` byte a byte. Esta versión recorre la
- * longitud máxima de ambos siempre.
- */
-function timingSafeEqualStr(a: string, b: string): boolean {
-  const max = Math.max(a.length, b.length);
-  let diff = a.length ^ b.length;
-  for (let i = 0; i < max; i++) {
-    diff |= (a.charCodeAt(i) ?? 0) ^ (b.charCodeAt(i) ?? 0);
-  }
-  return diff === 0;
 }
 
 // Rate-limit en memoria por IP para el gate del panel admin (audit P0 A-01).
