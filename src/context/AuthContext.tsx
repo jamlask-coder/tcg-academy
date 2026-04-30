@@ -802,7 +802,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               error: data.error ?? "Error al iniciar sesión con Google",
             };
           }
-          persist(data.user, REMEMBER_ME_MS);
+          // /api/auth google-signin devuelve un userProfile sin
+          // favorites/addresses (mismo shape que login). Si los persistimos
+          // crudo, FavoritesContext lee `user.favorites` undefined y crashea
+          // en .length / .includes al renderizar el callback. Hidratamos con
+          // caché local (login previo en este navegador) o `[]` por defecto,
+          // mismo patrón que login con email/password.
+          let cachedExtras: Partial<User> = {};
+          try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+              const parsed = JSON.parse(stored) as Partial<User>;
+              if (parsed.email?.toLowerCase() === data.user.email.toLowerCase()) {
+                cachedExtras = {
+                  favorites: parsed.favorites ?? [],
+                  addresses: parsed.addresses ?? [],
+                };
+              }
+            }
+          } catch { /* ignore */ }
+          const merged: User = {
+            ...data.user,
+            favorites: cachedExtras.favorites ?? [],
+            addresses: cachedExtras.addresses ?? [],
+          } as User;
+          persist(merged, REMEMBER_ME_MS);
           return { ok: true, created: data.created };
         } catch {
           return { ok: false, error: "Error de red al iniciar sesión con Google" };

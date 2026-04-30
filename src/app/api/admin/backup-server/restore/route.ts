@@ -25,9 +25,15 @@ interface RestoreBody {
 }
 
 export async function POST(req: Request) {
-  const auth = verifyBackupAdmin(req);
+  const auth = await verifyBackupAdmin(req);
   if (!auth.ok) {
-    return NextResponse.json({ ok: false, error: auth.reason }, { status: 401 });
+    const headers = auth.retryAfterSec
+      ? { "Retry-After": String(auth.retryAfterSec) }
+      : undefined;
+    return NextResponse.json(
+      { ok: false, error: auth.reason },
+      { status: auth.retryAfterSec ? 429 : 401, headers },
+    );
   }
   if (!isBackupConfigured()) {
     return NextResponse.json(

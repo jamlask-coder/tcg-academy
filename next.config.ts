@@ -61,7 +61,13 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-XSS-Protection", value: "1; mode=block" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+          // Permissions-Policy: deshabilita explícitamente APIs sensibles.
+          // `interest-cohort=()` opta out de FLoC/Topics (Chrome) — no nos
+          // interesa formar parte del tracking publicitario por defecto.
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=(), bluetooth=(), midi=(), serial=(), interest-cohort=(), browsing-topics=()" },
+          // Aísla este origin en su propio agent cluster — refuerza COOP y
+          // protege contra cross-origin attacks tipo Spectre/cache poisoning.
+          { key: "Origin-Agent-Cluster", value: "?1" },
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" },
           { key: "X-DNS-Prefetch-Control", value: "off" },
           { key: "X-Download-Options", value: "noopen" },

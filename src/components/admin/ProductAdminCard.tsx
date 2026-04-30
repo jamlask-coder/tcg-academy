@@ -2,7 +2,7 @@
 import { Pencil, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { InlineEdit } from "./InlineEdit";
-import { type LocalProduct } from "@/data/products";
+import { type LocalProduct, isNewProduct } from "@/data/products";
 
 interface ProductAdminCardProps {
   product: LocalProduct;
@@ -53,7 +53,7 @@ export function ProductAdminCard({
             Agotado
           </span>
         )}
-        {product.isNew && (
+        {isNewProduct(product) && (
           <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-600">
             Nuevo
           </span>

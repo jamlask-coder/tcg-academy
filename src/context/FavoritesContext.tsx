@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { useAuth } from "./AuthContext";
 import { logger } from "@/lib/logger";
 
@@ -43,14 +43,23 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     const pending = readLocal();
     if (pending.length === 0) return;
-    const toAdd = pending.filter((id) => !user.favorites.includes(id));
+    const userFavs = user.favorites ?? [];
+    const toAdd = pending.filter((id) => !userFavs.includes(id));
     if (toAdd.length > 0) mergeFavorites(toAdd);
     writeLocal([]);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocal([]);
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const ids = user ? user.favorites : local;
+  // `user.favorites` puede llegar undefined si un endpoint olvida incluirlo
+  // (ej: callback OAuth en server mode, incidente 2026-04-30). Default a []
+  // garantiza que .length / .includes nunca crasheen el árbol React entero.
+  // `useMemo` evita que el array cambie de identidad en cada render — sin él,
+  // los `useCallback` que dependen de `ids` se invalidan en cada render.
+  const ids = useMemo<number[]>(
+    () => (user ? (user.favorites ?? []) : local),
+    [user, local],
+  );
 
   const toggle = useCallback((productId: number) => {
     if (user) {
