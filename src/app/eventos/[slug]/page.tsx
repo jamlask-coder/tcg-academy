@@ -36,6 +36,8 @@ import {
   eventJsonLd,
   jsonLdProps,
 } from "@/lib/seo";
+import { AddEventTicketButton } from "@/components/events/AddEventTicketButton";
+import { SessionFullControl } from "@/components/events/SessionFullControl";
 
 interface RouteParams {
   params: Promise<{ slug: string }>;
@@ -102,16 +104,6 @@ export default async function EventDetailPage({ params }: RouteParams) {
     <article className="bg-white">
       <script {...jsonLdProps(eventLd)} />
       <script {...jsonLdProps(breadcrumbLd)} />
-      {/* ── Breadcrumb / volver ─────────────────────────────────────── */}
-      <div className="mx-auto max-w-5xl px-4 pt-8">
-        <Link
-          href={past ? "/eventos/historial" : "/eventos"}
-          className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-gray-500 transition hover:text-gray-900"
-        >
-          <ArrowLeft size={13} />
-          {past ? "Volver al historial" : "Todos los eventos"}
-        </Link>
-      </div>
 
       {/* ── HERO ───────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden">
@@ -130,12 +122,31 @@ export default async function EventDetailPage({ params }: RouteParams) {
           style={{ background: past ? "#9ca3af" : accent }}
         />
 
-        <div className="relative mx-auto max-w-5xl px-4 pt-12 pb-16 sm:pt-16 sm:pb-20">
-          <div className="grid gap-10 lg:grid-cols-[1fr,300px] lg:gap-14">
-            {/* Columna izquierda — texto + stats + CTA */}
-            <div>
+        {/* Volver — anclado en la esquina, no roba alto al hero */}
+        <Link
+          href={past ? "/eventos/historial" : "/eventos"}
+          className="absolute top-4 left-4 z-10 inline-flex items-center gap-1.5 text-[11px] font-semibold text-gray-400 transition hover:text-gray-900 sm:top-5 sm:left-6"
+        >
+          <ArrowLeft size={12} />
+          {past ? "Volver al historial" : "Todos los eventos"}
+        </Link>
+
+        <div className="relative mx-auto max-w-6xl px-4 pt-10 pb-10 sm:pt-12 sm:pb-12">
+          {/* Layout tipo ficha de producto:
+              - Cartel (foto principal) a la izquierda, ratio 2/3 real.
+              - Bloque editorial a la derecha: eyebrow, título, descripción,
+                stats y CTA en un único plano.
+              - En mobile colapsa a una columna (poster primero, luego texto). */}
+          <div className="grid gap-8 lg:grid-cols-[auto_1fr] lg:items-start lg:gap-12">
+            {/* Columna izquierda — cartel oficial */}
+            <aside className="lg:sticky lg:top-24">
+              <PosterFrame event={event} accent={accent} past={past} />
+            </aside>
+
+            {/* Columna derecha — info ordenada como una ficha de producto */}
+            <div className="flex flex-col">
               {/* Eyebrow: estado + tienda */}
-              <div className="mb-8 flex flex-wrap items-center gap-2 text-[11px] font-bold tracking-[0.16em] uppercase">
+              <div className="mb-5 flex flex-wrap items-center gap-2 text-[11px] font-bold tracking-[0.16em] uppercase">
                 {past ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-gray-500">
                     <CheckCircle2 size={11} /> Evento finalizado
@@ -158,18 +169,18 @@ export default async function EventDetailPage({ params }: RouteParams) {
 
               {/* Título display */}
               <h1
-                className="mb-5 text-[40px] leading-[1.05] font-bold tracking-tight text-gray-900 sm:text-[56px]"
+                className="mb-4 text-[32px] leading-[1.05] font-bold tracking-tight text-gray-900 sm:text-[40px] lg:text-[44px]"
                 style={{ fontFamily: "var(--font-fraunces), serif" }}
               >
                 {event.title}
               </h1>
 
-              <p className="mb-10 max-w-2xl text-[17px] leading-relaxed text-gray-600 sm:text-[18px]">
+              <p className="mb-8 text-[15px] leading-relaxed text-gray-600 sm:text-[16px]">
                 {event.shortDescription}
               </p>
 
               {/* 3 stats clave */}
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="mb-8 grid gap-3 sm:grid-cols-3">
                 <BigStat
                   icon={<Calendar size={16} />}
                   label="Fechas"
@@ -190,9 +201,11 @@ export default async function EventDetailPage({ params }: RouteParams) {
                 />
               </div>
 
-              {/* CTA principal — solo si el evento es futuro */}
+              {/* CTA principal alineado al final del bloque (bottom-right en
+                  desktop, full-width arriba en mobile como cualquier ficha
+                  de producto). El ticket entra al carrito como producto. */}
               {past ? (
-                <p className="mt-10 text-[13px] text-gray-400">
+                <p className="text-[13px] text-gray-400">
                   Este evento ya finalizó.{" "}
                   <Link
                     href="/eventos"
@@ -202,21 +215,14 @@ export default async function EventDetailPage({ params }: RouteParams) {
                   </Link>
                 </p>
               ) : (
-                <div className="mt-10 flex flex-wrap items-center gap-3">
-                  <ReservationCTA event={event} />
+                <div className="mt-2 flex flex-wrap items-center justify-end gap-3">
                   <span className="text-[12px] text-gray-400">
                     Plazas limitadas
                   </span>
+                  <AddEventTicketButton event={event} />
                 </div>
               )}
             </div>
-
-            {/* Columna derecha — el cartel oficial del evento como apoyo
-                visual. Framed, ratio 2/3 (cartel real), sombra suave.
-                No domina la página — la tipografía manda. */}
-            <aside className="order-first lg:order-none">
-              <PosterFrame event={event} accent={accent} past={past} />
-            </aside>
           </div>
         </div>
       </section>
@@ -258,26 +264,35 @@ export default async function EventDetailPage({ params }: RouteParams) {
                 {event.sessions.map((s, i) => (
                   <div
                     key={i}
-                    className="flex items-center justify-between rounded-xl px-3.5 py-3"
+                    className="rounded-xl px-3.5 py-3"
                     style={{ background: `${accent}0d` }}
                   >
-                    <div className="min-w-0">
-                      <p
-                        className="text-[10px] font-bold tracking-[0.14em] uppercase"
-                        style={{ color: accent }}
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0">
+                        <p
+                          className="text-[10px] font-bold tracking-[0.14em] uppercase"
+                          style={{ color: accent }}
+                        >
+                          {s.label}
+                        </p>
+                        <p className="truncate text-[15px] font-bold text-gray-900">
+                          {formatLong(s.date)}
+                        </p>
+                      </div>
+                      <span
+                        className="rounded-lg px-2.5 py-1 font-mono text-[15px] font-black text-white"
+                        style={{ background: accent }}
                       >
-                        {s.label}
-                      </p>
-                      <p className="truncate text-[15px] font-bold text-gray-900">
-                        {formatLong(s.date)}
-                      </p>
+                        {s.time}
+                      </span>
                     </div>
-                    <span
-                      className="rounded-lg px-2.5 py-1 font-mono text-[15px] font-black text-white"
-                      style={{ background: accent }}
-                    >
-                      {s.time}
-                    </span>
+                    {!past && (
+                      <SessionFullControl
+                        eventId={event.id}
+                        sessionIdx={i}
+                        accent={accent}
+                      />
+                    )}
                   </div>
                 ))}
               </div>
@@ -337,12 +352,15 @@ function PosterFrame({
   accent: string;
   past: boolean;
 }) {
+  // Altura limitada por viewport (min con 560px) → en pantallas cortas el
+  // cartel se reduce y deja sitio al texto; en pantallas grandes no crece
+  // más allá de su tamaño natural. El ancho se deriva del aspect-ratio
+  // 2/3 → así nunca se deforma.
   return (
-    <div className="mx-auto max-w-[300px] lg:mx-0">
+    <div className="flex w-full justify-center lg:justify-start">
       <div
-        className="relative aspect-[2/3] overflow-hidden rounded-2xl ring-1 ring-black/5"
+        className="relative aspect-[2/3] h-[min(72vh,560px)] overflow-hidden rounded-2xl ring-1 ring-black/5"
         style={{
-          // Halo del color del juego — sutil, NO compite con el cartel
           boxShadow: `0 24px 60px -20px ${accent}55, 0 4px 16px rgba(0,0,0,0.12)`,
         }}
       >
@@ -350,7 +368,7 @@ function PosterFrame({
           src={event.posterImage}
           alt={`Cartel oficial: ${event.title}`}
           fill
-          sizes="(max-width: 1024px) 280px, 300px"
+          sizes="(max-width: 1024px) 60vh, 380px"
           className={`object-cover ${past ? "opacity-70 saturate-50" : ""}`}
           priority
         />
@@ -362,33 +380,7 @@ function PosterFrame({
           </div>
         )}
       </div>
-      <p className="mt-3 text-center text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase">
-        Cartel oficial
-      </p>
     </div>
-  );
-}
-
-function ReservationCTA({ event }: { event: Event }) {
-  const isExternal = !!event.registrationUrl;
-  const href =
-    event.registrationUrl ??
-    `mailto:hola@tcgacademy.es?subject=${encodeURIComponent(`Inscripción: ${event.title}`)}`;
-
-  // Mismo lenguaje visual que el botón "Añadir al carrito" (LocalProductCard):
-  // borde dorado amber-500, fondo blanco→amber-50, texto amber-800. Coherencia
-  // total — el CTA principal del site (carrito) y el de eventos hablan igual.
-  return (
-    <a
-      href={href}
-      target={isExternal ? "_blank" : undefined}
-      rel={isExternal ? "noopener noreferrer" : undefined}
-      className="gold-sweep inline-flex items-center gap-2 rounded-xl border-[1.5px] border-amber-500 bg-gradient-to-r from-white to-amber-50 px-6 py-3.5 text-sm font-bold text-amber-800 shadow-[0_2px_12px_rgba(217,119,6,0.28)] transition-all hover:scale-[1.02] hover:from-amber-50 hover:to-amber-100 hover:shadow-[0_6px_24px_rgba(217,119,6,0.4)] active:scale-[0.98]"
-    >
-      <Ticket size={15} />
-      Reservar plaza · {event.entryFee}€
-      {isExternal && <ArrowRight size={13} />}
-    </a>
   );
 }
 

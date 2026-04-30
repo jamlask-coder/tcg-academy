@@ -416,7 +416,7 @@ export default function DevolucionModal({ invoice, onClose, onSuccess }: Props) 
                       rectificativa debe reflejar un importe distinto al original
                       (p.ej. devolución parcial de valor de la línea). */}
                   <label className="flex flex-col items-end text-[10px] text-gray-500">
-                    <span>€/ud (IVA incl.)</span>
+                    <span>€/unidad (IVA incl.)</span>
                     <input
                       type="number"
                       min={0}

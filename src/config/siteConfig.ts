@@ -23,7 +23,7 @@ export const SITE_CONFIG = {
   vatRate: 21, // IVA General Spain (Ley 37/1992)
 
   // Product display
-  newProductDays: 45, // badge "NUEVO" expires after N days
+  newProductDays: 0, // badge "NUEVO" — 0 desactiva globalmente (todos los productos llevan >50d)
 
   // Sesión
   sessionExpiryHours: 24, // duración por defecto de la sesión

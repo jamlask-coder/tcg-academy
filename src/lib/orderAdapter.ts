@@ -59,6 +59,8 @@ export interface CheckoutOrder {
     quantity: number;
     price: number;
     image?: string;
+    /** Metadatos opcionales por línea — p.ej. asistentes a un evento. */
+    meta?: { attendees?: string[] };
   }>;
   subtotal: number;
   shipping: number;
@@ -256,6 +258,7 @@ export function checkoutOrderToAdmin(o: CheckoutOrder): AdminOrder {
       qty: it.quantity,
       price: it.price,
       game: prod?.game ?? "otros",
+      ...(it.meta ? { meta: it.meta } : {}),
     };
   });
 

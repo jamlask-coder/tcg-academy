@@ -31,6 +31,17 @@ const cartKeyFor = (userId?: string) =>
  * El servidor (priceVerification.ts) hace una segunda verificación con
  * tolerancia 0,02 €: si un cliente obsoleto manda precio viejo, se rechaza.
  */
+/**
+ * Metadata libre por línea de carrito. Hoy se usa para entradas a eventos
+ * (`attendees`: nombres de los participantes) — un evento de 3 entradas
+ * requiere 3 nombres. Diseñado como objeto opcional para que cualquier
+ * tipo de producto futuro (regalos, suscripciones…) pueda añadir campos
+ * sin tocar la firma del carrito.
+ */
+export interface CartItemMeta {
+  attendees?: string[];
+}
+
 export interface CartItem {
   key: string;
   product_id: number;
@@ -38,6 +49,7 @@ export interface CartItem {
   price: number;
   quantity: number;
   image: string;
+  meta?: CartItemMeta;
 }
 
 function parseCart(raw: string | null): CartItem[] {
@@ -100,6 +112,7 @@ interface CartCtx {
     price: number,
     image: string,
     qty?: number,
+    meta?: CartItemMeta,
   ) => AddItemResult;
   removeItem: (key: string) => void;
   updateQty: (key: string, qty: number) => UpdateQtyResult;
@@ -283,6 +296,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     price: number,
     image: string,
     qty = 1,
+    meta?: CartItemMeta,
   ): AddItemResult => {
     const key = `item_${id}`;
     const ex = items.find((i) => i.key === key);
@@ -302,16 +316,33 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return { added: false, reason: describeLimit(info, role) || "No se pueden añadir más unidades." };
     }
 
+    // Para líneas con meta (p.ej. entradas con asistentes) sustituimos
+    // siempre el meta — la última operación gana, ya que el modal recoge
+    // los nombres definitivos. Si no se pasa meta, conservamos el actual.
     if (ex) {
       save(
         items.map((i) =>
-          i.key === key ? { ...i, quantity: i.quantity + effectiveQty } : i,
+          i.key === key
+            ? {
+                ...i,
+                quantity: i.quantity + effectiveQty,
+                meta: meta ?? i.meta,
+              }
+            : i,
         ),
       );
     } else {
       save([
         ...items,
-        { key, product_id: id, name, price, quantity: effectiveQty, image },
+        {
+          key,
+          product_id: id,
+          name,
+          price,
+          quantity: effectiveQty,
+          image,
+          ...(meta ? { meta } : {}),
+        },
       ]);
     }
     const capped = effectiveQty < qty;
@@ -345,7 +376,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return { applied: 0, capped: true, reason: describeLimit(info, role) };
     }
 
-    save(items.map((i) => (i.key === key ? { ...i, quantity: applied } : i)));
+    save(
+      items.map((i) =>
+        i.key === key
+          ? {
+              ...i,
+              quantity: applied,
+              // Si la línea tiene asistentes (entradas a evento) y la cantidad
+              // baja, recortamos los nombres sobrantes para no dejar estado
+              // inconsistente. Si sube por encima del nº de nombres, los
+              // huecos se rellenan al pasar por checkout o al re-editar
+              // desde la ficha del evento.
+              ...(i.meta?.attendees
+                ? {
+                    meta: {
+                      ...i.meta,
+                      attendees: i.meta.attendees.slice(0, applied),
+                    },
+                  }
+                : {}),
+            }
+          : i,
+      ),
+    );
     return {
       applied,
       capped,

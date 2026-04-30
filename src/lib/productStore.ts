@@ -2,6 +2,11 @@ import type { LocalProduct } from "@/data/products";
 import { PRODUCTS } from "@/data/products";
 import { DataHub } from "@/lib/dataHub";
 import { getProductCache } from "@/lib/productCache";
+import {
+  isEventVirtualId,
+  resolveEventVirtualProduct,
+  resolveEventVirtualProductBySlug,
+} from "@/lib/eventProduct";
 
 const LS_NEW = "tcgacademy_new_products";
 const LS_OVERRIDES = "tcgacademy_product_overrides";
@@ -81,6 +86,11 @@ export function getMergedByGameAndCategory(
 }
 
 export function getMergedById(id: number): LocalProduct | undefined {
+  // Eventos viven en su propio rango reservado y se resuelven on-the-fly
+  // desde EVENTS — no aparecen en getMergedProducts() para no contaminar
+  // listados de catálogo, pero el carrito/checkout/facturas los encuentran
+  // por ID virtual.
+  if (isEventVirtualId(id)) return resolveEventVirtualProduct(id);
   return getMergedProducts().find((p) => p.id === id);
 }
 
@@ -97,6 +107,9 @@ export function getProductsByIds(ids: number[]): LocalProduct[] {
 }
 
 export function getMergedBySlug(slug: string): LocalProduct | undefined {
+  if (slug.startsWith("evento-")) {
+    return resolveEventVirtualProductBySlug(slug);
+  }
   return getMergedProducts().find((p) => p.slug === slug);
 }
 

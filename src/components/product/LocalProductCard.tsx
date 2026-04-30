@@ -270,8 +270,8 @@ function LocalProductCardInner({ product }: Props) {
                       <span className="text-lg leading-none font-bold">−</span>
                     )}
                   </button>
-                  <span className="flex flex-1 items-center justify-center gap-1.5 px-1 text-sm font-bold text-amber-800">
-                    <ShoppingCart size={13} strokeWidth={2.5} />
+                  <span className="flex flex-1 items-center justify-center gap-1.5 px-1 text-sm font-bold whitespace-nowrap text-amber-800">
+                    <ShoppingCart size={13} strokeWidth={2.5} className="flex-shrink-0" />
                     {cartQty} en la cesta
                   </span>
                   <button
@@ -363,8 +363,8 @@ function LocalProductCardInner({ product }: Props) {
                     <span className="text-sm leading-none font-bold">−</span>
                   )}
                 </button>
-                <span className="flex flex-1 items-center justify-center gap-1 text-[11px] font-bold text-amber-800">
-                  <ShoppingCart size={10} strokeWidth={2.5} />
+                <span className="flex flex-1 items-center justify-center gap-1 px-0.5 text-[11px] font-bold whitespace-nowrap text-amber-800">
+                  <ShoppingCart size={10} strokeWidth={2.5} className="flex-shrink-0" />
                   {cartQty} en la cesta
                 </span>
                 <button

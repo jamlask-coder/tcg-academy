@@ -34,6 +34,12 @@ export interface EventSession {
   date: string;
   /** "10:30" */
   time: string;
+  /**
+   * Aforo de ESTA sesión específica. Si se omite, hereda `Event.capacity`
+   * (y, en última instancia, `DEFAULT_EVENT_CAPACITY = 24`). Cada sesión
+   * tiene stock independiente — el sábado y el domingo NO comparten plazas.
+   */
+  capacity?: number;
 }
 
 export interface Event {
@@ -70,6 +76,11 @@ export interface Event {
    * de Eventbrite, etc.). Si se omite, el CTA cae en mailto a la tienda.
    */
   registrationUrl?: string;
+  /**
+   * Aforo máximo de plazas. Se mapea al `stock` del producto virtual al
+   * comprar entradas. Si se omite, se usa `DEFAULT_EVENT_CAPACITY` (24).
+   */
+  capacity?: number;
 }
 
 export interface B2BApplication {

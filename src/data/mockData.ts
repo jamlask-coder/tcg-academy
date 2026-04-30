@@ -22,6 +22,12 @@ export interface OrderItem {
   qtyShipped?: number; // if < qty → suministro parcial; defaults to qty when undefined
   price: number;
   game: string;
+  /**
+   * Metadatos opcionales por línea. Hoy se usa para entradas de eventos
+   * (`attendees: string[]` con los nombres de los asistentes), pero el
+   * shape se deja abierto para futuros casos (regalos, suscripciones…).
+   */
+  meta?: { attendees?: string[] };
 }
 
 export type PaymentStatus = "paid" | "refunded" | "failed";

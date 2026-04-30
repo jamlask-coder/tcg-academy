@@ -778,7 +778,7 @@ export function Header() {
             HeaderInlineAuth vive aquí (no en la zona central) para que el
             buscador quede SIEMPRE centrado en la página, independiente de si
             el usuario está logueado y del ancho del pill. */}
-        <div className="flex shrink-0 items-start gap-0.5 pr-2 lg:items-start lg:justify-self-start lg:gap-2 lg:pr-0">
+        <div className="flex shrink-0 items-start gap-0.5 pr-2 lg:items-center lg:justify-self-start lg:gap-2 lg:pr-0">
           {/* Desktop login/greeting pill — único elemento que cambia entre
               estados logueado / no logueado. Su ancho variable NO afecta al
               centrado del buscador porque está en la columna derecha del grid. */}

@@ -4,6 +4,10 @@ import { getRoleLimit, getPurchasedQty } from "@/services/purchaseLimitService";
 import type { UserRole } from "@/types/user";
 import { getDb, type CouponRecord } from "@/lib/db";
 import { POINTS_PER_EURO_REDEMPTION } from "@/services/pointsService";
+import {
+  isEventVirtualId,
+  resolveEventVirtualProduct,
+} from "@/lib/eventProduct";
 
 interface CartItem {
   product_id: number;
@@ -60,8 +64,12 @@ function applyOverrides(p: LocalProduct): LocalProduct {
   }
 }
 
-/** Busca en PRODUCTS + productos creados por admin + aplica overrides. */
+/** Busca en PRODUCTS + productos creados por admin + aplica overrides.
+ *  Eventos (rango virtual reservado) se resuelven directamente desde EVENTS. */
 function getMergedProduct(id: number): LocalProduct | null {
+  if (isEventVirtualId(id)) {
+    return resolveEventVirtualProduct(id) ?? null;
+  }
   const base = PRODUCTS.find((p) => p.id === id);
   if (base) return applyOverrides(base);
   if (typeof window !== "undefined") {

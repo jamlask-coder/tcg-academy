@@ -448,6 +448,7 @@ export default function CheckoutPage() {
           quantity: i.quantity,
           price: i.price,
           image: i.image,
+          ...(i.meta ? { meta: i.meta } : {}),
         })),
         subtotal: total,
         coupon: pending?.appliedCoupon ?? null,

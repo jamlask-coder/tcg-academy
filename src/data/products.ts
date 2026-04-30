@@ -1,5 +1,7 @@
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+import { SITE_CONFIG } from "@/config/siteConfig";
+
 export interface LocalProduct {
   id: number;
   name: string;
@@ -267,12 +269,19 @@ const CATEGORY_ORDER: Record<string, number> = {
 
 // ─── isNew utility ────────────────────────────────────────────────────────────
 
-/** Returns true if the product was added within the last 45 days (uses createdAt when available, falls back to isNew flag). */
+/**
+ * Returns true if the product was added within the last `SITE_CONFIG.newProductDays` days.
+ * Si `newProductDays` es 0, el badge NUEVO queda desactivado globalmente.
+ * SSOT: cambiar el valor en `SITE_CONFIG` y se propaga a toda la web (tarjetas,
+ * detalle, filtros del catálogo, sort).
+ */
 export function isNewProduct(product: LocalProduct): boolean {
+  const days = SITE_CONFIG.newProductDays;
+  if (days <= 0) return false;
   if (product.createdAt) {
     return (
       Date.now() - new Date(product.createdAt).getTime() <=
-      45 * 24 * 60 * 60 * 1000
+      days * 24 * 60 * 60 * 1000
     );
   }
   return product.isNew;

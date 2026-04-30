@@ -2,8 +2,6 @@ import Link from "next/link";
 import {
   ArrowRight,
   Building2,
-  Store,
-  Package2,
   MapPin,
   Truck,
   Mail,
@@ -16,9 +14,10 @@ import { MOBILE_GAMES } from "@/data/mobileGames";
 const STORE_LIST = Object.values(STORES);
 
 // 3 líneas reales — subpáginas ya existen en /mayoristas/{b2b,franquicias,vending}.
+// Iconos amber pixelados — mismos assets que el dropdown navbar y el MobileDrawer.
 const SOLUTIONS = [
   {
-    icon: Building2,
+    iconSrc: "/images/logos/b2b-cart-amber.png",
     title: "Cuenta B2B",
     desc: "Alta como cliente profesional: tarifas para empresas, tiendas y vendedores online.",
     cta: "Solicitar cuenta",
@@ -26,7 +25,7 @@ const SOLUTIONS = [
     color: "#2563eb",
   },
   {
-    icon: Store,
+    iconSrc: "/images/logos/franquicias-amber.png",
     title: "Abre tu tienda TCG",
     desc: "Acompañamiento para montar un punto de venta físico con nuestro catálogo.",
     cta: "Saber más",
@@ -34,7 +33,7 @@ const SOLUTIONS = [
     color: "#0f766e",
   },
   {
-    icon: Package2,
+    iconSrc: "/images/logos/vending-amber.png",
     title: "Máquinas Vending TCG",
     desc: "Venta desatendida en centros comerciales y zonas de paso.",
     cta: "Registrar interés",
@@ -47,33 +46,18 @@ const SOLUTIONS = [
 export default function MayoristasPage() {
   return (
     <div className="bg-white">
-      {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="border-b border-gray-100 bg-white py-12 sm:py-14">
-        <div className="mx-auto max-w-[1400px] px-6 text-center">
-          <h1 className="mb-3 text-3xl font-bold text-gray-900 md:text-5xl">
-            Profesionales
-          </h1>
-          <p className="mx-auto max-w-2xl text-base text-gray-600 sm:text-lg">
-            {SITE_CONFIG.legalName} ({SITE_CONFIG.cif}) es una tienda
-            especializada en juegos de cartas coleccionables con 4 tiendas
-            físicas en España. Ofrecemos cuenta B2B para empresas, tiendas y
-            vendedores online.
-          </p>
-        </div>
-      </section>
-
       {/* ── Soluciones (líneas reales) ───────────────────────────────────── */}
-      <section className="mx-auto max-w-[1400px] px-6 py-16">
+      <section className="mx-auto max-w-[1400px] px-6 pt-12 pb-16 sm:pt-14">
         <div className="mb-10 text-center">
-          <h2 className="mb-2 text-2xl font-bold text-gray-900 md:text-3xl">
+          <h1 className="mb-2 text-2xl font-bold text-gray-900 md:text-3xl">
             Líneas para profesionales
-          </h2>
+          </h1>
           <p className="text-gray-500">
             Tres formas de trabajar con nosotros.
           </p>
         </div>
         <div className="grid gap-5 md:grid-cols-3">
-          {SOLUTIONS.map(({ icon: Icon, title, desc, cta, href, color, badge }) => (
+          {SOLUTIONS.map(({ iconSrc, title, desc, cta, href, color, badge }) => (
             <Link
               key={href}
               href={href}
@@ -87,11 +71,13 @@ export default function MayoristasPage() {
                   {badge}
                 </span>
               )}
-              <div
-                className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl"
-                style={{ backgroundColor: `${color}14`, color }}
-              >
-                <Icon size={22} />
+              <div className="mb-4 flex h-12 w-12 items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={iconSrc}
+                  alt=""
+                  className="h-10 w-10 object-contain transition-transform duration-200 group-hover:scale-110"
+                />
               </div>
               <h3 className="mb-2 font-bold text-gray-900">{title}</h3>
               <p className="mb-6 flex-1 text-sm leading-relaxed text-gray-500">

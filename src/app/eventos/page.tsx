@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowRight, History } from "lucide-react";
 import { getUpcomingEvents, getPastEvents } from "@/data/events";
 import { STORES } from "@/data/stores";
 import { EventsClient } from "./EventsClient";
@@ -12,56 +10,54 @@ export const metadata: Metadata = {
 };
 
 export default function EventosPage() {
-  const upcoming = getUpcomingEvents().map((e) => {
-    const store = STORES[e.storeId];
-    return {
-      event: e,
-      storeName: store?.name ?? e.storeId,
-    };
-  });
-  const pastCount = getPastEvents().length;
+  // Próximos primero (orden cronológico ascendente). Pasados al final, en
+  // gris, con el más reciente arriba — el histórico vive en la misma página
+  // para que el usuario perciba continuidad: "antes hicimos esto, ahora
+  // viene esto otro".
+  const upcoming = getUpcomingEvents().map((e) => ({
+    event: e,
+    storeName: STORES[e.storeId]?.name ?? e.storeId,
+    past: false,
+  }));
+  const past = getPastEvents().map((e) => ({
+    event: e,
+    storeName: STORES[e.storeId]?.name ?? e.storeId,
+    past: true,
+  }));
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12 sm:py-16">
-      <header className="mb-10 text-center sm:mb-14">
-        <span className="mb-3 inline-block rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold tracking-wider text-amber-600 uppercase">
-          Eventos presenciales
-        </span>
-        <h1 className="mb-3 text-4xl font-black tracking-tight text-gray-900 sm:text-5xl">
-          Vive el TCG en directo
-        </h1>
-        <p className="mx-auto max-w-2xl text-base text-gray-500">
-          Presentaciones, prereleases y torneos en nuestras tiendas. Plazas
-          limitadas — reserva la tuya con tiempo.
-        </p>
-      </header>
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
+      {/* SEO: H1 oculto para indexación, sin ocupar espacio visual. */}
+      <h1 className="sr-only">Eventos presenciales TCG Academy</h1>
 
-      {upcoming.length === 0 ? (
+      {upcoming.length === 0 && past.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-200 px-6 py-20 text-center">
           <p className="text-sm text-gray-400">
             No hay eventos programados ahora mismo. ¡Vuelve pronto!
           </p>
         </div>
       ) : (
-        <EventsClient events={upcoming} />
-      )}
+        <>
+          {upcoming.length > 0 && <EventsClient events={upcoming} />}
 
-      {/* Enlace al historial — solo si hay eventos pasados */}
-      {pastCount > 0 && (
-        <div className="mt-12 flex justify-center sm:mt-16">
-          <Link
-            href="/eventos/historial"
-            className="group inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-5 py-2.5 text-[13px] font-semibold text-gray-700 transition-all hover:border-gray-300 hover:shadow-sm"
-          >
-            <History size={14} className="text-gray-400" />
-            Ver historial de eventos
-            <span className="text-gray-400">({pastCount})</span>
-            <ArrowRight
-              size={13}
-              className="text-gray-400 transition-transform group-hover:translate-x-0.5"
-            />
-          </Link>
-        </div>
+          {past.length > 0 && (
+            <>
+              {upcoming.length > 0 && (
+                <div
+                  className="my-12 flex items-center gap-4"
+                  aria-hidden="true"
+                >
+                  <span className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
+                  <span className="text-[10px] font-bold tracking-[0.16em] text-gray-400 uppercase">
+                    Eventos finalizados
+                  </span>
+                  <span className="h-px flex-1 bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
+                </div>
+              )}
+              <EventsClient events={past} />
+            </>
+          )}
+        </>
       )}
     </div>
   );

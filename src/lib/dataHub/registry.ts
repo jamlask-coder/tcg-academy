@@ -356,6 +356,18 @@ const STABLE: EntityRegistryEntry[] = [
     notes: "Servicio canónico: addSolicitud/updateSolicitudEstado/loadSolicitudes. Eventos via DataHub.emit('solicitudes').",
   },
   {
+    key: "event_sessions",
+    description: "Marcas admin de 'plazas agotadas' por sesión de evento (corte manual de ventas online)",
+    storageKeys: ["tcgacademy_event_session_full"],
+    event: DataHubEvents.EVENT_SESSIONS_UPDATED,
+    pii: false,
+    retentionMonths: 12,
+    adapter: "@/services/eventSessionStatusService",
+    maturity: "stable",
+    category: "config",
+    notes: "Granularidad por (eventId, sessionIdx). Sirve para que el admin cierre una sesión cuando alguien se apunta presencialmente en tienda. Independiente del stock virtual del producto-evento.",
+  },
+  {
     key: "priceHistory",
     description: "Histórico diario de precios Cardmarket EUR por carta (snapshots {cardId,game,date,eur})",
     storageKeys: ["tcgacademy_price_history", "tcgacademy_price_history_meta", "tcgacademy_forex_eur_rates"],

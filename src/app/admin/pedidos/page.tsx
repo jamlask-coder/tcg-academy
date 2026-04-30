@@ -416,8 +416,15 @@ function OrderPanel({
                           {item.name}
                         </p>
                         <p className="text-[10px] text-gray-400">
-                          {item.qty}× · {item.price.toFixed(2)}€/ud
+                          {item.qty}× · {item.price.toFixed(2)}€/unidad
                         </p>
+                        {item.meta?.attendees && item.meta.attendees.length > 0 && (
+                          <ul className="mt-0.5 space-y-0.5 text-[10px] text-amber-700">
+                            {item.meta.attendees.map((name, idx) => (
+                              <li key={idx}>· {name}</li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                       <span className="flex-shrink-0 text-xs text-gray-900">
                         {(item.price * item.qty).toFixed(2)}€

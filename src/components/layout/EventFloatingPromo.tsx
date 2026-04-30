@@ -298,36 +298,16 @@ function ExpandedCard({
         </div>
       </Link>
 
-      {/* CTA — va directo al locator externo si está definido (no obliga
-          al usuario a aterrizar en /eventos/[slug] y bajar a buscar el
-          botón). Fallback mailto a la tienda si el evento no tiene URL. */}
-      <ReservationCTA event={event} />
+      {/* CTA — la entrada se compra como un producto: va al detalle del
+          evento donde el botón "Comprar entrada" mete el ticket al carrito.
+          Mismo lenguaje dorado que "Añadir al carrito" en producto. */}
+      <Link href={`/eventos/${event.slug}`} className="block px-3 pb-3">
+        <span className="gold-sweep flex items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-amber-500 bg-gradient-to-r from-white to-amber-50 py-2.5 text-xs font-bold text-amber-800 shadow-[0_2px_12px_rgba(217,119,6,0.28)] transition hover:from-amber-50 hover:to-amber-100 hover:shadow-[0_6px_22px_rgba(217,119,6,0.4)] active:scale-[0.98]">
+          <Ticket size={13} />
+          Comprar entrada · {event.entryFee}€
+        </span>
+      </Link>
     </div>
-  );
-}
-
-function ReservationCTA({ event }: { event: Event }) {
-  const isExternal = !!event.registrationUrl;
-  const href =
-    event.registrationUrl ??
-    `mailto:hola@tcgacademy.es?subject=${encodeURIComponent(
-      `Inscripción: ${event.title}`,
-    )}`;
-
-  // Mismo lenguaje que el botón "Añadir al carrito" (LocalProductCard) — el
-  // CTA principal del site y el de eventos hablan el mismo idioma dorado.
-  return (
-    <a
-      href={href}
-      target={isExternal ? "_blank" : undefined}
-      rel={isExternal ? "noopener noreferrer" : undefined}
-      className="block px-3 pb-3"
-    >
-      <span className="gold-sweep flex items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-amber-500 bg-gradient-to-r from-white to-amber-50 py-2.5 text-xs font-bold text-amber-800 shadow-[0_2px_12px_rgba(217,119,6,0.28)] transition hover:from-amber-50 hover:to-amber-100 hover:shadow-[0_6px_22px_rgba(217,119,6,0.4)] active:scale-[0.98]">
-        <Ticket size={13} />
-        Reservar plaza · {event.entryFee}€
-      </span>
-    </a>
   );
 }
 

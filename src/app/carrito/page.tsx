@@ -213,8 +213,20 @@ export default function CartPage() {
                     </h3>
                   )}
                   <p className="text-base font-bold text-[#2563eb]">
-                    {item.price.toFixed(2)}€/ud
+                    {item.price.toFixed(2)}€/unidad
                   </p>
+                  {item.meta?.attendees && item.meta.attendees.length > 0 && (
+                    <ul className="mt-1.5 space-y-0.5 text-[11px] text-gray-600">
+                      {item.meta.attendees.map((name, i) => (
+                        <li key={i} className="flex items-center gap-1.5">
+                          <span className="inline-flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 text-[9px] font-bold text-amber-700">
+                            {i + 1}
+                          </span>
+                          <span className="truncate">{name}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   {packSavings && (
                     <p className="mt-1 text-xs font-semibold text-green-600">
                       Ahorras {packSavings.saved.toFixed(2)}€ ({packSavings.pct}%) vs comprar los sobres sueltos
