@@ -61,8 +61,14 @@ run("Test 1 — TypeScript: 0 errores (tsc --noEmit)", () => {
 })
 
 // ── Test 2: Build ───────────────────────────────────────────────────────────────
+// Heap a 4GB porque el build de Next 16 + Tailwind v4 supera el default
+// (~1.5GB) en Windows. Vercel y la mayoría de CIs ya corren con >=4GB, así que
+// alineamos el test a lo que ven los entornos de despliegue real.
 run("Test 2 — Build: npm run build sin errores", () => {
-  const out = execSync(`cd "${ROOT}" && npm run build 2>&1`, { encoding: "utf8" })
+  const out = execSync(`cd "${ROOT}" && npm run build 2>&1`, {
+    encoding: "utf8",
+    env: { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --max-old-space-size=4096`.trim() },
+  })
   if (out.includes("error") && !out.includes("Compiled successfully")) {
     throw new Error("Build output contains errors")
   }
