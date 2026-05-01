@@ -744,9 +744,45 @@ run("Test 36 — /cuenta/* no filtra mocks sin gate isDemoUser/userId", () => {
   }
 })
 
+// Test 37 — NotificationContext gatea MOCK_NOTIFICATIONS por isDemoUser
+// Bug 2026-04-30: cualquier login real veía notificaciones demo en la
+// campana ("Tu pedido X enviado", "Tienes un cupón") porque buildList hacía
+// `[...dynamic, ...MOCK_NOTIFICATIONS]` para TODOS.
+run("Test 37 — NotificationContext gatea MOCK_NOTIFICATIONS por isDemoUser", () => {
+  const p = join(SRC, "context", "NotificationContext.tsx")
+  const text = readFileSync(p, "utf8")
+  if (!/MOCK_NOTIFICATIONS/.test(text)) return // ya no se usa, ok
+  const hasGate = /startsWith\(\s*["']demo-["']\s*\)/.test(text) ||
+    /isDemoUser/.test(text)
+  if (!hasGate) {
+    throw new Error(
+      "NotificationContext usa MOCK_NOTIFICATIONS sin gate isDemoUser — " +
+      "los usuarios reales verían notificaciones demo en la campana",
+    )
+  }
+})
+
+// Test 38 — verificar-factura no devuelve MOCK_INVOICES en producción
+// Bug 2026-04-30: endpoint público falla-suave a MOCK_INVOICES en producción
+// → atacante prueba IDs comunes, ve PII falsa (nombre, total) como real.
+run("Test 38 — verificar-factura gatea MOCK_INVOICES por NODE_ENV !== production", () => {
+  const p = join(SRC, "app", "verificar-factura", "page.tsx")
+  const text = readFileSync(p, "utf8")
+  if (!/MOCK_INVOICES/.test(text)) return
+  // Debe haber un check de NODE_ENV antes del find/use de MOCK_INVOICES.
+  const hasNodeEnvGate = /process\.env\.NODE_ENV\s*[!=]==\s*["']production["']/.test(text) ||
+    /NODE_ENV\s*===?\s*["']development["']/.test(text)
+  if (!hasNodeEnvGate) {
+    throw new Error(
+      "verificar-factura/page.tsx usa MOCK_INVOICES sin gate NODE_ENV — " +
+      "en producción mostraría PII de cliente demo como factura real",
+    )
+  }
+})
+
 // ── Summary ────────────────────────────────────────────────────────────────────
 console.log("\n══════════════════════════════════════════")
-console.log(`  Resultado: ${passed}/36 tests pasados`)
+console.log(`  Resultado: ${passed}/38 tests pasados`)
 if (failed > 0) {
   console.log(`  FALLOS (${failed}):`)
   failures.forEach(({ name }) => console.log(`    - ${name}`))

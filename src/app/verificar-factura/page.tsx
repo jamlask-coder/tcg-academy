@@ -44,22 +44,29 @@ export default function VerificarFacturaPage() {
       }
     } catch { /* ignore */ }
 
-    // Fallback: check mock invoices by invoice number or order ID
-    const inv = MOCK_INVOICES.find(
-      (i) => i.id.toUpperCase() === trimmed || i.orderId.toUpperCase() === trimmed,
-    );
-    if (inv) {
-      setResult({
-        found: true,
-        id: inv.id,
-        date: inv.date,
-        total: inv.total,
-        clientName: inv.clientName,
-        status: inv.status,
-      });
-    } else {
-      setResult({ found: false });
+    // Fallback: check mock invoices ONLY in development. En producción NUNCA
+    // devolver datos de MOCK_INVOICES — es un endpoint público y mostraría
+    // PII falsa (nombre/total/fecha de un cliente demo) como si fuera real.
+    // Bug 2026-04-30 (mega test puntos ciegos).
+    const isDev = process.env.NODE_ENV !== "production";
+    if (isDev) {
+      const inv = MOCK_INVOICES.find(
+        (i) => i.id.toUpperCase() === trimmed || i.orderId.toUpperCase() === trimmed,
+      );
+      if (inv) {
+        setResult({
+          found: true,
+          id: inv.id,
+          date: inv.date,
+          total: inv.total,
+          clientName: inv.clientName,
+          status: inv.status,
+        });
+        setLoading(false);
+        return;
+      }
     }
+    setResult({ found: false });
     setLoading(false);
   };
 

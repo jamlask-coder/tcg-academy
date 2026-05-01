@@ -49,8 +49,12 @@ function saveReadIds(ids: string[]): void {
 
 function buildList(userId: string | null, readIds: string[]): Notification[] {
   const dynamic = userId ? loadUserNotifications(userId) : [];
-  // dynamic notifications come first (most recent), then mock
-  const combined = [...dynamic, ...MOCK_NOTIFICATIONS];
+  // Bug 2026-04-30: antes hacía `[...dynamic, ...MOCK_NOTIFICATIONS]` para
+  // todos. Resultado: cualquier login real (o navegación anónima) veía las
+  // notificaciones demo ("Tu pedido X se ha enviado", "Tienes un cupón")
+  // como si fueran reales. Solo se sirven a IDs demo.
+  const isDemoUser = userId?.startsWith("demo-") ?? false;
+  const combined = isDemoUser ? [...dynamic, ...MOCK_NOTIFICATIONS] : dynamic;
   return combined.map((n) => ({
     ...n,
     read: readIds.includes(n.id) ? true : n.read,
