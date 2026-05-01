@@ -14,8 +14,7 @@ import {
   X,
 } from "lucide-react";
 import {
-  MOCK_RETURNS,
-  MOCK_ORDERS,
+  type Order,
   type ReturnRequest,
   type ReturnStatus,
 } from "@/data/mockData";
@@ -138,31 +137,19 @@ function RequestForm({ onClose }: { onClose: () => void }) {
   });
   const [submitted, setSubmitted] = useState(false);
 
-  // Bug 2026-04-30: antes mostraba MOCK_ORDERS sin filtrar a cualquier usuario,
-  // permitiendo seleccionar pedidos demo para "devolver". Ahora se filtra por
-  // user.id (real → tcgacademy_orders del propio cliente; demo → MOCK).
-  // Migración 2026-04-20: "entregado" se eliminó del set customer; pedidos
-  // enviados (estado final del flujo) son elegibles para devolución.
-  const deliveredOrders = (() => {
+  // Pedidos del usuario actual con estado "enviado" (elegibles para devolución).
+  const deliveredOrders: Order[] = (() => {
     if (!user) return [];
-    const isDemoUser = user.id?.startsWith("demo-") ?? false;
     try {
       const raw = typeof window !== "undefined"
         ? localStorage.getItem("tcgacademy_orders")
         : null;
-      const real = raw
-        ? (JSON.parse(raw) as typeof MOCK_ORDERS).filter(
-            (o) => o.userId === user.id && o.status === "enviado",
-          )
-        : [];
-      const seed = isDemoUser
-        ? MOCK_ORDERS.filter((o) => o.status === "enviado")
-        : [];
-      return [...real, ...seed];
+      if (!raw) return [];
+      return (JSON.parse(raw) as Order[]).filter(
+        (o) => o.userId === user.id && o.status === "enviado",
+      );
     } catch {
-      return isDemoUser
-        ? MOCK_ORDERS.filter((o) => o.status === "enviado")
-        : [];
+      return [];
     }
   })();
 
@@ -356,14 +343,11 @@ function RequestForm({ onClose }: { onClose: () => void }) {
 }
 
 export default function DevolucionesPage() {
-  const { user } = useAuth();
   const [showForm, setShowForm] = useState(false);
 
-  // Bug 2026-04-30: antes listaba MOCK_RETURNS a cualquier usuario.
-  // Solo demos los ven; el resto (cliente real recién logueado con Google) ve
-  // empty state hasta que tenga devoluciones reales suyas.
-  const isDemoUser = user?.id?.startsWith("demo-") ?? false;
-  const visibleReturns = isDemoUser ? MOCK_RETURNS : [];
+  // TODO: conectar con returnService.getReturnsByUser(user.id).
+  // Hasta entonces, lista vacía para todos los usuarios.
+  const visibleReturns: ReturnRequest[] = [];
 
   return (
     <div>

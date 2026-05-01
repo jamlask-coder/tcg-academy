@@ -21,7 +21,7 @@ const SECTIONS: Section[] = [
       },
       {
         heading: "Gráfica de ventas",
-        text: "Muestra las ventas de los últimos 7 días mediante un gráfico de barras. Los datos provienen de MOCK_SALES_7D en el fichero de datos.",
+        text: "Muestra las ventas de los últimos 7 días mediante un gráfico de barras. Los datos provienen de los pedidos reales (readAdminOrdersMerged).",
       },
       {
         heading: "Alertas",

@@ -43,7 +43,7 @@ import {
 import type { InvoiceRecord } from "@/types/fiscal";
 import { InvoiceStatus, VerifactuStatus, InvoiceType, PaymentMethod } from "@/types/fiscal";
 import type { Quarter } from "@/types/tax";
-import { ADMIN_ORDERS, type AdminOrder } from "@/data/mockData";
+import { type AdminOrder } from "@/data/mockData";
 import { readAdminOrdersMerged, getPaymentStatusMap, isCountableOrder } from "@/lib/orderAdapter";
 import {
   downloadLibroFacturas,
@@ -205,7 +205,7 @@ async function syncPaidOrdersAsInvoices(): Promise<SyncResult> {
     // Así ningún pedido pagado queda sin factura emitida (cumplimiento fiscal).
     // Carry-over (SL anterior) NUNCA se factura desde aquí — pertenecen a la
     // sociedad previa. Solo se muestran como observación en /admin/pedidos.
-    const orders = readAdminOrdersMerged(ADMIN_ORDERS).filter(isCountableOrder);
+    const orders = readAdminOrdersMerged().filter(isCountableOrder);
     const existingInvoices = loadInvoices();
     const invoicedOrderIds = new Set(existingInvoices.map((inv) => inv.sourceOrderId).filter(Boolean));
 

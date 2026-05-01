@@ -26,31 +26,11 @@ interface ResetToken {
   expiresAt: number;
 }
 
-/**
- * Demo users that can be "migrated" to registered on password reset.
- *
- * SEGURIDAD: el mapa queda vacío en producción salvo activación explícita
- * con NEXT_PUBLIC_ENABLE_DEMO_USERS=true. Esto evita que una build de
- * producción permita "recuperar la contraseña" de cuentas demo bien
- * conocidas (admin@tcgacademy.es, luri@tcgacademy.es, etc.).
- *
- * Auditado por tests/audit/run-audit.mjs (Test 26).
- */
-const DEMO_USERS_ENABLED =
-  process.env.NODE_ENV !== "production" ||
-  process.env.NEXT_PUBLIC_ENABLE_DEMO_USERS === "true";
-
-const DEMO_USERS_FULL: Record<string, { id: string; name: string; lastName: string; phone: string; role: string }> = {
-  "cliente@test.com": { id: "demo-cliente", name: "Maria", lastName: "Garcia", phone: "+34 666 111 111", role: "cliente" },
-  "mayorista@test.com": { id: "demo-mayorista", name: "Carlos", lastName: "Lopez", phone: "+34 666 222 222", role: "mayorista" },
-  "tienda@test.com": { id: "demo-tienda", name: "Ana", lastName: "Martinez", phone: "+34 666 333 333", role: "tienda" },
-  "admin@tcgacademy.es": { id: "demo-admin", name: "Admin", lastName: "TCG", phone: "+34 666 000 000", role: "admin" },
-  "luri@tcgacademy.es": { id: "admin-luri", name: "Luri", lastName: "", phone: "+34 666 000 001", role: "admin" },
-  "font@tcgacademy.es": { id: "admin-font", name: "Font", lastName: "", phone: "+34 666 000 002", role: "admin" },
-};
-
-const DEMO_USERS: typeof DEMO_USERS_FULL =
-  DEMO_USERS_ENABLED ? DEMO_USERS_FULL : {};
+// Modo real 100%: mapa de cuentas demo eliminado. El reset de contraseña sólo
+// migra cuentas que ya existen en `tcgacademy_registered` (local-mode dev) o
+// va contra /api/auth (server-mode). Mantenemos el símbolo vacío para no
+// romper los callsites — `DEMO_USERS[email]` devolverá undefined.
+const DEMO_USERS: Record<string, { id: string; name: string; lastName: string; phone: string; role: string }> = {};
 
 function ResetForm() {
   const searchParams = useSearchParams();

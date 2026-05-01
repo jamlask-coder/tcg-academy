@@ -131,100 +131,8 @@ const STATUS_CONFIG: Record<
   },
 };
 
-const MOCK_ORDERS: Order[] = [
-  {
-    id: "TCG-20250128-001",
-    date: "2025-01-28",
-    dateFormatted: "28 enero 2025",
-    status: "enviado",
-    total: 109.85,
-    trackingNumber: "ES2025012800001",
-    address: "Calle Mayor 15, 2ºB, 28001 Madrid",
-    paymentMethod: "Tarjeta Visa ****4242",
-    paymentStatus: "paid",
-    envio: "estandar",
-    items: [
-      {
-        name: "Naruto Mythos: Konoha Shido Booster Box (24 sobres)",
-        qty: 1,
-        price: 79.95,
-        game: "naruto",
-      },
-      {
-        name: "Naruto Starter Pack — Naruto Uzumaki",
-        qty: 2,
-        price: 14.95,
-        game: "naruto",
-      },
-    ],
-  },
-  {
-    id: "TCG-20250115-002",
-    date: "2025-01-15",
-    dateFormatted: "15 enero 2025",
-    status: "enviado",
-    total: 174.9,
-    trackingNumber: "ES2025011500002",
-    address: "Calle Mayor 15, 2ºB, 28001 Madrid",
-    paymentMethod: "PayPal",
-    paymentStatus: "paid",
-    envio: "estandar",
-    items: [
-      {
-        name: "Magic The Gathering: Bloomburrow Draft Booster Box",
-        qty: 1,
-        price: 129.95,
-        game: "magic",
-      },
-      { name: "MTG Bloomburrow Bundle", qty: 1, price: 44.95, game: "magic" },
-    ],
-  },
-  {
-    id: "TCG-20241230-003",
-    date: "2024-12-30",
-    dateFormatted: "30 diciembre 2024",
-    status: "enviado",
-    total: 109.9,
-    trackingNumber: "ES2024123000003",
-    address: "Calle Mayor 15, 2ºB, 28001 Madrid",
-    paymentMethod: "Bizum",
-    paymentStatus: "refunded",
-    envio: "estandar",
-    items: [
-      {
-        name: "Pokémon: Prismatic Evolutions Elite Trainer Box",
-        qty: 2,
-        price: 54.95,
-        game: "pokemon",
-      },
-    ],
-  },
-  {
-    id: "TCG-20241201-004",
-    date: "2024-12-01",
-    dateFormatted: "01 diciembre 2024",
-    status: "enviado",
-    total: 104.9,
-    address: "Calle Mayor 15, 2ºB, 28001 Madrid",
-    paymentMethod: "Tarjeta Visa ****4242",
-    paymentStatus: "failed",
-    envio: "estandar",
-    items: [
-      {
-        name: "One Piece OP-07 500 Years in the Future Booster Box",
-        qty: 1,
-        price: 89.95,
-        game: "one-piece",
-      },
-      {
-        name: "One Piece Starter Deck ST-21 Land of Wano",
-        qty: 1,
-        price: 14.95,
-        game: "one-piece",
-      },
-    ],
-  },
-];
+// Modo real 100%: el listado de pedidos se hidrata exclusivamente desde
+// `tcgacademy_orders` (cliente) o /api/orders (server-mode). Sin seed.
 
 const GAME_EMOJI: Record<string, string> = {
   magic: "🧙",
@@ -359,28 +267,25 @@ function IncidentModal({ orderId, onClose, onSubmit }: IncidentModalProps) {
 
 export default function PedidosPage() {
   const { user } = useAuth();
-  const isDemoUser = !!user?.id?.startsWith("demo-");
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
       const raw =
         typeof window !== "undefined"
           ? localStorage.getItem("tcgacademy_orders")
           : null;
-      const seed = isDemoUser ? MOCK_ORDERS : [];
-      if (!raw || !user?.id) return seed;
+      if (!raw || !user?.id) return [];
       const local = JSON.parse(raw) as StoredOrder[];
       // Filtro ESTRICTO: solo pedidos con userId === user.id. Pedidos sin userId
       // (guest checkout legacy) NUNCA se muestran a usuarios autenticados, o
       // fugan entre cuentas.
       const mine = local.filter((o) => o.userId === user.id);
-      const normalized: Order[] = mine.map((o) => ({
+      return mine.map((o) => ({
         ...o,
         status: normalizeStatus(o.status),
         dateFormatted: formatDate(o.date),
       }));
-      return [...normalized, ...seed];
     } catch {
-      return isDemoUser ? MOCK_ORDERS : [];
+      return [];
     }
   });
   const [expanded, setExpanded] = useState<string | null>(null);

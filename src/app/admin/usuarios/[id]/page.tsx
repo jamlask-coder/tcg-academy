@@ -16,12 +16,17 @@ import {
   KeyRound,
 } from "lucide-react";
 import {
-  MOCK_USERS,
-  MOCK_INVOICES,
-  ADMIN_ORDERS,
   type AdminUser,
   type AdminOrder,
+  type Invoice,
 } from "@/data/mockData";
+// Modo real: MOCK_USERS/MOCK_INVOICES/ADMIN_ORDERS ya no existen. La ficha
+// de admin usuarios resuelve contra BD vía /api/admin/users/[id] y los
+// pedidos vivos vía readAdminOrdersMerged*. Mantenemos placeholders vacíos
+// solo para que las firmas que esperan arrays sigan compilando.
+const MOCK_USERS: User[] = [];
+const MOCK_INVOICES: Invoice[] = [];
+const ADMIN_ORDERS: AdminOrder[] = [];
 import type { User } from "@/types/user";
 import {
   readAdminOrdersMerged,
@@ -139,7 +144,7 @@ export default function AdminUsuarioDetailPage() {
         if (!isServerMode) {
           const fromMock = findUserByHandle(MOCK_USERS, id) ?? null;
           if (fromMock) {
-            await finalize(fromMock);
+            await finalize(userToAdminUser(fromMock as User));
             return;
           }
         }
@@ -326,7 +331,7 @@ export default function AdminUsuarioDetailPage() {
 
     // Invoices shown (keep original mock lookup logic)
     const invoices = MOCK_INVOICES.filter(
-      (inv) =>
+      (inv: Invoice) =>
         orders.some((o) => o.id === inv.orderId) ||
         inv.clientName?.toLowerCase().includes(user.name.toLowerCase()),
     ).slice(0, 5);
@@ -565,7 +570,7 @@ export default function AdminUsuarioDetailPage() {
                 </h3>
               </div>
               <div className="divide-y divide-gray-100">
-                {invoices.map((inv) => (
+                {invoices.map((inv: Invoice) => (
                   <div key={inv.id} className="flex items-center gap-4 px-5 py-3 text-sm">
                     <span className="font-mono font-semibold text-gray-800">{inv.id}</span>
                     <span className="flex-1 text-gray-400">{inv.date}</span>

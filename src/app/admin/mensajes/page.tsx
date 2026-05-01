@@ -16,9 +16,6 @@ import {
   Eye,
 } from "lucide-react";
 import {
-  MOCK_MESSAGES,
-  MOCK_USERS,
-  MOCK_BROADCASTS,
   MSG_STORAGE_KEY,
   BROADCAST_STORAGE_KEY,
   type AppMessage,
@@ -27,6 +24,8 @@ import {
   type BroadcastChannel,
   type BroadcastTarget,
 } from "@/data/mockData";
+
+const MOCK_USERS: AdminUser[] = [];
 import {
   sendMessage as sendCanonicalMessage,
   markAsRead as markMessageAsRead,
@@ -68,30 +67,24 @@ function fmtDateTime(iso: string) {
 }
 
 function loadMessages(): AppMessage[] {
-  if (typeof window === "undefined") return MOCK_MESSAGES;
+  if (typeof window === "undefined") return [];
   try {
     const saved = localStorage.getItem(MSG_STORAGE_KEY);
     const local: AppMessage[] = saved ? JSON.parse(saved) : [];
-    const ids = new Set(local.map((m) => m.id));
-    return [...local, ...MOCK_MESSAGES.filter((m) => !ids.has(m.id))].sort(
-      (a, b) => b.date.localeCompare(a.date),
-    );
+    return local.sort((a, b) => b.date.localeCompare(a.date));
   } catch {
-    return MOCK_MESSAGES;
+    return [];
   }
 }
 
 function loadBroadcasts(): Broadcast[] {
-  if (typeof window === "undefined") return MOCK_BROADCASTS;
+  if (typeof window === "undefined") return [];
   try {
     const saved = localStorage.getItem(BROADCAST_STORAGE_KEY);
     const local: Broadcast[] = saved ? JSON.parse(saved) : [];
-    const ids = new Set(local.map((b) => b.id));
-    return [...local, ...MOCK_BROADCASTS.filter((b) => !ids.has(b.id))].sort(
-      (a, b) => b.date.localeCompare(a.date),
-    );
+    return local.sort((a, b) => b.date.localeCompare(a.date));
   } catch {
-    return MOCK_BROADCASTS;
+    return [];
   }
 }
 

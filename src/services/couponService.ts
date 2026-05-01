@@ -4,7 +4,7 @@
 // Storage: localStorage["tcgacademy_user_coupons"]
 // Replace localStorage calls with API calls when backend is ready.
 
-import { MOCK_ADMIN_COUPONS, type AdminCoupon } from "@/data/mockData";
+import { type AdminCoupon } from "@/data/mockData";
 import { DataHub } from "@/lib/dataHub";
 
 // Re-export para que consumidores no tengan que importar de mockData.
@@ -300,28 +300,23 @@ export function getCouponUsageCount(
 }
 
 // ── Admin coupon store (SSOT) ─────────────────────────────────────────────────
-// Antes: los cupones vivían solo en `MOCK_ADMIN_COUPONS` (constante en RAM) y
-// la página /admin/cupones los guardaba en `useState`, por lo que cualquier
-// mutación se perdía al recargar. Ahora hay una fuente única persistente.
+// Fuente única persistente para los cupones admin.
 //
 // Evento canónico: "tcga:coupons:updated" — cualquier vista suscrita se refresca.
 
 const ADMIN_COUPONS_KEY = "tcgacademy_admin_coupons";
 
 /**
- * Read the persisted admin coupon list.
- * On first call (empty key) seeds from MOCK_ADMIN_COUPONS so demo data is available.
+ * Read the persisted admin coupon list. Devuelve `[]` si aún no hay cupones.
  */
 export function loadAdminCoupons(): AdminCoupon[] {
-  if (typeof window === "undefined") return MOCK_ADMIN_COUPONS.slice();
+  if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(ADMIN_COUPONS_KEY);
     if (raw) return JSON.parse(raw) as AdminCoupon[];
-    // Primera vez: sembrar con los mocks.
-    localStorage.setItem(ADMIN_COUPONS_KEY, JSON.stringify(MOCK_ADMIN_COUPONS));
-    return MOCK_ADMIN_COUPONS.slice();
+    return [];
   } catch {
-    return MOCK_ADMIN_COUPONS.slice();
+    return [];
   }
 }
 

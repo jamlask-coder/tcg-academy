@@ -1,14 +1,12 @@
 // ─── User handle ───────────────────────────────────────────────────────────
 // Handle legible para URLs admin (`/admin/usuarios/{handle}`). Prioridad:
-//   1. `user.username` explícito (ya poblado en MOCK_USERS + registro).
+//   1. `user.username` explícito (poblado en el registro).
 //   2. Slug derivado de `name` + `lastName` (ej. "Miguel Torres" → "miguel-torres").
 //   3. Fallback al `id` crudo (nunca debería ocurrir en producción, pero evita
 //      romper URLs si un usuario migrado no tiene username ni nombre legibles).
 //
 // Case-insensitive. Si el campo viene con mayúsculas, se normaliza a minúsculas
 // aquí; el resto del sistema asume que los handles almacenados ya son slug.
-
-import { MOCK_USERS } from "@/data/mockData";
 
 export interface HasHandle {
   id: string;
@@ -20,9 +18,7 @@ export interface HasHandle {
 /**
  * Handles reservados — no se pueden registrar por un usuario nuevo.
  *
- * Incluye:
- *   · Palabras del sistema / rutas sensibles (admin, api, login…)
- *   · Usernames hardcodeados en MOCK_USERS (demo accounts)
+ * Palabras del sistema / rutas sensibles (admin, api, login…).
  *
  * Nota: la lista se normaliza (lowercase) al usar. Edita esta constante
  * si añades una ruta nueva bajo `/admin/usuarios/` que pueda colisionar.
@@ -59,26 +55,18 @@ const SYSTEM_RESERVED_HANDLES = [
 let _reservedSet: Set<string> | null = null;
 
 /**
- * Set de handles reservados (system words + usernames de MOCK_USERS).
- * Se cachea tras la primera llamada (MOCK_USERS es estático).
+ * Set de handles reservados (system words).
+ * Se cachea tras la primera llamada.
  */
 export function getReservedHandles(): Set<string> {
   if (_reservedSet) return _reservedSet;
-  const set = new Set<string>(SYSTEM_RESERVED_HANDLES);
-  for (const u of MOCK_USERS) {
-    if (u.username) set.add(u.username.toLowerCase());
-    // Backward-compat: algunos IDs viejos (u5, admin, demo_cliente) podrían
-    // viajar en URLs antiguas bookmarkeadas; los reservamos también para
-    // que un cliente nuevo no pueda secuestrarlos.
-    if (u.id) set.add(u.id.toLowerCase());
-  }
-  _reservedSet = set;
-  return set;
+  _reservedSet = new Set<string>(SYSTEM_RESERVED_HANDLES);
+  return _reservedSet;
 }
 
 /**
  * ¿Este handle está reservado y no puede ser usado por un nuevo registro?
- * Case-insensitive. Comprueba system words + MOCK_USERS usernames + MOCK_USERS ids.
+ * Case-insensitive. Comprueba palabras reservadas del sistema.
  */
 export function isHandleReserved(handle: string): boolean {
   if (!handle) return false;
@@ -104,8 +92,7 @@ export function getUserHandle(user: HasHandle): string {
   if (full) {
     const slug = slugifyName(full);
     if (slug) {
-      // Si el slug derivado colisiona con un handle reservado (p.ej. un
-      // cliente llamado "Laura" y MOCK_USERS.demo_cliente.username="laura"),
+      // Si el slug derivado colisiona con un handle reservado del sistema,
       // uniquificamos con sufijo derivado del id para que cada usuario tenga
       // una URL distinta. El lookup se resuelve via `findUserByHandle` que
       // coincide por username → id → slug, así que un id-suffix siempre resuelve.
@@ -178,19 +165,17 @@ export function findUserByHandle<T extends HasHandle>(
 
 /**
  * Convierte un `userId` (el que viaja con los pedidos) al handle legible para
- * URLs. Busca en MOCK_USERS + localStorage `tcgacademy_registered`. Si no
- * encuentra el user, devuelve el propio userId como fallback — la página de
- * detalle admin igualmente lo resuelve via `findUserByHandle`.
+ * URLs. Busca en localStorage `tcgacademy_registered`. Si no encuentra el
+ * user, devuelve el propio userId como fallback — la página de detalle admin
+ * igualmente lo resuelve via `findUserByHandle`.
  *
- * Safe en SSR: si no hay `localStorage` (server), solo usa MOCK_USERS.
+ * Safe en SSR: si no hay `localStorage` (server), devuelve userId sin cambios.
  */
 export function userIdToHandle(
   userId: string,
-  mockUsers: HasHandle[],
+  _legacy: HasHandle[] = [],
 ): string {
-  const fromMock = mockUsers.find((u) => u.id === userId);
-  if (fromMock) return getUserHandle(fromMock);
-
+  void _legacy;
   if (typeof window !== "undefined") {
     try {
       const raw = window.localStorage.getItem("tcgacademy_registered");

@@ -358,12 +358,11 @@ function normalizeLegacyOrder(o: AdminOrder): AdminOrder {
 
 /**
  * En server-mode (BACKEND_MODE=server) la BD es la ÚNICA fuente de verdad.
- * Los mocks (ADMIN_ORDERS) y los pedidos de demo en localStorage NO se mezclan
- * — sólo se hidratan vía `readAdminOrdersMergedAsync` desde /api/orders.
+ * Los pedidos sólo se hidratan vía `readAdminOrdersMergedAsync` desde /api/orders.
  *
  * Razón: en producción los pedidos reales de la web actual pertenecen a la SL
- * anterior (ver `fiscalCarryOver`) y NO podemos contaminar la lista con cuentas
- * mock o intentos de checkout local. Ver memoria `feedback_fiscal_carry_over`.
+ * anterior (ver `fiscalCarryOver`) y NO podemos contaminar la lista con
+ * intentos de checkout local. Ver memoria `feedback_fiscal_carry_over`.
  */
 const SERVER_MODE = process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
 

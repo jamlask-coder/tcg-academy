@@ -664,7 +664,7 @@ export function Header() {
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
-            className="-mt-[3px] flex items-center justify-center rounded-lg p-1 text-white transition hover:bg-white/10 lg:mt-0 lg:hidden"
+            className="-mt-[3px] ml-1 flex items-center justify-center rounded-lg p-1.5 text-white transition hover:bg-white/10 lg:hidden"
             aria-label="Abrir menú"
           >
             <Menu size={24} />

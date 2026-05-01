@@ -46,7 +46,7 @@ const DEFAULT_FORM: Omit<AdminCoupon, "timesUsed" | "totalSaved"> = {
 };
 
 export default function AdminCuponesPage() {
-  // SSOT: lee desde store persistente (semilla MOCK_ADMIN_COUPONS al primer load).
+  // SSOT: lee desde store persistente.
   const [coupons, setCoupons] = useState<AdminCoupon[]>([]);
 
   useEffect(() => {

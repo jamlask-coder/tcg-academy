@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo } from "react";
 import { Receipt, Download, FileSpreadsheet, Calendar } from "lucide-react";
-import { MOCK_INVOICES, type Invoice, type InvoiceItem } from "@/data/mockData";
+import { type Invoice, type InvoiceItem } from "@/data/mockData";
 import { useAuth } from "@/context/AuthContext";
 import { calcVAT } from "@/hooks/usePrice";
 import { printInvoiceWithCSV, type InvoiceData } from "@/utils/invoiceGenerator";
@@ -304,18 +304,16 @@ export default function FacturasPage() {
     user?.role === "admin";
 
   const filtered = useMemo(() => {
-    // Bug 2026-04-30: antes mostraba MOCK_INVOICES a cualquier usuario logueado.
-    // Solo demos los ven; usuario real ve lista vacía hasta que existan facturas
-    // suyas reales (la fuente real es invoiceService.getInvoicesByUser).
-    const isDemoUser = user?.id?.startsWith("demo-") ?? false;
-    const source = isDemoUser ? MOCK_INVOICES : [];
+    // TODO: conectar con invoiceService.getInvoicesByUser(user.id).
+    // Hasta entonces, lista vacía para todos los usuarios.
+    const source: Invoice[] = [];
     return source.filter((inv) => {
       const ym = inv.date.slice(0, 7);
       if (dateFrom && ym < dateFrom) return false;
       if (dateTo && ym > dateTo) return false;
       return true;
     });
-  }, [dateFrom, dateTo, user?.id]);
+  }, [dateFrom, dateTo]);
 
   const periodLabel = dateFrom && dateTo ? `${dateFrom}_${dateTo}` : "completo";
   const showingAll = !dateFrom && !dateTo;

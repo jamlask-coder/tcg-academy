@@ -25,7 +25,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { saveIncident, getIncidentsByOrder } from "@/services/incidentService";
 import type { Incident } from "@/types/incident";
-import { MOCK_ORDERS } from "@/data/mockData";
+import { type Order } from "@/data/mockData";
 import {
   printInvoiceWithCSV,
   buildInvoiceFromOrder,
@@ -102,19 +102,17 @@ export function PedidoDetailClient({ id }: Props) {
   const { user } = useAuth();
 
   // Busca el pedido del usuario actual. Filtra por userId para evitar que un
-  // usuario vea un pedido de otra cuenta aunque conozca/adivine el id. Solo
-  // cuentas demo caen al fallback MOCK_ORDERS.
+  // usuario vea un pedido de otra cuenta aunque conozca/adivine el id.
   const order = (() => {
-    const isDemoUser = user?.id?.startsWith("demo-") ?? false;
     try {
       const raw = typeof window !== "undefined" ? localStorage.getItem("tcgacademy_orders") : null;
       if (raw && user?.id) {
-        const local = JSON.parse(raw) as Array<typeof MOCK_ORDERS[number] & { userId?: string }>;
+        const local = JSON.parse(raw) as Array<Order & { userId?: string }>;
         const found = local.find((o) => o.id === id && o.userId === user.id);
         if (found) return found;
       }
     } catch {}
-    return isDemoUser ? MOCK_ORDERS.find((o) => o.id === id) ?? null : null;
+    return null;
   })();
 
   useEffect(() => {

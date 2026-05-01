@@ -2,8 +2,13 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ChevronDown, Users, X, ChevronRight, Clock } from "lucide-react";
-import { MOCK_USERS, ADMIN_ORDERS, type AdminUser } from "@/data/mockData";
+import { type AdminUser, type AdminOrder } from "@/data/mockData";
 import type { User } from "@/types/user";
+// Modo real: ya no existen MOCK_USERS ni ADMIN_ORDERS. Mantenemos placeholders
+// vacíos para no romper las firmas que esperan arrays — los datos vivos llegan
+// desde /api/admin/users (server-mode) o tcgacademy_registered (local-mode).
+const MOCK_USERS: AdminUser[] = [];
+const ADMIN_ORDERS: AdminOrder[] = [];
 import {
   readAdminOrdersMerged,
   readAdminOrdersMergedAsync,
@@ -34,10 +39,9 @@ const IS_SERVER_MODE =
 
 export default function AdminUsuariosPage() {
   const router = useRouter();
-  // En server-mode la BD es la SSOT — arrancamos vacío y dejamos que el
-  // fetch a /api/admin/users rellene. Nunca mostramos MOCK_USERS porque son
-  // demos heredados de cuando todo vivía en localStorage.
-  const [users, setUsers] = useState<AdminUser[]>(IS_SERVER_MODE ? [] : MOCK_USERS);
+  // SSOT: arrancamos vacío y dejamos que el fetch a /api/admin/users (server)
+  // o el lectura de localStorage (local) rellene la lista.
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
   const [sortByRecent, setSortByRecent] = useState(true);
@@ -63,7 +67,7 @@ export default function AdminUsuariosPage() {
         const registered = stored
           ? (JSON.parse(stored) as Record<string, { password: string; user: User }>)
           : {};
-        const mockEmails = new Set(MOCK_USERS.map((u) => u.email.toLowerCase()));
+        const mockEmails = new Set(MOCK_USERS.map((u: AdminUser) => u.email.toLowerCase()));
         newUsers = Object.values(registered)
           .filter((entry) => !mockEmails.has(entry.user.email.toLowerCase()))
           .map((entry) => ({

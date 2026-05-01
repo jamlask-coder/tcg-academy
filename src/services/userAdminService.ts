@@ -3,8 +3,7 @@
  *
  * Fuentes de datos:
  * - `tcgacademy_registered` → usuarios reales (shape `User` completo)
- * - `MOCK_USERS` → demo / seed (shape `AdminUser`, se sintetiza a `User`)
- * - `tcgacademy_user_overrides` → overlay del admin por encima de las dos anteriores
+ * - `tcgacademy_user_overrides` → overlay del admin por encima
  *
  * Cambios hechos desde el admin:
  * 1. Se persisten como overlay en `tcgacademy_user_overrides`.
@@ -20,7 +19,6 @@
  */
 
 import type { User, UserRole } from "@/types/user";
-import { MOCK_USERS, type AdminUser } from "@/data/mockData";
 import { validateSpanishNIF } from "@/lib/validations/nif";
 import { DataHub } from "@/lib/dataHub";
 
@@ -77,29 +75,6 @@ function writeJSON(key: string, value: unknown): void {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
-// ─── Sintetiza User a partir de AdminUser (mock users) ───────────────────────
-
-function adminUserToUser(a: AdminUser): User {
-  return {
-    id: a.id,
-    email: a.email,
-    name: a.name,
-    lastName: a.lastName,
-    phone: a.phone ?? "",
-    role: a.role,
-    addresses: [],
-    createdAt: a.registeredAt ? `${a.registeredAt}T00:00:00.000Z` : new Date().toISOString(),
-    favorites: [],
-    birthDate: a.birthDate,
-    ...(a.cif
-      ? {
-          nif: a.cif,
-          nifType: /^[A-HJ-NP-SUVW]/i.test(a.cif) ? ("CIF" as const) : ("DNI" as const),
-        }
-      : {}),
-  };
-}
-
 // ─── API pública ─────────────────────────────────────────────────────────────
 
 /**
@@ -113,13 +88,7 @@ export function loadFullUser(userId: string): User | null {
     {},
   );
   const regEntry = Object.values(registered).find((e) => e.user.id === userId);
-  let base: User | null = regEntry ? regEntry.user : null;
-
-  // 2. MOCK_USERS si no estaba en registered
-  if (!base) {
-    const mock = MOCK_USERS.find((u) => u.id === userId);
-    if (mock) base = adminUserToUser(mock);
-  }
+  const base: User | null = regEntry ? regEntry.user : null;
 
   if (!base) return null;
 
@@ -482,8 +451,8 @@ function normalize(s: string): string {
 }
 
 /**
- * Construye la lista unificada de usuarios consultables (registered + mock)
- * con overrides aplicados. Deduplica por `id` dando prioridad a registered.
+ * Construye la lista unificada de usuarios consultables con overrides aplicados.
+ * Deduplica por `id`.
  */
 function listAllUsers(): User[] {
   const registered = readJSON<Record<string, { password: string; user: User }>>(
@@ -498,13 +467,6 @@ function listAllUsers(): User[] {
     seen.add(entry.user.id);
     const patch = overrides[entry.user.id];
     out.push(patch ? mergeUserPatch(entry.user, patch) : entry.user);
-  }
-  for (const mock of MOCK_USERS) {
-    if (seen.has(mock.id)) continue;
-    seen.add(mock.id);
-    const base = adminUserToUser(mock);
-    const patch = overrides[mock.id];
-    out.push(patch ? mergeUserPatch(base, patch) : base);
   }
   return out;
 }

@@ -113,17 +113,9 @@ function dispatch(): void {
  */
 function getUserRoleById(userId: string): User["role"] | null {
   if (typeof window === "undefined") return null;
-  // Demo users (hardcoded IDs)
-  const DEMO_ROLES: Record<string, User["role"]> = {
-    "demo-cliente": "cliente",
-    "demo-mayorista": "mayorista",
-    "demo-tienda": "tienda",
-    "demo-admin": "admin",
-    "admin-luri": "admin",
-    "admin-font": "admin",
-  };
-  if (DEMO_ROLES[userId]) return DEMO_ROLES[userId];
-  // Registered users
+  // Modo real 100%: cuentas demo eliminadas. Sólo resolvemos contra usuarios
+  // realmente registrados (tcgacademy_registered en local-mode; en server-mode
+  // los grupos viven igualmente con userIds reales de Supabase).
   try {
     const registered = JSON.parse(
       localStorage.getItem(REGISTERED_KEY) ?? "{}",
@@ -157,14 +149,7 @@ export function getUserDisplayInfo(userId: string): UserDisplayInfo {
   } catch {
     /* ignore */
   }
-  // Fallback para usuarios demo
-  const DEMO_DISPLAY: Record<string, UserDisplayInfo> = {
-    "demo-cliente":   { name: "Maria G.",  initials: "MG" },
-    "demo-mayorista": { name: "Carlos L.", initials: "CL" },
-    "demo-tienda":    { name: "Ana M.",    initials: "AM" },
-    "demo-admin":     { name: "Admin T.",  initials: "AT" },
-  };
-  return DEMO_DISPLAY[userId] ?? { name: "Usuario", initials: "?" };
+  return { name: "Usuario", initials: "?" };
 }
 
 /**

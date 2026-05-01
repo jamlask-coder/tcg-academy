@@ -19,10 +19,8 @@ import { type LocalProduct } from "@/data/products";
 import { Package as PackageIcon } from "lucide-react";
 import { STOCK_THRESHOLDS } from "@/utils/stockStatus";
 import { getMergedProducts } from "@/lib/productStore";
-import { MOCK_USERS, ALL_ORDERS } from "@/data/mockData";
 import type { User } from "@/types/user";
-import { runSeed, resetSeed, type SeedResult } from "@/data/seedData";
-import { getPaymentStatusMap } from "@/lib/orderAdapter";
+import { getPaymentStatusMap, readAdminOrdersMerged } from "@/lib/orderAdapter";
 import {
   buildIntegrityReport,
   removeOrphanKey,
@@ -87,21 +85,16 @@ function exportUsers() {
     "Apellido",
     "Email",
     "Rol",
-    "Pedidos",
-    "Gasto total",
-    "Puntos",
     "Registrado",
   ];
-  const rows = MOCK_USERS.map((u) => [
-    u.id,
-    u.name,
-    u.lastName,
-    u.email,
-    u.role,
-    String(u.totalOrders),
-    u.totalSpent.toFixed(2),
-    String(u.points),
-    u.registeredAt,
+  const data = loadRegistered();
+  const rows = Object.values(data).map(({ user }) => [
+    user.id,
+    user.name,
+    user.lastName ?? "",
+    user.email,
+    user.role,
+    user.createdAt?.slice(0, 10) ?? "",
   ]);
   downloadCSV(
     `tcgacademy_usuarios_${new Date().toISOString().slice(0, 10)}.csv`,
@@ -123,11 +116,12 @@ function exportOrders() {
     "Pago",
     "Tracking",
   ];
-  const rows = ALL_ORDERS.map((o) => [
+  const orders = readAdminOrdersMerged();
+  const rows = orders.map((o) => [
     o.id,
     o.userId,
     o.date,
-    o.status,
+    o.adminStatus,
     o.subtotal.toFixed(2),
     o.shipping.toFixed(2),
     o.total.toFixed(2),
@@ -213,8 +207,6 @@ export default function AdminHerramientasPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
-  const [seedRunning, setSeedRunning] = useState(false);
-  const [seedResult, setSeedResult] = useState<SeedResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [allProducts, setAllProducts] = useState<LocalProduct[]>(() =>
     getMergedProducts(),
@@ -300,7 +292,7 @@ export default function AdminHerramientasPage() {
     },
     {
       title: "Exportar usuarios",
-      description: `${MOCK_USERS.length} usuarios · campos: nombre, email, rol, gasto, puntos`,
+      description: `Exporta los usuarios registrados (BD + locales)`,
       icon: Users,
       color: "#0891b2",
       action: () => {
@@ -310,7 +302,7 @@ export default function AdminHerramientasPage() {
     },
     {
       title: "Exportar pedidos",
-      description: `${ALL_ORDERS.length} pedidos · campos: id, estado, total, dirección, tracking`,
+      description: `Exporta el inbox admin de pedidos (id, estado, total, dirección, tracking)`,
       icon: ShoppingBag,
       color: "#7c3aed",
       action: () => {
@@ -560,80 +552,6 @@ export default function AdminHerramientasPage() {
         ) : (
           <p className="text-xs text-gray-400">Calculando integridad…</p>
         )}
-      </div>
-
-      {/* Simulacro / seed data */}
-      <div className="mb-8">
-        <h2 className="mb-4 font-bold text-gray-900">Simulacro de datos</h2>
-        <div className="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/30">
-          <div className="px-5 py-4">
-            <div className="mb-3 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold text-gray-900">
-                  Cargar 100 usuarios + 400 pedidos + stock 300
-                </p>
-                <p className="mt-1 text-xs text-gray-600">
-                  Genera datos deterministas: 2 admins (Luri, Font), 4 tiendas (Madrid, BCN, Calpe, Béjar),
-                  19 mayoristas y 75 clientes con NIF/CIF válidos. Añade 400 pedidos distribuidos a lo
-                  largo del último año y fija stock = 300 en todos los productos.
-                </p>
-              </div>
-              <div className="flex flex-shrink-0 gap-2">
-                <button
-                  onClick={() => {
-                    setSeedRunning(true);
-                    setTimeout(() => {
-                      const result = runSeed();
-                      setSeedResult(result);
-                      setSeedRunning(false);
-                      readDiag();
-                      showToast(
-                        result.errors.length === 0
-                          ? `Simulacro cargado: ${result.users} usuarios, ${result.orders} pedidos`
-                          : `Simulacro con errores: ${result.errors.length}`,
-                      );
-                    }, 50);
-                  }}
-                  disabled={seedRunning}
-                  className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:opacity-50"
-                >
-                  <Database size={14} /> {seedRunning ? "Cargando..." : "Cargar simulacro"}
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm("¿Borrar todos los pedidos, overrides de stock y payment status? (No borra usuarios)")) {
-                      resetSeed();
-                      setSeedResult(null);
-                      readDiag();
-                      showToast("Simulacro reseteado");
-                    }
-                  }}
-                  className="rounded-xl border border-gray-300 bg-white px-3.5 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
-            {seedResult && (
-              <div className="rounded-xl bg-white p-3 text-xs">
-                <p className="font-semibold text-gray-900">Resultado del último simulacro:</p>
-                <ul className="mt-1 space-y-0.5 text-gray-600">
-                  <li>• Usuarios inyectados: <strong>{seedResult.users}</strong></li>
-                  <li>• Usernames indexados (login por usuario): <strong>{seedResult.usernamesIndexed}</strong></li>
-                  <li>• Pedidos inyectados: <strong>{seedResult.orders}</strong></li>
-                  <li>• Productos con stock 300: <strong>{seedResult.stockedProducts}</strong></li>
-                  <li>• Estados de pago registrados: <strong>{seedResult.paymentStatus}</strong></li>
-                  <li>• Puntos otorgados a clientes: <strong>{seedResult.pointsGranted.toLocaleString("es-ES")}</strong></li>
-                  {seedResult.errors.length > 0 && (
-                    <li className="text-red-600">
-                      • Errores: {seedResult.errors.join("; ")}
-                    </li>
-                  )}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Backups producción (RGPD art. 32) */}

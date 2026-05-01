@@ -492,22 +492,22 @@ run("Test 27 — public/og-default.png existe (referenciada por metadata)", () =
   }
 })
 
-// ── Test 28: DEMO_USERS gateado en producción ──────────────────────────────────
-run("Test 28 — DEMO_USERS gateado por NODE_ENV/flag (no expuesto en prod)", () => {
+// ── Test 28: DEMO_USERS_FULL completamente eliminado (modo real 100%) ──────────
+run("Test 28 — DEMO_USERS_FULL eliminado, ninguna cuenta demo simulada en repo", () => {
   const files = [
     join(SRC, "context/AuthContext.tsx"),
     join(SRC, "app/restablecer-contrasena/page.tsx"),
   ]
   for (const f of files) {
     const c = readFileSync(f, "utf8")
-    if (!/DEMO_USERS_ENABLED/.test(c)) {
-      throw new Error(`${relative(ROOT, f)}: falta gate DEMO_USERS_ENABLED`)
+    if (/DEMO_USERS_FULL/.test(c)) {
+      throw new Error(`${relative(ROOT, f)}: aún contiene DEMO_USERS_FULL — limpiar`)
     }
-    if (!/NEXT_PUBLIC_ENABLE_DEMO_USERS/.test(c)) {
-      throw new Error(`${relative(ROOT, f)}: falta override NEXT_PUBLIC_ENABLE_DEMO_USERS`)
+    if (/cliente@test\.com|mayorista@test\.com|tienda@test\.com/.test(c)) {
+      throw new Error(`${relative(ROOT, f)}: aún contiene emails demo (cliente/mayorista/tienda @test.com)`)
     }
-    if (!/NODE_ENV\s*!==\s*["']production["']/.test(c)) {
-      throw new Error(`${relative(ROOT, f)}: falta condicional NODE_ENV !== "production"`)
+    if (/test123/.test(c)) {
+      throw new Error(`${relative(ROOT, f)}: aún contiene contraseñas demo "test123"`)
     }
   }
 })
@@ -712,70 +712,50 @@ run("Test 35 — admin/layout.tsx valida sesión server-side en producción", ()
   }
 })
 
-// Test 36 — Páginas /cuenta/* gatean MOCK_* por isDemoUser (no leak a usuarios reales)
-// Bug 2026-04-30: cualquier login con Google veía TCG-20250128-001 porque
-// /cuenta/page.tsx hacía `MOCK_ORDERS[0]` sin filtrar por user.id. Mismo
-// patrón en cupones, devoluciones, facturas. Este test impide regresión.
-run("Test 36 — /cuenta/* no filtra mocks sin gate isDemoUser/userId", () => {
+// Test 36 — Páginas /cuenta/* NO importan ningún MOCK_* (modo real 100%)
+// Modo real: ya no existen MOCK_ORDERS/MOCK_INVOICES/MOCK_RETURNS/MOCK_USER_COUPONS
+// en mockData.ts. Este test asegura que ninguna página de cuenta los reintroduzca.
+run("Test 36 — /cuenta/* no importa MOCK_* (mocks ya no existen)", () => {
   const pages = [
     ["app", "cuenta", "page.tsx"],
     ["app", "cuenta", "cupones", "page.tsx"],
     ["app", "cuenta", "facturas", "page.tsx"],
     ["app", "cuenta", "devoluciones", "page.tsx"],
+    ["app", "cuenta", "mensajes", "page.tsx"],
   ]
   const offenders = []
   for (const parts of pages) {
     const p = join(SRC, ...parts)
     const text = readFileSync(p, "utf8")
-    // Si la página importa algún MOCK_* del módulo de mocks debe tener gate.
-    const importsMock = /from\s+["']@\/data\/mockData["']/.test(text) &&
-      /MOCK_(ORDERS|INVOICES|RETURNS|USER_COUPONS)/.test(text)
-    if (!importsMock) continue
-    const hasDemoGate = /startsWith\(\s*["']demo-["']\s*\)/.test(text) ||
-      /isDemoUser/.test(text)
-    if (!hasDemoGate) {
+    if (/MOCK_(ORDERS|INVOICES|RETURNS|USER_COUPONS|MESSAGES|NOTIFICATIONS)/.test(text)) {
       offenders.push(parts.join("/"))
     }
   }
   if (offenders.length > 0) {
     throw new Error(
-      `Páginas /cuenta/* usan MOCK_* sin gate isDemoUser: ${offenders.join(", ")}`,
+      `Páginas /cuenta/* aún importan MOCK_*: ${offenders.join(", ")}`,
     )
   }
 })
 
-// Test 37 — NotificationContext gatea MOCK_NOTIFICATIONS por isDemoUser
-// Bug 2026-04-30: cualquier login real veía notificaciones demo en la
-// campana ("Tu pedido X enviado", "Tienes un cupón") porque buildList hacía
-// `[...dynamic, ...MOCK_NOTIFICATIONS]` para TODOS.
-run("Test 37 — NotificationContext gatea MOCK_NOTIFICATIONS por isDemoUser", () => {
+// Test 37 — NotificationContext NO importa MOCK_NOTIFICATIONS (modo real 100%)
+run("Test 37 — NotificationContext sin MOCK_NOTIFICATIONS", () => {
   const p = join(SRC, "context", "NotificationContext.tsx")
   const text = readFileSync(p, "utf8")
-  if (!/MOCK_NOTIFICATIONS/.test(text)) return // ya no se usa, ok
-  const hasGate = /startsWith\(\s*["']demo-["']\s*\)/.test(text) ||
-    /isDemoUser/.test(text)
-  if (!hasGate) {
+  if (/MOCK_NOTIFICATIONS/.test(text)) {
     throw new Error(
-      "NotificationContext usa MOCK_NOTIFICATIONS sin gate isDemoUser — " +
-      "los usuarios reales verían notificaciones demo en la campana",
+      "NotificationContext aún referencia MOCK_NOTIFICATIONS — limpiar (modo real)",
     )
   }
 })
 
-// Test 38 — verificar-factura no devuelve MOCK_INVOICES en producción
-// Bug 2026-04-30: endpoint público falla-suave a MOCK_INVOICES en producción
-// → atacante prueba IDs comunes, ve PII falsa (nombre, total) como real.
-run("Test 38 — verificar-factura gatea MOCK_INVOICES por NODE_ENV !== production", () => {
+// Test 38 — verificar-factura NO referencia MOCK_INVOICES (modo real 100%)
+run("Test 38 — verificar-factura sin MOCK_INVOICES", () => {
   const p = join(SRC, "app", "verificar-factura", "page.tsx")
   const text = readFileSync(p, "utf8")
-  if (!/MOCK_INVOICES/.test(text)) return
-  // Debe haber un check de NODE_ENV antes del find/use de MOCK_INVOICES.
-  const hasNodeEnvGate = /process\.env\.NODE_ENV\s*[!=]==\s*["']production["']/.test(text) ||
-    /NODE_ENV\s*===?\s*["']development["']/.test(text)
-  if (!hasNodeEnvGate) {
+  if (/MOCK_INVOICES/.test(text)) {
     throw new Error(
-      "verificar-factura/page.tsx usa MOCK_INVOICES sin gate NODE_ENV — " +
-      "en producción mostraría PII de cliente demo como factura real",
+      "verificar-factura/page.tsx aún referencia MOCK_INVOICES — limpiar (modo real)",
     )
   }
 })

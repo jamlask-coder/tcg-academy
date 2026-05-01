@@ -7,7 +7,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import { MOCK_NOTIFICATIONS, type Notification } from "@/data/mockData";
+import { type Notification } from "@/data/mockData";
 import { loadUserNotifications } from "@/services/notificationService";
 import { DataHub } from "@/lib/dataHub";
 
@@ -49,13 +49,7 @@ function saveReadIds(ids: string[]): void {
 
 function buildList(userId: string | null, readIds: string[]): Notification[] {
   const dynamic = userId ? loadUserNotifications(userId) : [];
-  // Bug 2026-04-30: antes hacía `[...dynamic, ...MOCK_NOTIFICATIONS]` para
-  // todos. Resultado: cualquier login real (o navegación anónima) veía las
-  // notificaciones demo ("Tu pedido X se ha enviado", "Tienes un cupón")
-  // como si fueran reales. Solo se sirven a IDs demo.
-  const isDemoUser = userId?.startsWith("demo-") ?? false;
-  const combined = isDemoUser ? [...dynamic, ...MOCK_NOTIFICATIONS] : dynamic;
-  return combined.map((n) => ({
+  return dynamic.map((n) => ({
     ...n,
     read: readIds.includes(n.id) ? true : n.read,
   }));

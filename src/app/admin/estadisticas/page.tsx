@@ -23,17 +23,21 @@ import {
   ArrowDownRight,
   Crown,
 } from "lucide-react";
-import {
-  MOCK_PROVINCE_VISITS,
-  MOCK_TRAFFIC_SOURCES_DETAIL,
-  MOCK_DEVICES,
-  MOCK_TOP_PAGES,
-  MOCK_HOURLY_TRAFFIC,
-  MOCK_AGE_DISTRIBUTION,
-  MOCK_COUNTRY_VISITS,
-  MOCK_USERS,
-  ADMIN_ORDERS,
+import type {
+  ProvinceVisit,
+  CountryVisit,
+  TrafficSourceDetail,
+  AdminUser,
 } from "@/data/mockData";
+
+const MOCK_PROVINCE_VISITS: ProvinceVisit[] = [];
+const MOCK_TRAFFIC_SOURCES_DETAIL: TrafficSourceDetail[] = [];
+const MOCK_DEVICES: { device: string; pct: number; users: number; color: string }[] = [];
+const MOCK_TOP_PAGES: { page: string; label: string; visits: number; bounce: number }[] = [];
+const MOCK_HOURLY_TRAFFIC: { hour: string; visits: number }[] = [];
+const MOCK_AGE_DISTRIBUTION: { group: string; users: number; pct: number; color: string }[] = [];
+const MOCK_COUNTRY_VISITS: CountryVisit[] = [];
+const MOCK_USERS: AdminUser[] = [];
 import { getMergedProducts } from "@/lib/productStore";
 import type { LocalProduct } from "@/data/products";
 import {
@@ -97,7 +101,7 @@ export default function EstadisticasPage() {
   const [trafficChannel, setTrafficChannel] = useState<TrafficChannel>("all");
   const [allProducts, setAllProducts] = useState<LocalProduct[]>(() => getMergedProducts());
   const [liveOrders, setLiveOrders] = useState(() =>
-    readAdminOrdersMerged(ADMIN_ORDERS),
+    readAdminOrdersMerged(),
   );
 
   useEffect(() => {
@@ -109,8 +113,8 @@ export default function EstadisticasPage() {
     // son de la SL anterior — los mostramos sólo informativos, no facturable.
     const reload = () => {
       setAllProducts(getMergedProducts());
-      setLiveOrders(readAdminOrdersMerged(ADMIN_ORDERS));
-      readAdminOrdersMergedAsync(ADMIN_ORDERS)
+      setLiveOrders(readAdminOrdersMerged());
+      readAdminOrdersMergedAsync()
         .then((orders) => {
           if (!cancelled) setLiveOrders(orders);
         })

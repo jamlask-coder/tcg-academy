@@ -21,12 +21,10 @@ import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import {
-  ADMIN_ORDERS,
   ORDER_STORAGE_KEY,
-  MOCK_ORDERS,
-  MOCK_USERS,
   type AdminOrder,
   type AdminOrderStatus,
+  type Order,
 } from "@/data/mockData";
 import { userIdToHandle } from "@/lib/userHandle";
 
@@ -171,7 +169,7 @@ function AdminDashboard() {
       const stored = localStorage.getItem(ORDER_STORAGE_KEY);
       if (stored) return JSON.parse(stored) as AdminOrder[];
     } catch {}
-    return ADMIN_ORDERS;
+    return [];
   });
   const [filter, setFilter] = useState<AdminFilterTab>("todos");
   const [search, setSearch] = useState("");
@@ -359,7 +357,7 @@ function AdminDashboard() {
                       {order.id}
                     </p>
                     <Link
-                      href={`/admin/usuarios/${userIdToHandle(order.userId, MOCK_USERS)}`}
+                      href={`/admin/usuarios/${userIdToHandle(order.userId, [])}`}
                       onClick={(e) => e.stopPropagation()}
                       className="text-xs text-[#2563eb] hover:underline"
                     >
@@ -548,33 +546,7 @@ export default function CuentaPage() {
           }>)
         : [];
       // Filtro estricto: solo los pedidos del usuario actual.
-      const stored = all.filter((o) => o.userId === user.id);
-      // Fallback a MOCK_ORDERS solo para usuarios demo (cuentas de prueba).
-      // Los usuarios reales ven sus pedidos reales o lista vacía.
-      const isDemoUser = user.id?.startsWith("demo-") ?? false;
-      const raw_orders: Array<{
-        total: number;
-        date: string;
-        items?: Array<{
-          game?: string;
-          price: number;
-          qty?: number;
-          quantity?: number;
-        }>;
-      }> =
-        stored.length > 0
-          ? stored
-          : isDemoUser
-            ? MOCK_ORDERS.map((o) => ({
-                total: o.total,
-                date: o.date,
-                items: o.items.map((it) => ({
-                  game: it.game,
-                  price: it.price,
-                  qty: it.qty,
-                })),
-              }))
-            : [];
+      const raw_orders = all.filter((o) => o.userId === user.id);
       // Normalize items: real checkout orders use `quantity`, mock uses `qty`.
       const orders = raw_orders.map((o) => ({
         total: o.total,
@@ -698,29 +670,18 @@ export default function CuentaPage() {
       </div>
 
       {/* Last order — hidden for B2B (mayoristas/tiendas) */}
-      {/* Bug 2026-04-30: antes hacía `MOCK_ORDERS[0]` sin filtrar → cualquier
-          usuario (incluso recién registrado con Google) veía el pedido demo
-          TCG-20250128-001. Ahora aplica el mismo patrón que /cuenta/pedidos:
-          lee tcgacademy_orders, filtra estrictamente por user.id, y solo cae
-          a MOCK_ORDERS si el usuario es demo (`demo-*`). Usuario real sin
-          pedidos → no se renderiza la sección. */}
       {!isB2B && (() => {
-        const isDemoUser = user.id?.startsWith("demo-") ?? false;
-        let userOrders: typeof MOCK_ORDERS = [];
+        let userOrders: Order[] = [];
         try {
           const raw = typeof window !== "undefined"
             ? localStorage.getItem("tcgacademy_orders")
             : null;
-          const seed = isDemoUser ? MOCK_ORDERS : [];
           if (raw) {
-            const parsed = JSON.parse(raw) as typeof MOCK_ORDERS;
-            const mine = parsed.filter((o) => o.userId === user.id);
-            userOrders = [...mine, ...seed];
-          } else {
-            userOrders = seed;
+            const parsed = JSON.parse(raw) as Order[];
+            userOrders = parsed.filter((o) => o.userId === user.id);
           }
         } catch {
-          userOrders = isDemoUser ? MOCK_ORDERS : [];
+          userOrders = [];
         }
         const lastOrder = userOrders
           .slice()

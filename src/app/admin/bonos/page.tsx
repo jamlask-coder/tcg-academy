@@ -1,12 +1,11 @@
 "use client";
 import { useState } from "react";
 import { Star, Settings, TrendingUp, Plus, AlertTriangle } from "lucide-react";
-import { MOCK_USERS, POINTS_REDEMPTION_TABLE } from "@/data/mockData";
+import { POINTS_REDEMPTION_TABLE, type AdminUser } from "@/data/mockData";
 import { POINTS_PER_EURO, POINTS_PER_EURO_REDEMPTION } from "@/services/pointsService";
 
-const TOP_USERS = [...MOCK_USERS]
-  .sort((a, b) => b.points - a.points)
-  .slice(0, 5);
+const TOP_USERS: AdminUser[] = [];
+const ALL_USERS: AdminUser[] = [];
 
 export default function AdminBonosPage() {
   const [pointsPerEuro, setPointsPerEuro] = useState(POINTS_PER_EURO);
@@ -229,7 +228,7 @@ export default function AdminBonosPage() {
                 className="h-11 w-full rounded-xl border-2 border-gray-200 bg-white px-3 text-sm focus:border-[#2563eb] focus:outline-none"
               >
                 <option value="">Seleccionar usuario...</option>
-                {MOCK_USERS.filter((u) => u.role !== "admin").map((u) => (
+                {ALL_USERS.filter((u) => u.role !== "admin").map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.name} {u.lastName} ({u.email})
                   </option>
@@ -252,7 +251,7 @@ export default function AdminBonosPage() {
             <button
               onClick={() => {
                 if (!addPointsUser || !addPointsAmount) return;
-                const user = MOCK_USERS.find((u) => u.id === addPointsUser);
+                const user = ALL_USERS.find((u) => u.id === addPointsUser);
                 showToast(
                   `${addPointsAmount} puntos añadidos a ${user?.name} ${user?.lastName}`,
                 );

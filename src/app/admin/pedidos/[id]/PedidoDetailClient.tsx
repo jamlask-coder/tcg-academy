@@ -24,8 +24,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 import {
-  ADMIN_ORDERS,
-  MOCK_USERS,
   ORDER_STORAGE_KEY,
   type AdminOrder,
   type AdminOrderStatus,
@@ -78,10 +76,10 @@ function loadOrder(id: string): AdminOrder | null {
   if (typeof window === "undefined") return null;
   try {
     // Merge robusto: incluye pedidos huérfanos del checkout.
-    const orders = readAdminOrdersMerged(ADMIN_ORDERS);
+    const orders = readAdminOrdersMerged();
     return orders.find((o) => o.id === id) ?? null;
   } catch {
-    return ADMIN_ORDERS.find((o) => o.id === id) ?? null;
+    return null;
   }
 }
 
@@ -532,7 +530,7 @@ export default function PedidoDetailClient() {
       };
       try {
         const raw = localStorage.getItem(ORDER_STORAGE_KEY);
-        const all: AdminOrder[] = raw ? JSON.parse(raw) : ADMIN_ORDERS;
+        const all: AdminOrder[] = raw ? JSON.parse(raw) : [];
         const existsInInbox = all.some((o) => o.id === order.id);
         const nextAll = existsInInbox
           ? all.map((o) => (o.id === order.id ? updatedOrder : o))
@@ -596,7 +594,7 @@ export default function PedidoDetailClient() {
     if (!order) return;
     try {
       const raw = localStorage.getItem(ORDER_STORAGE_KEY);
-      const orders: AdminOrder[] = raw ? JSON.parse(raw) : ADMIN_ORDERS;
+      const orders: AdminOrder[] = raw ? JSON.parse(raw) : [];
       const updated = orders.map((o) => o.id === order.id ? { ...o, adminNotes: notes } : o);
       localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(updated));
       setNotesSaved(true);
@@ -1102,7 +1100,7 @@ export default function PedidoDetailClient() {
             <div className="px-5 py-4 text-sm text-gray-700">
               <div className="mb-2">
                 <Link
-                  href={`/admin/usuarios/${userIdToHandle(order.userId, MOCK_USERS)}`}
+                  href={`/admin/usuarios/${userIdToHandle(order.userId)}`}
                   className="font-bold text-gray-900 hover:text-[#2563eb] hover:underline"
                 >
                   {order.userName}

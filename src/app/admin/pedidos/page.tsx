@@ -22,8 +22,6 @@ import {
   RotateCcw,
 } from "lucide-react";
 import {
-  ADMIN_ORDERS,
-  MOCK_USERS,
   ORDER_STORAGE_KEY,
   type AdminOrder,
   type AdminOrderStatus,
@@ -439,7 +437,7 @@ function OrderPanel({
             <div className="grid gap-1.5 sm:grid-cols-3">
               <div className="rounded-lg bg-gray-50 px-2.5 py-1.5 text-xs leading-snug">
                 <p className="mb-0.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase">Cliente</p>
-                <p><Link href={`/admin/usuarios/${userIdToHandle(order.userId, MOCK_USERS)}`} className="font-medium text-[#2563eb] hover:underline">{order.userName}</Link></p>
+                <p><Link href={`/admin/usuarios/${userIdToHandle(order.userId)}`} className="font-medium text-[#2563eb] hover:underline">{order.userName}</Link></p>
                 <p className="truncate font-mono text-[10px] text-gray-500">{order.userEmail}</p>
                 <p className="mt-0.5"><RoleBadge role={order.userRole} /></p>
               </div>
@@ -954,8 +952,8 @@ export default function AdminPedidosPage() {
   // Tanto esta tabla como `countPendingOrdersToShip` (badge cabecera/sidebar)
   // lo usan, así que los contadores no pueden desfasarse.
   const [orders, setOrders] = useState<AdminOrder[]>(() => {
-    if (typeof window === "undefined") return ADMIN_ORDERS.filter(isAdminVisibleOrder);
-    return readAdminOrdersMerged(ADMIN_ORDERS).filter(isAdminVisibleOrder);
+    if (typeof window === "undefined") return [];
+    return readAdminOrdersMerged().filter(isAdminVisibleOrder);
   });
 
   // Refresca al volver del background y al recibir eventos de cambio.
@@ -964,7 +962,7 @@ export default function AdminPedidosPage() {
   useEffect(() => {
     let cancelled = false;
     const refresh = async () => {
-      const merged = await readAdminOrdersMergedAsync(ADMIN_ORDERS);
+      const merged = await readAdminOrdersMergedAsync();
       if (!cancelled) setOrders(merged.filter(isAdminVisibleOrder));
     };
     void refresh();
@@ -1716,7 +1714,7 @@ export default function AdminPedidosPage() {
                       </td>
                       <td className="hidden px-3 py-3 text-sm md:table-cell">
                         <Link
-                          href={`/admin/usuarios/${userIdToHandle(order.userId, MOCK_USERS)}`}
+                          href={`/admin/usuarios/${userIdToHandle(order.userId)}`}
                           onClick={(e) => e.stopPropagation()}
                           className="text-[#2563eb] no-underline hover:no-underline"
                         >

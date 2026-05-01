@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import { Search, CheckCircle, XCircle, FileText, Shield } from "lucide-react";
-import { MOCK_INVOICES } from "@/data/mockData";
+import type { AdminOrder } from "@/data/mockData";
+import { ORDER_STORAGE_KEY } from "@/data/mockData";
 
 type VerifyResult =
   | { found: true; id: string; date: string; total: number; clientName: string | undefined; status: string }
@@ -18,7 +19,7 @@ export default function VerificarFacturaPage() {
     setLoading(true);
     await new Promise((r) => setTimeout(r, 500));
 
-    // Check CSV store first (codes generated from admin invoice PDFs)
+    // Check CSV store (codes generated from admin invoice PDFs).
     try {
       const csvStore: Record<string, string> = JSON.parse(
         localStorage.getItem("tcgacademy_invoice_csv") ?? "{}",
@@ -27,8 +28,10 @@ export default function VerificarFacturaPage() {
         ([, csv]) => csv.toUpperCase() === trimmed,
       )?.[0];
       if (matchedOrderId) {
-        const { ADMIN_ORDERS } = await import("@/data/mockData");
-        const order = ADMIN_ORDERS.find((o) => o.id === matchedOrderId);
+        const adminOrders: AdminOrder[] = JSON.parse(
+          localStorage.getItem(ORDER_STORAGE_KEY) ?? "[]",
+        );
+        const order = adminOrders.find((o) => o.id === matchedOrderId);
         if (order) {
           setResult({
             found: true,
@@ -44,28 +47,6 @@ export default function VerificarFacturaPage() {
       }
     } catch { /* ignore */ }
 
-    // Fallback: check mock invoices ONLY in development. En producción NUNCA
-    // devolver datos de MOCK_INVOICES — es un endpoint público y mostraría
-    // PII falsa (nombre/total/fecha de un cliente demo) como si fuera real.
-    // Bug 2026-04-30 (mega test puntos ciegos).
-    const isDev = process.env.NODE_ENV !== "production";
-    if (isDev) {
-      const inv = MOCK_INVOICES.find(
-        (i) => i.id.toUpperCase() === trimmed || i.orderId.toUpperCase() === trimmed,
-      );
-      if (inv) {
-        setResult({
-          found: true,
-          id: inv.id,
-          date: inv.date,
-          total: inv.total,
-          clientName: inv.clientName,
-          status: inv.status,
-        });
-        setLoading(false);
-        return;
-      }
-    }
     setResult({ found: false });
     setLoading(false);
   };

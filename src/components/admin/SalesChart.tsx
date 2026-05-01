@@ -9,28 +9,30 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import {
-  MOCK_SALES_7D,
-  MOCK_SALES_30D,
-  MOCK_SALES_3M,
-  MOCK_SALES_1Y,
-  MOCK_SALES_ALL,
-  MOCK_USERS_7D,
-  MOCK_USERS_30D,
-  MOCK_USERS_3M,
-  MOCK_USERS_1Y,
-  MOCK_USERS_ALL,
-  MOCK_PRODUCTS_7D,
-  MOCK_PRODUCTS_30D,
-  MOCK_PRODUCTS_3M,
-  MOCK_PRODUCTS_1Y,
-  MOCK_PRODUCTS_ALL,
-  MOCK_DISCOUNTS_7D,
-  MOCK_DISCOUNTS_30D,
-  MOCK_DISCOUNTS_3M,
-  MOCK_DISCOUNTS_1Y,
-  MOCK_DISCOUNTS_ALL,
-} from "@/data/mockData";
+// Modo real: el chart se alimenta exclusivamente desde `livePeriods` (datos
+// derivados de readAdminOrdersMerged). Si no hay datos vivos, mostramos arrays
+// vacíos en cada periodo — sin fallback mock.
+const EMPTY: object[] = [];
+const MOCK_SALES_7D = EMPTY,
+  MOCK_SALES_30D = EMPTY,
+  MOCK_SALES_3M = EMPTY,
+  MOCK_SALES_1Y = EMPTY,
+  MOCK_SALES_ALL = EMPTY,
+  MOCK_USERS_7D = EMPTY,
+  MOCK_USERS_30D = EMPTY,
+  MOCK_USERS_3M = EMPTY,
+  MOCK_USERS_1Y = EMPTY,
+  MOCK_USERS_ALL = EMPTY,
+  MOCK_PRODUCTS_7D = EMPTY,
+  MOCK_PRODUCTS_30D = EMPTY,
+  MOCK_PRODUCTS_3M = EMPTY,
+  MOCK_PRODUCTS_1Y = EMPTY,
+  MOCK_PRODUCTS_ALL = EMPTY,
+  MOCK_DISCOUNTS_7D = EMPTY,
+  MOCK_DISCOUNTS_30D = EMPTY,
+  MOCK_DISCOUNTS_3M = EMPTY,
+  MOCK_DISCOUNTS_1Y = EMPTY,
+  MOCK_DISCOUNTS_ALL = EMPTY;
 
 export type KpiMode = "ventas" | "usuarios" | "productos" | "descuentos";
 
@@ -57,10 +59,10 @@ interface ModeConfig {
 const MODE_CONFIG: Record<KpiMode, ModeConfig> = {
   ventas: {
     periods: {
-      "7d": { data: MOCK_SALES_7D, prev: 5890 },
-      "30d": { data: MOCK_SALES_30D, prev: 22400 },
-      "3m": { data: MOCK_SALES_3M, prev: 68200 },
-      "1a": { data: MOCK_SALES_1Y, prev: 298400 },
+      "7d": { data: MOCK_SALES_7D, prev: 0 },
+      "30d": { data: MOCK_SALES_30D, prev: 0 },
+      "3m": { data: MOCK_SALES_3M, prev: 0 },
+      "1a": { data: MOCK_SALES_1Y, prev: 0 },
       "todo": { data: MOCK_SALES_ALL, prev: 0 },
     },
     keys: { primary: "sales", secondary: "orders" },
@@ -79,10 +81,10 @@ const MODE_CONFIG: Record<KpiMode, ModeConfig> = {
   },
   usuarios: {
     periods: {
-      "7d": { data: MOCK_USERS_7D, prev: 12 },
-      "30d": { data: MOCK_USERS_30D, prev: 38 },
-      "3m": { data: MOCK_USERS_3M, prev: 110 },
-      "1a": { data: MOCK_USERS_1Y, prev: 18 },
+      "7d": { data: MOCK_USERS_7D, prev: 0 },
+      "30d": { data: MOCK_USERS_30D, prev: 0 },
+      "3m": { data: MOCK_USERS_3M, prev: 0 },
+      "1a": { data: MOCK_USERS_1Y, prev: 0 },
       "todo": { data: MOCK_USERS_ALL, prev: 0 },
     },
     keys: { primary: "totalUsers", secondary: "newUsers" },
@@ -101,10 +103,10 @@ const MODE_CONFIG: Record<KpiMode, ModeConfig> = {
   },
   productos: {
     periods: {
-      "7d": { data: MOCK_PRODUCTS_7D, prev: 5 },
-      "30d": { data: MOCK_PRODUCTS_30D, prev: 28 },
-      "3m": { data: MOCK_PRODUCTS_3M, prev: 65 },
-      "1a": { data: MOCK_PRODUCTS_1Y, prev: 42 },
+      "7d": { data: MOCK_PRODUCTS_7D, prev: 0 },
+      "30d": { data: MOCK_PRODUCTS_30D, prev: 0 },
+      "3m": { data: MOCK_PRODUCTS_3M, prev: 0 },
+      "1a": { data: MOCK_PRODUCTS_1Y, prev: 0 },
       "todo": { data: MOCK_PRODUCTS_ALL, prev: 0 },
     },
     keys: { primary: "totalProducts", secondary: "newProducts" },
@@ -123,10 +125,10 @@ const MODE_CONFIG: Record<KpiMode, ModeConfig> = {
   },
   descuentos: {
     periods: {
-      "7d": { data: MOCK_DISCOUNTS_7D, prev: 42 },
-      "30d": { data: MOCK_DISCOUNTS_30D, prev: 165 },
-      "3m": { data: MOCK_DISCOUNTS_3M, prev: 480 },
-      "1a": { data: MOCK_DISCOUNTS_1Y, prev: 890 },
+      "7d": { data: MOCK_DISCOUNTS_7D, prev: 0 },
+      "30d": { data: MOCK_DISCOUNTS_30D, prev: 0 },
+      "3m": { data: MOCK_DISCOUNTS_3M, prev: 0 },
+      "1a": { data: MOCK_DISCOUNTS_1Y, prev: 0 },
       "todo": { data: MOCK_DISCOUNTS_ALL, prev: 0 },
     },
     keys: { primary: "used", secondary: "redeemed" },

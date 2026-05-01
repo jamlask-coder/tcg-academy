@@ -2,8 +2,7 @@
  * messageService — SSOT para mensajes cliente ↔ admin.
  *
  * Modo dual:
- * - **local**: SSOT en `localStorage[MSG_STORAGE_KEY]` con fallback a
- *   `MOCK_MESSAGES` para que la UI demo aparezca poblada.
+ * - **local**: SSOT en `localStorage[MSG_STORAGE_KEY]`.
  * - **server**: el LS sigue siendo cache (preserva el API sync que consumen
  *   /cuenta/mensajes, /admin/mensajes, /admin/pedidos/[id], etc.). Las
  *   escrituras se replican a `/api/messages` y `hydrateMessagesForUser`
@@ -12,7 +11,7 @@
  * Todas las mutaciones disparan `tcga:messages:updated` (DataHub).
  */
 
-import { MOCK_MESSAGES, MSG_STORAGE_KEY, type AppMessage } from "@/data/mockData";
+import { MSG_STORAGE_KEY, type AppMessage } from "@/data/mockData";
 import { DataHub } from "@/lib/dataHub";
 
 export type { AppMessage };
@@ -24,18 +23,16 @@ function isServerMode(): boolean {
 }
 
 /**
- * Lee TODOS los mensajes persistidos. Si no hay ninguno en localStorage,
- * devuelve MOCK_MESSAGES para que la UI no aparezca vacía en modo demo
- * (no se sembra automáticamente — es fallback de solo-lectura).
+ * Lee TODOS los mensajes persistidos. Devuelve `[]` si aún no hay ninguno.
  */
 export function loadMessages(): AppMessage[] {
-  if (typeof window === "undefined") return MOCK_MESSAGES.slice();
+  if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(MSG_STORAGE_KEY);
-    if (!raw) return MOCK_MESSAGES.slice();
+    if (!raw) return [];
     return JSON.parse(raw) as AppMessage[];
   } catch {
-    return MOCK_MESSAGES.slice();
+    return [];
   }
 }
 
@@ -71,8 +68,7 @@ export function getUnreadCount(userId: string): number {
 
 /**
  * Hidrata desde el servidor en server mode. Trae los mensajes en los que
- * `userId` participa y los mergea con el cache LS (preserva los que vienen
- * de MOCK_MESSAGES en modo demo).
+ * `userId` participa y los mergea con el cache LS.
  */
 export async function hydrateMessagesForUser(userId: string): Promise<void> {
   if (!isServerMode() || typeof window === "undefined") return;
@@ -98,7 +94,7 @@ export async function hydrateMessagesForUser(userId: string): Promise<void> {
       broadcastId: typeof m.broadcastId === "string" ? m.broadcastId : undefined,
     }));
     // Merge: server mensajes ganan sobre LS por id; preservamos los que LS
-    // tiene pero server no (broadcast local, mocks).
+    // tiene pero server no (broadcast local).
     const existing = loadMessages();
     const byId = new Map<string, AppMessage>();
     for (const m of existing) byId.set(m.id, m);

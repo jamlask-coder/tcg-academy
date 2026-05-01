@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
-  MOCK_MESSAGES,
   MSG_STORAGE_KEY,
   type AppMessage,
 } from "@/data/mockData";
@@ -57,9 +56,7 @@ function loadMessages(userId: string): AppMessage[] {
   try {
     const saved = localStorage.getItem(MSG_STORAGE_KEY);
     const local: AppMessage[] = saved ? JSON.parse(saved) : [];
-    const ids = new Set(local.map((m) => m.id));
-    const all = [...local, ...MOCK_MESSAGES.filter((m) => !ids.has(m.id))];
-    return all
+    return local
       .filter((m) => m.fromUserId === userId || m.toUserId === userId)
       .sort((a, b) => b.date.localeCompare(a.date));
   } catch {
