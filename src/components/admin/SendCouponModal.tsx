@@ -307,7 +307,7 @@ function SendCouponModal({
                     step={discountType === "percent" ? "1" : "0.01"}
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
-                    className="h-12 w-full rounded-xl border-2 border-gray-200 pl-4 pr-12 text-xl font-bold transition focus:border-amber-500 focus:outline-none"
+                    className="h-12 w-full rounded-xl border-2 border-gray-200 pl-4 pr-12 text-xl font-bold text-gray-900 transition focus:border-amber-500 focus:outline-none"
                   />
                   <span className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-base font-bold text-gray-400">
                     {discountType === "percent" ? "%" : "€"}
@@ -337,7 +337,7 @@ function SendCouponModal({
                     )
                   }
                   maxLength={20}
-                  className="h-11 flex-1 rounded-xl border-2 border-gray-200 px-4 font-mono text-sm font-bold uppercase transition focus:border-amber-500 focus:outline-none"
+                  className="h-11 flex-1 rounded-xl border-2 border-gray-200 px-4 font-mono text-sm font-bold uppercase text-gray-900 transition focus:border-amber-500 focus:outline-none"
                 />
                 <button
                   type="button"
@@ -361,7 +361,7 @@ function SendCouponModal({
                 value={expiresAt}
                 min={new Date().toISOString().slice(0, 10)}
                 onChange={(e) => setExpiresAt(e.target.value)}
-                className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-amber-500 focus:outline-none"
+                className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm text-gray-900 transition focus:border-amber-500 focus:outline-none"
               />
             </div>
 
@@ -379,7 +379,7 @@ function SendCouponModal({
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={autoDesc}
                 maxLength={120}
-                className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm transition focus:border-amber-500 focus:outline-none"
+                className="h-11 w-full rounded-xl border-2 border-gray-200 px-4 text-sm text-gray-900 transition focus:border-amber-500 focus:outline-none"
               />
             </div>
 
@@ -397,7 +397,7 @@ function SendCouponModal({
                 placeholder="Ej: ¡Gracias por tu fidelidad! Esperamos verte pronto en la tienda."
                 rows={2}
                 maxLength={220}
-                className="w-full resize-none rounded-xl border-2 border-gray-200 px-4 py-3 text-sm transition focus:border-amber-500 focus:outline-none"
+                className="w-full resize-none rounded-xl border-2 border-gray-200 px-4 py-3 text-sm text-gray-900 transition focus:border-amber-500 focus:outline-none"
               />
             </div>
 

@@ -30,7 +30,7 @@
 
 CREATE TABLE IF NOT EXISTS public.user_visits (
   id BIGSERIAL PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   -- Path normalizado (sin query string). Truncamos a 512 chars defensivo.
   path TEXT NOT NULL,
   -- Hash corto del session token (no el token en claro) — sirve para
