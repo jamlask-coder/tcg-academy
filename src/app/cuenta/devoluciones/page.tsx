@@ -20,6 +20,7 @@ import {
   type ReturnStatus,
 } from "@/data/mockData";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
+import { useAuth } from "@/context/AuthContext";
 
 const STATUS_CONFIG: Record<
   ReturnStatus,
@@ -127,6 +128,7 @@ function Timeline({ steps }: { steps: ReturnRequest["timeline"] }) {
 }
 
 function RequestForm({ onClose }: { onClose: () => void }) {
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     orderId: "",
@@ -136,9 +138,33 @@ function RequestForm({ onClose }: { onClose: () => void }) {
   });
   const [submitted, setSubmitted] = useState(false);
 
+  // Bug 2026-04-30: antes mostraba MOCK_ORDERS sin filtrar a cualquier usuario,
+  // permitiendo seleccionar pedidos demo para "devolver". Ahora se filtra por
+  // user.id (real → tcgacademy_orders del propio cliente; demo → MOCK).
   // Migración 2026-04-20: "entregado" se eliminó del set customer; pedidos
   // enviados (estado final del flujo) son elegibles para devolución.
-  const deliveredOrders = MOCK_ORDERS.filter((o) => o.status === "enviado");
+  const deliveredOrders = (() => {
+    if (!user) return [];
+    const isDemoUser = user.id?.startsWith("demo-") ?? false;
+    try {
+      const raw = typeof window !== "undefined"
+        ? localStorage.getItem("tcgacademy_orders")
+        : null;
+      const real = raw
+        ? (JSON.parse(raw) as typeof MOCK_ORDERS).filter(
+            (o) => o.userId === user.id && o.status === "enviado",
+          )
+        : [];
+      const seed = isDemoUser
+        ? MOCK_ORDERS.filter((o) => o.status === "enviado")
+        : [];
+      return [...real, ...seed];
+    } catch {
+      return isDemoUser
+        ? MOCK_ORDERS.filter((o) => o.status === "enviado")
+        : [];
+    }
+  })();
 
   if (submitted) {
     return (
@@ -330,7 +356,14 @@ function RequestForm({ onClose }: { onClose: () => void }) {
 }
 
 export default function DevolucionesPage() {
+  const { user } = useAuth();
   const [showForm, setShowForm] = useState(false);
+
+  // Bug 2026-04-30: antes listaba MOCK_RETURNS a cualquier usuario.
+  // Solo demos los ven; el resto (cliente real recién logueado con Google) ve
+  // empty state hasta que tenga devoluciones reales suyas.
+  const isDemoUser = user?.id?.startsWith("demo-") ?? false;
+  const visibleReturns = isDemoUser ? MOCK_RETURNS : [];
 
   return (
     <div>
@@ -367,7 +400,7 @@ export default function DevolucionesPage() {
         </div>
       )}
 
-      {MOCK_RETURNS.length === 0 ? (
+      {visibleReturns.length === 0 ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center">
           <RefreshCw size={48} className="mx-auto mb-3 text-gray-200" />
           <p className="mb-1 text-gray-500">
@@ -380,7 +413,7 @@ export default function DevolucionesPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {MOCK_RETURNS.map((ret) => (
+          {visibleReturns.map((ret) => (
             <div
               key={ret.id}
               className="rounded-2xl border border-gray-200 bg-white p-5"

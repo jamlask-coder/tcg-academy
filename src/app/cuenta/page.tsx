@@ -698,8 +698,33 @@ export default function CuentaPage() {
       </div>
 
       {/* Last order — hidden for B2B (mayoristas/tiendas) */}
+      {/* Bug 2026-04-30: antes hacía `MOCK_ORDERS[0]` sin filtrar → cualquier
+          usuario (incluso recién registrado con Google) veía el pedido demo
+          TCG-20250128-001. Ahora aplica el mismo patrón que /cuenta/pedidos:
+          lee tcgacademy_orders, filtra estrictamente por user.id, y solo cae
+          a MOCK_ORDERS si el usuario es demo (`demo-*`). Usuario real sin
+          pedidos → no se renderiza la sección. */}
       {!isB2B && (() => {
-        const lastOrder = MOCK_ORDERS[0];
+        const isDemoUser = user.id?.startsWith("demo-") ?? false;
+        let userOrders: typeof MOCK_ORDERS = [];
+        try {
+          const raw = typeof window !== "undefined"
+            ? localStorage.getItem("tcgacademy_orders")
+            : null;
+          const seed = isDemoUser ? MOCK_ORDERS : [];
+          if (raw) {
+            const parsed = JSON.parse(raw) as typeof MOCK_ORDERS;
+            const mine = parsed.filter((o) => o.userId === user.id);
+            userOrders = [...mine, ...seed];
+          } else {
+            userOrders = seed;
+          }
+        } catch {
+          userOrders = isDemoUser ? MOCK_ORDERS : [];
+        }
+        const lastOrder = userOrders
+          .slice()
+          .sort((a, b) => (a.date < b.date ? 1 : -1))[0];
         if (!lastOrder) return null;
         // Estados customer 2026-04-20: pedido → pagado → pendiente_envio → enviado
         // Flujo normal unificado en azul #2563eb (el mismo que los menús).

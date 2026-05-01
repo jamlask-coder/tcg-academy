@@ -304,13 +304,18 @@ export default function FacturasPage() {
     user?.role === "admin";
 
   const filtered = useMemo(() => {
-    return MOCK_INVOICES.filter((inv) => {
+    // Bug 2026-04-30: antes mostraba MOCK_INVOICES a cualquier usuario logueado.
+    // Solo demos los ven; usuario real ve lista vacía hasta que existan facturas
+    // suyas reales (la fuente real es invoiceService.getInvoicesByUser).
+    const isDemoUser = user?.id?.startsWith("demo-") ?? false;
+    const source = isDemoUser ? MOCK_INVOICES : [];
+    return source.filter((inv) => {
       const ym = inv.date.slice(0, 7);
       if (dateFrom && ym < dateFrom) return false;
       if (dateTo && ym > dateTo) return false;
       return true;
     });
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, user?.id]);
 
   const periodLabel = dateFrom && dateTo ? `${dateFrom}_${dateTo}` : "completo";
   const showingAll = !dateFrom && !dateTo;

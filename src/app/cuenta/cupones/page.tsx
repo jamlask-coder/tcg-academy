@@ -2,6 +2,7 @@
 import { Gift, Tag, Clock, Check, X, Percent, Euro } from "lucide-react";
 import { MOCK_USER_COUPONS, type Coupon } from "@/data/mockData";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
+import { useAuth } from "@/context/AuthContext";
 
 function CouponCard({ coupon }: { coupon: Coupon }) {
   const isActive = coupon.status === "activo";
@@ -78,8 +79,16 @@ function CouponCard({ coupon }: { coupon: Coupon }) {
 }
 
 export default function CuponesPage() {
-  const activeCoupons = MOCK_USER_COUPONS.filter((c) => c.status === "activo");
-  const historialCoupons = MOCK_USER_COUPONS.filter((c) => c.status !== "activo");
+  const { user } = useAuth();
+  // Bug 2026-04-30: antes mostraba MOCK_USER_COUPONS a cualquier usuario.
+  // Solo demos los ven; usuario real ve lista vacía hasta que existan cupones
+  // suyos reales (la fuente real es `couponService.getUserCoupons(user.id)`,
+  // pero usa shape `UserCoupon` distinto al `Coupon` mock — por minimizar
+  // cambios visuales lo conectamos en una iteración aparte).
+  const isDemoUser = user?.id?.startsWith("demo-") ?? false;
+  const sourceCoupons = isDemoUser ? MOCK_USER_COUPONS : [];
+  const activeCoupons = sourceCoupons.filter((c) => c.status === "activo");
+  const historialCoupons = sourceCoupons.filter((c) => c.status !== "activo");
 
   return (
     <div>

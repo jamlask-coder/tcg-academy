@@ -712,9 +712,41 @@ run("Test 35 — admin/layout.tsx valida sesión server-side en producción", ()
   }
 })
 
+// Test 36 — Páginas /cuenta/* gatean MOCK_* por isDemoUser (no leak a usuarios reales)
+// Bug 2026-04-30: cualquier login con Google veía TCG-20250128-001 porque
+// /cuenta/page.tsx hacía `MOCK_ORDERS[0]` sin filtrar por user.id. Mismo
+// patrón en cupones, devoluciones, facturas. Este test impide regresión.
+run("Test 36 — /cuenta/* no filtra mocks sin gate isDemoUser/userId", () => {
+  const pages = [
+    ["app", "cuenta", "page.tsx"],
+    ["app", "cuenta", "cupones", "page.tsx"],
+    ["app", "cuenta", "facturas", "page.tsx"],
+    ["app", "cuenta", "devoluciones", "page.tsx"],
+  ]
+  const offenders = []
+  for (const parts of pages) {
+    const p = join(SRC, ...parts)
+    const text = readFileSync(p, "utf8")
+    // Si la página importa algún MOCK_* del módulo de mocks debe tener gate.
+    const importsMock = /from\s+["']@\/data\/mockData["']/.test(text) &&
+      /MOCK_(ORDERS|INVOICES|RETURNS|USER_COUPONS)/.test(text)
+    if (!importsMock) continue
+    const hasDemoGate = /startsWith\(\s*["']demo-["']\s*\)/.test(text) ||
+      /isDemoUser/.test(text)
+    if (!hasDemoGate) {
+      offenders.push(parts.join("/"))
+    }
+  }
+  if (offenders.length > 0) {
+    throw new Error(
+      `Páginas /cuenta/* usan MOCK_* sin gate isDemoUser: ${offenders.join(", ")}`,
+    )
+  }
+})
+
 // ── Summary ────────────────────────────────────────────────────────────────────
 console.log("\n══════════════════════════════════════════")
-console.log(`  Resultado: ${passed}/35 tests pasados`)
+console.log(`  Resultado: ${passed}/36 tests pasados`)
 if (failed > 0) {
   console.log(`  FALLOS (${failed}):`)
   failures.forEach(({ name }) => console.log(`    - ${name}`))
