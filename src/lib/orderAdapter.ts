@@ -297,7 +297,13 @@ export function checkoutOrderToAdmin(o: CheckoutOrder): AdminOrder {
 
 // ─── Persistencia dual ──────────────────────────────────────────────────────
 
-const ADMIN_KEY = "tcgacademy_admin_orders";
+/**
+ * Clave canónica de localStorage para el admin inbox de pedidos.
+ * Tras Fase 3 vive aquí (servicio canónico de orders) en lugar de mockData.
+ * Alias `ADMIN_KEY` se preserva interno para no tocar el resto del fichero.
+ */
+export const ORDER_STORAGE_KEY = "tcgacademy_admin_orders";
+const ADMIN_KEY = ORDER_STORAGE_KEY;
 
 /**
  * Añade el pedido al inbox admin (`tcgacademy_admin_orders`).

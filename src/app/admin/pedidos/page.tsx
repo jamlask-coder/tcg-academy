@@ -21,12 +21,12 @@ import {
   Ban,
   RotateCcw,
 } from "lucide-react";
-import {
-  ORDER_STORAGE_KEY,
-  type AdminOrder,
-  type AdminOrderStatus,
+import type {
+  AdminOrder,
+  AdminOrderStatus,
 } from "@/data/mockData";
 import {
+  ORDER_STORAGE_KEY,
   readAdminOrdersMerged,
   readAdminOrdersMergedAsync,
   isAdminVisibleOrder,

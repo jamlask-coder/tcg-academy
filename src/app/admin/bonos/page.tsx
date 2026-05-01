@@ -1,8 +1,12 @@
 "use client";
 import { useState } from "react";
 import { Star, Settings, TrendingUp, Plus, AlertTriangle } from "lucide-react";
-import { POINTS_REDEMPTION_TABLE, type AdminUser } from "@/data/mockData";
-import { POINTS_PER_EURO, POINTS_PER_EURO_REDEMPTION } from "@/services/pointsService";
+import type { AdminUser } from "@/data/mockData";
+import {
+  POINTS_PER_EURO,
+  POINTS_PER_EURO_REDEMPTION,
+  POINTS_REDEMPTION_TABLE,
+} from "@/services/pointsService";
 
 const TOP_USERS: AdminUser[] = [];
 const ALL_USERS: AdminUser[] = [];

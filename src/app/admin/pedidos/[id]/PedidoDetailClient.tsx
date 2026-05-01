@@ -23,13 +23,13 @@ import {
   RefreshCw,
   ChevronDown,
 } from "lucide-react";
-import {
-  ORDER_STORAGE_KEY,
-  type AdminOrder,
-  type AdminOrderStatus,
-  type AppMessage,
+import type {
+  AdminOrder,
+  AdminOrderStatus,
+  AppMessage,
 } from "@/data/mockData";
 import {
+  ORDER_STORAGE_KEY,
   readAdminOrdersMerged,
   getOrderPaymentStatus,
   setOrderPaymentStatus,

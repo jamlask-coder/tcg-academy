@@ -116,13 +116,7 @@ export interface PointsTransaction {
   balance: number;
 }
 
-// 10.000 puntos = €1 (tasa de canje, escala actual)
-export const POINTS_REDEMPTION_TABLE = [
-  { points: 10000,  euros: 1 },
-  { points: 25000,  euros: 2.5 },
-  { points: 50000,  euros: 5 },
-  { points: 100000, euros: 10 },
-];
+// 10.000 puntos = €1 — POINTS_REDEMPTION_TABLE se movió a @/services/pointsService
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
@@ -299,8 +293,8 @@ export interface AppMessage {
   broadcastId?: string;
 }
 
-export const MSG_STORAGE_KEY = "tcgacademy_messages";
-export const ORDER_STORAGE_KEY = "tcgacademy_admin_orders";
+// MSG_STORAGE_KEY se movió a @/services/messageService
+// ORDER_STORAGE_KEY se movió a @/lib/orderAdapter
 
 // countPendingOrders eliminado — migrado a `countPendingOrdersToShip` en
 // `@/lib/orderAdapter`, que usa `readAdminOrdersMerged` (SSOT canónico que
@@ -330,7 +324,7 @@ export interface Broadcast {
   sentBy: string;
 }
 
-export const BROADCAST_STORAGE_KEY = "tcgacademy_broadcasts";
+// BROADCAST_STORAGE_KEY se movió a @/services/messageService
 
 // ─── Visits / analytics types ─────────────────────────────────────────────────
 

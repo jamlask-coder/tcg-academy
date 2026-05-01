@@ -10,10 +10,8 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import {
-  MSG_STORAGE_KEY,
-  type AppMessage,
-} from "@/data/mockData";
+import type { AppMessage } from "@/data/mockData";
+import { MSG_STORAGE_KEY } from "@/services/messageService";
 import { DataHub } from "@/lib/dataHub";
 import { SITE_CONFIG } from "@/config/siteConfig";
 

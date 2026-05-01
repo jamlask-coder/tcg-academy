@@ -64,6 +64,17 @@ export const REFERRAL_NEW_USER_BONUS     = 30000;
 export const REFERRAL_ASSOC_PTS_PER_100 = 5000;
 export const ASSOCIATION_LOCK_MS = 365 * 24 * 60 * 60 * 1000; // bloqueo 1 año
 
+/**
+ * Tabla de canje (10.000 pts = 1€). Tras Fase 3 vive aquí, no en mockData.
+ * Es el SSOT que consume /admin/bonos para mostrar tramos editables.
+ */
+export const POINTS_REDEMPTION_TABLE = [
+  { points: 10000,  euros: 1 },
+  { points: 25000,  euros: 2.5 },
+  { points: 50000,  euros: 5 },
+  { points: 100000, euros: 10 },
+];
+
 // Storage keys
 const POINTS_KEY   = "tcgacademy_pts";
 const REFCODE_KEY  = "tcgacademy_refcodes";

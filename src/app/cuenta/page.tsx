@@ -20,12 +20,12 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import {
-  ORDER_STORAGE_KEY,
-  type AdminOrder,
-  type AdminOrderStatus,
-  type Order,
+import type {
+  AdminOrder,
+  AdminOrderStatus,
+  Order,
 } from "@/data/mockData";
+import { ORDER_STORAGE_KEY } from "@/lib/orderAdapter";
 import { userIdToHandle } from "@/lib/userHandle";
 
 const B2BCharts = dynamic(

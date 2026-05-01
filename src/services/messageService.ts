@@ -11,10 +11,22 @@
  * Todas las mutaciones disparan `tcga:messages:updated` (DataHub).
  */
 
-import { MSG_STORAGE_KEY, type AppMessage } from "@/data/mockData";
+import type { AppMessage } from "@/data/mockData";
 import { DataHub } from "@/lib/dataHub";
 
 export type { AppMessage };
+
+/**
+ * Clave canónica de localStorage para la entidad messages.
+ * Antes vivía en mockData.ts; tras Fase 3 se movió a su servicio canónico.
+ */
+export const MSG_STORAGE_KEY = "tcgacademy_messages";
+
+/**
+ * Clave canónica para broadcasts admin (mensajes masivos).
+ * Tras Fase 3 vive en messageService porque broadcasts cuelgan de mensajes.
+ */
+export const BROADCAST_STORAGE_KEY = "tcgacademy_broadcasts";
 
 const MAX_MESSAGES = 2000;
 

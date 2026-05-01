@@ -42,6 +42,24 @@ const eslintConfig = defineConfig([
       "jsx-a11y/interactive-supports-focus": "warn",
       "jsx-a11y/click-events-have-key-events": "warn",
       "jsx-a11y/no-static-element-interactions": "warn",
+
+      // ── Anti-mock-leak: mockData solo expone TYPES ───────────────
+      // Tras la purga Fase 3 (2026-05-01) mockData.ts solo contiene types.
+      // Si alguien intenta importar valores de ahí, ESLint lo bloquea.
+      // Solo `import type { ... } from "@/data/mockData"` está permitido.
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/data/mockData",
+              message:
+                "mockData solo expone TYPES. Importa valores del servicio canónico (ver ENTITIES.md). Si necesitas un type, usa `import type`.",
+              allowTypeImports: true,
+            },
+          ],
+        },
+      ],
     },
   },
 ]);

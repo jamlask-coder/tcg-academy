@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Search, CheckCircle, XCircle, FileText, Shield } from "lucide-react";
 import type { AdminOrder } from "@/data/mockData";
-import { ORDER_STORAGE_KEY } from "@/data/mockData";
+import { ORDER_STORAGE_KEY } from "@/lib/orderAdapter";
 
 type VerifyResult =
   | { found: true; id: string; date: string; total: number; clientName: string | undefined; status: string }
@@ -17,9 +17,42 @@ export default function VerificarFacturaPage() {
     const trimmed = code.trim().toUpperCase();
     if (!trimmed) return;
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 500));
 
-    // Check CSV store (codes generated from admin invoice PDFs).
+    // 1) Server mode: pregunta al endpoint público (consulta Supabase).
+    //    Si responde found:true, lo mostramos sin tocar localStorage.
+    try {
+      const res = await fetch("/api/invoices/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: trimmed }),
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const json = (await res.json()) as
+          | { found: true; id: string; date: string; total: number; clientName?: string; status: string }
+          | { found: false };
+        if (json.found) {
+          setResult({
+            found: true,
+            id: json.id,
+            date: json.date,
+            total: json.total,
+            clientName: json.clientName,
+            status: json.status,
+          });
+          setLoading(false);
+          return;
+        }
+      } else if (res.status === 429) {
+        setResult({ found: false });
+        setLoading(false);
+        return;
+      }
+    } catch {
+      /* offline o endpoint caído → seguimos con fallback LS */
+    }
+
+    // 2) Fallback local: lookup en CSV store + admin orders (modo dev).
     try {
       const csvStore: Record<string, string> = JSON.parse(
         localStorage.getItem("tcgacademy_invoice_csv") ?? "{}",

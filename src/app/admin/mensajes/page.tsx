@@ -15,18 +15,18 @@ import {
   Bell,
   Eye,
 } from "lucide-react";
-import {
-  MSG_STORAGE_KEY,
-  BROADCAST_STORAGE_KEY,
-  type AppMessage,
-  type AdminUser,
-  type Broadcast,
-  type BroadcastChannel,
-  type BroadcastTarget,
+import type {
+  AppMessage,
+  AdminUser,
+  Broadcast,
+  BroadcastChannel,
+  BroadcastTarget,
 } from "@/data/mockData";
 
 const MOCK_USERS: AdminUser[] = [];
 import {
+  MSG_STORAGE_KEY,
+  BROADCAST_STORAGE_KEY,
   sendMessage as sendCanonicalMessage,
   markAsRead as markMessageAsRead,
 } from "@/services/messageService";
