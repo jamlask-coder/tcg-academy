@@ -18,6 +18,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/apiAuth";
 import { getDb, type UserRecord } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { slugifyName } from "@/lib/userHandle";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,6 +84,20 @@ export async function GET(
     // 3. email (sólo si parece email — evita falsos positivos)
     if (!user && decoded.includes("@")) {
       user = await db.getUserByEmail(decoded);
+    }
+    // 4. slug derivado de name+lastName — cubre el caso de usuarios Google
+    //    históricos sin `username` (bug pre-2026-05-01: el handle de la URL
+    //    es slug(name lastName) pero la BD no lo tenía indexado). Listamos
+    //    usuarios y matcheamos por slug para no romper la navegación admin
+    //    sin necesidad de migración.
+    if (!user) {
+      const slug = decoded.toLowerCase();
+      const all = await db.listAllUsers({ limit: 1000 });
+      user =
+        all.find((u) => {
+          const full = [u.name, u.lastName].filter(Boolean).join(" ");
+          return full && slugifyName(full) === slug;
+        }) ?? null;
     }
 
     if (!user) {

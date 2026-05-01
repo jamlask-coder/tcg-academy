@@ -21,6 +21,7 @@ import { verifyTurnstileToken, isTurnstileConfigured } from "@/lib/turnstile";
 import { validateSpanishNIF } from "@/lib/validations/nif";
 import { validatePasswordForRole } from "@/lib/passwordPolicy";
 import { logger } from "@/lib/logger";
+import { generateUniqueUsername, isHandleReserved } from "@/lib/userHandle";
 
 const isServerMode = () => (process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local") === "server";
 
@@ -1126,12 +1127,34 @@ export async function POST(req: NextRequest) {
           // poder loguearse sin Google.
           const randomPw = `${crypto.randomUUID()}${crypto.randomUUID()}`;
           const passwordHash = await hashPassword(randomPw);
+
+          // Generamos un username automático (slug name+lastName o prefijo
+          // email) — sin él, /admin/usuarios/[handle] no puede resolver al
+          // usuario porque el id es UUID. Bug detectado 2026-05-01: el panel
+          // admin daba "Usuario no encontrado" para todo registro Google.
+          const baseName = cleanName || email.split("@")[0];
+          const candidates: string[] = [];
+          const generated = generateUniqueUsername({
+            name: baseName,
+            lastName: cleanLastName,
+            email,
+            isUsed: (h) => candidates.includes(h) || isHandleReserved(h),
+          });
+          // Comprobación final contra BD (la función pura no tiene acceso).
+          let finalUsername = generated;
+          for (let i = 0; i < 5; i++) {
+            const exists = await db.getUserByUsername(finalUsername);
+            if (!exists) break;
+            const suffix = Math.random().toString(36).slice(2, 6);
+            finalUsername = `${generated.slice(0, 20 - suffix.length - 1)}-${suffix}`;
+          }
+
           user = await db.createUser({
             id: crypto.randomUUID(),
             email,
-            username: undefined,
+            username: finalUsername,
             passwordHash,
-            name: cleanName || email.split("@")[0],
+            name: baseName,
             lastName: cleanLastName,
             phone: "",
             role: "cliente",

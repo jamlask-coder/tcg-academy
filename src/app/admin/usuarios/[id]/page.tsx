@@ -414,17 +414,20 @@ export default function AdminUsuarioDetailPage() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold">
+              <h1 className="whitespace-nowrap text-2xl font-bold">
                 {user.name} {user.lastName}
               </h1>
               <UserPresenceDot lastSeenAt={lastSeenAt} />
             </div>
             <p className="text-blue-200">{user.email}</p>
-            <span
-              className={`mt-1 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${ROLE_COLORS[user.role]}`}
-            >
-              {user.role}
-            </span>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span
+                className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${ROLE_COLORS[user.role]}`}
+              >
+                {user.role}
+              </span>
+              <UserLastSeen lastSeenAt={lastSeenAt} />
+            </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <SendCouponButton
@@ -656,6 +659,36 @@ function SendResetPasswordButton({ email }: { email: string }) {
  * `now` vive en estado y se refresca cada 30s — leer `Date.now()` durante
  * render rompe react-hooks/purity (resultado no determinista entre renders).
  */
+/**
+ * Texto explícito con la fecha+hora de última conexión, junto al rol del
+ * usuario. Complementa al pulse dot de UserPresenceDot — el dot solo dice
+ * "online/offline", esto da el contexto temporal exacto que el admin
+ * necesita para juzgar si un usuario está activo o lleva meses sin entrar.
+ */
+function UserLastSeen({ lastSeenAt }: { lastSeenAt: string | null }) {
+  if (!lastSeenAt) {
+    return (
+      <span className="text-[11px] font-medium text-blue-100/80">
+        Última conexión: aún no registrada
+      </span>
+    );
+  }
+  const ts = Date.parse(lastSeenAt);
+  if (!Number.isFinite(ts)) return null;
+  const formatted = new Date(ts).toLocaleString("es-ES", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return (
+    <span className="text-[11px] font-medium text-blue-100/90">
+      Última conexión: {formatted}
+    </span>
+  );
+}
+
 function UserPresenceDot({ lastSeenAt }: { lastSeenAt: string | null }) {
   const [now, setNow] = useState<number>(() => Date.now());
   useEffect(() => {
