@@ -28,9 +28,26 @@ interface Props {
   avgVisits: number;
   pageViews: number;
   roleColor: string;
+  /**
+   * Cuando es true, los datos provienen del endpoint real
+   * `/api/admin/users/[id]/activity` y la nota al pie indica fuente real.
+   * Si es false (default), se mantiene el aviso "datos simulados".
+   */
+  isRealData?: boolean;
+  /** ISO de la primera y última visita registradas — solo se muestran si isRealData. */
+  firstVisit?: string | null;
+  lastVisit?: string | null;
 }
 
-export function VisitChart({ visitData, totalVisits, pageViews, roleColor }: Props) {
+export function VisitChart({
+  visitData,
+  totalVisits,
+  pageViews,
+  roleColor,
+  isRealData = false,
+  firstVisit = null,
+  lastVisit = null,
+}: Props) {
   const [period, setPeriod] = useState<Period>("all");
 
   const filtered = useMemo(() => {
@@ -41,6 +58,7 @@ export function VisitChart({ visitData, totalVisits, pageViews, roleColor }: Pro
   const periodTotal = filtered.reduce((s, d) => s + d.visitas, 0);
   const periodAvg = filtered.length > 0 ? Math.round(periodTotal / filtered.length) : 0;
   const periodPages = Math.round(periodTotal * (pageViews / Math.max(totalVisits, 1)));
+  const hasAnyData = isRealData ? totalVisits > 0 : true;
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -127,8 +145,24 @@ export function VisitChart({ visitData, totalVisits, pageViews, roleColor }: Pro
         </div>
       </div>
 
+      {!hasAnyData && (
+        <div className="mt-3 rounded-lg bg-blue-50 p-4 text-center text-xs text-blue-800">
+          Aún no hay visitas registradas para este usuario. El tracking se
+          activa la próxima vez que el usuario navegue por la web autenticado.
+        </div>
+      )}
+
       <p className="mt-3 text-center text-[10px] text-gray-400">
-        <Clock size={9} className="mr-0.5 inline" /> Datos simulados para demo — se conectarán con analytics real
+        <Clock size={9} className="mr-0.5 inline" />{" "}
+        {isRealData ? (
+          <>
+            Datos reales del tracker autenticado
+            {firstVisit && <> · Desde {firstVisit.slice(0, 10)}</>}
+            {lastVisit && <> · Última: {lastVisit.slice(0, 10)}</>}
+          </>
+        ) : (
+          <>Datos simulados para demo — se conectarán con analytics real</>
+        )}
       </p>
     </div>
   );

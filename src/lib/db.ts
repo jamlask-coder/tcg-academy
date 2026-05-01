@@ -608,6 +608,25 @@ export interface DbAdapter {
   getCompanyProfile(userId: string): Promise<CompanyProfileRecord | null>;
   upsertCompanyProfile(profile: CompanyProfileRecord): Promise<CompanyProfileRecord>;
   deleteCompanyProfile(userId: string): Promise<void>;
+
+  // ── User visits (analítica autenticada) ──────────────────────────────────
+  /**
+   * Registra una navegación a una ruta del sitio. Llamado desde
+   * /api/activity/visit tras validar la sesión y throttle.
+   */
+  recordVisit(visit: { userId: string; path: string; sessionHash?: string; ts?: string }): Promise<void>;
+  /**
+   * Devuelve las visitas brutas del usuario para los últimos `sinceMonths`
+   * meses. El endpoint admin agrega por mes/path.
+   */
+  getVisitsByUser(userId: string, sinceMonths?: number): Promise<UserVisitRecord[]>;
+}
+
+export interface UserVisitRecord {
+  userId: string;
+  path: string;
+  sessionHash?: string;
+  ts: string;
 }
 
 // ─── localStorage keys ──────────────────────────────────────────────────────
@@ -955,6 +974,12 @@ export class LocalDbAdapter implements DbAdapter {
   async getCompanyProfile(): Promise<CompanyProfileRecord | null> { return null; }
   async upsertCompanyProfile(p: CompanyProfileRecord): Promise<CompanyProfileRecord> { return p; }
   async deleteCompanyProfile(): Promise<void> { /* noop */ }
+
+  // ── User visits ─────────────────────────────────────────────────────────
+  // En local-mode no registramos analítica de navegación: el admin sólo
+  // se ve a sí mismo, no aporta nada.
+  async recordVisit(): Promise<void> { /* noop */ }
+  async getVisitsByUser(): Promise<UserVisitRecord[]> { return []; }
 }
 
 // ─── Server adapter (Supabase) ─────────────────────────────────────────────
@@ -2179,6 +2204,44 @@ export class ServerDbAdapter implements DbAdapter {
       .delete()
       .eq("user_id", userId);
     if (error) throw error;
+  }
+
+  // ── User visits ─────────────────────────────────────────────────────────
+
+  async recordVisit(visit: { userId: string; path: string; sessionHash?: string; ts?: string }): Promise<void> {
+    // Si la migración user_visits.sql no se ha aplicado, suprimimos el error
+    // para no romper la navegación del usuario por una analítica que es
+    // best-effort (el endpoint /api/activity/visit responde 204 igual).
+    const { error } = await this.db.from("user_visits").insert({
+      user_id: visit.userId,
+      path: visit.path.slice(0, 512),
+      session_hash: visit.sessionHash ?? null,
+      ts: visit.ts ?? new Date().toISOString(),
+    });
+    if (error && !/user_visits/i.test(error.message)) throw error;
+  }
+
+  async getVisitsByUser(userId: string, sinceMonths = 12): Promise<UserVisitRecord[]> {
+    const since = new Date();
+    since.setMonth(since.getMonth() - sinceMonths);
+    const { data, error } = await this.db
+      .from("user_visits")
+      .select("user_id, path, session_hash, ts")
+      .eq("user_id", userId)
+      .gte("ts", since.toISOString())
+      .order("ts", { ascending: false })
+      .limit(20000);
+    if (error) {
+      // Tabla aún no migrada → tratamos como sin datos en vez de 500.
+      if (/user_visits/i.test(error.message)) return [];
+      throw error;
+    }
+    return (data ?? []).map((r: DbRow) => ({
+      userId: String(r.user_id ?? ""),
+      path: String(r.path ?? ""),
+      sessionHash: r.session_hash ? String(r.session_hash) : undefined,
+      ts: String(r.ts ?? ""),
+    }));
   }
 }
 

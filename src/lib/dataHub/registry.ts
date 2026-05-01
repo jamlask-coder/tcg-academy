@@ -526,6 +526,19 @@ const PARTIAL: EntityRegistryEntry[] = [
     notes: "Clave canónica: tcgacademy_recently_viewed (vía recentlyViewed.ts). Las tcga_* son stubs para futuras features.",
   },
   {
+    key: "userVisits",
+    description: "Visitas autenticadas (1 fila por navegación) — alimenta /admin/usuarios/[id] con datos REALES en lugar de la serie inventada por seed",
+    storageKeys: [],
+    event: DataHubEvents.USER_VISITS_UPDATED,
+    pii: true,
+    retentionMonths: 36,
+    adapter: "@/app/api/activity/visit",
+    maturity: "stable",
+    category: "logs",
+    dependsOn: ["users"],
+    notes: "Sólo persiste en server-mode (tabla user_visits con RLS service-role). Cliente: VisitTracker en Providers.tsx. Lectura admin: GET /api/admin/users/[handle]/activity.",
+  },
+  {
     key: "systemOps",
     description: "Primitivas operacionales: anomalías, circuit breakers, dead-letter queue, locks, heal log, quarantine, storage errors, reloj fiable",
     storageKeys: [

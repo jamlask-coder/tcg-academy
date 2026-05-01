@@ -23,6 +23,33 @@ import { slugifyName } from "@/lib/userHandle";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+interface AdminAddressDetail {
+  id: string;
+  alias?: string;
+  calle: string;
+  numero?: string;
+  piso?: string;
+  cp: string;
+  ciudad: string;
+  provincia?: string;
+  pais: string;
+  telefono?: string;
+  predeterminada: boolean;
+}
+
+interface AdminCompanyDetail {
+  cif?: string;
+  razonSocial?: string;
+  direccionFiscal?: string;
+  cpFiscal?: string;
+  ciudadFiscal?: string;
+  provinciaFiscal?: string;
+  paisFiscal?: string;
+  contactoNombre?: string;
+  companyPhone?: string;
+  billingEmail?: string;
+}
+
 interface AdminUserDetail {
   id: string;
   email: string;
@@ -32,17 +59,31 @@ interface AdminUserDetail {
   phone?: string;
   role: UserRecord["role"];
   registeredAt: string;
+  /** ISO completo de createdAt (no solo fecha). Útil para mostrar hora exacta. */
+  registeredAtIso?: string;
   nif?: string;
   nifType?: UserRecord["nifType"];
+  birthDate?: string;
   emailVerified?: boolean;
   emailVerifiedAt?: string;
   referralCode?: string;
   referredBy?: string;
   /** Último heartbeat del cliente — el admin lo usa para el indicador online. */
   lastSeenAt?: string;
+  /** Direcciones de envío (todas, no solo la primera). */
+  addresses: AdminAddressDetail[];
+  /** Datos B2B si role ∈ {mayorista,tienda} y existe profile. */
+  company?: AdminCompanyDetail;
+  /** Conteo de referidos directos (resuelto vía referredBy === user.referralCode). */
+  referralsCount: number;
 }
 
-function toDetail(u: UserRecord): AdminUserDetail {
+function toDetail(
+  u: UserRecord,
+  addresses: AdminAddressDetail[],
+  company: AdminCompanyDetail | undefined,
+  referralsCount: number,
+): AdminUserDetail {
   return {
     id: u.id,
     email: u.email,
@@ -52,13 +93,18 @@ function toDetail(u: UserRecord): AdminUserDetail {
     phone: u.phone,
     role: u.role,
     registeredAt: (u.createdAt ?? "").slice(0, 10),
+    registeredAtIso: u.createdAt,
     nif: u.nif,
     nifType: u.nifType,
+    birthDate: u.birthDate,
     emailVerified: u.emailVerified,
     emailVerifiedAt: u.emailVerifiedAt,
     referralCode: u.referralCode,
     referredBy: u.referredBy,
     lastSeenAt: u.lastSeenAt,
+    addresses,
+    company,
+    referralsCount,
   };
 }
 
@@ -111,11 +157,67 @@ export async function GET(
       );
     }
 
+    // ── Datos relacionados que cuelgan del ID-Usuario ────────────────────────
+    // Cargamos addresses + company profile en paralelo. Si la migración aún
+    // no creó las tablas, los métodos devuelven [] / null y la UI renderiza
+    // "Sin direcciones" en vez de romper.
+    const [addressRows, companyRow] = await Promise.all([
+      db.getAddresses(user.id).catch(() => []),
+      db.getCompanyProfile(user.id).catch(() => null),
+    ]);
+
+    const addresses: AdminAddressDetail[] = addressRows.map((a) => ({
+      id: a.id,
+      alias: a.label,
+      calle: a.street,
+      // El AddressRecord no separa numero del street — ya viene concatenado.
+      numero: undefined,
+      piso: a.floor,
+      cp: a.postalCode,
+      ciudad: a.city,
+      provincia: a.province,
+      pais: a.country,
+      telefono: a.phone,
+      predeterminada: a.isDefault,
+    }));
+
+    const isB2B = user.role === "mayorista" || user.role === "tienda";
+    let company: AdminCompanyDetail | undefined;
+    if (isB2B && companyRow) {
+      company = {
+        cif: companyRow.cif,
+        razonSocial: companyRow.legalName,
+        direccionFiscal: companyRow.fiscalAddress,
+        contactoNombre: companyRow.contactPerson,
+        companyPhone: companyRow.companyPhone,
+        billingEmail: companyRow.billingEmail,
+      };
+    } else if (isB2B && user.nif) {
+      // Sin company_profile pero el usuario tiene NIF → para B2B sirve como CIF
+      // a efectos de mostrar algo. La UI marca "datos fiscales incompletos".
+      company = { cif: user.nif };
+    }
+
+    // Conteo de referidos directos: usuarios cuyo referredBy === user.referralCode.
+    // listAllUsers es caro pero solo se llama desde admin y devuelve hasta 5000.
+    let referralsCount = 0;
+    if (user.referralCode) {
+      try {
+        const all = await db.listAllUsers({ limit: 5000 });
+        referralsCount = all.filter((u) => u.referredBy === user.referralCode).length;
+      } catch {
+        referralsCount = 0;
+      }
+    }
+
     logger.info(`Admin user detail returned`, "api/admin/users/[handle]", {
       adminId: adminResult.id,
       targetId: user.id,
     });
-    return NextResponse.json({ ok: true, user: toDetail(user) });
+    return NextResponse.json({
+      ok: true,
+      user: toDetail(user, addresses, company, referralsCount),
+    });
   } catch (err) {
     logger.error("Failed to fetch admin user detail", "api/admin/users/[handle]", {
       adminId: adminResult.id,

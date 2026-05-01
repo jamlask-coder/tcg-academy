@@ -14,6 +14,12 @@ import {
   MapPin,
   Star,
   KeyRound,
+  CheckCircle2,
+  XCircle,
+  Building2,
+  Users as UsersIcon,
+  Cake,
+  Hash,
 } from "lucide-react";
 import {
   type AdminUser,
@@ -50,6 +56,41 @@ const ROLE_COLORS: Record<string, string> = {
   admin: "bg-amber-100 text-amber-700",
 };
 
+// ─── Tipos extras (lo que devuelve /api/admin/users/[handle] tras el ampliado) ─
+interface ProfileAddress {
+  id: string;
+  alias?: string;
+  calle: string;
+  numero?: string;
+  piso?: string;
+  cp: string;
+  ciudad: string;
+  provincia?: string;
+  pais: string;
+  telefono?: string;
+  predeterminada: boolean;
+}
+
+interface ProfileCompany {
+  cif?: string;
+  razonSocial?: string;
+  direccionFiscal?: string;
+  contactoNombre?: string;
+  companyPhone?: string;
+  billingEmail?: string;
+}
+
+interface UserActivity {
+  monthly: { month: string; visitas: number }[];
+  totalVisits: number;
+  pageViews: number;
+  avgVisitsPerMonth: number;
+  uniqueSessions: number;
+  firstVisit: string | null;
+  lastVisit: string | null;
+  topPaths: { path: string; visits: number }[];
+}
+
 function userToAdminUser(u: User): AdminUser {
   const addr = u.addresses?.[0];
   return {
@@ -84,6 +125,28 @@ export default function AdminUsuarioDetailPage() {
   // Refresca cada 30s en server-mode para que el punto verde/rojo refleje
   // el último heartbeat del usuario sin tener que recargar la página.
   const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
+
+  // Datos extra del perfil que el endpoint detalle ahora devuelve junto al
+  // user (direcciones, datos B2B, referidos, verificación). Los guardamos
+  // por separado para no inflar AdminUser que se reusa en otras vistas.
+  const [profileExtras, setProfileExtras] = useState<{
+    addresses: ProfileAddress[];
+    company?: ProfileCompany;
+    referralCode?: string;
+    referredBy?: string;
+    referralsCount: number;
+    emailVerified?: boolean;
+    emailVerifiedAt?: string;
+    birthDate?: string;
+    nif?: string;
+    nifType?: "DNI" | "NIE" | "CIF";
+    registeredAtIso?: string;
+    username?: string;
+  } | null>(null);
+
+  // Actividad REAL del usuario (sustituye al seed determinista anterior).
+  // null = cargando, el componente muestra empty state si totalVisits=0.
+  const [activity, setActivity] = useState<UserActivity | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,16 +230,40 @@ export default function AdminUsuarioDetailPage() {
                 phone?: string;
                 role: AdminUser["role"];
                 registeredAt: string;
+                registeredAtIso?: string;
                 nif?: string;
                 nifType?: "DNI" | "NIE" | "CIF";
                 birthDate?: string;
                 lastSeenAt?: string;
+                emailVerified?: boolean;
+                emailVerifiedAt?: string;
+                referralCode?: string;
+                referredBy?: string;
+                addresses?: ProfileAddress[];
+                company?: ProfileCompany;
+                referralsCount?: number;
               };
             };
             if (data.ok && data.user) {
               const u = data.user;
               const isB2B = u.role === "mayorista" || u.role === "tienda";
-              if (!cancelled) setLastSeenAt(u.lastSeenAt ?? null);
+              if (!cancelled) {
+                setLastSeenAt(u.lastSeenAt ?? null);
+                setProfileExtras({
+                  addresses: u.addresses ?? [],
+                  company: u.company,
+                  referralCode: u.referralCode,
+                  referredBy: u.referredBy,
+                  referralsCount: u.referralsCount ?? 0,
+                  emailVerified: u.emailVerified,
+                  emailVerifiedAt: u.emailVerifiedAt,
+                  birthDate: u.birthDate,
+                  nif: u.nif,
+                  nifType: u.nifType,
+                  registeredAtIso: u.registeredAtIso,
+                  username: u.username,
+                });
+              }
               await finalize({
                 id: u.id,
                 username: u.username,
@@ -191,8 +278,32 @@ export default function AdminUsuarioDetailPage() {
                 active: true,
                 phone: u.phone,
                 birthDate: u.birthDate,
-                cif: isB2B ? u.nif : undefined,
+                cif: isB2B ? (u.company?.cif ?? u.nif) : undefined,
               });
+
+              // Disparar fetch de actividad real en paralelo (no bloquea
+              // el render de las stats principales).
+              void fetch(
+                `/api/admin/users/${encodeURIComponent(id)}/activity`,
+                { credentials: "include" },
+              )
+                .then(async (r) => (r.ok ? ((await r.json()) as { ok: boolean } & UserActivity) : null))
+                .then((act) => {
+                  if (cancelled || !act?.ok) return;
+                  setActivity({
+                    monthly: act.monthly,
+                    totalVisits: act.totalVisits,
+                    pageViews: act.pageViews,
+                    avgVisitsPerMonth: act.avgVisitsPerMonth,
+                    uniqueSessions: act.uniqueSessions,
+                    firstVisit: act.firstVisit,
+                    lastVisit: act.lastVisit,
+                    topPaths: act.topPaths,
+                  });
+                })
+                .catch(() => {
+                  // Silenciosamente: el chart muestra empty state si activity es null/0
+                });
               return;
             }
           }
@@ -308,26 +419,25 @@ export default function AdminUsuarioDetailPage() {
       .sort((a, b) => b.gasto - a.gasto)
       .slice(0, 6);
 
-    // Simulated visit data (deterministic per user)
-    const seed = user.id.split("").reduce((s, c) => s + c.charCodeAt(0), 0);
-    const visitData: { month: string; visitas: number }[] = [];
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const label =
-        MONTH_MAP[String(d.getMonth() + 1).padStart(2, "0")] ??
-        String(d.getMonth() + 1);
-      const base =
-        user.role === "mayorista"
-          ? 18
-          : user.role === "tienda"
-            ? 25
-            : 8;
-      const visits = Math.max(1, base + ((seed * (i + 3) * 7) % 15) - 5);
-      visitData.push({ month: label, visitas: visits });
-    }
-    const totalVisits = visitData.reduce((s, d) => s + d.visitas, 0);
-    const avgVisits = Math.round(totalVisits / visitData.length);
-    const pageViews = Math.round(totalVisits * (2.5 + (seed % 30) / 10));
+    // Datos REALES de actividad (vienen de /api/admin/users/[id]/activity).
+    // Si todavía no han llegado (fetch en curso) o el usuario nunca navegó
+    // autenticado, devolvemos serie de 12 meses a 0 — VisitChart muestra
+    // empty state explícito.
+    const visitData: { month: string; visitas: number }[] = activity?.monthly ??
+      (() => {
+        const empty: { month: string; visitas: number }[] = [];
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const label =
+            MONTH_MAP[String(d.getMonth() + 1).padStart(2, "0")] ??
+            String(d.getMonth() + 1);
+          empty.push({ month: label, visitas: 0 });
+        }
+        return empty;
+      })();
+    const totalVisits = activity?.totalVisits ?? 0;
+    const avgVisits = activity?.avgVisitsPerMonth ?? 0;
+    const pageViews = activity?.pageViews ?? 0;
 
     // Invoices shown (keep original mock lookup logic)
     const invoices = MOCK_INVOICES.filter(
@@ -345,7 +455,7 @@ export default function AdminUsuarioDetailPage() {
       pageViews,
       invoices,
     };
-  }, [resolved, MONTH_MAP]);
+  }, [resolved, MONTH_MAP, activity]);
 
   if (loading) {
     return (
@@ -486,7 +596,23 @@ export default function AdminUsuarioDetailPage() {
             <div className="space-y-2 text-sm">
               <div className="flex items-center gap-2 text-gray-600">
                 <Mail size={14} className="text-gray-400" />
-                {user.email}
+                <span className="flex-1">{user.email}</span>
+                {profileExtras?.emailVerified ? (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700"
+                    title={
+                      profileExtras.emailVerifiedAt
+                        ? `Verificado el ${profileExtras.emailVerifiedAt.slice(0, 10)}`
+                        : "Email verificado"
+                    }
+                  >
+                    <CheckCircle2 size={10} /> verificado
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                    <XCircle size={10} /> sin verificar
+                  </span>
+                )}
               </div>
               {user.phone && (
                 <div className="flex items-center gap-2 text-gray-600">
@@ -494,14 +620,138 @@ export default function AdminUsuarioDetailPage() {
                   {user.phone}
                 </div>
               )}
-              {user.address && (
-                <div className="flex items-start gap-2 text-gray-600">
-                  <MapPin size={14} className="mt-0.5 flex-shrink-0 text-gray-400" />
-                  {user.address}
+              {profileExtras?.username && (
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Hash size={14} className="text-gray-400" />
+                  <span className="font-mono text-xs">@{profileExtras.username}</span>
+                </div>
+              )}
+              {profileExtras?.birthDate && (
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Cake size={14} className="text-gray-400" />
+                  {profileExtras.birthDate}
+                </div>
+              )}
+              {profileExtras?.nif && (
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Receipt size={14} className="text-gray-400" />
+                  <span className="font-mono text-xs">{profileExtras.nif}</span>
+                  {profileExtras.nifType && (
+                    <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-gray-600">
+                      {profileExtras.nifType}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
           </div>
+
+          {/* Direcciones de envío — todas las que tiene el usuario en BD */}
+          {profileExtras && profileExtras.addresses.length > 0 && (
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <h3 className="mb-3 flex items-center gap-2 font-bold text-gray-900">
+                <MapPin size={16} className="text-[#2563eb]" /> Direcciones ({profileExtras.addresses.length})
+              </h3>
+              <div className="space-y-3">
+                {profileExtras.addresses.map((a) => (
+                  <div
+                    key={a.id}
+                    className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-xs text-gray-700"
+                  >
+                    <div className="mb-1 flex items-center gap-2">
+                      {a.alias && <span className="font-bold text-gray-900">{a.alias}</span>}
+                      {a.predeterminada && (
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold text-blue-700">
+                          predeterminada
+                        </span>
+                      )}
+                    </div>
+                    <p>
+                      {a.calle}
+                      {a.numero ? ` ${a.numero}` : ""}
+                      {a.piso ? `, ${a.piso}` : ""}
+                    </p>
+                    <p>
+                      {a.cp} {a.ciudad}
+                      {a.provincia ? `, ${a.provincia}` : ""}
+                    </p>
+                    <p className="text-gray-500">{a.pais}</p>
+                    {a.telefono && (
+                      <p className="mt-1 flex items-center gap-1 text-gray-500">
+                        <Phone size={10} /> {a.telefono}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Datos B2B — empresa (sólo mayorista/tienda) */}
+          {profileExtras?.company && (
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <h3 className="mb-3 flex items-center gap-2 font-bold text-gray-900">
+                <Building2 size={16} className="text-[#2563eb]" /> Datos de empresa
+              </h3>
+              <div className="space-y-1.5 text-xs text-gray-700">
+                {profileExtras.company.razonSocial && (
+                  <p className="font-bold text-gray-900">{profileExtras.company.razonSocial}</p>
+                )}
+                {profileExtras.company.cif && (
+                  <p className="font-mono">{profileExtras.company.cif}</p>
+                )}
+                {profileExtras.company.direccionFiscal && (
+                  <p>{profileExtras.company.direccionFiscal}</p>
+                )}
+                {profileExtras.company.contactoNombre && (
+                  <p>
+                    Contacto: <span className="font-medium">{profileExtras.company.contactoNombre}</span>
+                  </p>
+                )}
+                {profileExtras.company.companyPhone && (
+                  <p className="flex items-center gap-1 text-gray-500">
+                    <Phone size={10} /> {profileExtras.company.companyPhone}
+                  </p>
+                )}
+                {profileExtras.company.billingEmail && (
+                  <p className="flex items-center gap-1 text-gray-500">
+                    <Mail size={10} /> {profileExtras.company.billingEmail}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Programa de referidos — código + count de referidos directos */}
+          {(profileExtras?.referralCode || profileExtras?.referredBy) && (
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <h3 className="mb-3 flex items-center gap-2 font-bold text-gray-900">
+                <UsersIcon size={16} className="text-[#2563eb]" /> Referidos
+              </h3>
+              <div className="space-y-2 text-sm text-gray-700">
+                {profileExtras.referralCode && (
+                  <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+                    <div>
+                      <p className="text-[10px] uppercase text-gray-400">Su código</p>
+                      <p className="font-mono font-bold">{profileExtras.referralCode}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] uppercase text-gray-400">Referidos</p>
+                      <p className="font-bold">{profileExtras.referralsCount}</p>
+                    </div>
+                  </div>
+                )}
+                {profileExtras.referredBy && (
+                  <p className="text-xs text-gray-500">
+                    Referido por:{" "}
+                    <span className="font-mono font-bold text-gray-700">
+                      {profileExtras.referredBy}
+                    </span>
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Role manager */}
           {user.role !== "admin" && (
@@ -528,14 +778,47 @@ export default function AdminUsuarioDetailPage() {
             />
           </div>
 
-          {/* Visits chart */}
+          {/* Visits chart — datos REALES desde /api/admin/users/[id]/activity */}
           <VisitChart
             visitData={visitData}
             totalVisits={totalVisits}
             avgVisits={avgVisits}
             pageViews={pageViews}
             roleColor={roleColor}
+            isRealData
+            firstVisit={activity?.firstVisit ?? null}
+            lastVisit={activity?.lastVisit ?? null}
           />
+
+          {/* Top rutas visitadas — sólo si hay actividad real */}
+          {activity && activity.topPaths.length > 0 && (
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <h3 className="mb-3 flex items-center gap-2 font-bold text-gray-900">
+                <Hash size={16} className="text-[#2563eb]" /> Páginas más visitadas
+              </h3>
+              <div className="space-y-1.5">
+                {activity.topPaths.map((p) => {
+                  const max = activity.topPaths[0]?.visits ?? 1;
+                  const pct = Math.round((p.visits / max) * 100);
+                  return (
+                    <div key={p.path} className="flex items-center gap-3 text-sm">
+                      <code className="flex-1 truncate font-mono text-xs text-gray-600">{p.path}</code>
+                      <div className="h-1.5 w-32 overflow-hidden rounded-full bg-gray-100">
+                        <div
+                          className="h-full bg-[#2563eb]"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="w-10 text-right text-xs font-bold text-gray-700">{p.visits}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-[10px] text-gray-400">
+                Top 10 rutas por visitas. {activity.uniqueSessions} sesiones únicas detectadas.
+              </p>
+            </div>
+          )}
 
           {/* Recent orders */}
           <div className="rounded-2xl border border-gray-200 bg-white">
