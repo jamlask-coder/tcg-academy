@@ -8,6 +8,12 @@ const withBundleAnalyzer = bundleAnalyzer({
 const nextConfig: NextConfig = {
   // output: "export" removed — enables API routes, SSR, and image optimization
   images: {
+    // Permitimos SVG sólo para nuestros propios assets bajo /public/images/.
+    // Anti-XSS: sandbox sin scripts + content-disposition attachment evita
+    // que un SVG malicioso se ejecute si alguna vez se sirve cross-origin.
+    dangerouslyAllowSVG: true,
+    contentDispositionType: "attachment",
+    contentSecurityPolicy: "default-src 'none'; sandbox; style-src 'unsafe-inline'",
     remotePatterns: [
       { protocol: "https", hostname: "images.pokemontcg.io" },
       { protocol: "https", hostname: "cards.scryfall.io" },
