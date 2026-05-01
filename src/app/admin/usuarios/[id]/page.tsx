@@ -367,16 +367,17 @@ export default function AdminUsuarioDetailPage() {
         <div className="mt-6 rounded-2xl border border-red-100 bg-red-50 p-6 text-sm text-red-800">
           <p className="font-bold">Usuario no encontrado</p>
           <p className="mt-1 text-red-600">
-            El usuario con ID <span className="font-mono">{id}</span> no existe
-            en MOCK_USERS ni en localStorage (<code>tcgacademy_registered</code>).
-            Si esperabas verlo tras cargar el simulacro, vuelve a{" "}
+            No hemos podido resolver el handle{" "}
+            <span className="font-mono">{id}</span> en la base de datos. Esto
+            suele indicar un enlace antiguo o un usuario cuya cuenta fue
+            eliminada. Vuelve a{" "}
             <button
               className="underline"
-              onClick={() => router.push("/admin/herramientas")}
+              onClick={() => router.push("/admin/usuarios")}
             >
-              /admin/herramientas
+              /admin/usuarios
             </button>{" "}
-            y pulsa &ldquo;Cargar simulacro&rdquo;.
+            y entra desde la lista para usar el handle actualizado.
           </p>
         </div>
       </div>

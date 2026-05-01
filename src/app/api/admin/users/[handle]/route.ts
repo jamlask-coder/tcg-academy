@@ -88,15 +88,19 @@ export async function GET(
     // 4. slug derivado de name+lastName — cubre el caso de usuarios Google
     //    históricos sin `username` (bug pre-2026-05-01: el handle de la URL
     //    es slug(name lastName) pero la BD no lo tenía indexado). Listamos
-    //    usuarios y matcheamos por slug para no romper la navegación admin
-    //    sin necesidad de migración.
+    //    usuarios y matcheamos por slug — Y por prefijo de email (legacy:
+    //    el listado antes inventaba el handle como email.split("@")[0], y
+    //    siguen circulando enlaces con ese formato en bookmarks admin).
     if (!user) {
-      const slug = decoded.toLowerCase();
-      const all = await db.listAllUsers({ limit: 1000 });
+      const needle = decoded.toLowerCase();
+      const all = await db.listAllUsers({ limit: 5000 });
       user =
         all.find((u) => {
           const full = [u.name, u.lastName].filter(Boolean).join(" ");
-          return full && slugifyName(full) === slug;
+          if (full && slugifyName(full) === needle) return true;
+          const emailPrefix = u.email.split("@")[0]?.toLowerCase();
+          if (emailPrefix && emailPrefix === needle) return true;
+          return false;
         }) ?? null;
     }
 

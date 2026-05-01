@@ -35,7 +35,12 @@ function toAdminUser(u: UserRecord): AdminUser {
   const isB2B = u.role === "mayorista" || u.role === "tienda";
   return {
     id: u.id,
-    username: u.username ?? u.email.split("@")[0] ?? u.id,
+    // username pasa tal cual viene de BD. NO falsearlo con email.split("@")[0]:
+    // antes lo hacíamos y eso generaba links `/admin/usuarios/<email-prefix>`
+    // que el endpoint detalle no podía resolver (no es ni username, ni id, ni
+    // slug de name+lastName). Si BD no tiene username, `getUserHandle()` cae
+    // al slug `name-lastName` que el detalle SÍ resuelve por su 4o intento.
+    username: u.username,
     name: u.name,
     lastName: u.lastName,
     email: u.email,
