@@ -12,6 +12,10 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getDb, type MessageRecord } from "@/lib/db";
 import { requireAuth } from "@/lib/apiAuth";
 import { logger } from "@/lib/logger";
+import { persistentRateLimit } from "@/lib/rateLimitStore";
+
+const MAX_SUBJECT_LEN = 200;
+const MAX_BODY_LEN = 5000;
 
 function isServerMode(): boolean {
   return process.env.NEXT_PUBLIC_BACKEND_MODE === "server";
@@ -44,10 +48,25 @@ export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;
 
+  // Rate limit por usuario: 20/min (cubre hilos rápidos legítimos, frena bots).
+  // Admins exentos para poder hacer broadcasts y respuestas rápidas.
+  if (auth.role !== "admin") {
+    const rl = await persistentRateLimit(`messages:user:${auth.id}`, 20, 60_000);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Demasiados mensajes. Espera un momento." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) } },
+      );
+    }
+  }
+
   try {
     const body = (await req.json()) as Partial<MessageRecord>;
     if (!body.subject || !body.body) {
       return NextResponse.json({ error: "subject y body requeridos" }, { status: 400 });
+    }
+    if (body.subject.length > MAX_SUBJECT_LEN || body.body.length > MAX_BODY_LEN) {
+      return NextResponse.json({ error: "Campos demasiado largos" }, { status: 400 });
     }
     // Nunca confiar en fromUserId del cliente — usar auth.id.
     // Solo admin puede emitir broadcasts (is_broadcast / broadcast_id).

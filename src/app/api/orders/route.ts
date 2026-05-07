@@ -4,6 +4,7 @@ import { verifyOrder, validateAndComputeDiscounts } from "@/lib/priceVerificatio
 import { getApiUser, requireAuth } from "@/lib/apiAuth";
 import { generateOrderId } from "@/lib/orderIds";
 import { serverRateLimit } from "@/utils/sanitize";
+import { persistentRateLimit } from "@/lib/rateLimitStore";
 import { getDb, type OrderRecord } from "@/lib/db";
 import { sendOrderNotification, getEmailService } from "@/lib/email";
 import { getClientIp } from "@/lib/auth";
@@ -137,6 +138,18 @@ export async function POST(req: NextRequest) {
     // ── Price verification ────────────────────────────────────────────────
     const apiUser = await getApiUser(req);
     const userRole = apiUser?.role ?? "cliente";
+
+    // Rate limit por usuario (complementa el de IP). Evita que un atacante
+    // con muchas IPs pueda crear pedidos en ráfaga sobre la misma cuenta.
+    if (apiUser?.id) {
+      const userRl = await persistentRateLimit(`orders:user:${apiUser.id}`, 5, 60_000);
+      if (!userRl.allowed) {
+        return NextResponse.json(
+          { error: "Demasiados pedidos seguidos. Espera un momento." },
+          { status: 429, headers: { "Retry-After": String(Math.ceil((userRl.resetAt - Date.now()) / 1000)) } },
+        );
+      }
+    }
 
     const verification = verifyOrder(
       items,
@@ -292,6 +305,20 @@ export async function POST(req: NextRequest) {
     const backendMode = process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local";
 
     if (backendMode === "server") {
+      // Reserva atómica de stock para evitar oversold por concurrencia.
+      // Si llegan dos POST simultáneos sobre el último stock, solo uno gana.
+      const stockDecrement = await db.decrementStockAtomic(
+        order.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+      );
+      if (!stockDecrement.ok) {
+        return NextResponse.json(
+          {
+            error: "Stock insuficiente (otro pedido lo agotó hace un instante).",
+            stockConflicts: stockDecrement.conflicts,
+          },
+          { status: 409 },
+        );
+      }
       await db.createOrder(order);
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://tcgacademy.es";

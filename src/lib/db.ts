@@ -479,6 +479,19 @@ export interface DbAdapter {
   createOrder(order: OrderRecord): Promise<OrderRecord>;
   updateOrderStatus(orderId: string, status: OrderStatus, data?: Partial<OrderRecord>): Promise<void>;
 
+  /**
+   * Reserva stock atómicamente para todos los items o ninguno.
+   * Implementación server: UPDATE condicional `stock = stock - qty WHERE stock >= qty`.
+   * Si falla algún item, los anteriores se compensan (incremento) para no perder stock.
+   * Implementación local: no-op (productos estáticos no tienen stock en BD).
+   *
+   * @returns `{ ok: true }` o `{ ok: false, conflicts: [{productId, requested, available?}] }`
+   */
+  decrementStockAtomic(items: { productId: number; quantity: number }[]): Promise<
+    | { ok: true }
+    | { ok: false; conflicts: { productId: number; requested: number; available?: number }[] }
+  >;
+
   // Users
   getUser(userId: string): Promise<UserRecord | null>;
   getUserByEmail(email: string): Promise<UserRecord | null>;
@@ -716,6 +729,13 @@ export class LocalDbAdapter implements DbAdapter {
     orders.push(order);
     writeStorage(KEYS.orders, orders);
     return order;
+  }
+
+  async decrementStockAtomic(): Promise<{ ok: true }> {
+    // Local mode: catálogo estático en src/data/products.ts. No hay tabla
+    // products en localStorage para decrementar. La verificación previa de
+    // stock en verifyOrder ya basta (no hay concurrencia real entre tabs).
+    return { ok: true };
   }
 
   async updateOrderStatus(orderId: string, status: OrderStatus, data?: Partial<OrderRecord>): Promise<void> {
@@ -1116,6 +1136,86 @@ export class ServerDbAdapter implements DbAdapter {
       if (itemsError) throw itemsError;
     }
     return order;
+  }
+
+  async decrementStockAtomic(items: { productId: number; quantity: number }[]): Promise<
+    | { ok: true }
+    | { ok: false; conflicts: { productId: number; requested: number; available?: number }[] }
+  > {
+    // Decremento condicional por item: UPDATE products SET stock = stock - qty
+    // WHERE id = pid AND stock >= qty. Postgres garantiza atomicidad por fila.
+    // Si algún item falla (stock insuficiente con concurrencia real), revertimos
+    // los previos sumando el qty de vuelta. No es transaccional global pero
+    // evita oversold en el caso común (flash-sale, último stock).
+    const decremented: { productId: number; quantity: number }[] = [];
+    for (const item of items) {
+      // Postgrest no expone UPDATE ... WHERE col >= val limpiamente. Usamos
+      // RPC por simplicidad: una función SQL `decrement_stock(pid, qty)`
+      // que devuelve el stock resultante o NULL si rechazó. Si la RPC no
+      // existe en la BD, caemos al patrón check-then-update (best-effort).
+      const { data: rpcData, error: rpcError } = await this.db.rpc("decrement_stock", {
+        p_product_id: item.productId,
+        p_quantity: item.quantity,
+      });
+      const accepted = !rpcError && rpcData !== null && rpcData !== false;
+      if (accepted) {
+        decremented.push(item);
+        continue;
+      }
+      // Fallback: read + write no atómico (mejor que nada en BD sin la RPC).
+      if (rpcError && /does not exist|function/i.test(rpcError.message ?? "")) {
+        const { data: prod } = await this.db
+          .from("products")
+          .select("stock")
+          .eq("id", item.productId)
+          .single();
+        const currentStock = (prod as { stock?: number } | null)?.stock ?? 0;
+        if (currentStock >= item.quantity) {
+          const { error: upErr } = await this.db
+            .from("products")
+            .update({ stock: currentStock - item.quantity })
+            .eq("id", item.productId)
+            .eq("stock", currentStock); // optimistic lock
+          if (!upErr) {
+            decremented.push(item);
+            continue;
+          }
+        }
+        // Revertir los ya decrementados
+        await this.compensateStock(decremented);
+        return {
+          ok: false,
+          conflicts: [{ productId: item.productId, requested: item.quantity, available: currentStock }],
+        };
+      }
+      // Rechazo legítimo (stock insuficiente con la RPC instalada)
+      await this.compensateStock(decremented);
+      const { data: prod } = await this.db
+        .from("products")
+        .select("stock")
+        .eq("id", item.productId)
+        .single();
+      return {
+        ok: false,
+        conflicts: [
+          {
+            productId: item.productId,
+            requested: item.quantity,
+            available: (prod as { stock?: number } | null)?.stock ?? 0,
+          },
+        ],
+      };
+    }
+    return { ok: true };
+  }
+
+  private async compensateStock(items: { productId: number; quantity: number }[]): Promise<void> {
+    for (const item of items) {
+      await this.db.rpc("decrement_stock", {
+        p_product_id: item.productId,
+        p_quantity: -item.quantity, // suma de vuelta
+      });
+    }
   }
 
   async updateOrderStatus(orderId: string, status: OrderStatus, data?: Partial<OrderRecord>): Promise<void> {
