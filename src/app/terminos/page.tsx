@@ -76,17 +76,73 @@ export default function TerminosPage() {
             </p>
           </Section>
 
-          <Section title="4. Proceso de compra y precios">
+          <Section title="4. Proceso de compra, precios e información precontractual">
             <p>
-              Todos los precios publicados incluyen el IVA vigente (
-              {SITE_CONFIG.vatRate}%) salvo indicación expresa en contrario. El
-              proceso de compra queda perfeccionado cuando TCG Academy confirma
-              el pedido por correo electrónico.
+              En cumplimiento del <strong>artículo 97 del TRLGDCU</strong> (Real
+              Decreto Legislativo 1/2007), antes de la formalización del pedido
+              el usuario dispone de la siguiente información:
             </p>
+            <ul>
+              <li>
+                <strong>Características esenciales del producto:</strong>{" "}
+                visibles en cada ficha de producto (juego, edición, idioma,
+                rareza cuando aplique, estado y fotografías).
+              </li>
+              <li>
+                <strong>Precio total con impuestos:</strong> todos los precios
+                publicados incluyen el IVA vigente ({SITE_CONFIG.vatRate}%)
+                salvo indicación expresa en contrario.
+              </li>
+              <li>
+                <strong>Gastos de envío:</strong> envío gratuito para pedidos
+                superiores a {SITE_CONFIG.shippingThreshold}€ (IVA incluido).
+                Para importes inferiores, el coste exacto se muestra en el
+                carrito antes de pagar.
+              </li>
+              <li>
+                <strong>Modalidades de pago:</strong> tarjeta bancaria,
+                Bizum, PayPal, transferencia bancaria y pago en tienda
+                (cuando proceda recogida).
+              </li>
+              <li>
+                <strong>Plazo de entrega estimado:</strong> preparación del
+                pedido en un máximo de {SITE_CONFIG.dispatchHours} horas
+                hábiles desde la confirmación del pago, más el plazo de
+                tránsito del transportista (1-3 días laborables habituales en
+                península).
+              </li>
+              <li>
+                <strong>Procedimiento de pago:</strong> el contrato se
+                perfecciona cuando {SITE_CONFIG.legalName} confirma el pedido
+                por correo electrónico tras la verificación del pago.
+              </li>
+              <li>
+                <strong>Derecho de desistimiento:</strong> 14 días naturales
+                desde la recepción (ver{" "}
+                <Link
+                  href="/devoluciones"
+                  className="text-[#2563eb] hover:underline"
+                >
+                  Devoluciones
+                </Link>
+                ).
+              </li>
+              <li>
+                <strong>Garantía legal de conformidad:</strong> 3 años desde la
+                entrega para productos nuevos, conforme al Real Decreto-Ley
+                7/2021 (artículos 114 a 124 TRLGDCU).
+              </li>
+              <li>
+                <strong>Servicio de atención y reclamaciones:</strong> email{" "}
+                {SITE_CONFIG.email} y teléfono {SITE_CONFIG.phone}. Hojas de
+                reclamaciones a disposición del consumidor.
+              </li>
+            </ul>
             <p>
-              {SITE_CONFIG.legalName} se reserva el derecho de rechazar o cancelar
-              pedidos en los que se detecte un error de precio o disponibilidad,
-              informando al cliente en el menor tiempo posible.
+              {SITE_CONFIG.legalName} se reserva el derecho de rechazar o
+              cancelar pedidos en los que se detecte un error de precio o
+              disponibilidad, informando al cliente en el menor tiempo
+              posible y reembolsando, en su caso, el importe ya abonado.
             </p>
           </Section>
 
@@ -94,14 +150,18 @@ export default function TerminosPage() {
             <p>
               Los pedidos se procesan en un plazo máximo de{" "}
               {SITE_CONFIG.dispatchHours} horas hábiles desde la confirmación
-              del pago. El envío es gratuito para pedidos superiores a{" "}
+              del pago. Los envíos se realizan a través de {SITE_CONFIG.carrier}{" "}
+              o Correos Express. El envío es gratuito para pedidos superiores a{" "}
               {SITE_CONFIG.shippingThreshold}€. Para pedidos de menor importe se
               aplican los gastos de envío vigentes mostrados en el carrito.
             </p>
             <p>
               Los plazos de entrega son estimativos y pueden verse afectados por
-              causas ajenas a TCG Academy (incidencias del transportista,
-              festivos, etc.).
+              causas ajenas a {SITE_CONFIG.legalName} (incidencias del
+              transportista, festivos, climatología, etc.). Conforme al
+              artículo 109 TRLGDCU, el plazo máximo de entrega no excederá de
+              <strong> 30 días naturales</strong> desde la celebración del
+              contrato salvo acuerdo en contrario.
             </p>
           </Section>
 

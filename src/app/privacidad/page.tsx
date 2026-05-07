@@ -119,19 +119,44 @@ export default function PrivacidadPage() {
             </ul>
           </Section>
 
-          <Section title="5. Destinatarios de los datos">
+          <Section title="5. Destinatarios de los datos (encargados del tratamiento)">
             <p>
-              Sus datos no se ceden a terceros salvo obligación legal o cuando
-              sea necesario para la prestación del servicio:
+              Sus datos pueden ser tratados por los siguientes encargados del
+              tratamiento, todos ellos contratados con las garantías exigidas
+              por el artículo 28 del RGPD:
             </p>
             <ul>
               <li>
-                <strong>Transportistas</strong> ({SITE_CONFIG.carrier}): nombre,
-                apellidos y dirección de entrega para la gestión del envío.
+                <strong>Hosting y despliegue:</strong> Vercel Inc. (Estados
+                Unidos) — infraestructura web.
               </li>
               <li>
-                <strong>Pasarela de pago:</strong> datos de pago procesados de
-                forma segura. TCG Academy no almacena datos de tarjetas.
+                <strong>Base de datos y autenticación:</strong> Supabase Inc.
+                (servidores en la Unión Europea, región Fráncfort).
+              </li>
+              <li>
+                <strong>Email transaccional:</strong> Resend Inc. (Estados
+                Unidos) — envío de confirmaciones, facturas y avisos.
+              </li>
+              <li>
+                <strong>Almacenamiento de copias de seguridad:</strong>{" "}
+                Cloudflare R2 (Cloudflare Inc., infraestructura global).
+              </li>
+              <li>
+                <strong>Pasarela de pago:</strong> Stripe Payments Europe Ltd.
+                (Irlanda, con tratamiento de datos en EE. UU.). TCG Academy
+                no almacena datos de tarjetas: el procesamiento se realiza
+                directamente en los sistemas certificados PCI-DSS de Stripe.
+              </li>
+              <li>
+                <strong>Inicio de sesión social (opcional):</strong> Google
+                LLC (Estados Unidos) — solo si el usuario elige la opción
+                &quot;Iniciar sesión con Google&quot;.
+              </li>
+              <li>
+                <strong>Transportistas:</strong> {SITE_CONFIG.carrier} y
+                Correos Express, S.A. (España) — nombre, apellidos, dirección
+                y teléfono para la entrega del pedido.
               </li>
               <li>
                 <strong>Gestoría / asesoría fiscal:</strong> datos de
@@ -139,13 +164,45 @@ export default function PrivacidadPage() {
                 tributario.
               </li>
             </ul>
+          </Section>
+
+          <Section title="6. Transferencias internacionales de datos">
             <p>
-              No transferimos datos fuera del Espacio Económico Europeo salvo
-              que existan garantías adecuadas conforme al RGPD.
+              Algunos de los proveedores anteriores procesan datos fuera del
+              Espacio Económico Europeo (EEE), principalmente en{" "}
+              <strong>Estados Unidos</strong> (Vercel, Resend, Stripe, Google,
+              Cloudflare). Estas transferencias se amparan en alguno de los
+              siguientes mecanismos previstos en el RGPD:
+            </p>
+            <ul>
+              <li>
+                <strong>EU-US Data Privacy Framework (DPF)</strong> —
+                certificación bajo la decisión de adecuación de la Comisión
+                Europea (Decisión 2023/1795).
+              </li>
+              <li>
+                <strong>Cláusulas Contractuales Tipo (SCC)</strong> aprobadas
+                por la Comisión Europea (Decisión 2021/914), cuando el
+                proveedor no esté adherido al DPF.
+              </li>
+              <li>
+                Medidas técnicas adicionales (cifrado en tránsito y en reposo,
+                seudonimización en su caso).
+              </li>
+            </ul>
+            <p>
+              Puede solicitar copia de las garantías concretas escribiendo a{" "}
+              <a
+                href={`mailto:${SITE_CONFIG.email}`}
+                className="text-[#2563eb] hover:underline"
+              >
+                {SITE_CONFIG.email}
+              </a>
+              .
             </p>
           </Section>
 
-          <Section title="6. Sus derechos">
+          <Section title="7. Sus derechos">
             <p>
               Puede ejercer en cualquier momento los siguientes derechos
               escribiendo a{" "}
@@ -155,7 +212,10 @@ export default function PrivacidadPage() {
               >
                 {SITE_CONFIG.email}
               </a>{" "}
-              con una copia de su documento de identidad:
+              desde la dirección de correo asociada a su cuenta. Si tenemos
+              dudas razonables sobre su identidad, podremos solicitarle
+              información adicional para verificarla, conforme al artículo 12.6
+              del RGPD:
             </p>
             <ul>
               <li>
@@ -192,7 +252,7 @@ export default function PrivacidadPage() {
             </p>
           </Section>
 
-          <Section title="7. Cookies">
+          <Section title="8. Cookies">
             <p>
               Utilizamos exclusivamente cookies técnicas necesarias para el
               funcionamiento del sitio (sesión, carrito, preferencias). No
@@ -209,16 +269,19 @@ export default function PrivacidadPage() {
             </p>
           </Section>
 
-          <Section title="8. Seguridad">
+          <Section title="9. Seguridad">
             <p>
               Aplicamos medidas técnicas y organizativas apropiadas para
               proteger sus datos contra accesos no autorizados, pérdida o
-              alteración. Las contraseñas se almacenan mediante hash
-              criptográfico (SHA-256 con sal) y nunca en texto plano.
+              alteración. Las contraseñas se almacenan exclusivamente mediante
+              funciones de derivación de clave criptográficas resistentes
+              (bcrypt, gestionado por Supabase Auth) y nunca en texto plano.
+              Las comunicaciones con el sitio web están cifradas mediante
+              TLS 1.2 o superior.
             </p>
           </Section>
 
-          <Section title="9. Modificaciones de esta política">
+          <Section title="10. Modificaciones de esta política">
             <p>
               Podemos actualizar esta política para reflejar cambios en nuestra
               práctica o en la legislación aplicable. Le notificaremos cualquier

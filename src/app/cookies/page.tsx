@@ -126,24 +126,11 @@ export default function CookiesPage() {
               3.2 Cookies de análisis
             </h3>
             <p>
-              Permiten realizar un seguimiento anónimo y agregado del
-              comportamiento de los usuarios en el sitio web para mejorar la
-              experiencia de navegación. Solo se activan si el usuario otorga
-              su consentimiento.
-            </p>
-            <CookieTable
-              cookies={[
-                {
-                  name: "_ga / _ga_*",
-                  provider: "Google Analytics",
-                  purpose: "Distinguir usuarios únicos y sesiones de navegación",
-                  duration: "2 años / 24h",
-                },
-              ]}
-            />
-            <p className="mt-2 text-xs text-gray-400">
-              * Actualmente no tenemos cookies de análisis activas. Este
-              apartado se actualiza si se incorporan en el futuro.
+              <strong>Actualmente no utilizamos cookies de análisis.</strong>{" "}
+              Si en el futuro incorporamos herramientas como Google Analytics o
+              Plausible, se listarán aquí con detalle (proveedor, finalidad,
+              duración) y solo se activarán previa aceptación expresa del
+              usuario en el banner de consentimiento.
             </p>
 
             <h3 className="mt-6 mb-2 font-semibold text-gray-700">

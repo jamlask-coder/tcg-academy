@@ -202,7 +202,7 @@ export default function DevolucionesPage() {
                 {
                   step: "5",
                   title: "Reembolso",
-                  desc: "Procesamos el reembolso en un máximo de 14 días desde la recepción del producto devuelto, usando el mismo medio de pago original.",
+                  desc: "Procesamos el reembolso en un máximo de 14 días desde la recepción del producto devuelto, mediante transferencia bancaria al IBAN que nos facilites.",
                 },
               ].map((s) => (
                 <div key={s.step} className="flex gap-3">
@@ -308,7 +308,8 @@ export default function DevolucionesPage() {
                     Medio de reembolso
                   </dt>
                   <dd className="text-gray-600">
-                    Mismo medio de pago utilizado en la compra original
+                    Transferencia bancaria al IBAN facilitado por el cliente
+                    (acompañada de factura rectificativa VeriFactu)
                   </dd>
                 </div>
               </dl>
