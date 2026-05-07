@@ -273,7 +273,9 @@ function SortIcon({
 const PAGE_SIZE = Number.MAX_SAFE_INTEGER;
 
 export default function PreciosPage() {
-  const [rows, setRows] = useState<PriceRow[]>(initRows);
+  // Inicializa vacío para evitar hydration mismatch (initRows lee
+  // localStorage). El primer fill se hace en el useEffect de abajo.
+  const [rows, setRows] = useState<PriceRow[]>([]);
   const [dirtyIds, setDirtyIds] = useState<Set<number>>(new Set());
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
@@ -282,6 +284,7 @@ export default function PreciosPage() {
   // las filas con cambios pendientes (no las pisamos).
   useEffect(() => {
     if (typeof window === "undefined") return;
+    setRows(initRows());
     const reload = () => {
       setRows((prev) => {
         const fresh = initRows();

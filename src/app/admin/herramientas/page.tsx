@@ -208,9 +208,9 @@ export default function AdminHerramientasPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [allProducts, setAllProducts] = useState<LocalProduct[]>(() =>
-    getMergedProducts(),
-  );
+  // Inicializa vacío para evitar hydration mismatch (overrides de localStorage
+  // sólo existen en cliente). El merge real ocurre en el useEffect de abajo.
+  const [allProducts, setAllProducts] = useState<LocalProduct[]>([]);
   const [diag, setDiag] = useState<{
     registered: number;
     usernames: number;

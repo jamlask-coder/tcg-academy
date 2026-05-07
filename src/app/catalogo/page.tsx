@@ -2,7 +2,7 @@
 import { Suspense, useState, useMemo, useEffect } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { X, ChevronDown, ArrowLeft, Layers } from "lucide-react";
-import { GAME_CONFIG, isNewProduct } from "@/data/products";
+import { GAME_CONFIG, isNewProduct, PRODUCTS } from "@/data/products";
 import type { LocalProduct } from "@/data/products";
 import { getMergedProducts } from "@/lib/productStore";
 import { LocalProductCard } from "@/components/product/LocalProductCard";
@@ -64,9 +64,10 @@ function CatalogoPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const [allProducts, setAllProducts] = useState<LocalProduct[]>(() =>
-    getMergedProducts(),
-  );
+  // Inicializamos con PRODUCTS estático para que SSR y primer render cliente
+  // coincidan (evita hydration mismatch). El merge con overrides de
+  // localStorage se aplica en el useEffect de abajo, ya hidratado.
+  const [allProducts, setAllProducts] = useState<LocalProduct[]>(PRODUCTS);
   const [sort, setSort] = useState("new");
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [newOnly, setNewOnly] = useState(false);
@@ -102,11 +103,11 @@ function CatalogoPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-load when admin adds/edits products
+  // Hidrata con merged (estáticos + admin overrides) tras el primer paint, y
+  // re-carga cuando admin añada/edite productos.
   useEffect(() => {
-    const reload = () =>
-       
-      setAllProducts(getMergedProducts());
+    const reload = () => setAllProducts(getMergedProducts());
+    reload(); // primer merge tras hidratación
     window.addEventListener("tcga:products:updated", reload);
     window.addEventListener("storage", reload);
     return () => {

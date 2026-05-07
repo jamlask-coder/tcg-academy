@@ -99,10 +99,10 @@ export default function EstadisticasPage() {
   const [locationSort, setLocationSort] = useState<LocationSort>("visits");
   const [showAllLocations, setShowAllLocations] = useState(false);
   const [trafficChannel, setTrafficChannel] = useState<TrafficChannel>("all");
-  const [allProducts, setAllProducts] = useState<LocalProduct[]>(() => getMergedProducts());
-  const [liveOrders, setLiveOrders] = useState(() =>
-    readAdminOrdersMerged(),
-  );
+  // Iniciamos vacío para que SSR == primer render cliente (sin overrides de
+  // localStorage). El merge se aplica en el useEffect tras hidratación.
+  const [allProducts, setAllProducts] = useState<LocalProduct[]>([]);
+  const [liveOrders, setLiveOrders] = useState<ReturnType<typeof readAdminOrdersMerged>>([]);
 
   useEffect(() => {
     let cancelled = false;

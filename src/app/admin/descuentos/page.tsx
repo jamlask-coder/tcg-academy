@@ -18,12 +18,13 @@ export default function AdminDescuentosPage() {
     saveToStorage,
   } = useDiscounts();
 
-  const [allProducts, setAllProducts] = useState<LocalProduct[]>(() =>
-    getMergedProducts(),
-  );
+  // Inicializa vacío para que SSR y primer render cliente coincidan; el merge
+  // con localStorage overrides se hace en el useEffect (post-hidratación).
+  const [allProducts, setAllProducts] = useState<LocalProduct[]>([]);
 
   useEffect(() => {
     const reload = () => setAllProducts(getMergedProducts());
+    reload();
     window.addEventListener("tcga:products:updated", reload);
     window.addEventListener("storage", reload);
     return () => {
