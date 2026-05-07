@@ -1,0 +1,31 @@
+# Supabase CLI config — TCG Academy
+#
+# Linkado al proyecto en producción: fdfpuxccxftpsjzffaes
+# Dashboard: https://supabase.com/dashboard/project/fdfpuxccxftpsjzffaes
+#
+# Workflow normal: editas un .sql en supabase/migrations/, luego `npm run db:push`.
+# Antes de aplicar a producción, conviene verificar con `npm run db:diff`.
+
+project_id = "fdfpuxccxftpsjzffaes"
+
+[db]
+# Puerto local del shadow database para `supabase db diff` (no se usa contra prod).
+port = 54322
+# Versión de Postgres que corre Supabase en producción a fecha de hoy.
+major_version = 17
+
+[db.migrations]
+# Las migraciones viven en supabase/migrations/ y se nombran <timestamp>_<slug>.sql
+# o con prefijos legibles que ya tenemos (ej. price_history.sql).
+schema_paths = []
+
+[api]
+# Puerto del API local cuando se levanta `supabase start` (no obligatorio para push).
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+# Solo informativo — la auth real corre en supabase.com, esto es para emulación local.
+enabled = false

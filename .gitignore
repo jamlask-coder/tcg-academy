@@ -49,6 +49,10 @@ next-env.d.ts
 # audit handoff transitorio (memoria de sesiones de auditoría)
 /.claude/audit-handoff.md
 
+# Supabase CLI — metadata local del link, NO commitear
+/supabase/.temp/
+/supabase/.branches/
+
 # Python price tracker — datos locales, cache y bytecode
 __pycache__/
 *.pyc

@@ -34,7 +34,11 @@
     "test:unit:watch": "vitest",
     "quality:gate": "npm run lint && npm run typecheck && npm run test:unit && npm run warnings:count && npm run analyze",
     "preflight": "node scripts/preflight.mjs",
-    "preflight:strict": "node scripts/preflight.mjs -- --strict"
+    "preflight:strict": "node scripts/preflight.mjs -- --strict",
+    "db:link": "supabase link --project-ref fdfpuxccxftpsjzffaes",
+    "db:push": "supabase db push",
+    "db:diff": "supabase db diff",
+    "db:status": "supabase migration list"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
@@ -66,7 +70,6 @@
     "react-dom": "19.2.4",
     "react-hook-form": "^7.72.0",
     "recharts": "^3.8.1",
-    "shadcn": "^4.1.1",
     "sharp": "^0.34.5",
     "stripe": "^22.0.2",
     "tailwind-merge": "^3.5.0",
@@ -101,6 +104,7 @@
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "serve": "^14.2.6",
+    "shadcn": "^4.1.1",
     "tailwindcss": "^4",
     "ts-prune": "^0.10.3",
     "typescript": "^5",
