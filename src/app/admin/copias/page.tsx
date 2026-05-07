@@ -120,10 +120,24 @@ export default function AdminCopiasPage() {
       const res = await fetch("/api/admin/backup-server/list", {
         headers: { "x-admin-token": token },
       });
-      const json = (await res.json()) as ListResponse;
+      const raw = (await res.json()) as Partial<ListResponse> & { error?: string };
+      // Endurecimiento: si la API devuelve error (401/500/etc), `backups` puede
+      // venir undefined. Forzamos shape consistente para que el render no
+      // intente leer `.backups[0]` sobre undefined y crashee el ErrorBoundary.
+      const json: ListResponse = {
+        ok: raw.ok ?? false,
+        configured: raw.configured ?? false,
+        backend: raw.backend ?? "none",
+        backups: Array.isArray(raw.backups) ? raw.backups : [],
+        message: raw.message,
+        error: raw.error,
+      };
       setData(json);
-      if (!json.ok && json.error) {
-        setBanner({ kind: "err", text: json.error });
+      if (!json.ok) {
+        const text = json.error
+          ? `Error ${res.status}: ${json.error}`
+          : `Error ${res.status} al cargar la lista de backups`;
+        setBanner({ kind: "err", text });
       }
     } catch (err) {
       setBanner({
@@ -245,8 +259,13 @@ export default function AdminCopiasPage() {
 
   // ─── Render ────────────────────────────────────────────────────────────
 
-  const lastBackupHours =
-    data?.backups[0]?.finishedAt ? hoursSince(data.backups[0].finishedAt) : null;
+  // Defensa: data.backups puede llegar undefined si la API responde con error.
+  // El sanitizado en refresh() ya lo fuerza a [], pero protegemos también el
+  // render por si alguien llamara a setData con un shape distinto.
+  const firstBackup = data?.backups?.[0];
+  const lastBackupHours = firstBackup?.finishedAt
+    ? hoursSince(firstBackup.finishedAt)
+    : null;
   const healthColor =
     lastBackupHours === null
       ? "text-red-600"
