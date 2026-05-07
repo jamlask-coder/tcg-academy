@@ -44,7 +44,6 @@ import { countNewIncidents } from "@/services/incidentService";
 import { countNuevasSolicitudes } from "@/services/solicitudService";
 import { DataHub } from "@/lib/dataHub";
 import { AdminFiscalGuard } from "@/components/AdminFiscalGuard";
-import { runAutoBackupIfDue } from "@/lib/backupScheduler";
 
 interface NavItem {
   href: string;
@@ -377,16 +376,12 @@ export default function AdminShell({
     if (!user || user.role !== "admin") router.push("/login");
   }, [user, isLoading, router]);
 
-  // Auto-snapshot diario: al cargar el layout admin, el scheduler comprueba
-  // si toca y crea uno si han pasado >= 24h. Silencioso (no bloquea UI).
-  useEffect(() => {
-    if (isLoading || !user || user.role !== "admin") return;
-    runAutoBackupIfDue().catch(() => {
-      /* el scheduler ya registra el error internamente */
-    });
-  }, [isLoading, user]);
+  // Backups: el cron de Vercel (vercel.json → /api/cron/backup-supabase) los
+  // ejecuta server-side a las 03:00 UTC. Ya no se programa nada desde el
+  // navegador admin — sería redundante y dependiente de que alguien tuviera la
+  // pestaña abierta. Panel manual: /admin/copias.
 
-  useEffect(() => {
+useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMobileSidebarOpen(false);
   }, [pathname]);
