@@ -34,11 +34,25 @@ export async function GET(req: Request) {
         "Almacenamiento no configurado — define GOOGLE_DRIVE_SA_KEY+GOOGLE_DRIVE_BACKUP_FOLDER_ID o BACKUP_S3_*",
     });
   }
-  const backups = await listBackups();
-  return NextResponse.json({
-    ok: true,
-    configured: true,
-    backend: activeBackupBackend(),
-    backups,
-  });
+  try {
+    const backups = await listBackups();
+    return NextResponse.json({
+      ok: true,
+      configured: true,
+      backend: activeBackupBackend(),
+      backups,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json(
+      {
+        ok: false,
+        configured: true,
+        backend: activeBackupBackend(),
+        backups: [],
+        error: `listBackups failed: ${msg.slice(0, 500)}`,
+      },
+      { status: 500 },
+    );
+  }
 }
