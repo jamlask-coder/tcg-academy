@@ -793,20 +793,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         usernameIndex[autoUsername] = email;
         saveUsernameIndex(usernameIndex);
 
-        // Record GDPR consents (Art. 7 — proof of consent)
-        const consentEntries: Array<{
-          type: ConsentType;
-          status: "granted" | "revoked";
-        }> = [
-          { type: "terms", status: "granted" },
-          { type: "privacy", status: "granted" },
-          { type: "data_processing", status: "granted" },
-        ];
-        recordBulkConsent({
-          userId: newUserId,
-          consents: consentEntries,
-          method: "google_signin",
-        });
+        // Record GDPR consents (Art. 7 — proof of consent).
+        // En server mode el endpoint /api/auth?action=google-signin ya graba
+        // los consents en BD (ver route.ts). Solo registramos en cliente
+        // cuando estamos en local mode (localStorage).
+        if (!IS_SERVER_MODE) {
+          const consentEntries: Array<{
+            type: ConsentType;
+            status: "granted" | "revoked";
+          }> = [
+            { type: "terms", status: "granted" },
+            { type: "privacy", status: "granted" },
+            { type: "data_processing", status: "granted" },
+          ];
+          await recordBulkConsent({
+            userId: newUserId,
+            consents: consentEntries,
+            method: "google_signin",
+          });
+        }
 
         persist(newUser, REMEMBER_ME_MS);
         return { ok: true, created: true };
@@ -999,18 +1004,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           saveUsernameIndex(index);
         }
 
-        // Record GDPR consents (Art. 7 — proof of consent)
-        const consentEntries: Array<{ type: ConsentType; status: "granted" | "revoked" }> = [
-          { type: "terms", status: "granted" },
-          { type: "privacy", status: "granted" },
-          { type: "data_processing", status: "granted" },
-          { type: "marketing_email", status: data.marketingConsent ? "granted" : "revoked" },
-        ];
-        recordBulkConsent({
-          userId: newUserId,
-          consents: consentEntries,
-          method: "registration_form",
-        });
+        // Record GDPR consents (Art. 7 — proof of consent).
+        // En server mode el endpoint /api/auth?action=register ya graba los
+        // consents en BD vía db.createConsent. Solo registramos en cliente
+        // cuando estamos en local mode (localStorage).
+        if (!IS_SERVER_MODE) {
+          const consentEntries: Array<{ type: ConsentType; status: "granted" | "revoked" }> = [
+            { type: "terms", status: "granted" },
+            { type: "privacy", status: "granted" },
+            { type: "data_processing", status: "granted" },
+            { type: "marketing_email", status: data.marketingConsent ? "granted" : "revoked" },
+          ];
+          await recordBulkConsent({
+            userId: newUserId,
+            consents: consentEntries,
+            method: "registration_form",
+          });
+        }
 
         // Issue email verification token (preparado — no bloquea login
         // salvo que NEXT_PUBLIC_EMAIL_VERIFICATION_REQUIRED=true).

@@ -165,6 +165,8 @@ export interface EmailVerificationTokenRecord {
 }
 
 export interface ConsentRecord {
+  /** UUID asignado por la BD — opcional al crear, presente al leer. */
+  id?: string;
   userId: string;
   type: string;
   status: "granted" | "revoked";
@@ -172,6 +174,23 @@ export interface ConsentRecord {
   version: string;
   ipAddress?: string;
   userAgent?: string;
+  /** ISO timestamp asignado por la BD — opcional al crear, presente al leer. */
+  timestamp?: string;
+}
+
+/**
+ * Preferencias de canales de comunicación. Los canales transaccionales
+ * (`email_orders`, `email_shipping`) no se pueden desactivar — base legal
+ * contractual. El servidor los fuerza a true en cada PUT.
+ */
+export interface CommPreferencesRecord {
+  userId: string;
+  emailOrders: boolean;
+  emailShipping: boolean;
+  emailMarketing: boolean;
+  emailNewsletter: boolean;
+  emailOffers: boolean;
+  updatedAt: string;
 }
 
 // ─── Record types — entidades adicionales ───────────────────────────────────
@@ -507,6 +526,13 @@ export interface DbAdapter {
   // Consents (GDPR)
   createConsent(consent: ConsentRecord): Promise<void>;
   getConsents(userId: string): Promise<ConsentRecord[]>;
+
+  // Comm preferences (RGPD — canales)
+  getCommPreferences(userId: string): Promise<CommPreferencesRecord>;
+  saveCommPreferences(
+    userId: string,
+    channels: Omit<CommPreferencesRecord, "userId" | "updatedAt">,
+  ): Promise<CommPreferencesRecord>;
 
   // Audit
   logAudit(entry: {
@@ -890,6 +916,25 @@ export class LocalDbAdapter implements DbAdapter {
   async markEmailVerified(_userId: string): Promise<void> { /* handled client-side */ }
   async createConsent(_consent: ConsentRecord): Promise<void> { /* handled client-side */ }
   async getConsents(_userId: string): Promise<ConsentRecord[]> { return []; }
+  async getCommPreferences(userId: string): Promise<CommPreferencesRecord> {
+    // En modo local el service ya gestiona localStorage. El stub devuelve
+    // los defaults transaccional-on / marketing-off para cumplir contrato.
+    return {
+      userId,
+      emailOrders: true,
+      emailShipping: true,
+      emailMarketing: false,
+      emailNewsletter: false,
+      emailOffers: false,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+  async saveCommPreferences(
+    userId: string,
+    channels: Omit<CommPreferencesRecord, "userId" | "updatedAt">,
+  ): Promise<CommPreferencesRecord> {
+    return { userId, ...channels, updatedAt: new Date().toISOString() };
+  }
   async logAudit(_entry: { entityType: string; entityId: string; action: string }): Promise<void> { /* handled client-side */ }
 
   // ── Extended entities: en local mode los services ya escriben a localStorage.
@@ -1353,6 +1398,7 @@ export class ServerDbAdapter implements DbAdapter {
     const { data, error } = await this.db.from("consents").select("*").eq("user_id", userId).order("created_at", { ascending: true });
     if (error) throw error;
     return (data ?? []).map((r: Record<string, string>) => ({
+      id: r.id,
       userId: r.user_id,
       type: r.type,
       status: r.status as "granted" | "revoked",
@@ -1360,7 +1406,71 @@ export class ServerDbAdapter implements DbAdapter {
       version: r.version,
       ipAddress: r.ip_address,
       userAgent: r.user_agent,
+      timestamp: r.created_at,
     }));
+  }
+
+  // ── Comm preferences ────────────────────────────────────────────────────
+
+  async getCommPreferences(userId: string): Promise<CommPreferencesRecord> {
+    const { data, error } = await this.db
+      .from("comm_preferences")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) {
+      // Sin fila aún → devolver defaults RGPD-safe (transaccional ON, marketing OFF).
+      return {
+        userId,
+        emailOrders: true,
+        emailShipping: true,
+        emailMarketing: false,
+        emailNewsletter: false,
+        emailOffers: false,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    return {
+      userId: data.user_id,
+      emailOrders: data.email_orders,
+      emailShipping: data.email_shipping,
+      emailMarketing: data.email_marketing,
+      emailNewsletter: data.email_newsletter,
+      emailOffers: data.email_offers,
+      updatedAt: data.updated_at,
+    };
+  }
+
+  async saveCommPreferences(
+    userId: string,
+    channels: Omit<CommPreferencesRecord, "userId" | "updatedAt">,
+  ): Promise<CommPreferencesRecord> {
+    // Forzar canales transaccionales a true por base legal contractual.
+    // El cliente NO puede desactivarlos vía este endpoint.
+    const updatedAt = new Date().toISOString();
+    const row = {
+      user_id: userId,
+      email_orders: true,
+      email_shipping: true,
+      email_marketing: Boolean(channels.emailMarketing),
+      email_newsletter: Boolean(channels.emailNewsletter),
+      email_offers: Boolean(channels.emailOffers),
+      updated_at: updatedAt,
+    };
+    const { error } = await this.db
+      .from("comm_preferences")
+      .upsert(row, { onConflict: "user_id" });
+    if (error) throw error;
+    return {
+      userId,
+      emailOrders: true,
+      emailShipping: true,
+      emailMarketing: row.email_marketing,
+      emailNewsletter: row.email_newsletter,
+      emailOffers: row.email_offers,
+      updatedAt,
+    };
   }
 
   // ── Audit ───────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   Download,
@@ -24,6 +24,7 @@ import {
   exportConsentData,
   type ConsentType,
   type CommChannel,
+  type ConsentRecord,
 } from "@/services/consentService";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
 import { SITE_CONFIG } from "@/config/siteConfig";
@@ -89,6 +90,14 @@ const CHANNEL_LABELS: Record<CommChannel, { label: string; description: string; 
   },
 };
 
+const EMPTY_CHANNELS: Record<CommChannel, boolean> = {
+  email_orders: true,
+  email_shipping: true,
+  email_marketing: false,
+  email_newsletter: false,
+  email_offers: false,
+};
+
 export default function PrivacidadPage() {
   const { user, logout } = useAuth();
   const [downloading, setDownloading] = useState(false);
@@ -100,113 +109,130 @@ export default function PrivacidadPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [prefsSaved, setPrefsSaved] = useState(false);
 
+  // Estado async: se rellena en el useEffect inicial y tras cada acción.
+  const [channels, setChannels] = useState<Record<CommChannel, boolean>>(EMPTY_CHANNELS);
+  const [consents, setConsents] = useState<Record<ConsentType, ConsentRecord | null>>({
+    terms: null,
+    privacy: null,
+    marketing_email: null,
+    cookies_analytics: null,
+    cookies_marketing: null,
+    data_processing: null,
+  });
+  const [history, setHistory] = useState<ConsentRecord[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  // Carga inicial — todo en paralelo para evitar 3 viajes secuenciales.
+  const reload = useCallback(async () => {
+    if (!user) return;
+    const [statuses, hist, prefs] = await Promise.all([
+      getAllConsentStatuses(user.id),
+      getConsentHistory(user.id),
+      getCommPreferences(user.id),
+    ]);
+    setConsents(statuses);
+    setHistory(hist);
+    setChannels(prefs.channels);
+    setLoaded(true);
+  }, [user]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
   // ─── Data Export ────────────────────────────────────────────────────────
-  // Hooks must be called before any early return to satisfy rules-of-hooks.
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async () => {
     if (!user) return;
     setDownloading(true);
+    try {
+      const userData = exportUserData(user.id);
+      const consentData = await exportConsentData(user.id);
+      const fullExport = {
+        exportDate: new Date().toISOString(),
+        requestedBy: user.email,
+        legalBasis: "RGPD Art. 20 — Derecho a la portabilidad de datos",
+        data: userData,
+        consents: consentData,
+      };
 
-    // Collect ALL user data + consents
-    const userData = exportUserData(user.id);
-    const consentData = exportConsentData(user.id);
-    const fullExport = {
-      exportDate: new Date().toISOString(),
-      requestedBy: user.email,
-      legalBasis: "RGPD Art. 20 — Derecho a la portabilidad de datos",
-      data: userData,
-      consents: consentData,
-    };
-
-    const json = JSON.stringify(fullExport, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `tcgacademy_datos_${user.email}_${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-
-    setDownloading(false);
-    setDownloaded(true);
-    setTimeout(() => setDownloaded(false), 4000);
+      const json = JSON.stringify(fullExport, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `tcgacademy_datos_${user.email}_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setDownloaded(true);
+      setTimeout(() => setDownloaded(false), 4000);
+    } finally {
+      setDownloading(false);
+    }
   }, [user]);
 
   // ─── Account Deletion ──────────────────────────────────────────────────
-  const handleDelete = useCallback(() => {
+  const handleDelete = useCallback(async () => {
     if (!user) return;
     if (deleteConfirmText !== "ELIMINAR") return;
     setDeleting(true);
-
-    deleteUserData(user.id, true);
-
-    // Also clean consent records
-    // (keeping a minimal audit record of the deletion itself)
-    recordConsent({
-      userId: user.id,
-      type: "data_processing",
-      status: "revoked",
-      method: "account_deletion",
-    });
-
-    setDeleting(false);
-    setDeleted(true);
-
-    // Log out after 3 seconds
-    setTimeout(() => {
-      logout();
-    }, 3000);
+    try {
+      deleteUserData(user.id, true);
+      // Registro audit del propio borrado (Art. 5.2 — accountability).
+      await recordConsent({
+        userId: user.id,
+        type: "data_processing",
+        status: "revoked",
+        method: "account_deletion",
+      });
+      setDeleted(true);
+      setTimeout(() => logout(), 3000);
+    } finally {
+      setDeleting(false);
+    }
   }, [user, deleteConfirmText, logout]);
 
-  // Communication preferences state — must be called unconditionally.
-  const initialChannels = user ? getCommPreferences(user.id).channels : ({} as ReturnType<typeof getCommPreferences>["channels"]);
-  const [channels, setChannels] = useState(initialChannels);
-
-  if (!user) return null;
-
-  const consents = getAllConsentStatuses(user.id);
-  const history = getConsentHistory(user.id);
-
-  // ─── Consent Revocation ────────────────────────────────────────────────
-  const handleRevokeConsent = (type: ConsentType) => {
-    recordConsent({
+  // ─── Consent Revocation / Grant ────────────────────────────────────────
+  const handleRevokeConsent = useCallback(async (type: ConsentType) => {
+    if (!user) return;
+    await recordConsent({
       userId: user.id,
       type,
       status: "revoked",
       method: "privacy_dashboard",
     });
-    // Force re-render by triggering state
-    setPrefsSaved(false);
-    window.location.reload();
-  };
+    await reload();
+  }, [user, reload]);
 
-  const handleGrantConsent = (type: ConsentType) => {
-    recordConsent({
+  const handleGrantConsent = useCallback(async (type: ConsentType) => {
+    if (!user) return;
+    await recordConsent({
       userId: user.id,
       type,
       status: "granted",
       method: "privacy_dashboard",
     });
-    window.location.reload();
-  };
+    await reload();
+  }, [user, reload]);
 
   // ─── Communication Preferences ─────────────────────────────────────────
-  const handleSavePrefs = () => {
-    saveCommPreferences(user.id, channels);
+  const handleSavePrefs = useCallback(async () => {
+    if (!user) return;
+    await saveCommPreferences(user.id, channels);
 
-    // Record marketing consent change if marketing channels changed
-    const marketingEnabled = channels.email_marketing || channels.email_newsletter || channels.email_offers;
+    const marketingEnabled =
+      channels.email_marketing || channels.email_newsletter || channels.email_offers;
     const currentConsent = consents.marketing_email;
     const wasGranted = currentConsent?.status === "granted";
 
     if (marketingEnabled && !wasGranted) {
-      recordConsent({
+      await recordConsent({
         userId: user.id,
         type: "marketing_email",
         status: "granted",
         method: "preferences_page",
       });
     } else if (!marketingEnabled && wasGranted) {
-      recordConsent({
+      await recordConsent({
         userId: user.id,
         type: "marketing_email",
         status: "revoked",
@@ -214,9 +240,22 @@ export default function PrivacidadPage() {
       });
     }
 
+    await reload();
     setPrefsSaved(true);
     setTimeout(() => setPrefsSaved(false), 3000);
-  };
+  }, [user, channels, consents.marketing_email, reload]);
+
+  if (!user) return null;
+  if (!loaded) {
+    return (
+      <div className="space-y-8">
+        <AccountTabs group="perfil" />
+        <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center text-sm text-gray-500">
+          Cargando preferencias...
+        </div>
+      </div>
+    );
+  }
 
   if (deleted) {
     return (
