@@ -551,7 +551,8 @@ export default function PedidoDetailClient() {
         ...(historyNote ? { note: historyNote } : {}),
       });
 
-      // Email "Pedido enviado" al comprador con tracking + carrier
+      // Notificación al comprador en transiciones relevantes. Non-critical:
+      // si falla el email, el estado queda igualmente persistido.
       if (next === "enviado" && tracking) {
         const effectiveTracking = tracking;
         await sendAppEmail({
@@ -569,6 +570,28 @@ export default function PedidoDetailClient() {
           preview: `Pedido enviado · ${carrier} ${effectiveTracking}`,
         });
         showToast(`Pedido enviado. Email enviado al comprador (${carrier} ${effectiveTracking})`);
+      } else if (next === "cancelado" && order.adminStatus !== "cancelado") {
+        const appUrl =
+          (typeof window !== "undefined" ? window.location.origin : "") ||
+          process.env.NEXT_PUBLIC_SHOP_URL ||
+          "";
+        try {
+          await sendAppEmail({
+            toEmail: updatedOrder.userEmail,
+            toName: updatedOrder.userName,
+            templateId: "pedido_cancelado",
+            vars: {
+              nombre:
+                updatedOrder.userName.split(" ")[0] ?? updatedOrder.userName,
+              orderId: updatedOrder.id,
+              appUrl,
+            },
+            preview: `Pedido ${updatedOrder.id} cancelado`,
+          });
+          showToast(`Pedido cancelado. Email enviado al comprador.`);
+        } catch {
+          showToast(`Pedido cancelado. (Email no enviado — revisar logs)`);
+        }
       } else {
         showToast(`Estado actualizado → ${STATUS_CFG[next].label}`);
       }
