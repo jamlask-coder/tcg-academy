@@ -7,6 +7,7 @@ import {
   resolveEventVirtualProduct,
   resolveEventVirtualProductBySlug,
 } from "@/lib/eventProduct";
+import { isSnackId, resolveSnackProduct } from "@/data/tpvSnacks";
 
 const LS_NEW = "tcgacademy_new_products";
 const LS_OVERRIDES = "tcgacademy_product_overrides";
@@ -91,6 +92,10 @@ export function getMergedById(id: number): LocalProduct | undefined {
   // listados de catálogo, pero el carrito/checkout/facturas los encuentran
   // por ID virtual.
   if (isEventVirtualId(id)) return resolveEventVirtualProduct(id);
+  // Snacks de mostrador (TPV-only): mismo patrón que eventos — viven en su
+  // rango reservado y NO aparecen en `getMergedProducts()`, pero el TPV
+  // los resuelve por ID al cobrar para que la factura/ticket cuadre.
+  if (isSnackId(id)) return resolveSnackProduct(id);
   return getMergedProducts().find((p) => p.id === id);
 }
 

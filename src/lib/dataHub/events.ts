@@ -42,6 +42,12 @@ export const DataHubEvents = {
   EVENT_SESSIONS_UPDATED: "tcga:event_sessions:updated",
   USER_VISITS_UPDATED: "tcga:user_visits:updated",
 
+  // TPV multi-tienda — un evento genérico por tipo (los listeners deciden
+  // qué tienda re-leer; ver `tpvStores.ts` y `tpvStoreSalesService.ts`).
+  TPV_SALES_UPDATED: "tcga:tpv_sales:updated",
+  TPV_STOCK_UPDATED: "tcga:tpv_stock:updated",
+  TPV_INVOICES_UPDATED: "tcga:tpv_invoices:updated",
+
   // Entidades future (stubs — listeners aún no implementados)
   AFFILIATES_UPDATED: "tcga:affiliates:updated",
   SUBSCRIPTIONS_UPDATED: "tcga:subscriptions:updated",
@@ -98,6 +104,9 @@ export const ENTITY_EVENT: Record<string, DataHubEventName> = {
   bankMovements: DataHubEvents.BANK_MOVEMENTS_UPDATED,
   event_sessions: DataHubEvents.EVENT_SESSIONS_UPDATED,
   userVisits: DataHubEvents.USER_VISITS_UPDATED,
+  tpv_sales: DataHubEvents.TPV_SALES_UPDATED,
+  tpv_stock: DataHubEvents.TPV_STOCK_UPDATED,
+  tpv_invoices: DataHubEvents.TPV_INVOICES_UPDATED,
   affiliates: DataHubEvents.AFFILIATES_UPDATED,
   subscriptions: DataHubEvents.SUBSCRIPTIONS_UPDATED,
   warehouses: DataHubEvents.WAREHOUSES_UPDATED,

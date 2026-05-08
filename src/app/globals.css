@@ -385,3 +385,45 @@ html {
     transition-duration: 0.01ms !important;
   }
 }
+/* ─── TPV (POS) — Modo pantalla interna ───────────────────────────────────────
+   Cuando el body tiene `.tpv-mode` (lo pone TpvLayout al montar), ocultamos
+   header/nav/footer/cookies/promos públicos. La pantalla TPV ocupa todo el
+   viewport y no debe intercalarse con la chrome de la web pública. */
+body.tpv-mode > div > div.sticky.top-0,
+body.tpv-mode > div > footer,
+body.tpv-mode [data-cookie-consent],
+body.tpv-mode [data-floating-promo] {
+  display: none !important;
+}
+body.tpv-mode > div > main {
+  background: transparent !important;
+  padding: 0 !important;
+}
+body.tpv-mode {
+  background: #0f172a; /* slate-900 — coherente con el panel */
+  overflow: hidden;
+}
+
+/* ─── Print TPV ticket — papel térmico 80mm o A4 fallback ─────────────────── */
+@media print {
+  body.tpv-print > * { display: none !important; }
+  body.tpv-print .tpv-print-area { display: block !important; }
+  .tpv-print-area {
+    width: 76mm;
+    margin: 0 auto;
+    padding: 4mm;
+    color: #000;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .tpv-print-area .ticket-line {
+    border-bottom: 1px dashed #aaa;
+    padding: 2px 0;
+  }
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+}
+.tpv-print-area { display: none; }

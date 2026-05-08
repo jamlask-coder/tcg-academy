@@ -381,6 +381,15 @@ export interface CreateInvoiceParams {
   correctionData?: CorrectionData;
   /** Canal de emisión — sufijo del número de factura. Default: WEB (E). */
   origin?: InvoiceOrigin;
+  /**
+   * Canal comercial dentro del libro central. Default "WEB".
+   * Para Calpe (TPV) se pasa "CALPE" → queda en `metadata.salesChannel`
+   * y permite filtrar `/admin/fiscal/facturas` por origen sin romper la
+   * estructura de InvoiceRecord ni la cadena VeriFactu (mismo emisor).
+   * Las tiendas standalone (Béjar/Madrid/Barcelona) NO pasan por aquí —
+   * tienen su propio libro vía `tpvStoreInvoiceService`.
+   */
+  salesChannel?: "WEB" | "CALPE";
 }
 
 /**
@@ -400,6 +409,7 @@ export async function createInvoice(
     invoiceType = InvoiceType.COMPLETA,
     correctionData,
     origin = InvoiceOrigin.WEB,
+    salesChannel = "WEB",
   } = params;
 
   const invoiceNumber = generateInvoiceNumber(origin);
@@ -465,7 +475,7 @@ export async function createInvoice(
         detail: `Factura ${invoiceNumber} creada automáticamente`,
       },
     ],
-    metadata: {},
+    metadata: { salesChannel },
   };
 
   // Genera hash SHA-256 del contenido fiscal

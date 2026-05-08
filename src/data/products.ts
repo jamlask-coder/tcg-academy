@@ -171,6 +171,26 @@ export const GAME_CONFIG: Record<
       "Fundas, toploaders, tapetes, deckboxes, carpetas y dados — compatibles con cualquier TCG.",
     emoji: "🛡️",
   },
+  // ── Eventos / Snacks: keys auxiliares solo para el TPV de mostrador ─────
+  // No tienen página dedicada en /[game] ni aparecen en megamenu — se usan
+  // como filtro en el TPV para que el operador agrupe entradas y snacks
+  // junto al resto de productos físicos.
+  eventos: {
+    name: "Eventos",
+    color: "#7c3aed",
+    bgColor: "#ede9fe",
+    description:
+      "Entradas a torneos y eventos presenciales en las tiendas TCG Academy.",
+    emoji: "🏆",
+  },
+  snacks: {
+    name: "Snacks",
+    color: "#16a34a",
+    bgColor: "#dcfce7",
+    description:
+      "Refrescos, snacks y bebidas de mostrador. Sólo venta en tienda física.",
+    emoji: "🥤",
+  },
 };
 
 // ─── Category labels ──────────────────────────────────────────────────────────
@@ -219,6 +239,8 @@ export const CATEGORY_LABELS: Record<string, string> = {
   "gift-sets": "Gift Sets",
   scr: "Cartas SCR / God Rare",
   accesorios: "Accesorios",
+  snacks: "Snacks",
+  evento: "Entradas",
 };
 
 /** Categories that get merged under "Accesorios" in the nav pills */

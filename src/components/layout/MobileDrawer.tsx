@@ -23,6 +23,7 @@ import {
   ShoppingBag,
   MapPin,
   MoreHorizontal,
+  Calendar,
 } from "lucide-react";
 import {
   MOBILE_GAMES as DRAWER_GAMES,
@@ -658,9 +659,16 @@ export function MobileDrawer({ open, onClose, user, logout, pathname }: Props) {
             </div>
           </div>
 
-          {/* ═══ SERVICIOS — Compramos tus cartas ═══════════════════════════ */}
+          {/* ═══ SERVICIOS — Eventos · Compramos tus cartas ═════════════════ */}
           <SectionTitle>Servicios</SectionTitle>
           <div className="divide-y divide-white/[0.06]">
+            <DarkRow
+              href="/eventos"
+              onClick={go}
+              icon={<Calendar size={18} className="text-amber-300" />}
+              label="Eventos"
+              active={isActive("/eventos")}
+            />
             <DarkRow
               href="/compramos-tus-cartas"
               onClick={go}

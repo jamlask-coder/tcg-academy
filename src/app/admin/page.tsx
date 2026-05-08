@@ -10,6 +10,7 @@ import {
   AlertCircle,
   TrendingUp,
   Ticket,
+  ScanLine,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { getMergedProducts } from "@/lib/productStore";
@@ -240,13 +241,23 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">
-          Resumen
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Vista general de TCG Academy
-        </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Resumen
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Vista general de TCG Academy
+          </p>
+        </div>
+        <Link
+          href="/tpv"
+          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800"
+          aria-label="Abrir terminal punto de venta"
+        >
+          <ScanLine size={18} />
+          Abrir TPV
+        </Link>
       </div>
 
       {/* KPI cards — clickables para cambiar el gráfico */}
@@ -492,7 +503,7 @@ export default function AdminDashboard() {
               <h2 className="mb-4 font-bold text-gray-900">Top productos (por ingresos)</h2>
               <div className="space-y-2">
                 {topProducts.map((p, i) => (
-                  <div key={p.id} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2">
+                  <div key={`${p.id ?? "x"}-${i}`} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2">
                     <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb]/10 text-xs font-bold text-[#2563eb]">
                       {i + 1}
                     </span>
@@ -513,7 +524,7 @@ export default function AdminDashboard() {
               <h2 className="mb-4 font-bold text-gray-900">Top productos (por unidades)</h2>
               <div className="space-y-2">
                 {topProductsByQty.map((p, i) => (
-                  <div key={p.id} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2">
+                  <div key={`${p.id ?? "x"}-${i}`} className="flex items-center gap-3 rounded-xl bg-gray-50 px-3 py-2">
                     <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#2563eb]/10 text-xs font-bold text-[#2563eb]">
                       {i + 1}
                     </span>
