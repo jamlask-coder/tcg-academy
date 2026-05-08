@@ -60,8 +60,68 @@ export function loadAllUserCoupons(): UserCoupon[] {
   }
 }
 
+/**
+ * Detecta el QuotaExceededError de cualquier navegador. Algunos lo lanzan con
+ * `name === "QuotaExceededError"`, otros con el código numérico 22 (legacy)
+ * o 1014 en Firefox.
+ */
+function isQuotaError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (err.name === "QuotaExceededError") return true;
+  // Algunos engines exponen .code en DOMException
+  const code = (err as unknown as { code?: number }).code;
+  return code === 22 || code === 1014;
+}
+
 function persistUserCoupons(coupons: UserCoupon[]): void {
-  localStorage.setItem(USER_COUPONS_KEY, JSON.stringify(coupons.slice(0, MAX_LOG)));
+  const trimmed = coupons.slice(0, MAX_LOG);
+  const payload = JSON.stringify(trimmed);
+  try {
+    localStorage.setItem(USER_COUPONS_KEY, payload);
+    return;
+  } catch (err) {
+    if (!isQuotaError(err)) throw err;
+  }
+
+  // Quota exceeded: el storage está lleno (típicamente por logs antiguos).
+  // Vamos liberando espacio en orden de menor a mayor importancia y
+  // reintentamos. Si aun así no entra, propagamos un error legible para
+  // que la UI muestre algo útil en lugar de un crash mudo.
+  const reclaimables = [
+    "tcgacademy_email_log",          // log de envíos — se puede regenerar
+    "tcgacademy_sent_emails",        // legacy duplicado
+    "tcgacademy_logs",               // logs estructurados cliente
+    "tcgacademy_user_activity",      // tracking visitas (cache)
+    "tcgacademy_competitor_prices",  // cache 24h, se recalcula
+    "tcgacademy_price_history_cache",
+    "tcgacademy_backups_local",      // copias de seguridad locales
+  ];
+  for (const key of reclaimables) {
+    try {
+      if (localStorage.getItem(key) !== null) {
+        localStorage.removeItem(key);
+      }
+      localStorage.setItem(USER_COUPONS_KEY, payload);
+      return;
+    } catch (err) {
+      if (!isQuotaError(err)) throw err;
+      // sigue intentando con la siguiente clave
+    }
+  }
+
+  // Último recurso: nos quedamos con la mitad más reciente y reintentamos.
+  const halved = trimmed.slice(0, Math.floor(trimmed.length / 2));
+  try {
+    localStorage.setItem(USER_COUPONS_KEY, JSON.stringify(halved));
+    return;
+  } catch (err) {
+    if (!isQuotaError(err)) throw err;
+  }
+
+  throw new Error(
+    "No queda espacio en el almacenamiento del navegador. " +
+      "Limpia datos antiguos en DevTools (Application → Local Storage) o usa modo servidor.",
+  );
 }
 
 export function saveUserCoupon(coupon: UserCoupon): void {

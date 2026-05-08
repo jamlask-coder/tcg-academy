@@ -287,6 +287,34 @@ export interface SendAppEmailParams {
 export async function sendAppEmail(
   params: SendAppEmailParams,
 ): Promise<{ ok: boolean; emailId: string }> {
+  // Browser + server-mode: el adapter real (ResendEmailAdapter) requiere
+  // `RESEND_API_KEY`, variable server-only. Llamado desde un componente
+  // cliente, `getEmailService()` cae a LocalEmailAdapter y el correo NUNCA
+  // sale (solo se loguea). Por eso, cuando estamos en navegador y el modo
+  // es server, proxificamos vía POST al endpoint admin que SÍ corre en Node
+  // y tiene acceso a la API key.
+  const backendModeForProxy =
+    typeof process !== "undefined"
+      ? process.env.NEXT_PUBLIC_BACKEND_MODE
+      : undefined;
+  if (typeof window !== "undefined" && backendModeForProxy === "server") {
+    try {
+      const r = await fetch("/api/admin/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(params),
+      });
+      if (!r.ok) {
+        return { ok: false, emailId: "" };
+      }
+      const data = (await r.json()) as { ok: boolean; emailId: string };
+      return { ok: !!data.ok, emailId: data.emailId ?? "" };
+    } catch {
+      return { ok: false, emailId: "" };
+    }
+  }
+
   // Inyección automática del enlace "Cancelar suscripción". El placeholder
   // `{{unsubscribe_link}}` está presente en casi todas las plantillas (footer
   // legal RGPD), pero los call-sites nunca lo rellenan — antes acababa como

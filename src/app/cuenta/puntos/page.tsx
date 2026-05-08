@@ -303,7 +303,7 @@ export default function PuntosPage() {
                 ? "text-amber-600"
                 : item.pts < 0
                 ? "text-red-500"
-                : item.type === "asociacion" || item.type === "bienvenida"
+                : item.type === "asociacion" || item.type === "bienvenida" || item.type === "regalo"
                 ? "text-green-600"
                 : "text-[#2563eb]";
               return (

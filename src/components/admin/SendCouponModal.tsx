@@ -71,6 +71,7 @@ function SendCouponModal({
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [tab, setTab] = useState<"form" | "preview">("form");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const numVal = Number(value) || 0;
 
@@ -102,6 +103,7 @@ function SendCouponModal({
   const handleSend = useCallback(async () => {
     if (!canSend) return;
     setSending(true);
+    setErrorMsg(null);
     try {
       const coupon = {
         id: `uc_${Date.now()}`,
@@ -131,6 +133,17 @@ function SendCouponModal({
       });
 
       setSent(true);
+    } catch (err) {
+      // Antes el try/finally dejaba pasar la excepción al error boundary del
+      // árbol y el modal se quedaba en "Enviando…" sin feedback. Ahora la
+      // capturamos y mostramos un mensaje accionable. Caso típico:
+      // QuotaExceededError de localStorage → couponService ya intenta
+      // autorrecuperarse purgando logs; si aun así falla, llega aquí.
+      setErrorMsg(
+        err instanceof Error
+          ? err.message
+          : "No se ha podido enviar el cupón. Inténtalo de nuevo.",
+      );
     } finally {
       setSending(false);
     }
@@ -613,6 +626,14 @@ function SendCouponModal({
 
       {/* Footer CTA */}
       <div className="border-t border-gray-100 px-6 py-4">
+        {errorMsg && (
+          <div
+            role="alert"
+            className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+          >
+            {errorMsg}
+          </div>
+        )}
         <button
           onClick={handleSend}
           disabled={sending || !canSend}

@@ -138,7 +138,8 @@ export type HistoryEntryType =
   | "compra"
   | "devolucion"
   | "bienvenida"
-  | "asociacion";
+  | "asociacion"
+  | "regalo";
 
 export interface HistoryEntry {
   id: string;
@@ -312,6 +313,35 @@ export function addPoints(
     return current;
   }
   return next;
+}
+
+/**
+ * Regalo manual del admin: añade puntos disponibles inmediatamente (sin hold)
+ * y deja huella en el historial para que el cliente lo vea con motivo.
+ * No tiene `availableAt` — se entregan ya, son un detalle, no fidelidad.
+ */
+export function giftPoints(
+  userId: string,
+  pts: number,
+  note?: string,
+): { ok: boolean; balance: number } {
+  if (!Number.isFinite(pts) || pts <= 0) {
+    return { ok: false, balance: loadPoints(userId) };
+  }
+  const amount = Math.floor(pts);
+  const balance = addPoints(userId, amount);
+  // addPoints devuelve el balance actual; si falló, será igual al anterior.
+  // Si el balance no cambió, no escribimos history para no falsear el log.
+  const desc = note?.trim()
+    ? note.trim()
+    : "Regalo del equipo TCG Academy";
+  addHistory(userId, {
+    ts: Date.now(),
+    pts: amount,
+    type: "regalo",
+    desc,
+  });
+  return { ok: true, balance };
 }
 
 /**

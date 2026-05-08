@@ -12,12 +12,10 @@ import {
   Mail,
   Phone,
   MapPin,
-  Star,
   KeyRound,
   CheckCircle2,
   XCircle,
   Building2,
-  Users as UsersIcon,
   Cake,
   Hash,
 } from "lucide-react";
@@ -44,6 +42,7 @@ import { findUserByHandle } from "@/lib/userHandle";
 import { B2BCharts } from "@/components/account/B2BCharts";
 import { SendCouponButton } from "@/components/admin/SendCouponModal";
 import { SendMessageButton } from "@/components/admin/SendMessageModal";
+import { SendPointsButton } from "@/components/admin/SendPointsModal";
 import { UserRoleManager } from "@/components/admin/UserRoleManager";
 import { VisitChart } from "@/components/account/VisitChart";
 import { UserPersonalDataPanel } from "@/components/admin/UserPersonalDataPanel";
@@ -516,21 +515,23 @@ export default function AdminUsuarioDetailPage() {
         </Link>
       </div>
 
-      {/* Header card con acciones integradas */}
-      <div className="mb-6 rounded-2xl bg-gradient-to-br from-[#2563eb] to-[#3b82f6] p-6 text-white">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-2xl font-black">
+      {/* Header card — compacto en móvil (avatar pequeño + info densa + acciones
+          en grid 2x2 ancho completo, estilo apps móviles tipo Amazon/AliExpress).
+          En sm+ vuelve al layout horizontal con acciones a la derecha. */}
+      <div className="mb-6 rounded-2xl bg-gradient-to-br from-[#2563eb] to-[#3b82f6] p-4 text-white sm:p-6">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-white/20 text-lg font-black sm:h-16 sm:w-16 sm:text-2xl">
             {user.name[0]}
             {user.lastName[0]}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="whitespace-nowrap text-2xl font-bold">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h1 className="truncate text-lg font-bold sm:text-2xl">
                 {user.name} {user.lastName}
               </h1>
               <UserPresenceDot lastSeenAt={lastSeenAt} />
             </div>
-            <p className="text-blue-200">{user.email}</p>
+            <p className="truncate text-sm text-blue-200">{user.email}</p>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
               <span
                 className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${ROLE_COLORS[user.role]}`}
@@ -540,27 +541,31 @@ export default function AdminUsuarioDetailPage() {
               <UserLastSeen lastSeenAt={lastSeenAt} />
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <SendCouponButton
-              userId={user.id}
-              userName={user.name}
-              userLastName={user.lastName}
-              userEmail={user.email}
-            />
-            <Link
-              href="/admin/bonos"
-              className="flex items-center gap-2 rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-[#0a1628] shadow-md transition hover:bg-amber-300 active:scale-95"
-            >
-              <Star size={16} /> Enviar puntos
-            </Link>
-            <SendMessageButton
-              userId={user.id}
-              userName={user.name}
-              userLastName={user.lastName}
-              userEmail={user.email}
-            />
-            <SendResetPasswordButton email={user.email} />
-          </div>
+        </div>
+        {/* Acciones — en móvil grid 2x2 a ancho completo (botones se estiran
+            via [&>button]:w-full); en sm+ vuelven a flex-wrap a la derecha.
+            El selector `>button` apunta al trigger de cada componente sin
+            tocar sus internos (los modales son fixed y no se ven afectados). */}
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-3 sm:flex sm:flex-wrap sm:justify-end [&>button]:w-full [&>button]:justify-center sm:[&>button]:w-auto sm:[&>button]:justify-start">
+          <SendCouponButton
+            userId={user.id}
+            userName={user.name}
+            userLastName={user.lastName}
+            userEmail={user.email}
+          />
+          <SendPointsButton
+            userId={user.id}
+            userName={user.name}
+            userLastName={user.lastName}
+            userEmail={user.email}
+          />
+          <SendMessageButton
+            userId={user.id}
+            userName={user.name}
+            userLastName={user.lastName}
+            userEmail={user.email}
+          />
+          <SendResetPasswordButton email={user.email} />
         </div>
       </div>
 
@@ -716,37 +721,6 @@ export default function AdminUsuarioDetailPage() {
                 {profileExtras.company.billingEmail && (
                   <p className="flex items-center gap-1 text-gray-500">
                     <Mail size={10} /> {profileExtras.company.billingEmail}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Programa de referidos — código + count de referidos directos */}
-          {(profileExtras?.referralCode || profileExtras?.referredBy) && (
-            <div className="rounded-2xl border border-gray-200 bg-white p-5">
-              <h3 className="mb-3 flex items-center gap-2 font-bold text-gray-900">
-                <UsersIcon size={16} className="text-[#2563eb]" /> Referidos
-              </h3>
-              <div className="space-y-2 text-sm text-gray-700">
-                {profileExtras.referralCode && (
-                  <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
-                    <div>
-                      <p className="text-[10px] uppercase text-gray-400">Su código</p>
-                      <p className="font-mono font-bold">{profileExtras.referralCode}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] uppercase text-gray-400">Referidos</p>
-                      <p className="font-bold">{profileExtras.referralsCount}</p>
-                    </div>
-                  </div>
-                )}
-                {profileExtras.referredBy && (
-                  <p className="text-xs text-gray-500">
-                    Referido por:{" "}
-                    <span className="font-mono font-bold text-gray-700">
-                      {profileExtras.referredBy}
-                    </span>
                   </p>
                 )}
               </div>
