@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle, X, Calendar, Bell } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
+import { VERIFACTU_CONFIG } from "@/config/verifactuConfig";
 
 interface AlertItem {
   id: string;
@@ -26,6 +27,13 @@ export function AdminFiscalGuard() {
   useEffect(() => {
     if (hasRun.current || !user) return;
     hasRun.current = true;
+
+    // Mientras VeriFactu esté apagado (la SL aún no factura), las alertas
+    // saltantes no aplican: no hay obligaciones reales que vencer en este
+    // entorno. Cuando se cambie `VERIFACTU_CONFIG.mode` a sandbox/production
+    // (probablemente en 2027 al constituir y empezar a facturar), este guard
+    // se reactiva automáticamente — no hay que tocar nada más.
+    if (VERIFACTU_CONFIG.mode === "off") return;
 
     void (async () => {
       const newAlerts: AlertItem[] = [];

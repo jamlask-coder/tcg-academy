@@ -398,56 +398,60 @@ export default function AdminFiscalPage() {
         ))}
       </div>
 
-      {/* Alerts */}
-      {(pendingVerifactu > 0 ||
-        rejectedVerifactu > 0 ||
-        daysUntilDue <= 14) && (
-        <div className="mb-6 space-y-2">
-          {daysUntilDue <= 14 && daysUntilDue > 0 && (
-            <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              <Calendar size={15} />
-              <span>
-                Vencimiento modelo 303 {quarterLabel}: queda
-                {daysUntilDue === 1 ? " 1 día" : ` ${daysUntilDue} días`} (
-                {currentPeriod.dueDate.toLocaleDateString("es-ES")})
-              </span>
-            </div>
-          )}
-          {pendingVerifactu > 0 && (
-            <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              <AlertCircle size={15} />
-              <span>
-                {pendingVerifactu} factura
-                {pendingVerifactu !== 1 ? "s" : ""} pendiente
-                {pendingVerifactu !== 1 ? "s" : ""} de envío a VeriFactu
-              </span>
-              <Link
-                href="/admin/fiscal/verifactu"
-                className="ml-auto text-xs font-semibold underline"
-              >
-                Ver →
-              </Link>
-            </div>
-          )}
-          {rejectedVerifactu > 0 && (
-            <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-              <AlertCircle size={15} />
-              <span>
-                {rejectedVerifactu} factura
-                {rejectedVerifactu !== 1 ? "s" : ""} rechazada
-                {rejectedVerifactu !== 1 ? "s" : ""} por VeriFactu — requieren
-                atención
-              </span>
-              <Link
-                href="/admin/fiscal/verifactu"
-                className="ml-auto text-xs font-semibold underline"
-              >
-                Ver →
-              </Link>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Alerts — silenciadas mientras VeriFactu esté en modo "off" (la SL
+          aún no emite facturas reales y los plazos del 303/etc. no aplican).
+          Cuando entre VeriFactu (probablemente 2027) basta cambiar
+          `VERIFACTU_CONFIG.mode` y esta sección vuelve sola. */}
+      {VERIFACTU_CONFIG.mode !== "off" &&
+        (pendingVerifactu > 0 ||
+          rejectedVerifactu > 0 ||
+          daysUntilDue <= 14) && (
+          <div className="mb-6 space-y-2">
+            {daysUntilDue <= 14 && daysUntilDue > 0 && (
+              <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <Calendar size={15} />
+                <span>
+                  Vencimiento modelo 303 {quarterLabel}: queda
+                  {daysUntilDue === 1 ? " 1 día" : ` ${daysUntilDue} días`} (
+                  {currentPeriod.dueDate.toLocaleDateString("es-ES")})
+                </span>
+              </div>
+            )}
+            {pendingVerifactu > 0 && (
+              <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <AlertCircle size={15} />
+                <span>
+                  {pendingVerifactu} factura
+                  {pendingVerifactu !== 1 ? "s" : ""} pendiente
+                  {pendingVerifactu !== 1 ? "s" : ""} de envío a VeriFactu
+                </span>
+                <Link
+                  href="/admin/fiscal/verifactu"
+                  className="ml-auto text-xs font-semibold underline"
+                >
+                  Ver →
+                </Link>
+              </div>
+            )}
+            {rejectedVerifactu > 0 && (
+              <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                <AlertCircle size={15} />
+                <span>
+                  {rejectedVerifactu} factura
+                  {rejectedVerifactu !== 1 ? "s" : ""} rechazada
+                  {rejectedVerifactu !== 1 ? "s" : ""} por VeriFactu — requieren
+                  atención
+                </span>
+                <Link
+                  href="/admin/fiscal/verifactu"
+                  className="ml-auto text-xs font-semibold underline"
+                >
+                  Ver →
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
 
       {/* Datos fiscales pendientes */}
       {pendingTasks.length > 0 && (
