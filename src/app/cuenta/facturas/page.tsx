@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Receipt, Download, FileSpreadsheet, Calendar } from "lucide-react";
 import { type Invoice, type InvoiceItem } from "@/data/mockData";
 import { useAuth } from "@/context/AuthContext";
@@ -8,6 +8,53 @@ import { printInvoiceWithCSV, type InvoiceData } from "@/utils/invoiceGenerator"
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import { getIssuerAddress } from "@/lib/fiscalAddress";
+import { getInvoicesByUser } from "@/services/invoiceService";
+import type { InvoiceRecord } from "@/types/fiscal";
+import { DataHub } from "@/lib/dataHub";
+
+/**
+ * Mapea el shape canónico fiscal `InvoiceRecord` (servicio) al shape UI `Invoice`
+ * (mockData). El UI espera precios CON IVA en `unitPrice`/`total` mientras que
+ * el motor fiscal almacena el precio SIN IVA en `unitPrice`. Hacemos la
+ * conversión aquí (no en el servicio: la cadena hash VeriFactu se calcula
+ * sobre los precios netos y no se debe tocar).
+ */
+function fiscalToUiInvoice(rec: InvoiceRecord): Invoice {
+  const items: InvoiceItem[] = rec.items.map((line) => ({
+    description: line.description,
+    qty: line.quantity,
+    unitPrice:
+      Math.round(line.unitPrice * (1 + line.vatRate / 100) * 100) / 100,
+    total: Math.round(line.totalLine * 100) / 100,
+    vatRate: line.vatRate,
+  }));
+
+  // El cliente solo distingue pagada/pendiente. Si el motor fiscal marcó pago
+  // total (paymentDate o totalPaid >= totalInvoice), la presentamos como
+  // "pagada"; cualquier otro caso (parcial, sin pago, anulada) → "pendiente"
+  // para que no muestre el botón de descarga PDF como si estuviera cerrada.
+  const isPaid =
+    !!rec.paymentDate || rec.totals.totalPaid >= rec.totals.totalInvoice;
+
+  // El receptor puede ser CompanyData (B2B) o CustomerData (particular).
+  const recipient = rec.recipient as Partial<{
+    name: string;
+    taxId?: string;
+    address?: { street?: string; cityLine?: string };
+  }>;
+
+  return {
+    id: rec.invoiceNumber,
+    orderId: rec.sourceOrderId ?? "",
+    date: rec.invoiceDate.toISOString().slice(0, 10),
+    total: Math.round(rec.totals.totalInvoice * 100) / 100,
+    status: isPaid ? "pagada" : "pendiente",
+    items,
+    clientName: recipient.name,
+    clientNif: recipient.taxId,
+    clientAddress: recipient.address?.street,
+  };
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -303,17 +350,26 @@ export default function FacturasPage() {
     user?.role === "tienda" ||
     user?.role === "admin";
 
+  const [source, setSource] = useState<Invoice[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const reload = () => {
+      setSource(getInvoicesByUser(user.id).map(fiscalToUiInvoice));
+    };
+    reload();
+    // SSOT: invoiceService emite "invoices" cuando admin crea/anula/rectifica.
+    return DataHub.on("invoices", reload);
+  }, [user]);
+
   const filtered = useMemo(() => {
-    // TODO: conectar con invoiceService.getInvoicesByUser(user.id).
-    // Hasta entonces, lista vacía para todos los usuarios.
-    const source: Invoice[] = [];
     return source.filter((inv) => {
       const ym = inv.date.slice(0, 7);
       if (dateFrom && ym < dateFrom) return false;
       if (dateTo && ym > dateTo) return false;
       return true;
     });
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, source]);
 
   const periodLabel = dateFrom && dateTo ? `${dateFrom}_${dateTo}` : "completo";
   const showingAll = !dateFrom && !dateTo;

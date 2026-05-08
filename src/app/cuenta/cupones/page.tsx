@@ -1,7 +1,40 @@
 "use client";
+import { useEffect, useState } from "react";
 import { Gift, Tag, Clock, Check, X, Percent, Euro } from "lucide-react";
-import { type Coupon } from "@/data/mockData";
+import { type Coupon, type CouponStatus } from "@/data/mockData";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
+import { useAuth } from "@/context/AuthContext";
+import { getUserCoupons, type UserCoupon } from "@/services/couponService";
+import { DataHub } from "@/lib/dataHub";
+
+/**
+ * Mapea el shape canónico `UserCoupon` (servicio) al shape de UI `Coupon`
+ * (mockData). El status se deriva en vivo: usado > caducado > activo. Así, una
+ * vez canjeado en checkout (markCouponUsed escribe `usedAt`), aparece en la
+ * pestaña "historial" automáticamente.
+ */
+function toUiCoupon(uc: UserCoupon): Coupon {
+  const today = new Date().toISOString().slice(0, 10);
+  let status: CouponStatus = "activo";
+  if (uc.usedAt) status = "usado";
+  else if (!uc.active || uc.expiresAt < today) status = "caducado";
+
+  // El UI sólo soporta percent/fixed; "shipping" no se modela aquí. Los cupones
+  // de envío gratis del admin global no llegan a esta vista (van directos al
+  // checkout vía AdminCoupon, no como UserCoupon personal).
+  const discountType: Coupon["discountType"] =
+    uc.discountType === "percent" ? "percent" : "fixed";
+
+  return {
+    code: uc.code,
+    description: uc.description,
+    discountType,
+    value: uc.value,
+    expiresAt: uc.expiresAt,
+    status,
+    usedAt: uc.usedAt?.slice(0, 10),
+  };
+}
 
 function CouponCard({ coupon }: { coupon: Coupon }) {
   const isActive = coupon.status === "activo";
@@ -78,9 +111,21 @@ function CouponCard({ coupon }: { coupon: Coupon }) {
 }
 
 export default function CuponesPage() {
-  // TODO: conectar con couponService.getUserCoupons(user.id) (shape UserCoupon).
-  // Hasta entonces, lista vacía para todos los usuarios.
-  const sourceCoupons: Coupon[] = [];
+  const { user } = useAuth();
+  const [sourceCoupons, setSourceCoupons] = useState<Coupon[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const reload = () => {
+      setSourceCoupons(getUserCoupons(user.id).map(toUiCoupon));
+    };
+    reload();
+    // SSOT: cualquier escritura en couponService emite `coupons`. Así,
+    // si el admin envía un cupón en otra pestaña o el usuario canjea uno en
+    // /finalizar-compra, esta vista se actualiza al instante sin recarga.
+    return DataHub.on("coupons", reload);
+  }, [user]);
+
   const activeCoupons = sourceCoupons.filter((c) => c.status === "activo");
   const historialCoupons = sourceCoupons.filter((c) => c.status !== "activo");
 

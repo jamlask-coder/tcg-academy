@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   RefreshCw,
@@ -20,6 +20,112 @@ import {
 } from "@/data/mockData";
 import { AccountTabs } from "@/components/cuenta/AccountTabs";
 import { useAuth } from "@/context/AuthContext";
+import {
+  createReturnRequest,
+  getReturnsByUser,
+  type ReturnReason,
+  type ReturnRequest as ServiceReturnRequest,
+  type ReturnStatus as ServiceReturnStatus,
+} from "@/services/returnService";
+import { DataHub } from "@/lib/dataHub";
+
+/**
+ * El servicio canónico tiene más estados granulares (aprobada/en_transito/
+ * recibida/cerrada) de los que el UI cliente actual sabe pintar. Reducimos
+ * al subset visible: el cliente sólo necesita saber si su devolución está
+ * en proceso, aceptada, reembolsada o rechazada.
+ */
+function mapServiceStatusToUi(s: ServiceReturnStatus): ReturnStatus {
+  switch (s) {
+    case "solicitada":
+      return "solicitada";
+    case "aprobada":
+    case "en_transito":
+    case "recibida":
+      return "aceptada";
+    case "reembolsada":
+    case "cerrada":
+      return "reembolsada";
+    case "rechazada":
+      return "rechazada";
+    default:
+      return "en_revision";
+  }
+}
+
+/**
+ * Mapea el motivo del UI (texto humano) al enum canónico `ReturnReason` del
+ * servicio. El detalle libre del usuario va siempre a `reasonDetail`. Si en
+ * el futuro añadimos más opciones al UI, basta con extender este switch — el
+ * servicio ya las acepta.
+ */
+function uiReasonToCanonical(reason: string): ReturnReason {
+  switch (reason) {
+    case "Producto dañado":
+      return "danado_envio";
+    case "Producto incorrecto":
+    case "No coincide con la descripción":
+      return "incorrecto";
+    case "No me gusta / cambio de opinión":
+      return "no_deseado";
+    default:
+      return "otro";
+  }
+}
+
+/**
+ * Convierte la RMA del servicio (shape canónico) al shape UI de mockData. El
+ * timeline real (cambios de estado) no se persiste todavía como historial
+ * explícito; mostramos una entrada por la creación + una por el estado actual
+ * cuando difiere. Es suficiente para la vista cliente; el detalle fino vive
+ * en el panel admin.
+ */
+function serviceToUiReturn(r: ServiceReturnRequest): ReturnRequest {
+  const createdDay = r.createdAt.slice(0, 10);
+  const updatedDay = r.updatedAt.slice(0, 10);
+  const uiStatus = mapServiceStatusToUi(r.status);
+  const timeline: ReturnRequest["timeline"] = [
+    {
+      date: createdDay,
+      status: "solicitada",
+      note: "Solicitud recibida. La revisaremos en 24-48 h hábiles.",
+    },
+  ];
+  if (uiStatus !== "solicitada") {
+    timeline.push({
+      date: updatedDay,
+      status: uiStatus,
+      note:
+        uiStatus === "reembolsada"
+          ? `Reembolso de ${r.totalRefundAmount.toFixed(2)}€ emitido por ${
+              r.refundMethod === "transferencia" ? "transferencia" : r.refundMethod
+            }.`
+          : r.adminNotes ?? "",
+    });
+  }
+  // El UI sólo muestra una nota; tomamos el reasonDetail del primer ítem o,
+  // en su defecto, el reason del primer ítem en formato legible.
+  const first = r.items[0];
+  const notes =
+    first?.reasonDetail?.trim() ||
+    (first?.reason ? first.reason.replace(/_/g, " ") : "");
+
+  return {
+    id: r.id,
+    orderId: r.orderId,
+    date: createdDay,
+    status: uiStatus,
+    reason: first?.reason ?? "otro",
+    notes,
+    items: r.items.map((it) => ({
+      name: it.productName,
+      qty: it.quantity,
+      price: it.unitPrice,
+    })),
+    refundAmount: r.totalRefundAmount,
+    timeline,
+  };
+}
 
 const STATUS_CONFIG: Record<
   ReturnStatus,
@@ -136,6 +242,8 @@ function RequestForm({ onClose }: { onClose: () => void }) {
     files: [] as string[],
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   // Pedidos del usuario actual con estado "enviado" (elegibles para devolución).
   const deliveredOrders: Order[] = (() => {
@@ -322,18 +430,73 @@ function RequestForm({ onClose }: { onClose: () => void }) {
               notificaremos por email.
             </p>
           </div>
+          {submitError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {submitError}
+            </div>
+          )}
           <div className="flex gap-3">
             <button
               onClick={() => setStep(2)}
-              className="flex-1 rounded-xl border-2 border-gray-200 py-3 text-sm font-bold transition hover:bg-gray-50"
+              disabled={submitting}
+              className="flex-1 rounded-xl border-2 border-gray-200 py-3 text-sm font-bold transition hover:bg-gray-50 disabled:opacity-40"
             >
               Atrás
             </button>
             <button
-              onClick={() => setSubmitted(true)}
-              className="flex-1 rounded-xl bg-[#2563eb] py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8]"
+              onClick={async () => {
+                if (!user) {
+                  setSubmitError("Sesión no válida.");
+                  return;
+                }
+                const order = deliveredOrders.find(
+                  (o) => o.id === form.orderId,
+                );
+                if (!order) {
+                  setSubmitError("No encontramos el pedido seleccionado.");
+                  return;
+                }
+                if (order.items.length === 0) {
+                  setSubmitError("El pedido no tiene líneas devolvibles.");
+                  return;
+                }
+                setSubmitting(true);
+                setSubmitError("");
+                try {
+                  const canonicalReason = uiReasonToCanonical(form.reason);
+                  const items = order.items.map((it) => ({
+                    productId: it.id,
+                    productName: it.name,
+                    quantity: it.qty,
+                    unitPrice: it.price,
+                    reason: canonicalReason,
+                    reasonDetail: form.notes || undefined,
+                  }));
+                  const fullName =
+                    [user.name, user.lastName].filter(Boolean).join(" ").trim() ||
+                    user.email;
+                  createReturnRequest(
+                    order.id,
+                    user.id,
+                    user.email,
+                    fullName,
+                    items,
+                  );
+                  setSubmitted(true);
+                } catch (err) {
+                  setSubmitError(
+                    err instanceof Error
+                      ? err.message
+                      : "No pudimos registrar la solicitud. Inténtalo de nuevo.",
+                  );
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+              disabled={submitting}
+              className="flex-1 rounded-xl bg-[#2563eb] py-3 text-sm font-bold text-white transition hover:bg-[#1d4ed8] disabled:opacity-40"
             >
-              Enviar solicitud
+              {submitting ? "Enviando..." : "Enviar solicitud"}
             </button>
           </div>
         </div>
@@ -343,11 +506,21 @@ function RequestForm({ onClose }: { onClose: () => void }) {
 }
 
 export default function DevolucionesPage() {
+  const { user } = useAuth();
   const [showForm, setShowForm] = useState(false);
+  const [visibleReturns, setVisibleReturns] = useState<ReturnRequest[]>([]);
 
-  // TODO: conectar con returnService.getReturnsByUser(user.id).
-  // Hasta entonces, lista vacía para todos los usuarios.
-  const visibleReturns: ReturnRequest[] = [];
+  // SSOT: leemos del returnService y nos suscribimos al evento `returns` para
+  // refrescar al instante cuando admin apruebe/reembolse o cuando creemos una
+  // RMA nueva desde este mismo formulario.
+  useEffect(() => {
+    if (!user) return;
+    const reload = () => {
+      setVisibleReturns(getReturnsByUser(user.id).map(serviceToUiReturn));
+    };
+    reload();
+    return DataHub.on("returns", reload);
+  }, [user]);
 
   return (
     <div>
