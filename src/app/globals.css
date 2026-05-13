@@ -406,24 +406,311 @@ body.tpv-mode {
 
 /* ─── Print TPV ticket — papel térmico 80mm o A4 fallback ─────────────────── */
 @media print {
-  body.tpv-print > * { display: none !important; }
-  body.tpv-print .tpv-print-area { display: block !important; }
+  /* Patrón visibility — funciona aunque .tpv-print-area esté anidado en
+     varios contenedores. `display: none` sobre un ancestro impediría que
+     ningún descendiente se viese, así que usamos `visibility: hidden` que
+     SÍ permite reactivar un descendiente concreto. */
+  body.tpv-print,
+  body.tpv-print * {
+    visibility: hidden;
+  }
+  /* body.tpv-mode pone overflow:hidden y bg oscuro — anulamos en impresión */
+  body.tpv-print {
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  body.tpv-print .tpv-print-area,
+  body.tpv-print .tpv-print-area * {
+    visibility: visible;
+  }
+  /* Sacamos el área imprimible a la esquina superior izquierda del papel
+     para que no salga desplazada al margen donde estaba la modal. */
+  /* El ticket queda CENTRADO horizontalmente en cualquier tamaño de papel:
+     - Impresora térmica 80mm  → 76mm dentro de 80mm (2mm a cada lado)
+     - Impresora normal A4     → 76mm centrados en los 210mm del folio
+     Usamos translateX(-50%) en lugar de margin:auto porque con position
+     fixed los márgenes no centran de forma fiable en todos los engines. */
+  body.tpv-print .tpv-print-area {
+    display: block !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    z-index: 9999;
+    background: #fff;
+  }
   .tpv-print-area {
     width: 76mm;
     margin: 0 auto;
-    padding: 4mm;
+    padding: 4mm 3mm 6mm;
     color: #000;
-    font-family: 'Courier New', monospace;
+    /* Fuente sans-serif densa pero legible — Helvetica/Arial-like.
+       Las térmicas no soportan webfonts; fallback robusto. */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
     font-size: 11px;
-    line-height: 1.35;
+    line-height: 1.4;
+    letter-spacing: 0.01em;
   }
-  .tpv-print-area .ticket-line {
-    border-bottom: 1px dashed #aaa;
-    padding: 2px 0;
+  /* ── Separadores ──────────────────────────────────────────────────── */
+  .tpv-print-area .ticket-line,
+  .tpv-print-area .ticket-rule {
+    border-bottom: 1px dashed #555;
+    margin: 2mm 0;
+    height: 0;
   }
+  /* ── Cabecera tienda ──────────────────────────────────────────────── */
+  .tpv-print-area .ticket-brand {
+    text-align: center;
+    margin-bottom: 3mm;
+  }
+  .tpv-print-area .ticket-brand-name {
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    margin-bottom: 1.5mm;
+  }
+  /* Logo escudo de marca — incluye el lettering "TCG ACADEMY" integrado.
+     Centrado por margin:auto (display:block). Tamaño 42mm para que el
+     ribbon con el nombre sea legible en papel térmico de 76mm útiles. */
+  .tpv-print-area .ticket-brand-logo {
+    display: block;
+    width: 52mm;
+    height: auto;
+    /* Margen inferior cero — el logo ya integra el lettering "TCG ACADEMY"
+       y el bloque inmediato es la razón social. Dejar mucho hueco daba
+       sensación de tarjeta partida. */
+    margin: 0 auto 0;
+    /* Forzar render exacto: si no, algunas impresoras aclaran el negro */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .tpv-print-area .ticket-brand-meta {
+    font-size: 10px;
+    line-height: 1.45;
+    color: #222;
+    margin-top: 0.5mm;
+  }
+  /* ── Banda con tipo de documento ──────────────────────────────────────
+     Sin recuadro: sólo dos líneas horizontales (arriba y abajo) que
+     enmarcan el texto. Texto centrado, sobrio, mismo flujo del ticket. */
+  .tpv-print-area .ticket-doc-band {
+    background: transparent;
+    color: #000;
+    text-align: center;
+    font-weight: 800;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    padding: 1.6mm 0;
+    margin: 2.5mm 0;
+    border-top: 0.7mm solid #000;
+    border-bottom: 0.7mm solid #000;
+  }
+  /* (eliminado) — el ticket regalo va íntegramente en blanco y negro,
+     mismas líneas horizontales en negro que el ticket fiscal. */
+  /* ── Bloque de metadatos: etiqueta / valor ────────────────────────── */
+  .tpv-print-area .ticket-meta-grid {
+    display: grid;
+    grid-template-columns: 22mm 1fr;
+    column-gap: 2mm;
+    row-gap: 0.5mm;
+    font-size: 10.5px;
+    margin: 2mm 0;
+  }
+  .tpv-print-area .ticket-meta-label {
+    color: #555;
+    text-transform: uppercase;
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    align-self: center;
+  }
+  .tpv-print-area .ticket-meta-value {
+    font-weight: 700;
+    word-break: break-word;
+  }
+  /* ── Bloque cliente (factura) ─────────────────────────────────────── */
+  .tpv-print-area .ticket-customer {
+    margin: 2mm 0;
+    padding: 2mm 2.5mm;
+    background: #f4f4f4;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-size: 10.5px;
+    line-height: 1.45;
+  }
+  .tpv-print-area .ticket-customer-name {
+    font-weight: 800;
+    font-size: 11.5px;
+    margin-bottom: 0.5mm;
+  }
+  .tpv-print-area .ticket-section-title {
+    text-transform: uppercase;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: #555;
+    margin-bottom: 0.8mm;
+  }
+  .tpv-print-area .ticket-meta-small {
+    font-size: 9.5px;
+    color: #444;
+    margin-top: 0.5mm;
+  }
+  /* ── Líneas del ticket ────────────────────────────────────────────── */
+  .tpv-print-area .ticket-lines {
+    margin: 2mm 0;
+  }
+  .tpv-print-area .ticket-line-row {
+    margin-bottom: 1.5mm;
+  }
+  .tpv-print-area .ticket-line-name {
+    font-weight: 700;
+    font-size: 11.5px;
+    line-height: 1.3;
+    /* Saltos suaves si el nombre es largo */
+    word-break: break-word;
+  }
+  .tpv-print-area .ticket-line-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #333;
+    margin-top: 0.3mm;
+    font-variant-numeric: tabular-nums;
+  }
+  .tpv-print-area .ticket-line-total {
+    font-weight: 800;
+    color: #000;
+  }
+  /* ── Tabla desglose IVA ───────────────────────────────────────────── */
+  .tpv-print-area .ticket-vat {
+    margin: 2mm 0;
+    font-size: 9.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .tpv-print-area .ticket-vat-header,
+  .tpv-print-area .ticket-vat-row {
+    display: grid;
+    grid-template-columns: 1fr 0.7fr 1fr 1fr;
+    gap: 1mm;
+    text-align: right;
+  }
+  .tpv-print-area .ticket-vat-header {
+    color: #555;
+    text-transform: uppercase;
+    font-size: 8.5px;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 0.5mm;
+    margin-bottom: 0.5mm;
+  }
+  .tpv-print-area .ticket-vat-row {
+    padding: 0.3mm 0;
+  }
+  /* ── Total destacado ────────────────────────────────────────────────
+     Sin recuadro: sólo dos líneas horizontales que delimitan la caja del
+     total, manteniendo el peso visual sin sobrecargar de tinta. */
+  .tpv-print-area .ticket-total-box {
+    margin: 2.5mm 0 1mm;
+    padding: 2.2mm 0;
+    background: transparent;
+    color: #000;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-top: 0.7mm solid #000;
+    border-bottom: 0.7mm solid #000;
+  }
+  .tpv-print-area .ticket-total-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+  }
+  .tpv-print-area .ticket-total-value {
+    font-size: 18px;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+  }
+  .tpv-print-area .ticket-total-note {
+    text-align: right;
+    font-size: 9px;
+    color: #555;
+    margin-bottom: 2mm;
+  }
+  /* ── Pago / cambio ────────────────────────────────────────────────── */
+  .tpv-print-area .ticket-pay {
+    margin: 2mm 0;
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .tpv-print-area .ticket-pay-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.4mm 0;
+  }
+  .tpv-print-area .ticket-pay-row.ticket-pay-change {
+    font-weight: 800;
+    border-top: 1px dashed #888;
+    padding-top: 0.8mm;
+    margin-top: 0.4mm;
+  }
+  /* ── Política de devoluciones ─────────────────────────────────────── */
+  .tpv-print-area .ticket-policy {
+    margin: 2mm 0;
+    padding: 1.8mm 2mm;
+    border: 1px dashed #777;
+    text-align: center;
+    font-size: 9.5px;
+    line-height: 1.45;
+  }
+  .tpv-print-area .ticket-policy strong {
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+  }
+  /* ── Sello VeriFactu ──────────────────────────────────────────────── */
+  .tpv-print-area .ticket-verifactu {
+    margin: 1.5mm 0 0;
+    font-size: 8.5px;
+    color: #555;
+    text-align: center;
+    font-style: italic;
+    line-height: 1.4;
+  }
+  /* ── Pie ──────────────────────────────────────────────────────────── */
+  .tpv-print-area .ticket-footer {
+    margin-top: 3mm;
+    text-align: center;
+    font-size: 10px;
+    color: #333;
+    line-height: 1.5;
+  }
+  .tpv-print-area .ticket-footer-thanks {
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.8mm;
+  }
+  .tpv-print-area .ticket-footer-web {
+    font-size: 10px;
+    color: #333;
+  }
+  .tpv-print-area .ticket-footer-tag {
+    margin-top: 1.5mm;
+    font-style: italic;
+    color: #555;
+  }
+  /* ── Ticket regalo — oculta precios; muestra cabecera regalo ──────── */
+  body.tpv-print-gift .tpv-gift-hide { display: none !important; }
+  body.tpv-print-gift .tpv-gift-only { display: block !important; }
+  /* Cuando es ticket regalo, ajustar grid de meta a una sola columna útil */
+  body.tpv-print-gift .tpv-print-area .ticket-meta-grid {
+    grid-template-columns: 18mm 1fr;
+  }
+  /* Tamaño de página: el usuario manda. Si tiene térmica configurada como
+     papel por defecto (80mm) se usa; si imprime en A4 el ticket queda
+     centrado en el folio gracias a la regla translateX(-50%) de arriba.
+     No forzamos size aquí para no romper el selector de papel del SO. */
   @page {
-    size: 80mm auto;
     margin: 0;
   }
 }
 .tpv-print-area { display: none; }
+.tpv-gift-only { display: none; }

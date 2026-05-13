@@ -16,10 +16,14 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySessionToken } from "@/lib/auth";
 import { isIpAllowedForAdmin } from "@/lib/adminIpAllowlist";
+import { isIpAllowedForTpv } from "@/lib/tpvIpAllowlist";
 import { timingSafeEqualStr } from "@/lib/timingSafe";
 
 const SESSION_COOKIE = "tcga_session";
 const ADMIN_LOCAL_COOKIE = "tcga_admin_panel"; // local-mode panel gate cookie
+
+/** Roles autorizados a entrar al TPV (server mode). */
+const TPV_ALLOWED_ROLES = new Set(["admin", "tienda"]);
 
 function getIp(request: NextRequest): string {
   return (
@@ -56,6 +60,67 @@ function adminGateRecordFail(ip: string): void {
   } else {
     entry.count += 1;
   }
+}
+
+// Rate-limit independiente para el gate del TPV — no compartimos memoria con
+// el del admin para evitar que un brute-force al panel admin bloquee a los
+// dependientes de tienda en mitad de un ticket (y viceversa).
+const TPV_GATE_FAILS = new Map<string, { count: number; resetAt: number }>();
+const TPV_GATE_WINDOW_MS = 5 * 60 * 1000;
+const TPV_GATE_MAX_FAILS = 5;
+function tpvGateRateLimit(ip: string): { allowed: boolean; retryAfterSec?: number } {
+  const now = Date.now();
+  const entry = TPV_GATE_FAILS.get(ip);
+  if (!entry || entry.resetAt < now) {
+    TPV_GATE_FAILS.set(ip, { count: 0, resetAt: now + TPV_GATE_WINDOW_MS });
+    return { allowed: true };
+  }
+  if (entry.count >= TPV_GATE_MAX_FAILS) {
+    return { allowed: false, retryAfterSec: Math.ceil((entry.resetAt - now) / 1000) };
+  }
+  return { allowed: true };
+}
+function tpvGateRecordFail(ip: string): void {
+  const now = Date.now();
+  const entry = TPV_GATE_FAILS.get(ip);
+  if (!entry || entry.resetAt < now) {
+    TPV_GATE_FAILS.set(ip, { count: 1, resetAt: now + TPV_GATE_WINDOW_MS });
+  } else {
+    entry.count += 1;
+  }
+}
+
+function denyTpv(
+  pathname: string,
+  reason: string,
+  request: NextRequest,
+): NextResponse {
+  const isApi = pathname.startsWith("/api/");
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[tpv-guard] DENY ${request.method} ${pathname} ip=${getIp(request)} reason=${reason} ua="${request.headers.get("user-agent") ?? ""}"`,
+  );
+  if (isApi) {
+    return new NextResponse(
+      JSON.stringify({ error: "Acceso denegado" }),
+      {
+        status: 403,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+          "X-Robots-Tag": "noindex, nofollow",
+        },
+      },
+    );
+  }
+  const url = request.nextUrl.clone();
+  url.pathname = "/login";
+  url.searchParams.set("from", pathname);
+  url.searchParams.set("reason", "tpv");
+  const r = NextResponse.redirect(url);
+  r.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  r.headers.set("X-Robots-Tag", "noindex, nofollow");
+  return r;
 }
 
 function denyAdmin(
@@ -290,6 +355,90 @@ export async function proxy(request: NextRequest) {
       }
     }
     // En development se permite el paso para DX (con todos los headers ya puestos).
+  }
+
+  // ── 6. TPV route protection ──
+  // Mismo patrón que /admin pero con role ∈ {admin, tienda} y IP allowlist
+  // independiente (TPV_ALLOWED_IPS). Doble capa: aquí (edge) + `src/app/tpv/layout.tsx`
+  // (server component). Si una falla, la otra sigue protegiendo.
+  //
+  // Modos:
+  //   a) Server mode → JWT firmada con role ∈ {admin, tienda}.
+  //   b) Local mode + production → cookie `tcga_admin_panel` (admin operativo).
+  //      Las tiendas no entran en local-prod porque no hay JWT real ahí.
+  //   c) Development → permite, para no romper DX.
+  if (pathname.startsWith("/tpv") || pathname.startsWith("/api/tpv")) {
+    const isProd = process.env.NODE_ENV === "production";
+    const isServerMode =
+      (process.env.NEXT_PUBLIC_BACKEND_MODE ?? "local") === "server";
+
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet");
+    response.headers.set("Referrer-Policy", "no-referrer");
+    response.headers.set("X-Tpv-Route", "true");
+
+    if (isProd) {
+      const ip = getIp(request);
+
+      // IP allowlist específica del TPV (si está configurada).
+      if (!isIpAllowedForTpv(ip)) {
+        return denyTpv(pathname, "ip-not-allowed", request);
+      }
+
+      // Rate-limit del gate (5 fallos / 5 min por IP).
+      const rl = tpvGateRateLimit(ip);
+      if (!rl.allowed) {
+        // eslint-disable-next-line no-console
+        console.warn(`[tpv-guard] RATE-LIMITED ${request.method} ${pathname} ip=${ip}`);
+        return new NextResponse(
+          JSON.stringify({ error: "Demasiados intentos. Espera unos minutos." }),
+          {
+            status: 429,
+            headers: {
+              "Content-Type": "application/json",
+              "Retry-After": String(rl.retryAfterSec ?? 300),
+              "Cache-Control": "no-store",
+            },
+          },
+        );
+      }
+
+      if (isServerMode) {
+        const token = request.cookies.get(SESSION_COOKIE)?.value;
+        if (!token) {
+          tpvGateRecordFail(ip);
+          return denyTpv(pathname, "no-session", request);
+        }
+        const session = await verifySessionToken(token);
+        if (!session) {
+          tpvGateRecordFail(ip);
+          return denyTpv(pathname, "invalid-session", request);
+        }
+        if (!TPV_ALLOWED_ROLES.has(session.role)) {
+          tpvGateRecordFail(ip);
+          return denyTpv(
+            pathname,
+            `role-not-allowed:${session.role}`,
+            request,
+          );
+        }
+      } else {
+        // Local mode + production: solo admin con token compartido.
+        const required = process.env.ADMIN_PANEL_TOKEN;
+        if (!required) {
+          return denyTpv(pathname, "no-admin-panel-token-configured", request);
+        }
+        if (required.length < 32) {
+          return denyTpv(pathname, "admin-panel-token-too-short", request);
+        }
+        const cookie = request.cookies.get(ADMIN_LOCAL_COOKIE)?.value;
+        if (!cookie || !timingSafeEqualStr(cookie, required)) {
+          tpvGateRecordFail(ip);
+          return denyTpv(pathname, "missing-admin-panel-cookie", request);
+        }
+      }
+    }
+    // En development pasa, con los headers anti-cache/noindex ya aplicados.
   }
 
   return response;

@@ -732,6 +732,16 @@ export default function AdminUsuarioDetailPage() {
             <UserRoleManager
               userId={user.id}
               defaultRole={user.role as "cliente" | "mayorista" | "tienda"}
+              userEmail={user.email}
+              userLabel={`${user.name ?? ""} ${user.lastName ?? ""}`.trim() || user.email}
+              defaultTpvStoreSlug={
+                (user.tpvStoreSlug as
+                  | "calpe"
+                  | "bejar"
+                  | "madrid"
+                  | "barcelona"
+                  | undefined) ?? null
+              }
             />
           )}
 

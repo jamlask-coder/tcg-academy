@@ -142,20 +142,38 @@ export interface SessionPayload extends JWTPayload {
   email: string;
   role: string;
   name: string;
+  /**
+   * Tienda asignada cuando `role === "tienda"`. Slug de `TPV_STORES`
+   * (calpe / bejar / madrid / barcelona). Lo lee `tpv/[store]/page.tsx`
+   * para denegar acceso cruzado entre tiendas. Para super-usuarios
+   * (`TPV_SUPER_USER_EMAILS`) y `admin` no aplica — esos acceden a todas.
+   */
+  tpvStoreSlug?: string;
 }
 
 export async function createSessionToken(
-  user: { id: string; email: string; role: string; name: string },
+  user: {
+    id: string;
+    email: string;
+    role: string;
+    name: string;
+    tpvStoreSlug?: string;
+  },
   rememberMe = false,
 ): Promise<string> {
   const secret = getJwtSecret();
   const expiry = rememberMe ? REMEMBER_ME_EXPIRY : SESSION_EXPIRY;
 
-  return new SignJWT({
+  // Claims base. `tpvStoreSlug` se omite si está undefined para no inflar
+  // el token cuando no aplica (la mayoría de usuarios).
+  const claims: Record<string, unknown> = {
     email: user.email,
     role: user.role,
     name: user.name,
-  })
+  };
+  if (user.tpvStoreSlug) claims.tpvStoreSlug = user.tpvStoreSlug;
+
+  return new SignJWT(claims)
     .setProtectedHeader({ alg: JWT_ALGORITHM })
     .setSubject(user.id)
     .setIssuedAt()

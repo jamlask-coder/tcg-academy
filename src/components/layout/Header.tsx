@@ -199,7 +199,7 @@ function SearchDropdown({
                       {config?.name || p.game}
                     </p>
                   </div>
-                  <p className="text-sm font-bold whitespace-nowrap text-[#2563eb]">
+                  <p className="text-sm font-bold whitespace-nowrap text-[#1d4ed8]">
                     {p.price.toFixed(2)}€
                   </p>
                 </Link>

@@ -96,8 +96,8 @@ const STABLE: EntityRegistryEntry[] = [
   },
   {
     key: "users",
-    description: "Usuarios registrados + sesión + overrides de rol",
-    storageKeys: ["tcgacademy_registered", "tcgacademy_usernames", "tcgacademy_user", "tcgacademy_user_role_overrides", "tcgacademy_user_overrides", "tcgacademy_user_changelog", "tcgacademy_reset_tokens", "tcgacademy_activation_tokens", "tcga_auth_token", "tcga_session"],
+    description: "Usuarios registrados + sesión + overrides de rol + asignación TPV",
+    storageKeys: ["tcgacademy_registered", "tcgacademy_usernames", "tcgacademy_user", "tcgacademy_user_role_overrides", "tcgacademy_user_tpv_store_overrides", "tcgacademy_user_overrides", "tcgacademy_user_changelog", "tcgacademy_reset_tokens", "tcgacademy_activation_tokens", "tcga_auth_token", "tcga_session"],
     event: DataHubEvents.USERS_UPDATED,
     pii: true,
     retentionMonths: 0,
@@ -440,6 +440,20 @@ const STABLE: EntityRegistryEntry[] = [
     criticalJson: true,
     dependsOn: ["tpv_sales"],
     notes: "Cada tienda standalone mantiene cadena hash SHA-256 + contador de serie + emisor (CompanyData) propios. Hoy operan con CIF placeholder 'PENDIENTE' hasta constituirse como entidades jurídicas. NO entran en /admin/fiscal central ni se envían a AEAT central. NO crean apuntes en el journal central. Inmutables: rectificativas vía createStoreInvoice() con previousInvoiceId.",
+  },
+  {
+    key: "tpv_workers",
+    description: "Trabajadores TPV dados de alta por cada cuenta `tienda` para vender en el TPV de su tienda con nick + password.",
+    storageKeys: ["tcgacademy_tpv_workers"],
+    event: DataHubEvents.TPV_WORKERS_UPDATED,
+    pii: true,
+    retentionMonths: 0,
+    adapter: "@/services/tpvWorkerService",
+    maturity: "stable",
+    category: "usuarios",
+    criticalJson: true,
+    dependsOn: ["users"],
+    notes: "Workers NO se loguean en la web pública: viven solo dentro del TPV de su tienda. Password hash bcryptjs rounds=10 (verificación cliente). Baja lógica (active=false) — nunca borrado físico para preservar trazabilidad de ventas históricas que apuntan a su id en operatorId. El seller activo por pestaña se guarda en sessionStorage `tcgacademy_tpv_active_seller`.",
   },
 ];
 

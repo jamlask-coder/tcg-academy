@@ -121,6 +121,13 @@ export interface UserRecord {
   /** Heartbeat del cliente (cada 60s mientras está logueado). Se usa para
    * mostrar punto verde/rojo en /admin/usuarios/[id]. */
   lastSeenAt?: string;
+  /**
+   * Tienda física asignada — solo para `role === "tienda"`. Slug de
+   * `TPV_STORES` (calpe / bejar / madrid / barcelona). El login lo propaga
+   * al JWT (`SessionPayload.tpvStoreSlug`) para que el guard del TPV pueda
+   * limitar acceso por tienda en server mode.
+   */
+  tpvStoreSlug?: string;
   createdAt: string;
   updatedAt: string;
 }

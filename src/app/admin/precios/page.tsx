@@ -1240,7 +1240,7 @@ export default function PreciosPage() {
                 className="flex items-center justify-between gap-2"
               >
                 <span className="truncate text-gray-700">{r.name}</span>
-                <span className="flex-shrink-0 font-mono font-bold text-[#2563eb]">
+                <span className="flex-shrink-0 font-mono font-bold text-[#1d4ed8]">
                   {r.price.toFixed(2)}€
                 </span>
               </li>

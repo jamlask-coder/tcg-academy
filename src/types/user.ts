@@ -84,6 +84,14 @@ export interface User {
    * si en el futuro añadimos upload manual de avatar.
    */
   avatarUrl?: string;
+  /**
+   * Tienda física asignada al usuario con rol `tienda` — slug de
+   * `TPV_STORES` (calpe / bejar / madrid / barcelona). Determina a qué TPV
+   * tiene acceso. Solo aplica si `role === "tienda"`. Los `admin` acceden
+   * a todos los TPV sin necesidad de este campo; los super-usuarios
+   * listados en `TPV_SUPER_USER_EMAILS` también (ver `src/lib/tpvAccess.ts`).
+   */
+  tpvStoreSlug?: string;
 }
 
 export interface RegisterData {

@@ -187,6 +187,13 @@ export interface AdminUser {
   cif?: string; // CIF/NIF (B2B)
   lastOrderDate?: string;
   birthDate?: string; // YYYY-MM-DD
+  /**
+   * Tienda física asignada al usuario `tienda` — slug de `TPV_STORES`
+   * (calpe / bejar / madrid / barcelona). Solo presente si `role === "tienda"`.
+   * Lo lee `UserRoleManager` para pintar la asignación actual y
+   * `app/tpv/[store]/page.tsx` (vía JWT) para denegar acceso cruzado.
+   */
+  tpvStoreSlug?: string;
 }
 
 // ─── Admin Orders ────────────────────────────────────────────────────────────

@@ -108,6 +108,8 @@ export default function EditProductClient({
         comparePrice: merged.comparePrice ?? 0,
         inStock: merged.inStock,
         isNew: merged.isNew,
+        gtin13: merged.gtin13 ?? "",
+        mpn: merged.mpn ?? "",
       }}
       initialTags={merged.tags ?? []}
       initialImages={merged.images}

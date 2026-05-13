@@ -47,6 +47,7 @@ export const DataHubEvents = {
   TPV_SALES_UPDATED: "tcga:tpv_sales:updated",
   TPV_STOCK_UPDATED: "tcga:tpv_stock:updated",
   TPV_INVOICES_UPDATED: "tcga:tpv_invoices:updated",
+  TPV_WORKERS_UPDATED: "tcga:tpv_workers:updated",
 
   // Entidades future (stubs — listeners aún no implementados)
   AFFILIATES_UPDATED: "tcga:affiliates:updated",
@@ -107,6 +108,7 @@ export const ENTITY_EVENT: Record<string, DataHubEventName> = {
   tpv_sales: DataHubEvents.TPV_SALES_UPDATED,
   tpv_stock: DataHubEvents.TPV_STOCK_UPDATED,
   tpv_invoices: DataHubEvents.TPV_INVOICES_UPDATED,
+  tpv_workers: DataHubEvents.TPV_WORKERS_UPDATED,
   affiliates: DataHubEvents.AFFILIATES_UPDATED,
   subscriptions: DataHubEvents.SUBSCRIPTIONS_UPDATED,
   warehouses: DataHubEvents.WAREHOUSES_UPDATED,

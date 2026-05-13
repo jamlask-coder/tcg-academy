@@ -217,7 +217,7 @@ function PriceDisplay({
       <div className="space-y-3">
         {/* Big PV Público */}
         <div className="flex flex-wrap items-end gap-3">
-          <span className="text-2xl font-bold" style={{ color }}>
+          <span className="text-2xl font-bold" style={{ color: "#1d4ed8" }}>
             <InlineEdit
               type="number"
               step="0.01"
@@ -274,7 +274,7 @@ function PriceDisplay({
         </span>
       )}
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-bold" style={{ color }}>
+        <span className="text-2xl font-bold" style={{ color: "#1d4ed8" }}>
           {displayPrice.toFixed(2)}€
         </span>
         <span className="text-xs text-gray-400">IVA incluido</span>
@@ -403,6 +403,10 @@ export function ProductDetailClient({ product: initialProduct, config, catLabel 
   const [inlineStockQty, setInlineStockQty] = useState<string>(
     product.stock !== undefined ? String(product.stock) : "",
   );
+  const [inlineGtin13, setInlineGtin13] = useState<string>(product.gtin13 ?? "");
+  const [gtin13Error, setGtin13Error] = useState<string | null>(null);
+  const [inlineMpn, setInlineMpn] = useState<string>(product.mpn ?? "");
+  const [mpnError, setMpnError] = useState<string | null>(null);
   const [descExpanded, setDescExpanded] = useState(false);
   const [descOverflows, setDescOverflows] = useState(false);
   const descRef = useRef<HTMLDivElement>(null);
@@ -448,6 +452,8 @@ export function ProductDetailClient({ product: initialProduct, config, catLabel 
       product.stock !== undefined ? String(product.stock) : "",
     );
     setInlineImages(product.images);
+    setInlineGtin13(product.gtin13 ?? "");
+    setInlineMpn(product.mpn ?? "");
   }, [product, initialProduct]);
 
   // Detect if description overflows line-clamp-3
@@ -663,11 +669,30 @@ export function ProductDetailClient({ product: initialProduct, config, catLabel 
   }, [product.id, product.game, router]);
 
   const displayImages = inlineImages.length > 0 ? inlineImages : [null];
-  const productUrl =
-    typeof window !== "undefined"
-      ? window.location.href
-      : `https://tcgacademy.es/${product.game}/${product.category}/${product.slug}`;
-  const related = getRelated(product);
+  // URL para compartir: SSR y el primer render cliente deben coincidir, por eso
+  // arrancamos siempre con la canónica de tcgacademy.es y rehidratamos a
+  // window.location.href tras montar. Sin esto, ShareButtons mete `localhost:3000`
+  // en cliente y `tcgacademy.es` en SSR → hydration mismatch.
+  const canonicalProductUrl = `https://tcgacademy.es/${product.game}/${product.category}/${product.slug}`;
+  const [productUrl, setProductUrl] = useState<string>(canonicalProductUrl);
+  useEffect(() => {
+    if (typeof window !== "undefined") setProductUrl(window.location.href);
+  }, [canonicalProductUrl]);
+  // `related` deriva de getMergedProducts(), que en SSR no ve overrides/admin
+  // creados/deletions (localStorage indisponible) y en cliente sí → lista
+  // distinta. Lo aplazamos a post-mount para que ambos renders coincidan.
+  const [related, setRelated] = useState<LocalProduct[]>([]);
+  useEffect(() => {
+    setRelated(getRelated(product));
+    if (typeof window === "undefined") return;
+    const onUpdated = () => setRelated(getRelated(product));
+    window.addEventListener("tcga:products:updated", onUpdated);
+    window.addEventListener("storage", onUpdated);
+    return () => {
+      window.removeEventListener("tcga:products:updated", onUpdated);
+      window.removeEventListener("storage", onUpdated);
+    };
+  }, [product]);
 
   return (
     <div className="mx-auto max-w-[1280px] px-5 pt-1 pb-4 sm:px-8 sm:py-4 lg:px-10">
@@ -1259,6 +1284,96 @@ export function ProductDetailClient({ product: initialProduct, config, catLabel 
               </div>
             );
           })()}
+
+          {/* 4d. Código de barras — sólo admin en editMode. No visible para
+              clientes. Lo lee el TPV al escanear con el lector. */}
+          {isAdmin && editMode && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <h3 className="mb-1 text-xs font-bold text-gray-700">
+                Código de barras
+              </h3>
+              <p className="mb-3 text-xs text-gray-400">
+                No se muestran en la web. Los lee el lector del TPV al escanear.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label
+                    htmlFor="pdp-gtin13"
+                    className="mb-1 block text-xs font-semibold text-gray-600"
+                  >
+                    Código de barras (EAN-13)
+                  </label>
+                  <input
+                    id="pdp-gtin13"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={inlineGtin13}
+                    maxLength={13}
+                    onChange={(e) => {
+                      setInlineGtin13(e.target.value);
+                      if (gtin13Error) setGtin13Error(null);
+                    }}
+                    onBlur={() => {
+                      const v = inlineGtin13.trim();
+                      if (v !== "" && !/^\d{13}$/.test(v)) {
+                        setGtin13Error(
+                          "EAN-13: deben ser exactamente 13 dígitos",
+                        );
+                        return;
+                      }
+                      setGtin13Error(null);
+                      if ((product.gtin13 ?? "") !== v) {
+                        persistPatch({
+                          gtin13: v === "" ? undefined : v,
+                        });
+                      }
+                    }}
+                    placeholder="13 dígitos (ej. 8431234567890)"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-1.5 font-mono text-sm focus:border-[#2563eb] focus:outline-none"
+                  />
+                  {gtin13Error && (
+                    <p className="mt-1 text-xs text-red-500">{gtin13Error}</p>
+                  )}
+                </div>
+                <div>
+                  <label
+                    htmlFor="pdp-mpn"
+                    className="mb-1 block text-xs font-semibold text-gray-600"
+                  >
+                    Referencia interna (MPN)
+                  </label>
+                  <input
+                    id="pdp-mpn"
+                    type="text"
+                    autoComplete="off"
+                    value={inlineMpn}
+                    maxLength={64}
+                    onChange={(e) => {
+                      setInlineMpn(e.target.value);
+                      if (mpnError) setMpnError(null);
+                    }}
+                    onBlur={() => {
+                      const v = inlineMpn.trim();
+                      if (v.length > 64) {
+                        setMpnError("Máx 64 caracteres");
+                        return;
+                      }
+                      setMpnError(null);
+                      if ((product.mpn ?? "") !== v) {
+                        persistPatch({ mpn: v === "" ? undefined : v });
+                      }
+                    }}
+                    placeholder="Opcional (ej. WOTC-MKM-DRAFT-EN)"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-1.5 font-mono text-sm focus:border-[#2563eb] focus:outline-none"
+                  />
+                  {mpnError && (
+                    <p className="mt-1 text-xs text-red-500">{mpnError}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 5. Description */}
           <div

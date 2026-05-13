@@ -457,7 +457,7 @@ function LocalProductCardInner({ product }: Props) {
                   {etiquetaRol}
                 </span>
               )}
-              <span className="text-sm font-bold" style={{ color }}>
+              <span className="text-sm font-bold" style={{ color: "#1d4ed8" }}>
                 {displayPrice.toFixed(2)}€
               </span>
               {effectiveHasDiscount && (

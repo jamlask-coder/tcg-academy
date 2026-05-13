@@ -13,13 +13,15 @@ import {
   LogOut,
   CheckCircle2,
   AlertTriangle,
-  Printer,
   Package,
   ScanLine,
   User as UserIcon,
+  Users as UsersIcon,
   PenLine,
   Tag,
   RotateCcw,
+  History,
+  Gift,
   Search as SearchIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -39,7 +41,7 @@ import {
   type MobileGame,
 } from "@/data/mobileGames";
 import { LanguageFlag } from "@/components/ui/LanguageFlag";
-import { getEffectivePriceWithVat } from "@/lib/pricing";
+import { getEffectivePriceWithVat, calcVAT } from "@/lib/pricing";
 import { SITE_CONFIG } from "@/config/siteConfig";
 import {
   completeTpvSale,
@@ -54,10 +56,23 @@ import {
   loadStoreInvoices,
   rectifyStoreInvoice,
 } from "@/services/tpvStoreInvoiceService";
+import { printSingleInvoicePDF } from "@/lib/fiscalExports";
+import {
+  loadTpvSales,
+  type TpvStoreSale,
+} from "@/services/tpvStoreSalesService";
 import { CorrectionType, type InvoiceRecord } from "@/types/fiscal";
 import { DataHub } from "@/lib/dataHub";
 import { TPV_STORES, type TpvStoreSlug } from "@/config/tpvStores";
 import { getStoreStockMap } from "@/services/tpvStoreStockService";
+import {
+  getActiveSellerForStore,
+  setActiveSeller,
+  clearActiveSeller,
+} from "@/lib/tpvSeller";
+import { TpvSellerGate } from "@/components/tpv/TpvSellerGate";
+import { TpvWorkerManager } from "@/components/tpv/TpvWorkerManager";
+import type { TpvActiveSeller } from "@/types/tpvWorker";
 
 // ─── Tipos UI ────────────────────────────────────────────────────────────────
 
@@ -395,7 +410,7 @@ function TpvProductCard({
           {product.name}
         </h3>
         <div className="flex items-baseline gap-1 pt-0.5">
-          <span className="text-xs font-black tabular-nums" style={{ color }}>
+          <span className="text-xs font-black tabular-nums" style={{ color: "#1d4ed8" }}>
             {price.toFixed(2)}€
           </span>
         </div>
@@ -428,7 +443,7 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
   const [processing, setProcessing] = useState(false);
   const [feedback, setFeedback] = useState<string>("");
   const [lastSale, setLastSale] = useState<
-    (CompleteSaleResult & { lines: TpvSaleLine[]; payment: PaymentMethod; mode: SaleMode; customer?: TpvCustomer; storeName: string }) | null
+    (CompleteSaleResult & { lines: TpvSaleLine[]; payment: PaymentMethod; mode: SaleMode; customer?: TpvCustomer; storeName: string; operatorName: string; cashTendered?: number }) | null
   >(null);
 
   /**
@@ -441,9 +456,27 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
   const [discountDraftType, setDiscountDraftType] = useState<"percent" | "euro">("percent");
   const [discountDraftValue, setDiscountDraftValue] = useState<string>("");
 
-  // Modales de toolbar — línea manual y devolución.
+  // Modales de toolbar — línea manual, devolución e historial.
   const [showManualLineModal, setShowManualLineModal] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  /**
+   * Modal de gestión de trabajadores. Sólo lo abre el owner (tienda) de
+   * esta tienda — la tienda da de alta/baja sus propios vendedores.
+   */
+  const [showWorkerManager, setShowWorkerManager] = useState(false);
+
+  /**
+   * Vendedor activo en esta sesión TPV (per-tab). Se inicializa leyendo
+   * sessionStorage — si ya hay uno guardado y corresponde a esta tienda,
+   * lo reutilizamos sin volver a preguntar.
+   */
+  const [activeSeller, setActiveSellerState] = useState<TpvActiveSeller | null>(
+    null,
+  );
+  useEffect(() => {
+    setActiveSellerState(getActiveSellerForStore(storeSlug));
+  }, [storeSlug]);
 
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -641,6 +674,9 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
   async function handleConfirmPayment() {
     if (!user || !paying) return;
     if (lines.length === 0) return;
+    // No debería ocurrir — el render bloquea la UI con el seller gate si
+    // activeSeller es null. Guard adicional para TypeScript narrowing.
+    if (!activeSeller) return;
     if (paying === "efectivo") {
       const tendered = Number(cashTendered.replace(",", "."));
       if (!Number.isFinite(tendered) || tendered < total) {
@@ -672,8 +708,11 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
         cashTendered: tendered,
         mode,
         customer: mode === "factura" ? customer : (customer.name ? customer : undefined),
-        operatorId: user.id,
-        operatorName: `${user.name ?? ""} ${user.lastName ?? ""}`.trim() || user.email,
+        // Operador efectivo de la venta — el vendedor activo de la sesión
+        // (tienda o trabajador), NO el usuario auth. Eso es lo que queda en
+        // la BD como autor de la venta.
+        operatorId: activeSeller.id,
+        operatorName: activeSeller.label,
       });
       if (!result.ok && !result.invoiceId) {
         setFeedback(result.error ?? "No se pudo completar la venta.");
@@ -690,6 +729,8 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
         mode,
         customer: customer.name ? customer : undefined,
         storeName: store.name,
+        operatorName: activeSeller.label,
+        cashTendered: tendered,
       });
       // Limpiamos para la siguiente venta.
       clearCart();
@@ -705,12 +746,14 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────
-  if (!user || role !== "admin") {
+  // Acceso operativo: admin (global) o tienda (limitada a su tienda — el
+  // gate por-tienda lo aplica `tpv/[store]/page.tsx`).
+  if (!user || (role !== "admin" && role !== "tienda")) {
     return (
       <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-50 text-slate-900">
         <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-lg">
           <AlertTriangle size={32} className="mx-auto mb-3 text-amber-500" />
-          <p className="font-semibold">Acceso restringido al personal admin.</p>
+          <p className="font-semibold">Acceso restringido al personal de tienda.</p>
           <Link
             href="/login?from=/tpv"
             className="mt-4 inline-block rounded-lg bg-blue-500 px-4 py-2 text-sm font-bold text-white hover:bg-blue-600"
@@ -721,6 +764,31 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
       </div>
     );
   }
+
+  // Si no hay vendedor activo todavía → bloquear UI con el seller gate.
+  if (!activeSeller) {
+    return (
+      <TpvSellerGate
+        storeSlug={storeSlug}
+        authUser={{
+          id: user.id,
+          name: user.name,
+          lastName: user.lastName,
+          email: user.email,
+        }}
+        ownerLabel={role === "tienda" ? store.name : undefined}
+        onSelected={(seller) => {
+          setActiveSeller(seller);
+          setActiveSellerState(seller);
+        }}
+      />
+    );
+  }
+
+  // El owner-tienda de esta tienda puede gestionar sus trabajadores. Los
+  // admin no ven el botón desde aquí (lo gestionan vía `/admin/usuarios`).
+  // Los workers logueados tampoco — no es su responsabilidad.
+  const canManageWorkers = role === "tienda" && activeSeller.kind === "owner";
 
   const cashTenderedNum = Number(cashTendered.replace(",", ".")) || 0;
   const change = paying === "efectivo" ? Math.max(0, cashTenderedNum - total) : 0;
@@ -800,14 +868,48 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
             <RotateCcw size={14} className="text-rose-600" />
             Devolución
           </button>
+          <button
+            type="button"
+            onClick={() => setShowHistoryModal(true)}
+            className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+            title="Histórico de ventas TPV de esta tienda — reimpresión de tickets y facturas"
+          >
+            <History size={14} className="text-indigo-600" />
+            Historial
+          </button>
         </div>
 
         {/* Operador + salida */}
         <div className="flex items-center gap-2">
-          <span className="rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700">
-            <UserIcon size={11} className="mr-1 inline" />
-            {(user.name ?? user.email).split(" ")[0]}
-          </span>
+          {canManageWorkers && (
+            <button
+              type="button"
+              onClick={() => setShowWorkerManager(true)}
+              className="flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+              title="Dar de alta, baja o resetear contraseñas de trabajadores"
+            >
+              <UsersIcon size={11} />
+              Trabajadores
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              // Cerrar sesión del vendedor activo y volver al gate. No
+              // cierra la sesión web — solo cambia el operador del TPV.
+              clearActiveSeller();
+              setActiveSellerState(null);
+            }}
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold ${
+              activeSeller.kind === "worker"
+                ? "bg-green-50 text-green-700 hover:bg-green-100"
+                : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+            }`}
+            title="Cambiar de vendedor"
+          >
+            <UserIcon size={11} />
+            {activeSeller.label.split(" ")[0]}
+          </button>
           <Link
             href="/admin"
             className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
@@ -816,6 +918,14 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
           </Link>
         </div>
       </div>
+
+      {showWorkerManager && canManageWorkers && (
+        <TpvWorkerManager
+          storeSlug={storeSlug}
+          ownerUserId={user.id}
+          onClose={() => setShowWorkerManager(false)}
+        />
+      )}
 
       {/* ─── MAIN GRID ────────────────────────────────────────────────── */}
       <div className="grid flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[1fr_440px]">
@@ -1025,7 +1135,7 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
               activo el botón pasa a "chip" con el valor para que sea
               obvio que la venta lleva descuento. */}
           <div className="border-t border-slate-200 bg-white px-3 pt-3">
-            {discount ? (
+            {!showDiscountPopover && discount && (
               <div className="mb-2 flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2 text-xs">
                 <span className="font-semibold text-emerald-700">
                   Descuento aplicado:{" "}
@@ -1044,7 +1154,8 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
                   Quitar
                 </button>
               </div>
-            ) : !showDiscountPopover ? (
+            )}
+            {!showDiscountPopover && !discount && (
               <button
                 onClick={() => {
                   setShowDiscountPopover(true);
@@ -1055,7 +1166,8 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
               >
                 + Añadir descuento
               </button>
-            ) : (
+            )}
+            {showDiscountPopover && (
               <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wide text-slate-600">
@@ -1069,10 +1181,18 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
                     <X size={14} />
                   </button>
                 </div>
-                {/* Toggle %/€ */}
+                {/* Toggle %/€ — al cambiar de tipo, recalcula el descuento
+                    si ya hay un valor tecleado para que la respuesta sea
+                    inmediata (no haga falta retocar el input). */}
                 <div className="mb-2 grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-white p-1">
                   <button
-                    onClick={() => setDiscountDraftType("percent")}
+                    onClick={() => {
+                      setDiscountDraftType("percent");
+                      const v = Number(discountDraftValue.replace(",", "."));
+                      if (Number.isFinite(v) && v > 0) {
+                        setDiscount({ type: "percent", value: v });
+                      }
+                    }}
                     className={`rounded-md py-1.5 text-xs font-bold transition ${
                       discountDraftType === "percent"
                         ? "bg-blue-500 text-white"
@@ -1082,7 +1202,13 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
                     %
                   </button>
                   <button
-                    onClick={() => setDiscountDraftType("euro")}
+                    onClick={() => {
+                      setDiscountDraftType("euro");
+                      const v = Number(discountDraftValue.replace(",", "."));
+                      if (Number.isFinite(v) && v > 0) {
+                        setDiscount({ type: "euro", value: v });
+                      }
+                    }}
                     className={`rounded-md py-1.5 text-xs font-bold transition ${
                       discountDraftType === "euro"
                         ? "bg-blue-500 text-white"
@@ -1092,42 +1218,36 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
                     €
                   </button>
                 </div>
-                {/* Input + apply */}
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={discountDraftValue}
-                      onChange={(e) => setDiscountDraftValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          const v = Number(discountDraftValue.replace(",", "."));
-                          if (Number.isFinite(v) && v > 0) {
-                            setDiscount({ type: discountDraftType, value: v });
-                            setShowDiscountPopover(false);
-                          }
-                        }
-                      }}
-                      autoFocus
-                      placeholder={discountDraftType === "percent" ? "10" : "5,00"}
-                      className="h-10 w-full rounded-lg border-2 border-slate-200 bg-white pl-3 pr-9 text-sm font-bold tabular-nums text-slate-900 outline-none focus:border-blue-500"
-                    />
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                      {discountDraftType === "percent" ? "%" : "€"}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      const v = Number(discountDraftValue.replace(",", "."));
-                      if (!Number.isFinite(v) || v <= 0) return;
-                      setDiscount({ type: discountDraftType, value: v });
-                      setShowDiscountPopover(false);
+                {/* Input — aplica en tiempo real al teclear. Si el valor
+                    se vacía o es inválido, retira el descuento. Enter
+                    cierra el popover y muestra el chip. */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={discountDraftValue}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setDiscountDraftValue(raw);
+                      const v = Number(raw.replace(",", "."));
+                      if (Number.isFinite(v) && v > 0) {
+                        setDiscount({ type: discountDraftType, value: v });
+                      } else {
+                        setDiscount(null);
+                      }
                     }}
-                    className="rounded-lg bg-blue-500 px-4 text-xs font-bold text-white hover:bg-blue-600"
-                  >
-                    Aplicar
-                  </button>
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setShowDiscountPopover(false);
+                      }
+                    }}
+                    autoFocus
+                    placeholder={discountDraftType === "percent" ? "10" : "5,00"}
+                    className="h-10 w-full rounded-lg border-2 border-slate-200 bg-white pl-3 pr-9 text-sm font-bold tabular-nums text-slate-900 outline-none focus:border-blue-500"
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                    {discountDraftType === "percent" ? "%" : "€"}
+                  </span>
                 </div>
                 {/* Atajos rápidos para descuentos % comunes */}
                 {discountDraftType === "percent" && (
@@ -1230,6 +1350,8 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
       {lastSale && (
         <PostSaleModal
           sale={lastSale}
+          storeSlug={storeSlug}
+          isCentralBook={store.sharesWebInvoicing}
           onClose={() => { setLastSale(null); searchRef.current?.focus(); }}
         />
       )}
@@ -1260,11 +1382,23 @@ export default function TpvClient({ storeSlug }: { storeSlug: TpvStoreSlug }) {
         <ReturnModal
           storeSlug={storeSlug}
           isCentralBook={store.sharesWebInvoicing}
-          operatorId={user.id}
-          operatorName={
-            `${user.name ?? ""} ${user.lastName ?? ""}`.trim() || user.email
-          }
+          operatorId={activeSeller.id}
+          operatorName={activeSeller.label}
           onClose={() => setShowReturnModal(false)}
+        />
+      )}
+
+      {/* ─── MODAL: historial de ventas ─────────────────────────────────
+          Tabla con todas las ventas TPV de esta tienda. Permite buscar,
+          ver detalle (líneas, total, método de pago, cliente, factura)
+          y reimprimir el ticket o la factura.
+      */}
+      {showHistoryModal && (
+        <HistoryModal
+          storeSlug={storeSlug}
+          storeName={store.name}
+          isCentralBook={store.sharesWebInvoicing}
+          onClose={() => setShowHistoryModal(false)}
         />
       )}
     </div>
@@ -1330,13 +1464,13 @@ function PaymentModal({
                       {a} €
                     </button>
                   ))}
-                  <button
-                    onClick={() => setCashTendered(total.toFixed(2))}
-                    className="rounded-lg border-2 border-emerald-500 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100"
-                  >
-                    Justo
-                  </button>
                 </div>
+                <button
+                  onClick={() => setCashTendered(total.toFixed(2))}
+                  className="mt-2 h-14 w-full rounded-xl border-2 border-emerald-500 bg-white px-4 text-2xl font-black tabular-nums text-emerald-700 transition hover:bg-emerald-50"
+                >
+                  Justo
+                </button>
               </div>
               <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Cambio a devolver</p>
@@ -1514,17 +1648,367 @@ function CustomerModal({
   );
 }
 
-function PostSaleModal({
-  sale, onClose,
+// ─── Helper: localizar InvoiceRecord ya emitida ──────────────────────────────
+
+/**
+ * Busca una factura por id (o por número, fallback) en el libro adecuado.
+ * Calpe usa el libro central (loadInvoices); el resto usa libro propio.
+ */
+function findInvoiceRecord(
+  invoiceId: string | null | undefined,
+  invoiceNumber: string | null | undefined,
+  storeSlug: TpvStoreSlug,
+  isCentralBook: boolean,
+): InvoiceRecord | null {
+  if (!invoiceId && !invoiceNumber) return null;
+  const book: InvoiceRecord[] = isCentralBook ? loadInvoices() : loadStoreInvoices(storeSlug);
+  if (invoiceId) {
+    const byId = book.find((r) => r.invoiceId === invoiceId);
+    if (byId) return byId;
+  }
+  if (invoiceNumber) {
+    const byNum = book.find((r) => r.invoiceNumber === invoiceNumber);
+    if (byNum) return byNum;
+  }
+  return null;
+}
+
+// ─── Helper: imprimir documento TPV (router 3 variantes) ─────────────────────
+
+/**
+ * Router único para los 3 botones del post-venta / historial.
+ *  · "ticket"       → ticket térmico 80mm (factura simplificada)
+ *  · "ticket-gift"  → ticket térmico 80mm sin importes (regalo)
+ *  · "factura"      → factura A4 completa via printInvoice (iframe oculto)
+ *
+ * Para "factura" se localiza el InvoiceRecord ya emitido por la venta y se
+ * utiliza la MISMA plantilla que en /admin/pedidos · /cuenta/facturas. No se
+ * regenera la factura, solo se reimprime. Si no existe el record se devuelve
+ * un fallo legible para que la UI lo informe al operador.
+ */
+async function printTpvDocument(
+  variant: "ticket" | "ticket-gift" | "factura",
+  opts: {
+    invoiceId: string | null | undefined;
+    invoiceNumber: string | null | undefined;
+    storeSlug: TpvStoreSlug;
+    isCentralBook: boolean;
+  },
+): Promise<{ ok: boolean; error?: string }> {
+  if (variant === "factura") {
+    const record = findInvoiceRecord(
+      opts.invoiceId,
+      opts.invoiceNumber,
+      opts.storeSlug,
+      opts.isCentralBook,
+    );
+    if (!record) {
+      return {
+        ok: false,
+        error:
+          "No se ha podido localizar la factura emitida. Imprime el ticket simplificado.",
+      };
+    }
+    try {
+      await printSingleInvoicePDF(record);
+      return { ok: true };
+    } catch (e) {
+      return {
+        ok: false,
+        error: e instanceof Error ? e.message : "Error al generar la factura.",
+      };
+    }
+  }
+  // Variantes térmicas (ticket / ticket regalo)
+  const gift = variant === "ticket-gift";
+  // Esperamos a que TODAS las imágenes dentro del área imprimible estén
+  // cargadas — el logo de cabecera puede pesar MB y, sin esta espera,
+  // window.print() se dispara antes de que el navegador haya pintado el
+  // <img>, resultando en un ticket sin logo.
+  const area = document.querySelector(".tpv-print-area");
+  if (area) {
+    const imgs = Array.from(area.querySelectorAll("img"));
+    await Promise.all(
+      imgs.map((img) => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          const done = () => resolve();
+          img.addEventListener("load", done, { once: true });
+          img.addEventListener("error", done, { once: true });
+          // Salvavidas — nunca bloqueamos la impresión más de 2s
+          setTimeout(done, 2000);
+        });
+      }),
+    );
+  }
+  document.body.classList.add("tpv-print");
+  if (gift) document.body.classList.add("tpv-print-gift");
+  try {
+    window.print();
+  } finally {
+    // Tras un breve delay para que el navegador cierre el diálogo
+    setTimeout(() => {
+      document.body.classList.remove("tpv-print");
+      document.body.classList.remove("tpv-print-gift");
+    }, 500);
+  }
+  return { ok: true };
+}
+
+// ─── Componente: área imprimible térmica (80mm) ──────────────────────────────
+
+/**
+ * Renderiza el `.tpv-print-area` con todas las clases ticket-* de globals.css.
+ * Compartido por PostSaleModal (venta nueva) y HistoryModal (reimpresión).
+ *
+ * Diseño estandar de ticket térmico profesional:
+ *   1. Cabecera marca + datos fiscales
+ *   2. Banda tipo de documento (TICKET / TICKET REGALO)
+ *   3. Metadatos (nº factura, tienda, venta, fecha, operador)
+ *   4. Bloque cliente (si lo hay)
+ *   5. Líneas con cantidad × pvp = total
+ *   6. Desglose IVA (base / tipo / cuota / total)
+ *   7. Caja total destacado
+ *   8. Forma de pago + cambio
+ *   9. Política devoluciones
+ *  10. Aviso VeriFactu
+ *  11. Pie de agradecimiento
+ *
+ * Las clases tpv-gift-hide / tpv-gift-only conmutan automáticamente entre
+ * vista fiscal y vista regalo (sin precios) cuando body.tpv-print-gift activo.
+ */
+function TpvPrintableTicket({
+  lines,
+  payment,
+  customer,
+  storeName,
+  operatorName,
+  saleId: _saleId,
+  invoiceNumber,
+  timestamp,
+  cashTendered,
+  change,
+  isCopy,
 }: {
-  sale: CompleteSaleResult & { lines: TpvSaleLine[]; payment: PaymentMethod; mode: SaleMode; customer?: TpvCustomer; storeName: string };
+  lines: TpvSaleLine[];
+  payment: PaymentMethod;
+  customer?: TpvCustomer | null;
+  storeName: string;
+  operatorName: string;
+  saleId: string;
+  invoiceNumber?: string | null;
+  timestamp: number | string | Date;
+  cashTendered?: number | null;
+  change?: number;
+  isCopy?: boolean;
+}) {
+  const total = computeTpvTotal(lines);
+  const date = new Date(timestamp);
+  // Agrupamos IVA por tipo para el desglose. Usamos calcVAT línea-a-línea
+  // (mismo método que el libro fiscal) para evitar deriva de céntimos.
+  const breakdown = new Map<number, { base: number; vat: number; gross: number }>();
+  for (const l of lines) {
+    const gross = l.unitPriceWithVat * l.quantity;
+    const { priceWithoutVAT, vatAmount } = calcVAT(gross, l.vatRate);
+    const entry = breakdown.get(l.vatRate) ?? { base: 0, vat: 0, gross: 0 };
+    entry.base += priceWithoutVAT;
+    entry.vat += vatAmount;
+    entry.gross += gross;
+    breakdown.set(l.vatRate, entry);
+  }
+  const vatRates = Array.from(breakdown.entries()).sort((a, b) => a[0] - b[0]);
+
+  return (
+    <div className="tpv-print-area">
+      {/* ── Encabezado tienda ───────────────────────────────────────────── */}
+      <div className="ticket-brand">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/logo-tcg-shield-ticket.png"
+          alt={SITE_CONFIG.name}
+          className="ticket-brand-logo"
+        />
+        <div className="ticket-brand-meta tpv-gift-hide">
+          {SITE_CONFIG.legalName}<br />
+          CIF · {SITE_CONFIG.cif}<br />
+          {SITE_CONFIG.address}<br />
+          Tel · {SITE_CONFIG.phone}
+        </div>
+      </div>
+
+      {/* ── Banda de tipo de documento ──────────────────────────────────── */}
+      <div className="tpv-gift-only ticket-doc-band">
+        TICKET REGALO
+      </div>
+      <div className="tpv-gift-hide ticket-doc-band">
+        TICKET — FACTURA SIMPLIFICADA
+      </div>
+
+      {/* ── Metadatos (dos columnas etiqueta / valor) ─────────────────────
+          Fecha aparece SIEMPRE (también en gift); el resto sólo en el
+          ticket fiscal — el ticket regalo no necesita tienda/operador. */}
+      <div className="ticket-meta-grid">
+        {invoiceNumber && (
+          <>
+            <span className="ticket-meta-label">Nº</span>
+            <span className="ticket-meta-value">{invoiceNumber}</span>
+          </>
+        )}
+        <span className="ticket-meta-label tpv-gift-hide">Tienda</span>
+        <span className="ticket-meta-value tpv-gift-hide">{storeName}</span>
+        <span className="ticket-meta-label tpv-gift-hide">Fecha</span>
+        <span className="ticket-meta-value tpv-gift-hide">{date.toLocaleString("es-ES")}</span>
+        <span className="ticket-meta-label tpv-gift-hide">Atendido por</span>
+        <span className="ticket-meta-value tpv-gift-hide">{operatorName}</span>
+        {isCopy && (
+          <>
+            <span className="ticket-meta-label tpv-gift-hide">Aviso</span>
+            <span className="ticket-meta-value tpv-gift-hide">COPIA REIMPRESA</span>
+          </>
+        )}
+      </div>
+
+      {/* ── Cliente (sólo factura, oculto en regalo) ────────────────────── */}
+      {customer && customer.name && (
+        <>
+          <div className="ticket-rule tpv-gift-hide" />
+          <div className="ticket-customer tpv-gift-hide">
+            <div className="ticket-section-title">Cliente</div>
+            <div className="ticket-customer-name">{customer.name}</div>
+            {customer.taxId && (
+              <div>NIF · {customer.taxId}</div>
+            )}
+            {customer.address?.street && (
+              <div>
+                {customer.address.street}<br />
+                {customer.address.postalCode} {customer.address.city}
+                {customer.address.province ? `, ${customer.address.province}` : ""}
+              </div>
+            )}
+            {customer.email && (
+              <div className="ticket-meta-small">{customer.email}</div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Líneas ──────────────────────────────────────────────────────── */}
+      <div className="ticket-rule" />
+      <div className="ticket-lines">
+        {lines.map((l, i) => {
+          const lineTotal = l.unitPriceWithVat * l.quantity;
+          return (
+            <div key={`${l.productId}-${i}`} className="ticket-line-row">
+              <div className="ticket-line-name">{l.name}</div>
+              <div className="ticket-line-meta">
+                <span className="tpv-gift-hide">
+                  {l.quantity} × {l.unitPriceWithVat.toFixed(2)} €
+                </span>
+                <span className="tpv-gift-only">
+                  {l.quantity} {l.quantity === 1 ? "ud" : "uds"}
+                </span>
+                <span className="ticket-line-total tpv-gift-hide">
+                  {lineTotal.toFixed(2)} €
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Desglose IVA ────────────────────────────────────────────────── */}
+      <div className="ticket-vat tpv-gift-hide">
+        <div className="ticket-rule" />
+        <div className="ticket-vat-header">
+          <span>Base</span>
+          <span>IVA</span>
+          <span>Cuota</span>
+          <span>Total</span>
+        </div>
+        {vatRates.map(([rate, v]) => (
+          <div key={rate} className="ticket-vat-row">
+            <span>{v.base.toFixed(2)}</span>
+            <span>{rate}%</span>
+            <span>{v.vat.toFixed(2)}</span>
+            <span>{v.gross.toFixed(2)}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Total destacado ─────────────────────────────────────────────── */}
+      <div className="ticket-total-box tpv-gift-hide">
+        <span className="ticket-total-label">TOTAL</span>
+        <span className="ticket-total-value">{total.toFixed(2)} €</span>
+      </div>
+
+      {/* ── Forma de pago ───────────────────────────────────────────────── */}
+      <div className="ticket-pay tpv-gift-hide">
+        <div className="ticket-pay-row">
+          <span>Forma de pago</span>
+          <span>{payment === "efectivo" ? "Efectivo" : "Tarjeta (datáfono)"}</span>
+        </div>
+        {payment === "efectivo" && cashTendered != null && cashTendered > 0 && (
+          <>
+            <div className="ticket-pay-row">
+              <span>Entregado</span>
+              <span>{cashTendered.toFixed(2)} €</span>
+            </div>
+            {change != null && change > 0 && (
+              <div className="ticket-pay-row ticket-pay-change">
+                <span>Cambio</span>
+                <span>{change.toFixed(2)} €</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── Aviso VeriFactu (oculto en regalo) ──────────────────────────── */}
+      <div className="ticket-rule tpv-gift-hide" />
+      <div className="ticket-verifactu tpv-gift-hide">
+        Sistema de facturación verificable conforme al Real Decreto 1007/2023 (VeriFactu).
+      </div>
+
+      {/* ── Pie ────────────────────────────────────────────────────────── */}
+      <div className="ticket-rule" />
+      <div className="ticket-footer">
+        <div className="ticket-footer-thanks tpv-gift-hide">¡Gracias por tu compra!</div>
+        <div className="ticket-footer-thanks tpv-gift-only">¡Gracias por su visita!</div>
+        <div className="ticket-footer-tag tpv-gift-only">
+          Vuelve cuando quieras
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PostSaleModal({
+  sale, storeSlug, isCentralBook, onClose,
+}: {
+  sale: CompleteSaleResult & { lines: TpvSaleLine[]; payment: PaymentMethod; mode: SaleMode; customer?: TpvCustomer; storeName: string; operatorName: string; cashTendered?: number };
+  storeSlug: TpvStoreSlug;
+  isCentralBook: boolean;
   onClose: () => void;
 }) {
   const total = computeTpvTotal(sale.lines);
-  function handlePrint() {
-    document.body.classList.add("tpv-print");
-    window.print();
-    setTimeout(() => document.body.classList.remove("tpv-print"), 500);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
+  const hasInvoice = Boolean(sale.invoiceId || sale.invoiceNumber);
+
+  async function handlePrint(variant: "ticket" | "ticket-gift" | "factura") {
+    setPrintError(null);
+    setPrinting(true);
+    try {
+      const res = await printTpvDocument(variant, {
+        invoiceId: sale.invoiceId,
+        invoiceNumber: sale.invoiceNumber,
+        storeSlug,
+        isCentralBook,
+      });
+      if (!res.ok && res.error) setPrintError(res.error);
+    } finally {
+      setPrinting(false);
+    }
   }
   return (
     <>
@@ -1556,93 +2040,65 @@ function PostSaleModal({
                 {sale.error}
               </div>
             )}
-            <div className="grid grid-cols-2 gap-2">
+            {printError && (
+              <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs text-rose-800">
+                {printError}
+              </div>
+            )}
+            <div className="grid grid-cols-3 gap-2">
               <button
-                onClick={handlePrint}
-                className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 py-3 text-sm font-bold text-white hover:bg-slate-800"
+                onClick={() => handlePrint("ticket")}
+                disabled={printing}
+                className="flex flex-col items-center justify-center gap-1 rounded-xl bg-slate-900 px-2 py-3 text-xs font-bold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                title="Ticket térmico (factura simplificada)"
               >
-                <Printer size={16} /> Imprimir
+                <Receipt size={18} />
+                Ticket
               </button>
               <button
-                onClick={onClose}
-                className="rounded-xl bg-emerald-500 py-3 text-sm font-bold text-white hover:bg-emerald-400"
+                onClick={() => handlePrint("ticket-gift")}
+                disabled={printing}
+                className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-pink-500 bg-white px-2 py-3 text-xs font-bold text-pink-700 transition hover:bg-pink-50 disabled:opacity-60"
+                title="Ticket térmico sin precios — para regalar"
               >
-                Nueva venta
+                <Gift size={18} />
+                Ticket regalo
+              </button>
+              <button
+                onClick={() => handlePrint("factura")}
+                disabled={printing || !hasInvoice}
+                className="flex flex-col items-center justify-center gap-1 rounded-xl bg-indigo-600 px-2 py-3 text-xs font-bold text-white transition hover:bg-indigo-500 disabled:bg-slate-300 disabled:text-slate-500"
+                title={hasInvoice ? "Factura A4 completa" : "Sin factura emitida"}
+              >
+                <FileText size={18} />
+                Factura
               </button>
             </div>
+            <button
+              onClick={onClose}
+              className="w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-white hover:bg-emerald-400"
+            >
+              Nueva venta
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Área imprimible — sólo visible cuando body.tpv-print está activo */}
-      <div className="tpv-print-area">
-        <div style={{ textAlign: "center", marginBottom: "6mm" }}>
-          <strong style={{ fontSize: "14px" }}>{SITE_CONFIG.name}</strong><br />
-          {SITE_CONFIG.legalName}<br />
-          CIF: {SITE_CONFIG.cif}<br />
-          {SITE_CONFIG.address}<br />
-          Tel: {SITE_CONFIG.phone}
-        </div>
-        <div className="ticket-line" />
-        <div style={{ marginBottom: "3mm" }}>
-          {sale.mode === "ticket" ? "TICKET (Factura simplificada)" : "FACTURA"}<br />
-          {sale.invoiceNumber && <>Nº {sale.invoiceNumber}<br /></>}
-          Tienda: {sale.storeName}<br />
-          Venta: {sale.saleId}<br />
-          Fecha: {new Date().toLocaleString("es-ES")}<br />
-          Pago: {sale.payment === "efectivo" ? "Efectivo" : "Tarjeta (datáfono)"}
-        </div>
-        {sale.customer && sale.customer.name && (
-          <>
-            <div className="ticket-line" />
-            <div style={{ margin: "3mm 0" }}>
-              <strong>Cliente:</strong><br />
-              {sale.customer.name}<br />
-              {sale.customer.taxId && <>NIF: {sale.customer.taxId}<br /></>}
-              {sale.customer.address?.street && (
-                <>
-                  {sale.customer.address.street}<br />
-                  {sale.customer.address.postalCode} {sale.customer.address.city}<br />
-                </>
-              )}
-            </div>
-          </>
-        )}
-        <div className="ticket-line" />
-        <table style={{ width: "100%", margin: "3mm 0", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              <th style={{ textAlign: "left" }}>Producto</th>
-              <th style={{ textAlign: "right" }}>Cant.</th>
-              <th style={{ textAlign: "right" }}>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sale.lines.map((l) => (
-              <tr key={l.productId}>
-                <td>{l.name}</td>
-                <td style={{ textAlign: "right" }}>{l.quantity}×{l.unitPriceWithVat.toFixed(2)}</td>
-                <td style={{ textAlign: "right" }}>{(l.unitPriceWithVat * l.quantity).toFixed(2)}€</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="ticket-line" />
-        <div style={{ margin: "3mm 0", textAlign: "right" }}>
-          <strong style={{ fontSize: "14px" }}>TOTAL: {total.toFixed(2)}€</strong><br />
-          <span style={{ fontSize: "10px", color: "#555" }}>IVA incluido ({SITE_CONFIG.vatRate}%)</span>
-        </div>
-        {sale.payment === "efectivo" && sale.change > 0 && (
-          <div style={{ textAlign: "right" }}>
-            Cambio: {sale.change.toFixed(2)}€
-          </div>
-        )}
-        <div className="ticket-line" />
-        <div style={{ marginTop: "5mm", textAlign: "center", fontSize: "10px" }}>
-          Gracias por tu compra<br />
-          {SITE_CONFIG.email}
-        </div>
-      </div>
+      {/* Área imprimible térmica — visible sólo con body.tpv-print activo.
+          Para la factura A4 NO se usa esto: printSingleInvoicePDF abre su
+          propio iframe oculto con la plantilla canónica de invoiceGenerator. */}
+      <TpvPrintableTicket
+        lines={sale.lines}
+        payment={sale.payment}
+        customer={sale.customer}
+        storeName={sale.storeName}
+        operatorName={sale.operatorName}
+        saleId={sale.saleId}
+        invoiceNumber={sale.invoiceNumber}
+        timestamp={Date.now()}
+        cashTendered={sale.cashTendered}
+        change={sale.change}
+      />
     </>
   );
 }
@@ -2117,5 +2573,409 @@ function ReturnModal({
         )}
       </div>
     </div>
+  );
+}
+
+// ─── MODAL: Historial de ventas TPV ──────────────────────────────────────────
+/**
+ * Lista todas las ventas TPV de esta tienda (lectura de
+ * `tcgacademy_tpv_<slug>_sales`). Permite buscar por id/cliente/Nº factura,
+ * ver detalle (líneas, totales, cobro, factura) y reimprimir el documento
+ * original (ticket simplificado o factura completa) usando el mismo
+ * mecanismo `body.tpv-print` + `.tpv-print-area` que usa `SaleResult`.
+ */
+function HistoryModal({
+  storeSlug,
+  storeName,
+  isCentralBook,
+  onClose,
+}: {
+  storeSlug: TpvStoreSlug;
+  storeName: string;
+  isCentralBook: boolean;
+  onClose: () => void;
+}) {
+  const [sales, setSales] = useState<TpvStoreSale[]>([]);
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<TpvStoreSale | null>(null);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
+
+  useEffect(() => {
+    setSales(loadTpvSales(storeSlug));
+    const unsub = DataHub.on("tpv_sales", () => {
+      setSales(loadTpvSales(storeSlug));
+    });
+    return () => unsub();
+  }, [storeSlug]);
+
+  // Limpiamos cualquier error de impresión al cambiar de venta seleccionada
+  useEffect(() => {
+    setPrintError(null);
+  }, [selected?.id]);
+
+  const sorted = useMemo(
+    () => [...sales].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1)),
+    [sales],
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return sorted;
+    return sorted.filter((s) => {
+      const fields = [
+        s.id,
+        s.invoiceNumber ?? "",
+        s.customer?.name ?? "",
+        s.customer?.taxId ?? "",
+        s.operatorName,
+        new Date(s.timestamp).toLocaleString("es-ES"),
+      ];
+      return fields.some((f) => f.toLowerCase().includes(q));
+    });
+  }, [sorted, query]);
+
+  async function handlePrint(variant: "ticket" | "ticket-gift" | "factura") {
+    if (!selected) return;
+    setPrintError(null);
+    setPrinting(true);
+    try {
+      const res = await printTpvDocument(variant, {
+        invoiceId: selected.invoiceId,
+        invoiceNumber: selected.invoiceNumber,
+        storeSlug,
+        isCentralBook,
+      });
+      if (!res.ok && res.error) setPrintError(res.error);
+    } finally {
+      setPrinting(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/70 p-4">
+        <div className="flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white text-slate-900 shadow-2xl">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-3">
+            <div className="flex items-center gap-2">
+              <History size={18} className="text-indigo-600" />
+              <h2 className="text-base font-bold text-slate-900">
+                Historial de ventas — {storeName}
+              </h2>
+              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-700">
+                {sales.length}
+              </span>
+            </div>
+            <button
+              onClick={onClose}
+              className="rounded p-1 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
+              title="Cerrar"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Body — split: lista (izq) + detalle (dcha) */}
+          <div className="flex min-h-0 flex-1">
+            {/* Lista */}
+            <div className="flex w-1/2 flex-col border-r border-slate-200">
+              <div className="border-b border-slate-200 p-3">
+                <div className="relative">
+                  <SearchIcon
+                    size={14}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Buscar por id, factura, cliente, NIF…"
+                    className="w-full rounded-md border border-slate-200 bg-white py-2 pl-8 pr-3 text-xs focus:border-indigo-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {filtered.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-500">
+                    {sales.length === 0
+                      ? "Aún no hay ventas registradas en esta tienda."
+                      : "No hay resultados para esta búsqueda."}
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {filtered.map((s) => {
+                      const isSel = selected?.id === s.id;
+                      return (
+                        <li key={s.id}>
+                          <button
+                            type="button"
+                            onClick={() => setSelected(s)}
+                            className={`flex w-full flex-col gap-0.5 px-3 py-2.5 text-left text-xs transition ${
+                              isSel
+                                ? "bg-indigo-50"
+                                : "hover:bg-slate-50"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-mono font-semibold text-slate-800">
+                                {s.id}
+                              </span>
+                              <span className="font-bold tabular-nums text-slate-900">
+                                {s.total.toFixed(2)} €
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2 text-[10.5px] text-slate-500">
+                              <span>
+                                {new Date(s.timestamp).toLocaleString("es-ES", {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "2-digit",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                {s.mode === "factura" ? (
+                                  <FileText size={11} className="text-blue-600" />
+                                ) : (
+                                  <Receipt size={11} className="text-slate-500" />
+                                )}
+                                {s.payment === "efectivo" ? (
+                                  <Banknote size={11} className="text-emerald-600" />
+                                ) : (
+                                  <CreditCard size={11} className="text-indigo-600" />
+                                )}
+                              </span>
+                            </div>
+                            {s.customer?.name && (
+                              <div className="truncate text-[10.5px] text-slate-600">
+                                {s.customer.name}
+                              </div>
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            {/* Detalle */}
+            <div className="flex w-1/2 flex-col">
+              {!selected ? (
+                <div className="flex flex-1 items-center justify-center p-8 text-center text-xs text-slate-400">
+                  Selecciona una venta para ver el detalle.
+                </div>
+              ) : (
+                <>
+                  <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                    <div className="space-y-3">
+                      {/* Cabecera */}
+                      <div className="rounded-lg bg-slate-50 p-3 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-bold text-slate-900">
+                            {selected.id}
+                          </span>
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                            COBRADO
+                          </span>
+                        </div>
+                        <p className="mt-1 text-slate-600">
+                          {new Date(selected.timestamp).toLocaleString("es-ES")}
+                        </p>
+                        <p className="text-slate-600">
+                          Operador: <strong>{selected.operatorName}</strong>
+                        </p>
+                        <p className="text-slate-600">
+                          Tipo:{" "}
+                          <strong>
+                            {selected.mode === "factura"
+                              ? "Factura completa"
+                              : "Ticket (factura simplificada)"}
+                          </strong>
+                        </p>
+                        <p className="text-slate-600">
+                          Pago:{" "}
+                          <strong>
+                            {selected.payment === "efectivo"
+                              ? "Efectivo"
+                              : "Tarjeta (datáfono)"}
+                          </strong>
+                          {selected.payment === "efectivo" &&
+                            selected.cashTendered !== null && (
+                              <>
+                                {" — entregado "}
+                                <strong>
+                                  {selected.cashTendered.toFixed(2)} €
+                                </strong>
+                                {selected.change > 0 && (
+                                  <>
+                                    {" · cambio "}
+                                    <strong>
+                                      {selected.change.toFixed(2)} €
+                                    </strong>
+                                  </>
+                                )}
+                              </>
+                            )}
+                        </p>
+                        {selected.invoiceNumber ? (
+                          <p className="text-slate-600">
+                            Factura: <strong>{selected.invoiceNumber}</strong>
+                          </p>
+                        ) : (
+                          <p className="text-amber-700">
+                            ⚠ Sin factura emitida (regenerable desde el panel
+                            de la tienda).
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Cliente */}
+                      {selected.customer && (
+                        <div className="rounded-lg border border-slate-200 p-3 text-xs">
+                          <p className="mb-1 font-semibold text-slate-700">
+                            Cliente
+                          </p>
+                          <p className="text-slate-900">
+                            {selected.customer.name}
+                          </p>
+                          {selected.customer.taxId && (
+                            <p className="text-slate-600">
+                              {selected.customer.taxIdType ?? "NIF"}:{" "}
+                              {selected.customer.taxId}
+                            </p>
+                          )}
+                          {selected.customer.address?.street && (
+                            <p className="text-slate-600">
+                              {selected.customer.address.street},{" "}
+                              {selected.customer.address.postalCode}{" "}
+                              {selected.customer.address.city}
+                            </p>
+                          )}
+                          {selected.customer.email && (
+                            <p className="text-slate-600">
+                              {selected.customer.email}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Líneas */}
+                      <div className="overflow-hidden rounded-lg border border-slate-200">
+                        <table className="w-full text-xs">
+                          <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
+                            <tr>
+                              <th className="px-2 py-1.5 text-left">Producto</th>
+                              <th className="px-2 py-1.5 text-right">Cant.</th>
+                              <th className="px-2 py-1.5 text-right">Precio</th>
+                              <th className="px-2 py-1.5 text-right">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {selected.lines.map((l, i) => (
+                              <tr key={`${l.productId}-${i}`}>
+                                <td className="px-2 py-1.5 text-slate-800">
+                                  {l.name}
+                                </td>
+                                <td className="px-2 py-1.5 text-right tabular-nums">
+                                  {l.quantity}
+                                </td>
+                                <td className="px-2 py-1.5 text-right tabular-nums">
+                                  {l.unitPriceWithVat.toFixed(2)} €
+                                </td>
+                                <td className="px-2 py-1.5 text-right font-semibold tabular-nums">
+                                  {(l.unitPriceWithVat * l.quantity).toFixed(2)}{" "}
+                                  €
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t-2 border-slate-300 bg-slate-50">
+                              <td
+                                colSpan={3}
+                                className="px-2 py-2 text-right text-xs font-bold text-slate-700"
+                              >
+                                TOTAL
+                              </td>
+                              <td className="px-2 py-2 text-right text-sm font-black tabular-nums text-slate-900">
+                                {selected.total.toFixed(2)} €
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer — 3 botones (ticket / regalo / factura) */}
+                  <div className="border-t border-slate-200 bg-slate-50 p-3">
+                    {printError && (
+                      <div className="mb-2 rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-[11px] text-rose-800">
+                        {printError}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handlePrint("ticket")}
+                        disabled={printing}
+                        className="flex flex-col items-center justify-center gap-1 rounded-md bg-slate-900 px-2 py-2.5 text-xs font-bold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                        title="Ticket térmico (factura simplificada)"
+                      >
+                        <Receipt size={16} />
+                        Ticket
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePrint("ticket-gift")}
+                        disabled={printing}
+                        className="flex flex-col items-center justify-center gap-1 rounded-md border-2 border-pink-500 bg-white px-2 py-2.5 text-xs font-bold text-pink-700 transition hover:bg-pink-50 disabled:opacity-60"
+                        title="Ticket térmico sin precios — para regalar"
+                      >
+                        <Gift size={16} /> Ticket regalo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePrint("factura")}
+                        disabled={printing || !selected.invoiceId}
+                        className="flex flex-col items-center justify-center gap-1 rounded-md bg-indigo-600 px-2 py-2.5 text-xs font-bold text-white transition hover:bg-indigo-500 disabled:bg-slate-300 disabled:text-slate-500"
+                        title={selected.invoiceId ? "Factura A4 completa" : "Sin factura emitida"}
+                      >
+                        <FileText size={16} />
+                        Factura
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Área imprimible térmica — sólo visible con body.tpv-print activo.
+          Reutiliza el componente compartido TpvPrintableTicket con la marca
+          isCopy=true para añadir el aviso "COPIA REIMPRESA" en la cabecera.
+          La factura A4 NO se imprime aquí: printSingleInvoicePDF abre su
+          propio iframe oculto con la plantilla canónica.                   */}
+      {selected && (
+        <TpvPrintableTicket
+          lines={selected.lines}
+          payment={selected.payment}
+          customer={selected.customer}
+          storeName={storeName}
+          operatorName={selected.operatorName}
+          saleId={selected.id}
+          invoiceNumber={selected.invoiceNumber}
+          timestamp={selected.timestamp}
+          cashTendered={selected.cashTendered ?? undefined}
+          change={selected.change}
+          isCopy
+        />
+      )}
+    </>
   );
 }

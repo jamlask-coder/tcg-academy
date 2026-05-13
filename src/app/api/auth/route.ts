@@ -247,9 +247,16 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: "Usuario o contraseña incorrectos" }, { status: 401 });
         }
 
-        // Generate JWT
+        // Generate JWT. `tpvStoreSlug` solo está presente para usuarios con
+        // rol `tienda` — para el resto va undefined y se omite del payload.
         const token = await createSessionToken(
-          { id: user.id, email: user.email, role: user.role, name: user.name },
+          {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            name: user.name,
+            tpvStoreSlug: user.role === "tienda" ? user.tpvStoreSlug : undefined,
+          },
           !!rememberMe,
         );
 
@@ -270,6 +277,7 @@ export async function POST(req: NextRequest) {
           emailVerifiedAt: user.emailVerifiedAt,
           birthDate: user.birthDate,
           createdAt: user.createdAt,
+          tpvStoreSlug: user.tpvStoreSlug,
         };
 
         const response = NextResponse.json({ ok: true, user: userProfile });
@@ -1217,7 +1225,13 @@ export async function POST(req: NextRequest) {
         }
 
         const token = await createSessionToken(
-          { id: user.id, email: user.email, role: user.role, name: user.name },
+          {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            name: user.name,
+            tpvStoreSlug: user.role === "tienda" ? user.tpvStoreSlug : undefined,
+          },
           true, // Google login = remember me por defecto
         );
 
@@ -1237,6 +1251,7 @@ export async function POST(req: NextRequest) {
           emailVerifiedAt: user.emailVerifiedAt,
           birthDate: user.birthDate,
           createdAt: user.createdAt,
+          tpvStoreSlug: user.tpvStoreSlug,
         };
 
         const response = NextResponse.json({

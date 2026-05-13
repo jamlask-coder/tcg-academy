@@ -116,7 +116,7 @@ export function QuickView({ product, onClose }: Props) {
 
             {/* Price */}
             <div>
-              <span className="text-2xl font-bold" style={{ color }}>
+              <span className="text-2xl font-bold" style={{ color: "#1d4ed8" }}>
                 {displayPrice.toFixed(2)}€
               </span>
               <span className="ml-2 text-xs text-gray-400">IVA incl.</span>

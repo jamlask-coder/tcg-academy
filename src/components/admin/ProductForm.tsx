@@ -123,6 +123,16 @@ export const productSchema = z
     comparePrice: z.number().optional(),
     inStock: z.boolean(),
     isNew: z.boolean(),
+    // Identificadores de inventario — sólo TPV/SEO, nunca visibles en la web.
+    // Vacío permitido; si hay valor, gtin13 debe tener exactamente 13 dígitos.
+    gtin13: z
+      .string()
+      .max(13)
+      .refine((v) => v === "" || /^\d{13}$/.test(v), {
+        message: "EAN-13: deben ser exactamente 13 dígitos",
+      })
+      .optional(),
+    mpn: z.string().max(64, "Máx 64 caracteres").optional(),
   })
   .refine((d) => d.wholesalePrice <= d.price, {
     message: "Mayorista no puede superar el PV Público",
@@ -721,6 +731,46 @@ export function ProductForm({
                     Marcar como novedad
                   </span>
                 </label>
+              </div>
+            </section>
+
+            {/* Código de barras — campos NO visibles en la web pública */}
+            <section className="rounded-2xl border border-gray-200 bg-white p-6">
+              <h2 className="mb-1 font-bold text-gray-900">Código de barras</h2>
+              <p className="mb-5 text-xs text-gray-500">
+                Estos campos no se muestran en la web pública. Sirven para que
+                el lector de códigos del TPV detecte el producto al escanearlo.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className={labelCls}>
+                    Código de barras (EAN-13)
+                  </label>
+                  <input
+                    {...register("gtin13")}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    className={`${inputCls} font-mono`}
+                    placeholder="13 dígitos (ej. 8431234567890)"
+                  />
+                  {errors.gtin13 && (
+                    <p className={errorCls}>{errors.gtin13.message}</p>
+                  )}
+                </div>
+                <div>
+                  <label className={labelCls}>
+                    Referencia interna (MPN)
+                  </label>
+                  <input
+                    {...register("mpn")}
+                    autoComplete="off"
+                    className={`${inputCls} font-mono`}
+                    placeholder="Opcional (ej. WOTC-MKM-DRAFT-EN)"
+                  />
+                  {errors.mpn && (
+                    <p className={errorCls}>{errors.mpn.message}</p>
+                  )}
+                </div>
               </div>
             </section>
 

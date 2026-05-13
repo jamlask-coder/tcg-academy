@@ -212,7 +212,7 @@ export default function CartPage() {
                       {item.name}
                     </h3>
                   )}
-                  <p className="text-base font-bold text-[#2563eb]">
+                  <p className="text-base font-bold text-[#1d4ed8]">
                     {item.price.toFixed(2)}€/unidad
                   </p>
                   {item.meta?.attendees && item.meta.attendees.length > 0 && (

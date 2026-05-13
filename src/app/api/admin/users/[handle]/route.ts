@@ -76,6 +76,12 @@ interface AdminUserDetail {
   company?: AdminCompanyDetail;
   /** Conteo de referidos directos (resuelto vía referredBy === user.referralCode). */
   referralsCount: number;
+  /**
+   * Tienda física asignada al usuario `tienda`. Lo lee
+   * `UserRoleManager` para pintar la asignación actual sin tener que leer
+   * el override de localStorage del admin (que solo tiene datos parciales).
+   */
+  tpvStoreSlug?: string;
 }
 
 function toDetail(
@@ -105,6 +111,7 @@ function toDetail(
     addresses,
     company,
     referralsCount,
+    tpvStoreSlug: u.tpvStoreSlug,
   };
 }
 
