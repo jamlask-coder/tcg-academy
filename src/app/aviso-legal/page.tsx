@@ -3,15 +3,15 @@ import Link from "next/link";
 import { SITE_CONFIG } from "@/config/siteConfig";
 
 /**
- * Construye la línea "Registro Mercantil de X, Tomo Y, Folio Z, Hoja H".
- * Mientras los datos no estén rellenos en SITE_CONFIG.registroMercantil,
- * mostramos el aviso de inscripción en trámite (legalmente válido para SL
- * recién constituidas pendientes de publicación BORME).
+ * Construye la línea de inscripción registral.
+ * Si en SITE_CONFIG.registroMercantil hay Tomo/Folio/Hoja, los muestra.
+ * Si no, indica simplemente que la sociedad está inscrita en el Registro
+ * Mercantil de la provincia configurada.
  */
 function formatInscripcionRegistral(): string {
   const r = SITE_CONFIG.registroMercantil;
   if (!r.tomo || !r.folio || !r.hoja) {
-    return `Registro Mercantil de ${r.provincia} — en trámite de inscripción`;
+    return `Inscrita en el Registro Mercantil de ${r.provincia}`;
   }
   return `Registro Mercantil de ${r.provincia}, Tomo ${r.tomo}, Folio ${r.folio}, Hoja ${r.hoja}`;
 }
